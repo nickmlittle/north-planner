@@ -9,7 +9,7 @@ export function HomePage({ household }: { household: Household }) {
         <h2 id="household-heading">Your household</h2>
         <p role="status">Default household loaded successfully: <strong>{household.name}</strong>.</p>
         <p>Planning basis: real {household.assumptions.moneyBasis.priceYear} {household.assumptions.moneyBasis.currency}.</p>
-        <p className="muted">Starting balances and planning inputs are still to be configured. Forecasting will follow in a later release.</p>
+        <p className="muted">Edit your starting position below. Forecasting will follow in a later release.</p>
       </section>
     </>
   )

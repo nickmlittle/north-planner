@@ -9,12 +9,14 @@ describe('default household configuration', () => {
     ])
     expect(household.assumptions.moneyBasis).toEqual({ currency: 'GBP', priceYear: 2026, terms: 'real' })
     expect(household.assumptions.endYear).toBeGreaterThan(household.assumptions.startYear)
-    expect(household.people.every(person => person.birthYear === null && person.targetFireAge === null)).toBe(true)
-    expect(household.isas).toEqual([])
-    expect(household.pensions).toEqual([])
-    expect(household.properties).toEqual([])
-    expect(household.mortgages).toEqual([])
-    expect(household.cash).toEqual([])
+    expect(household.people.map(person => person.birthYear)).toEqual([1994, 1995])
+    expect(household.isas.map(asset => asset.value)).toEqual([88000, 1000])
+    expect(household.pensions.map(asset => asset.value)).toEqual([117000, 25000])
+    expect(household.properties[0]!.value).toBe(850000)
+    expect(household.mortgages[0]!.balance).toBe(446000)
+    expect(household.mortgages[0]!.propertyId).toBe(household.properties[0]!.id)
+    expect(household.cash[0]!.value).toBe(0)
+    expect(household.assumptions.startYear).toBe(2026)
     expect(household.events).toEqual([])
   })
 
@@ -23,10 +25,10 @@ describe('default household configuration', () => {
     const second = loadDefaultHousehold()
     first.people[0]!.name = 'Changed'
     first.assumptions.annualRealReturns.cash = 0.1
-    first.cash.push({ id: 'cash', kind: 'cash', name: 'Cash', ownerIds: ['nick'], value: 100 })
+    first.cash[0]!.value = 100
     expect(second).toEqual(loadDefaultHousehold())
     expect(second.people[0]!.name).toBe('Nick')
     expect(second.assumptions.annualRealReturns.cash).toBeNull()
-    expect(second.cash).toEqual([])
+    expect(second.cash[0]!.value).toBe(0)
   })
 })

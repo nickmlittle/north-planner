@@ -1,8 +1,8 @@
 # North Planner
 
-A client-side household financial planning and FIRE forecasting app. KAN-5 sets
-up the application shell only; financial inputs and forecasting arrive in later
-tickets.
+A client-side household financial planning and FIRE forecasting app. KAN-5
+established the shell; KAN-6 adds editable household starting-position inputs.
+Forecasting arrives in later tickets.
 
 ## Local development
 
@@ -29,6 +29,7 @@ npm run check    # lint, tests, and production build
 - `src/domain`: shared TypeScript models; no framework dependencies.
 - `src/config`: default household fixture and independent configuration loader.
 - `src/state`: React application state, initialized from configuration.
+- `src/formatting`: reusable GBP display formatting.
 - `src/engine`: extension point for pure deterministic forecast functions.
 - `src/simulation`: extension point for seeded Monte Carlo orchestration.
 - `src/components`: reusable layout and presentation components.
@@ -49,14 +50,30 @@ and real terms at the type level. Annual real asset returns use decimal rates
 (e.g. 0.03 for 3% above inflation). Mortgage contractual interest is explicitly
 nominal and must be handled separately by future mortgage logic.
 
-The default household contains Nick and Immy, stable person IDs, empty asset,
-liability, and event collections. Unknown birth years, FIRE ages and returns are
-`null`, not fabricated inputs. The 2026–2100 planning horizon is a provisional
-configuration default. Each load deep-clones the fixture so editing one household
-cannot affect another load. Asset ownership and mortgage/property relationships
-use IDs; future input validation must validate those references and numeric
-ranges. Financial events currently represent one-off signed cash flows; life
-events carry descriptive context. Their effects are not implemented.
+The default household uses the supplied starting values: Nick age 32, Immy age
+31, ISAs £88,000 / £1,000, pensions £117,000 / £25,000, house £850,000,
+mortgage £446,000, and cash £0, at base year 2026. ISAs provisionally use the
+stocks-and-shares type and property/cash use joint owner IDs. These classifications
+have no calculated effects yet. Unknown FIRE ages, pension access ages, returns,
+and mortgage interest/term remain `null`. The 2026–2100 horizon is provisional.
+
+Ages are whole years at the base year, represented by approximate birth years
+(1994 / 1995 initially); no birthday precision is implied. Changing the base year
+preserves birth years and therefore changes displayed ages. The base year must
+not exceed the planning horizon or put a person's age outside 1–120. Changing it
+does not change the real 2026 GBP price basis or inflate balances.
+
+Starting-position parsing and immutable updates live in `src/domain`, independent
+of React. Valid edits immediately update the household. Invalid text stays in the
+input with an accessible error while the last valid numeric domain value is
+retained. Money inputs show formatted GBP when idle and plain decimal pounds when
+focused; enter without currency symbols or separators, with up to two decimals.
+Negative, blank, malformed, non-finite, and out-of-range numbers are rejected.
+Zero balances are valid. Changes stay in memory and reset to defaults on reload.
+
+Each load deep-clones the fixture. Asset ownership and mortgage/property
+relationships use stable IDs. Financial events represent one-off signed cash
+flows; life events carry descriptive context. Their effects are not implemented.
 
 There is no forecast, tax model, simulation, persistence, backend or authentication
 in this shell. The UI confirms configuration loading and does not imply that a

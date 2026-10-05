@@ -15,3 +15,13 @@ h2 { font-size: 1.2rem; }
 .household-card { background: #fff; border: 1px solid #d6dfd9; border-radius: 8px; padding: 24px; margin-top: 32px; }
 .muted, footer { color: #52655e; }
 footer { font-size: 0.85rem; }
+
+fieldset { border: 0; padding: 16px 0; margin: 0; min-width: 0; }
+legend { font-weight: 650; }
+.input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px; }
+.input-field { display: flex; flex-direction: column; gap: 6px; }
+input { font: inherit; padding: 8px 10px; border: 1px solid #82968d; border-radius: 4px; min-width: 0; }
+input:focus-visible { outline: 2px solid #236b50; outline-offset: 2px; }
+input[aria-invalid="true"] { border-color: #a52a2a; }
+small { color: #52655e; }
+.input-error { color: #a52a2a; }
