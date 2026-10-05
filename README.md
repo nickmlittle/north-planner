@@ -78,3 +78,9 @@ flows; life events carry descriptive context. Their effects are not implemented.
 There is no forecast, tax model, simulation, persistence, backend or authentication
 in this shell. The UI confirms configuration loading and does not imply that a
 financial forecast has been calculated.
+
+KAN-7 adds session-owned planning assumptions, separate from the starting household.
+Illustrative defaults: equity 4% real / 15% volatility, bonds 1% / 5%, house 0%,
+cash fixed 0%, FIRE 50, pension access 58, horizon 95, withdrawal rate 3.5%.
+These are editable modelling inputs, not financial recommendations. Forecast
+recalculation is integrated by KAN-16; scenario toggles arrive in later tickets.
