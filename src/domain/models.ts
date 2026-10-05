@@ -44,8 +44,8 @@ export interface Mortgage {
   borrowerIds: PersonId[]
   balance: Real2026GBP
   /** Contractual nominal annual interest rate, unlike real asset returns. */
-  annualInterestRate: number
-  endYear: CalendarYear
+  annualInterestRate: number | null
+  endYear: CalendarYear | null
 }
 
 interface EventBase {

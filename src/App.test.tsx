@@ -11,5 +11,5 @@ it('renders the application shell with the loaded default household', () => {
   expect(screen.getByRole('main')).toHaveTextContent('financial independence')
   expect(screen.getByRole('status')).toHaveTextContent('Default household loaded successfully: Nick + Immy.')
   expect(screen.getByText('Planning basis: real 2026 GBP.')).toBeVisible()
-  expect(screen.getByText(/Starting balances and planning inputs are still to be configured/)).toBeVisible()
+  expect(screen.getByText(/Edit your starting position below/)).toBeVisible()
 })
