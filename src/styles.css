@@ -1,0 +1,17 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #20332e;
+  background: #f6f8f6;
+  line-height: 1.6;
+  font-synthesis: none;
+}
+body { margin: 0; }
+.app-shell { max-width: 840px; margin: 0 auto; padding: 24px; }
+header { border-bottom: 1px solid #d6dfd9; padding-bottom: 20px; }
+.wordmark { font-weight: 700; font-size: 1.25rem; }
+main { padding: 40px 0; }
+h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: 1.2; }
+h2 { font-size: 1.2rem; }
+.household-card { background: #fff; border: 1px solid #d6dfd9; border-radius: 8px; padding: 24px; margin-top: 32px; }
+.muted, footer { color: #52655e; }
+footer { font-size: 0.85rem; }
