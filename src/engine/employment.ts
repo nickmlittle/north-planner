@@ -23,3 +23,8 @@ export function employmentCashFlow(periods: IncomePeriod[], personId: string, ye
   const disposable = gross - employeeCash - estimate.tax - estimate.ni
   return { gross, taxableIncome, niEarnings, tax: estimate.tax, ni: estimate.ni, employee, employeeCash, employer, totalPension: employee + employer, disposable }
 }
+
+export function householdEmployment(household: import('../domain/models').Household, periods: IncomePeriod[], year: number, fireAge: number, rules: TaxRules, adjustments: IncomeAdjustment[] = []) {
+  const byPerson = household.people.map(person => ({ personId: person.id, ...employmentCashFlow(periods, person.id, year, year - (person.birthYear ?? year), person.targetFireAge ?? fireAge, rules, adjustments) }))
+  return { byPerson, disposable: byPerson.reduce((sum, flow) => sum + flow.disposable, 0) }
+}

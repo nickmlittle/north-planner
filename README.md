@@ -108,3 +108,8 @@ Employer contributions go only to pensions. Work/contributions end at FIRE unles
 explicitly continued, and always end with the income period. Rates start at zero
 until configured. Annual/tapered allowances, carry-forward, minimum wage and
 employer NI recycling are excluded. See [HMRC pension relief](https://www.gov.uk/tax-on-your-private-pension/pension-tax-relief).
+
+KAN-11 adds baseline lifestyle spending and stacking annual spending-change
+periods, with start inclusive/end exclusive. Combined spending cannot be negative.
+Mortgage, child costs and tax remain separate. Base-year surplus before mortgage
+and children updates immediately. Baseline zero is explicitly unconfigured.
