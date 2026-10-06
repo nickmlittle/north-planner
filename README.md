@@ -119,3 +119,11 @@ annual age bands 0–2/3–4/5–11/12–18 and linked parental work changes. No
 costs are invented. Disabling a child removes its costs and linked changes;
 conflicting parental work schedules are flagged, not multiplied together.
 Calendar-year approximation includes a full cost year at birth and age 18.
+
+KAN-13 implements nominal monthly repayment amortisation, capped overpayments
+and year-boundary remortgages. Overpayments retain the contractual monthly
+payment and shorten payoff; refinancing recalculates it using remaining principal.
+Personal interest/term start blank and must be entered. Inflation for nominal
+mortgage conversion is explicit, initially 0% (nominal equals real). Nominal debt
+is carried between years; payments use each year's opening price index and
+closing debt the next year's index. No lender fees, ERCs or interest-only loans.

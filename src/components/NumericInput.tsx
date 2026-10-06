@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
 export function NumericInput({ label, value, onChange, suffix = '' }: {
-  label: string; value: number; onChange: (value: number) => string | undefined; suffix?: string
+  label: string; value: number | null; onChange: (value: number) => string | undefined; suffix?: string
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const [error, setError] = useState<string>()
   return <label className="input-field">{label}{suffix}
-    <input type="text" inputMode="decimal" value={draft ?? String(value)} aria-invalid={Boolean(error)}
+    <input type="text" inputMode="decimal" value={draft ?? (value === null ? '' : String(value))} aria-invalid={Boolean(error)}
       onChange={event => {
         const raw = event.target.value
         setDraft(raw)
