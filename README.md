@@ -113,3 +113,9 @@ KAN-11 adds baseline lifestyle spending and stacking annual spending-change
 periods, with start inclusive/end exclusive. Combined spending cannot be negative.
 Mortgage, child costs and tax remain separate. Base-year surplus before mortgage
 and children updates immediately. Baseline zero is explicitly unconfigured.
+
+KAN-12 adds individually toggleable children, one-off birth costs, editable
+annual age bands 0–2/3–4/5–11/12–18 and linked parental work changes. No child
+costs are invented. Disabling a child removes its costs and linked changes;
+conflicting parental work schedules are flagged, not multiplied together.
+Calendar-year approximation includes a full cost year at birth and age 18.
