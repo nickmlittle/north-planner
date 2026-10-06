@@ -91,3 +91,11 @@ gross override. Overlapping jobs or linked work adjustments are rejected rather
 than silently stacked. No earnings are invented; configure income in the UI.
 Inside-IR35 day rates are assumed to be taxable worker gross pay, not umbrella
 assignment rates inclusive of employer NI/fees. Partial-year payroll is excluded.
+
+KAN-9 estimates per-person income tax and employee NI using editable 2026/27
+England/Wales/Northern Ireland rules and annualised category A NI. Allowance
+taper is explicit. Thresholds are constant in real 2026 GBP for future years
+unless edited (no implicit forecast of fiscal drag). Estimates exclude Scottish
+bands, student loans, benefits, employer NI and payroll timing.
+Sources: [HMRC income tax](https://www.gov.uk/income-tax-rates) and
+[2026/27 employer thresholds](https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027).
