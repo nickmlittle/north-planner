@@ -99,3 +99,12 @@ unless edited (no implicit forecast of fiscal drag). Estimates exclude Scottish
 bands, student loans, benefits, employer NI and payroll timing.
 Sources: [HMRC income tax](https://www.gov.uk/income-tax-rates) and
 [2026/27 employer thresholds](https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027).
+
+KAN-10 adds employee/employer pension percentages per income period. Salary
+sacrifice reduces taxable and NI earnings; net-pay reduces taxable earnings only.
+Relief-at-source uses gross contribution percentages, 20% provider relief, band
+extension and adjusted-net-income taper, assuming further relief claimed in-year.
+Employer contributions go only to pensions. Work/contributions end at FIRE unless
+explicitly continued, and always end with the income period. Rates start at zero
+until configured. Annual/tapered allowances, carry-forward, minimum wage and
+employer NI recycling are excluded. See [HMRC pension relief](https://www.gov.uk/tax-on-your-private-pension/pension-tax-relief).
