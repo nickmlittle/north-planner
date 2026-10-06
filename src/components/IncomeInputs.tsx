@@ -1,3 +1,4 @@
+import { ContributionInputs } from './ContributionInputs'
 import type { IncomePeriod } from '../domain/income'
 import { validateIncome } from '../domain/income'
 import type { Household } from '../domain/models'
@@ -26,6 +27,7 @@ export function IncomeInputs({ household, value, onChange }: { household: Househ
           <label><input type="checkbox" checked={p.annualGrossOverride !== null} onChange={event => update(p.id, { annualGrossOverride: event.target.checked ? 0 : null })} /> Override annual gross income</label>
           {p.annualGrossOverride !== null && <NumericInput label={`${person.name} Gross override (GBP)`} value={p.annualGrossOverride} onChange={number => update(p.id, { annualGrossOverride: number })} />}
         </div>
+        <ContributionInputs value={p.contributions} onChange={contributions => update(p.id, { contributions })} />
         <button type="button" onClick={() => onChange(value.filter(period => period.id !== p.id))}>Remove period</button>
       </fieldset>)}
       <button type="button" onClick={() => {

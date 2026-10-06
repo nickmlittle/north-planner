@@ -16,5 +16,5 @@ export default function App() {
   const [income, setIncome] = useState(() => structuredClone(defaultIncome))
   const [planning, setPlanning] = useState(() => structuredClone(defaultPlanning))
   const { household, update } = useHousehold()
-  return <AppLayout><HomePage household={household} /><StartingPosition household={household} onChange={update} /><PlanningInputs value={planning} onChange={setPlanning} /><IncomeInputs household={household} value={income} onChange={setIncome} /><TaxInputs value={tax} onChange={setTax} /><IncomeSummary household={household} income={income} tax={tax} /></AppLayout>
+  return <AppLayout><HomePage household={household} /><StartingPosition household={household} onChange={update} /><PlanningInputs value={planning} onChange={setPlanning} /><IncomeInputs household={household} value={income} onChange={setIncome} /><TaxInputs value={tax} onChange={setTax} /><IncomeSummary household={household} income={income} tax={tax} planning={planning} /></AppLayout>
 }

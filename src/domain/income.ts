@@ -1,7 +1,10 @@
+import type { PensionContributions } from './contributions'
+import { validateContributions } from './contributions'
 import type { YearPeriod } from './timeline'
 import { fraction, nonNegative, validPeriod } from './timeline'
 
 export interface IncomePeriod extends YearPeriod {
+  contributions?: PensionContributions
   id: string
   personId: string
   kind: 'paye' | 'inside-ir35'
@@ -21,6 +24,7 @@ export interface IncomeAdjustment extends YearPeriod {
 export function validateIncome(periods: IncomePeriod[], adjustments: IncomeAdjustment[] = []): string | undefined {
   if (new Set(periods.map(p => p.id)).size !== periods.length) return 'Income period IDs must be unique.'
   for (const p of periods) {
+    if (p.contributions && validateContributions(p.contributions)) return validateContributions(p.contributions)
     if (!p.personId || !validPeriod(p) || !['paye', 'inside-ir35'].includes(p.kind)) return 'Income periods need a person and valid start/end years.'
     if (![p.annualSalary, p.dayRate, p.billableDays].every(nonNegative) || p.billableDays > 366 || !fraction(p.workingFraction)
       || (p.annualGrossOverride !== null && !nonNegative(p.annualGrossOverride))) return 'Income amounts must be non-negative; billable days 0–366 and working fraction 0–1.'
