@@ -6,7 +6,7 @@ export function NumericInput({ label, value, onChange, suffix = '' }: {
   const [draft, setDraft] = useState<string | null>(null)
   const [error, setError] = useState<string>()
   return <label className="input-field">{label}{suffix}
-    <input type="text" inputMode="decimal" value={draft ?? (value === null ? '' : String(value))} aria-invalid={Boolean(error)}
+    <input type="text" inputMode="decimal" value={draft ?? (value === null ? '' : value.toLocaleString('en-GB', { useGrouping: false, maximumFractionDigits: 12 }))} aria-invalid={Boolean(error)}
       onChange={event => {
         const raw = event.target.value
         setDraft(raw)

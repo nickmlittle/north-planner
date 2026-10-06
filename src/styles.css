@@ -25,3 +25,12 @@ input:focus-visible { outline: 2px solid #236b50; outline-offset: 2px; }
 input[aria-invalid="true"] { border-color: #a52a2a; }
 small { color: #52655e; }
 .input-error { color: #a52a2a; }
+
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 0.85rem; width: 100%; }
+caption { text-align: left; font-weight: 650; padding: 12px 0; }
+th, td { padding: 8px; border-bottom: 1px solid #d6dfd9; text-align: right; white-space: nowrap; }
+th:first-child { text-align: left; }
+details { margin: 12px 0; }
+summary { cursor: pointer; }
+button, select { font: inherit; padding: 6px 10px; margin: 6px 6px 6px 0; }

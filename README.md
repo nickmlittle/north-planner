@@ -1,8 +1,8 @@
 # North Planner
 
-A client-side household financial planning and FIRE forecasting app. KAN-5
-established the shell; KAN-6 adds editable household starting-position inputs.
-Forecasting arrives in later tickets.
+A client-side household financial planning app. KAN-5 through KAN-16 provide
+editable starting inputs, assumptions and events with a deterministic annual
+forecast in real 2026 GBP.
 
 ## Local development
 
@@ -30,7 +30,7 @@ npm run check    # lint, tests, and production build
 - `src/config`: default household fixture and independent configuration loader.
 - `src/state`: React application state, initialized from configuration.
 - `src/formatting`: reusable GBP display formatting.
-- `src/engine`: extension point for pure deterministic forecast functions.
+- `src/engine`: pure deterministic financial engines and annual composition.
 - `src/simulation`: extension point for seeded Monte Carlo orchestration.
 - `src/components`: reusable layout and presentation components.
 - `src/pages`: page-level presentation; the single home page needs no router yet.
@@ -75,9 +75,8 @@ Each load deep-clones the fixture. Asset ownership and mortgage/property
 relationships use stable IDs. Financial events represent one-off signed cash
 flows; life events carry descriptive context. Their effects are not implemented.
 
-There is no forecast, tax model, simulation, persistence, backend or authentication
-in this shell. The UI confirms configuration loading and does not imply that a
-financial forecast has been calculated.
+There is no simulation, persistence, backend or authentication. Annual forecasts
+and tax outputs are planning estimates, with explicit limitations below.
 
 KAN-7 adds session-owned planning assumptions, separate from the starting household.
 Illustrative defaults: equity 4% real / 15% volatility, bonds 1% / 5%, house 0%,
@@ -143,3 +142,32 @@ mortgage plus available existing cash is eligible; excess remains 0%-real cash.
 Allowance defaults are £20,000 per adult ([HMRC](https://www.gov.uk/individual-savings-accounts)),
 held constant in real 2026 GBP and reset each annual calendar-year bucket.
 No flexible-ISA replacement, external subscriptions or UK-residency checks.
+
+## Deterministic annual results (KAN-16)
+
+The results view recalculates on valid edits and shows per-year income, tax/NI,
+lifestyle, child costs, mortgage payments/balance, ISA, pensions, cash, house/equity
+and net worth. Expand a year for per-person pension contributions, ISA flows,
+property costs and opening + flows + returns = closing ledgers.
+
+The forecast includes the base year through the year the **youngest adult**
+reaches the horizon age, so both adults reach at least that age. This age-based
+horizon supersedes the provisional calendar end year used by starting-position
+validation. The base date is a whole calendar year; no partial-year proration.
+Opening-year moves precede annual asset returns; contributions/withdrawals/sweeps
+occur at year end. ISA and pension equities use the fixed equity real return;
+cash ISAs and household cash use 0%. Bond allocation, volatility, withdrawal-rate
+rules, pension access/withdrawals, State Pension and retirement tax optimisation
+are deferred. No probability or retirement success claim is made.
+
+A negative projected cash ledger is a **cumulative unfunded plan need**, not an
+assumed overdraft. Deficits use cash then proportional ISA withdrawals; pension
+assets remain untouched. Planned mortgage amortisation continues, with any
+unfunded payment included in that ledger. Net worth includes signed cash so
+unfunded expenses are not hidden. Post-deficit results describe an unfunded plan,
+not a funded asset path. Missing personal mortgage terms prevent calculation and
+show an actionable message. Earnings/spending start at zero/unconfigured.
+
+V1 supports one home/mortgage and one individually owned ISA/pension per adult;
+inconsistent ownership, conflicting move/refinance years and unsupported generic
+events are reported, not silently ignored. Inputs stay in memory until reload.
