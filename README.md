@@ -136,3 +136,10 @@ valuation changes. Renovations are expensed, not automatically added to value.
 Stamp duty is a user-entered amount, not an automatic tax estimate. Borrowing is
 the residual funding need, with no lender affordability/LTV constraint. Multiple
 moves are supported in different years; conflicting same-year moves are flagged.
+
+KAN-15 uses deterministic water-filling toward equal projected FIRE ISA values,
+with each owner's allowance cap. Surplus after tax/pensions/lifestyle/children/
+mortgage plus available existing cash is eligible; excess remains 0%-real cash.
+Allowance defaults are £20,000 per adult ([HMRC](https://www.gov.uk/individual-savings-accounts)),
+held constant in real 2026 GBP and reset each annual calendar-year bucket.
+No flexible-ISA replacement, external subscriptions or UK-residency checks.
