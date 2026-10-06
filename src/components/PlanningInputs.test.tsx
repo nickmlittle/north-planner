@@ -12,3 +12,8 @@ it('edits assumptions and preserves them when household inputs change', () => {
   fireEvent.change(rate, { target: { value: '-100' } })
   expect(rate).toHaveAttribute('aria-invalid', 'true')
 })
+
+it('displays the default withdrawal percentage without floating-point artefacts', () => {
+  render(<App />)
+  expect(screen.getByLabelText('Sustainable withdrawal rate (%)')).toHaveValue('3.5')
+})
