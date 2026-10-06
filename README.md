@@ -127,3 +127,12 @@ Personal interest/term start blank and must be entered. Inflation for nominal
 mortgage conversion is explicit, initially 0% (nominal equals real). Nominal debt
 is carried between years; payments use each year's opening price index and
 closing debt the next year's index. No lender fees, ERCs or interest-only loans.
+
+KAN-14 executes property moves at the opening of the selected year. Equity after
+sale, old debt and selling fees funds purchase/costs, then proportional ISA draws,
+then a new mortgage. Excess equity becomes cash; existing cash is not a purchase
+funding source under the specified order. Optional sale overrides are explicit
+valuation changes. Renovations are expensed, not automatically added to value.
+Stamp duty is a user-entered amount, not an automatic tax estimate. Borrowing is
+the residual funding need, with no lender affordability/LTV constraint. Multiple
+moves are supported in different years; conflicting same-year moves are flagged.
