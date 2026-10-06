@@ -84,3 +84,10 @@ Illustrative defaults: equity 4% real / 15% volatility, bonds 1% / 5%, house 0%,
 cash fixed 0%, FIRE 50, pension access 58, horizon 95, withdrawal rate 3.5%.
 These are editable modelling inputs, not financial recommendations. Forecast
 recalculation is integrated by KAN-16; scenario toggles arrive in later tickets.
+
+KAN-8 uses inclusive start/exclusive end calendar-year income periods. Multiple
+sequential jobs are supported per person, with an optional working fraction and
+gross override. Overlapping jobs or linked work adjustments are rejected rather
+than silently stacked. No earnings are invented; configure income in the UI.
+Inside-IR35 day rates are assumed to be taxable worker gross pay, not umbrella
+assignment rates inclusive of employer NI/fees. Partial-year payroll is excluded.
