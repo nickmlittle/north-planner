@@ -14,7 +14,7 @@ export function SpendingInputs({ value, onChange, year, disposable }: { value: S
     return error
   }
   return <section className="household-card"><h2>Lifestyle spending</h2>
-    <p>Real 2026 GBP, excluding mortgage, tax and child costs. Zero baseline is unconfigured spending, not a realistic household budget.</p>
+    <p>Real 2026 GBP, excluding mortgage, tax and child costs. An explicit zero baseline is included as entered.</p>
     <NumericInput label="Annual baseline lifestyle spending (GBP)" value={value.baseline} onChange={n => apply({ ...value, baseline: n })} />
     {value.events.map(event => <fieldset key={event.id}><legend>{event.name}</legend>
       <div className="input-grid">{([['startYear', 'Start year'], ['endYear', 'End year'], ['annualChange', 'Annual spending change (GBP)']] as const).map(([key, label]) => <NumericInput key={key} label={label} value={event[key]} onChange={n => apply({ ...value, events: value.events.map(e => e.id === event.id ? { ...e, [key]: n } : e) })} />)}</div>

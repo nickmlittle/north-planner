@@ -1,0 +1,60 @@
+import { useEffect, useRef } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
+import { ageBands, currentBand, missingDetails, toForecastInput } from '../domain/setup'
+import type { AppDocument } from '../domain/setup'
+import type { ForecastInput } from '../domain/forecast'
+import type { IncomePeriod } from '../domain/income'
+import { forecastResult } from '../engine/forecast'
+import { householdEmployment } from '../engine/employment'
+import { childEffects } from '../engine/children'
+import { grossIncome } from '../engine/income'
+import { PlanningInputs } from '../components/PlanningInputs'
+import { IncomeInputs } from '../components/IncomeInputs'
+import { TaxInputs } from '../components/TaxInputs'
+import { MortgageInputs } from '../components/MortgageInputs'
+import { PropertyInputs } from '../components/PropertyInputs'
+import { AllowanceInputs } from '../components/AllowanceInputs'
+import { SpendingInputs } from '../components/SpendingInputs'
+import { ChildInputs } from '../components/ChildInputs'
+import { ForecastResults } from '../components/ForecastResults'
+import { SetupCard, MoneyField } from '../components/SetupFields'
+
+export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void
+}) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { heading.current?.focus(); window.scrollTo?.(0, 0) }, [])
+  const go = (step: number) => setDocument(d => ({ ...d, step }))
+  let input: ForecastInput | undefined; let error = ''
+  try { input = toForecastInput(doc) } catch (e) { error = e instanceof Error ? e.message : 'Complete household details before forecasting.' }
+  const missing = missingDetails(doc.snapshot, true)
+  const result = input ? forecastResult(input) : { rows: [], error }
+  function updateIncome(incomeTimeline: IncomePeriod[]) {
+    setDocument(d => ({ ...d, incomeTimeline, snapshot: { ...d.snapshot, people: d.snapshot.people.map(p => {
+      if (p.role === 'child') return p
+      const active = incomeTimeline.find(i => i.personId === p.id && i.startYear <= 2026 && i.endYear > 2026)
+      if (!active) return { ...p, incomeKind: 'none' }
+      const c = active.contributions
+      return { ...p, incomeKind: active.kind, pay: String(active.kind === 'paye' ? active.annualSalary : active.dayRate), payOverride: active.annualGrossOverride !== null || active.workingFraction !== 1 ? String(grossIncome(incomeTimeline, p.id, 2026)) : '', frequency: 'year', days: String(active.billableDays),
+        employee: c ? String(Number((c.employeeRate * 100).toFixed(2))) : p.employee, employer: c ? String(Number((c.employerRate * 100).toFixed(2))) : p.employer, treatment: c?.treatment ?? p.treatment }
+    }) } }))
+  }
+  return <div className="north-shell planner-shell"><header className="north-header"><button className="brand brand-button" onClick={() => go(8)}><span className="brand-mark">N</span>north<span className="brand-dot">.</span></button><span className="header-caption">Plan your future</span><span className="save-status">{warning ? 'Session draft' : 'Saved in this browser'}</span></header>
+    {warning && <aside className="storage-warning" role="status">{warning}{warning.startsWith('Saved data') && <button onClick={replaceSavedDraft}>Replace saved data with this draft</button>}</aside>}
+    <main className="planner-main"><p className="eyebrow">{doc.snapshot.name} · Your next chapter</p><h1 ref={heading} tabIndex={-1}>Plan your path to financial independence.</h1><p className="page-description">Explore your future using the household picture you just created.</p><button className="secondary-button" onClick={() => go(8)}>← Back to your starting position</button>
+      <p className="context-note">Forecasts use annual calendar-year ages derived from DOB, in real 2026 GBP. Current earnings initially continue unchanged in real terms until FIRE; you can change the timeline below. Returns and retirement ages are illustrative assumptions, not recommendations.</p>
+      {missing.filter(m => m.step !== 9).length > 0 && <SetupCard title="Complete your current picture"><ul className="missing-list">{missing.filter(m => m.step !== 9).map((m, i) => <li key={i}><span>{m.label}</span><button className="text-button" onClick={() => go(m.step)}>Add details</button></li>)}</ul></SetupCard>}
+      {doc.snapshot.people.filter(p => p.role === 'child' && currentBand(p)).map(p => <SetupCard title={`${p.name} · Future child costs`} key={p.id} description="Enter annual estimates for later age bands. Explicit £0 is accepted; blank future costs prevent forecasting."><div className="input-grid">{ageBands.slice(ageBands.findIndex(b => b.key === currentBand(p)) + 1).map(b => <MoneyField key={b.key} label={`${p.name} ${b.label} annual cost (£)`} value={p.futureCosts[b.key]} onChange={value => setDocument(d => ({ ...d, snapshot: { ...d.snapshot, people: d.snapshot.people.map(person => person.id === p.id ? { ...person, futureCosts: { ...person.futureCosts, [b.key]: value } } : person) } }))} />)}</div></SetupCard>)}
+      <PlanningInputs value={doc.planning} onChange={planning => setDocument(d => ({ ...d, planning }))} />
+      <TaxInputs value={doc.tax} onChange={tax => setDocument(d => ({ ...d, tax }))} />
+      {input && <><IncomeInputs household={input.household} value={input.income} onChange={updateIncome} />
+        <SpendingInputs value={input.spending} onChange={spending => setDocument(d => ({ ...d, spendingEvents: spending.events, snapshot: { ...d.snapshot, spending: String(spending.baseline), spendingFrequency: 'year' } }))} year={2026} disposable={householdEmployment(input.household, input.income, 2026, input.planning.fireAge, input.tax, childEffects(input.children, 2026).adjustments).disposable} />
+        <MortgageInputs value={input.mortgage} balance={input.household.mortgages[0]?.balance ?? 0} year={2026} onChange={mortgage => setDocument(d => ({ ...d, mortgageExtras: { monthlyOverpayment: mortgage.monthlyOverpayment, inflation: mortgage.inflation, refinances: mortgage.refinances }, snapshot: { ...d.snapshot, rate: mortgage.annualRate === null ? '' : String(Number((mortgage.annualRate * 100).toFixed(2))), term: mortgage.termYears === null ? '' : String(mortgage.termYears) } }))} />
+        <PropertyInputs value={doc.moves} onChange={moves => setDocument(d => ({ ...d, moves }))} year={2026} />
+        <AllowanceInputs people={input.household.people} value={input.allowances} onChange={allowances => setDocument(d => ({ ...d, allowances }))} />
+        <details className="future-events"><summary>Additional child and parental-work scenarios</summary><p className="muted">These are future planning events, separate from the people in your current household.</p><ChildInputs people={input.household.people} year={2026} value={doc.childEvents} onChange={childEvents => setDocument(d => ({ ...d, childEvents }))} /></details>
+      </>}
+      <ForecastResults result={result} people={input?.household.people ?? []} />
+      <footer className="journey-footer">Changes are saved in this browser. Current household finances can be edited from your starting position.</footer>
+    </main></div>
+}

@@ -1,10 +1,19 @@
 import type { ForecastInput } from './forecast'
+import { validatePlanning } from './planning'
 import type { ReturnAssumptions } from './planning'
+import { validateTaxRules } from './tax'
 import type { TaxRules } from './tax'
+import { validateMortgagePlan } from './mortgage'
 import type { MortgagePlan } from './mortgage'
+import { validateMoves } from './property'
 import type { PropertyMove } from './property'
+import { validateIncome } from './income'
 import type { IncomePeriod } from './income'
+import { validateChildren } from './children'
+import { validateSpending } from './spending'
 import type { PensionContributions } from './contributions'
+import type { ChildEvent } from './children'
+import type { SpendingEvent } from './spending'
 import { defaultPlanning } from '../config/defaultPlanning'
 import { defaultTax } from '../config/defaultTax'
 import { defaultMortgage } from '../config/defaultMortgage'
@@ -19,6 +28,7 @@ export const ageBands: { key: AgeBand; label: string; end: number }[] = [
 export interface SetupPerson {
   id: string; name: string; dob: string; role: 'you' | 'partner' | 'adult' | 'child'
   incomeKind: '' | 'paye' | 'inside-ir35' | 'none'; pay: string; frequency: Frequency; days: string
+  payOverride: string
   pensionStatus: '' | 'yes' | 'none'; pension: string; employee: string; employer: string
   treatment: '' | PensionContributions['treatment']
   isaType: '' | 'cash' | 'stocks-and-shares' | 'none'; isa: string
@@ -35,9 +45,10 @@ export interface AppDocument {
   version: 1; step: number; completed: boolean; snapshot: SetupSnapshot
   planning: ReturnAssumptions; tax: TaxRules; mortgageExtras: Pick<MortgagePlan, 'monthlyOverpayment' | 'inflation' | 'refinances'>
   moves: PropertyMove[]; allowances: Record<string, number>; incomeTimeline: IncomePeriod[] | null
+  childEvents: ChildEvent[]; spendingEvents: SpendingEvent[]
 }
 export function emptyPerson(role: SetupPerson['role'] = 'adult'): SetupPerson {
-  return { id: crypto.randomUUID(), name: '', dob: '', role, incomeKind: '', pay: '', frequency: 'year', days: '',
+  return { id: crypto.randomUUID(), name: '', dob: '', role, incomeKind: '', pay: '', frequency: 'year', days: '', payOverride: '',
     pensionStatus: '', pension: '', employee: '', employer: '', treatment: '', isaType: '', isa: '',
     childCost: '', childFrequency: 'month', futureCosts: { ages0to2: '', ages3to4: '', ages5to11: '', ages12to18: '' } }
 }
@@ -46,7 +57,7 @@ export function newDocument(): AppDocument {
     snapshot: { name: '', people: [], cash: [], noCash: false, housing: '', homeValue: '', homeOwners: [], mortgageStatus: '', mortgageBalance: '', rate: '', term: '', borrowers: [], spending: '', spendingFrequency: 'month' },
     planning: structuredClone(defaultPlanning), tax: structuredClone(defaultTax),
     mortgageExtras: { monthlyOverpayment: defaultMortgage.monthlyOverpayment, inflation: defaultMortgage.inflation, refinances: [] },
-    moves: [], allowances: {}, incomeTimeline: null }
+    moves: [], allowances: {}, incomeTimeline: null, childEvents: [], spendingEvents: [] }
 }
 export function amount(raw: string): number | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return null
@@ -55,6 +66,13 @@ export function amount(raw: string): number | null {
 }
 export function annual(raw: string, frequency: Frequency): number | null {
   const n = amount(raw); return n === null ? null : n * (frequency === 'month' ? 12 : 1)
+}
+export function annualIncome(p: SetupPerson): number | null {
+  if (p.incomeKind === 'none') return 0
+  if (!p.incomeKind) return null
+  if (p.payOverride) return amount(p.payOverride)
+  if (p.incomeKind === 'paye') return annual(p.pay, p.frequency)
+  return amount(p.pay) !== null && amount(p.days) !== null ? Number(p.pay) * Number(p.days) : null
 }
 export function validDOB(dob: string, today = new Date()): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return false
@@ -99,7 +117,7 @@ export function missingDetails(s: SetupSnapshot, future = false): { label: strin
   const add = (label: string, step: number) => missing.push({ label, step })
   const adults = s.people.filter(p => p.role !== 'child'); const ownerIds = adults.map(p => p.id)
   for (const p of adults) {
-    if (!p.incomeKind || (p.incomeKind !== 'none' && amount(p.pay) === null)) add(`${p.name}: current income`, 2)
+    if (!p.incomeKind || (p.incomeKind !== 'none' && (amount(p.pay) === null || (p.payOverride !== '' && amount(p.payOverride) === null)))) add(`${p.name}: current income`, 2)
     if (p.incomeKind === 'inside-ir35' && (amount(p.days) === null || !Number.isInteger(Number(p.days)) || Number(p.days) > 366)) add(`${p.name}: billable days (0–366)`, 2)
     if (knownBalance(p.pensionStatus, p.pension) === null) add(`${p.name}: pension balance or no pension`, 3)
     if (p.pensionStatus === 'yes' && p.incomeKind && p.incomeKind !== 'none' &&
@@ -143,14 +161,36 @@ export function toForecastInput(doc: AppDocument): ForecastInput {
     cash: s.noCash ? [] : s.cash.map(c => ({ id: c.id, name: c.name || 'Cash', kind: 'cash', ownerIds: c.ownerIds, value: amount(c.balance)! })), events: [],
     assumptions: { startYear: 2026, endYear, moneyBasis: { currency: 'GBP', priceYear: 2026, terms: 'real' }, annualRealReturns: { investments: doc.planning.equityReturn, property: doc.planning.houseGrowth, cash: 0 } } }
   const income = doc.incomeTimeline ?? adults.filter(p => p.incomeKind !== 'none').map(p => ({ id: `income-${p.id}`, personId: p.id, kind: p.incomeKind as 'paye' | 'inside-ir35',
-    startYear: 2026, endYear, annualSalary: annual(p.pay, p.frequency)!, dayRate: amount(p.pay)!, billableDays: Number(p.days), workingFraction: 1, annualGrossOverride: null,
+    startYear: 2026, endYear, annualSalary: annual(p.pay, p.frequency)!, dayRate: amount(p.pay)!, billableDays: Number(p.days), workingFraction: 1, annualGrossOverride: p.payOverride ? amount(p.payOverride) : null,
     contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: (p.treatment || 'salary-sacrifice') as PensionContributions['treatment'], continueAfterFire: false } }))
   return { household, planning: doc.planning, tax: doc.tax, income,
-    spending: { baseline: annual(s.spending, s.spendingFrequency)!, events: [] },
-    children: s.people.filter(p => p.role === 'child').map(p => ({ id: p.id, birthYear: Number(p.dob.slice(0, 4)), enabled: true, birthCost: 0,
-      costs: Object.fromEntries(ageBands.map(b => [b.key, b.key === currentBand(p) ? annual(p.childCost, p.childFrequency)! : amount(p.futureCosts[b.key]) ?? 0])) as Record<AgeBand, number>, workAdjustments: [] })),
+    spending: { baseline: annual(s.spending, s.spendingFrequency)!, events: doc.spendingEvents },
+    children: s.people.filter(p => p.role === 'child').map<ChildEvent>(p => ({ id: p.id, birthYear: Number(p.dob.slice(0, 4)), enabled: true, birthCost: 0,
+      costs: Object.fromEntries(ageBands.map(b => [b.key, b.key === currentBand(p) ? annual(p.childCost, p.childFrequency)! : amount(p.futureCosts[b.key]) ?? 0])) as Record<AgeBand, number>, workAdjustments: [] })).concat(doc.childEvents),
     mortgage: { ...doc.mortgageExtras, annualRate: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.rate) / 100 : null, termYears: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.term) : null },
     moves: doc.moves, allowances: Object.fromEntries(adults.map(p => [p.id, doc.allowances[p.id] ?? 20000])) }
+}
+
+/** Retain future timeline edits when editing people; reconcile only changed current earnings. */
+export function withSnapshot(d: AppDocument, snapshot: SetupSnapshot): AppDocument {
+  if (d.incomeTimeline === null) return { ...d, snapshot }
+  const adults = snapshot.people.filter(p => p.role !== 'child')
+  let timeline = d.incomeTimeline.filter(i => adults.some(p => p.id === i.personId))
+  const fields = ['incomeKind', 'pay', 'frequency', 'days', 'payOverride', 'pensionStatus', 'employee', 'employer', 'treatment'] as const
+  for (const p of adults) {
+    const previous = d.snapshot.people.find(old => old.id === p.id)
+    if (previous && fields.every(key => previous[key] === p[key])) continue
+    if (missingDetails({ ...snapshot, people: [p] }).some(m => m.step === 2 || m.step === 3)) continue
+    const current = timeline.find(i => i.personId === p.id && i.startYear <= 2026 && i.endYear > 2026)
+    timeline = timeline.filter(i => i !== current)
+    if (p.incomeKind === 'none' || !p.incomeKind) continue
+    const horizon = Math.max(...adults.map(person => Number(person.dob.slice(0, 4)))) + d.planning.horizonAge + 1
+    const nextJob = Math.min(horizon, ...timeline.filter(i => i.personId === p.id && i.startYear > 2026).map(i => i.startYear))
+    timeline.push({ id: current?.id ?? `income-${p.id}`, personId: p.id, kind: p.incomeKind, startYear: current?.startYear ?? 2026, endYear: current?.endYear ?? nextJob,
+      annualSalary: annual(p.pay, p.frequency) ?? 0, dayRate: amount(p.pay) ?? 0, billableDays: Number(p.days) || 0, workingFraction: 1, annualGrossOverride: p.payOverride ? amount(p.payOverride) : null,
+      contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: p.treatment || 'salary-sacrifice', continueAfterFire: current?.contributions?.continueAfterFire ?? false } })
+  }
+  return { ...d, snapshot, incomeTimeline: timeline }
 }
 
 /** Validate every persisted field by its default shape before restoring it. */
@@ -177,7 +217,15 @@ export function decodeDocument(raw: string): AppDocument | null {
     if (!enums(d.snapshot.housing, ['', 'own', 'rent', 'none']) || !enums(d.snapshot.mortgageStatus, ['', 'yes', 'none']) || !enums(d.snapshot.spendingFrequency, ['month', 'year'])) return null
     if (!d.tax.incomeTaxBands.every(b => hasShape(b, { upTo: 0, rate: 0 }) || hasShape(b, { upTo: null, rate: 0 })) || !d.tax.employeeNIBands.every(b => hasShape(b, { upTo: 0, rate: 0 }) || hasShape(b, { upTo: null, rate: 0 }))) return null
     if (!Object.values(d.allowances).every(n => typeof n === 'number' && Number.isFinite(n))) return null
-    // Complex advanced entries are validated by the existing domain validators before rendering.
+    const period = { id: '', personId: '', kind: '', startYear: 0, endYear: 0, annualSalary: 0, dayRate: 0, billableDays: 0, workingFraction: 0 }
+    if (d.incomeTimeline !== null && (!d.incomeTimeline.every(i => hasShape(i, period) && (i.annualGrossOverride === null || typeof i.annualGrossOverride === 'number')
+      && (!i.contributions || hasShape(i.contributions, { employeeRate: 0, employerRate: 0, treatment: '', continueAfterFire: false }))) || validateIncome(d.incomeTimeline))) return null
+    if (!d.mortgageExtras.refinances.every(r => hasShape(r, { id: '', year: 0, annualRate: 0, termYears: 0, enabled: false }))) return null
+    if (!d.childEvents.every(c => hasShape(c, { id: '', birthYear: 0, enabled: false, birthCost: 0, costs: { ages0to2: 0, ages3to4: 0, ages5to11: 0, ages12to18: 0 }, workAdjustments: [] })
+      && c.workAdjustments.every(a => hasShape(a, { id: '', personId: '', startYear: 0, endYear: 0, workingFraction: 0 }) && (a.annualGrossOverride === null || typeof a.annualGrossOverride === 'number')))) return null
+    if (!d.moves.every(m => hasShape(m, { id: '', name: '', year: 0, enabled: false, purchasePrice: 0, stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0 }) && [m.saleValue, m.annualRate, m.termYears].every(n => n === null || (typeof n === 'number' && Number.isFinite(n))))) return null
+    if (!d.spendingEvents.every(e => hasShape(e, { id: '', name: '', startYear: 0, endYear: 0, annualChange: 0, enabled: false }))) return null
+    if (validatePlanning(d.planning) || validateTaxRules(d.tax) || validateMortgagePlan({ ...d.mortgageExtras, annualRate: null, termYears: null }) || validateMoves(d.moves) || validateChildren(d.childEvents) || validateSpending({ baseline: annual(d.snapshot.spending, d.snapshot.spendingFrequency) ?? 0, events: d.spendingEvents })) return null
     return d
   } catch { return null }
 }

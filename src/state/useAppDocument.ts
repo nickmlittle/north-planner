@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import type { SetStateAction } from 'react'
 import { decodeDocument, newDocument } from '../domain/setup'
 
 export const storageKey = 'north.household.v1'
@@ -11,14 +12,19 @@ function restore() {
   } catch { return { document: newDocument(), warning: 'Browser storage is unavailable. Your changes will only last for this session.' } }
 }
 export function useAppDocument() {
-  const [initial] = useState(restore)
-  const [document, setDocument] = useState(initial.document)
-  const [warning, setWarning] = useState(initial.warning)
-  const [replaceInvalid, setReplaceInvalid] = useState(false)
-  useEffect(() => {
-    if (initial.warning.startsWith('Saved data') && !replaceInvalid) return
-    try { localStorage.setItem(storageKey, JSON.stringify(document)) }
-    catch { setWarning('Browser storage is unavailable or full. Your changes will only last for this session.') }
-  }, [document, initial.warning, replaceInvalid])
-  return { document, setDocument, warning, replaceSavedDraft: () => { setReplaceInvalid(true); setWarning('') } }
+  const [state, setState] = useState(() => { const saved = restore(); return { ...saved, preserveInvalid: saved.warning.startsWith('Saved data') } })
+  function persist(document: typeof state.document, preserveInvalid: boolean) {
+    if (preserveInvalid) return state.warning
+    try { localStorage.setItem(storageKey, JSON.stringify(document)); return '' }
+    catch { return 'Browser storage is unavailable or full. Your changes will only last for this session.' }
+  }
+  function setDocument(update: SetStateAction<typeof state.document>) {
+    setState(previous => {
+      const document = typeof update === 'function' ? update(previous.document) : update
+      return { ...previous, document, warning: persist(document, previous.preserveInvalid) }
+    })
+  }
+  return { document: state.document, setDocument, warning: state.warning, replaceSavedDraft: () => {
+    setState(previous => ({ ...previous, preserveInvalid: false, warning: persist(previous.document, false) }))
+  } }
 }
