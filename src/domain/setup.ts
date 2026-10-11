@@ -14,11 +14,13 @@ import { validateSpending } from './spending'
 import type { PensionContributions } from './contributions'
 import type { ChildEvent } from './children'
 import type { SpendingEvent } from './spending'
+import { purchaseSpending, validatePurchases } from './purchases'
+import type { PurchaseEvent } from './purchases'
 import { defaultPlanning } from '../config/defaultPlanning'
 import { defaultTax } from '../config/defaultTax'
 import { defaultMortgage } from '../config/defaultMortgage'
 
-export const setupSteps = ['Welcome', 'Household', 'Income', 'Pensions', 'Savings', 'Home', 'Spending', 'Review', 'Overview', 'Planner'] as const
+export const setupSteps = ['Welcome', 'Household', 'Income', 'Pensions', 'Savings', 'Home', 'Spending', 'Review', 'Overview', 'Dashboard', 'Plan settings'] as const
 export type Frequency = 'month' | 'year'
 export type AgeBand = 'ages0to2' | 'ages3to4' | 'ages5to11' | 'ages12to18'
 export const ageBands: { key: AgeBand; label: string; end: number }[] = [
@@ -45,7 +47,7 @@ export interface AppDocument {
   version: 1; step: number; completed: boolean; snapshot: SetupSnapshot
   planning: ReturnAssumptions; tax: TaxRules; mortgageExtras: Pick<MortgagePlan, 'monthlyOverpayment' | 'inflation' | 'refinances'>
   moves: PropertyMove[]; allowances: Record<string, number>; incomeTimeline: IncomePeriod[] | null
-  childEvents: ChildEvent[]; spendingEvents: SpendingEvent[]
+  childEvents: ChildEvent[]; spendingEvents: SpendingEvent[]; purchaseEvents: PurchaseEvent[]
 }
 export function emptyPerson(role: SetupPerson['role'] = 'adult'): SetupPerson {
   return { id: crypto.randomUUID(), name: '', dob: '', role, incomeKind: '', pay: '', frequency: 'year', days: '', payOverride: '',
@@ -57,7 +59,7 @@ export function newDocument(): AppDocument {
     snapshot: { name: '', people: [], cash: [], noCash: false, housing: '', homeValue: '', homeOwners: [], mortgageStatus: '', mortgageBalance: '', rate: '', term: '', borrowers: [], spending: '', spendingFrequency: 'month' },
     planning: structuredClone(defaultPlanning), tax: structuredClone(defaultTax),
     mortgageExtras: { monthlyOverpayment: defaultMortgage.monthlyOverpayment, inflation: defaultMortgage.inflation, refinances: [] },
-    moves: [], allowances: {}, incomeTimeline: null, childEvents: [], spendingEvents: [] }
+    moves: [], allowances: {}, incomeTimeline: null, childEvents: [], spendingEvents: [], purchaseEvents: [] }
 }
 export function amount(raw: string): number | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return null
@@ -149,6 +151,8 @@ export function isPersonLinked(s: SetupSnapshot, id: string): boolean {
 }
 /** Unknown values cannot enter the numerical engine. Children are kept out of the adult model. */
 export function toForecastInput(doc: AppDocument): ForecastInput {
+  const purchaseError = validatePurchases(doc.purchaseEvents)
+  if (purchaseError) throw new Error(purchaseError)
   const missing = [...householdErrors(doc.snapshot), ...missingDetails(doc.snapshot, true).map(m => m.label)]
   if (missing.length) throw new Error(`Complete these details: ${missing.join('; ')}`)
   const s = doc.snapshot; const adults = s.people.filter(p => p.role !== 'child')
@@ -164,7 +168,7 @@ export function toForecastInput(doc: AppDocument): ForecastInput {
     startYear: 2026, endYear, annualSalary: annual(p.pay, p.frequency)!, dayRate: amount(p.pay)!, billableDays: Number(p.days), workingFraction: 1, annualGrossOverride: p.payOverride ? amount(p.payOverride) : null,
     contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: (p.treatment || 'salary-sacrifice') as PensionContributions['treatment'], continueAfterFire: false } }))
   return { household, planning: doc.planning, tax: doc.tax, income,
-    spending: { baseline: annual(s.spending, s.spendingFrequency)!, events: doc.spendingEvents },
+    spending: { baseline: annual(s.spending, s.spendingFrequency)!, events: [...doc.spendingEvents, ...purchaseSpending(doc.purchaseEvents)] },
     children: s.people.filter(p => p.role === 'child').map<ChildEvent>(p => ({ id: p.id, birthYear: Number(p.dob.slice(0, 4)), enabled: true, birthCost: 0,
       costs: Object.fromEntries(ageBands.map(b => [b.key, b.key === currentBand(p) ? annual(p.childCost, p.childFrequency)! : amount(p.futureCosts[b.key]) ?? 0])) as Record<AgeBand, number>, workAdjustments: [] })).concat(doc.childEvents),
     mortgage: { ...doc.mortgageExtras, annualRate: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.rate) / 100 : null, termYears: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.term) : null },
@@ -203,7 +207,9 @@ function hasShape(value: unknown, template: unknown): boolean {
 }
 export function decodeDocument(raw: string): AppDocument | null {
   try {
-    const v: unknown = JSON.parse(raw); const base = newDocument()
+    const parsed: unknown = JSON.parse(raw); const base = newDocument()
+    const v: unknown = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? { ...parsed, purchaseEvents: 'purchaseEvents' in parsed ? parsed.purchaseEvents : [] } : parsed
     if (!hasShape(v, { ...base, incomeTimeline: [] }) && !hasShape(v, base)) return null
     const d = v as AppDocument
     const enums = (value: string, options: string[]) => options.includes(value)
@@ -221,11 +227,13 @@ export function decodeDocument(raw: string): AppDocument | null {
     if (d.incomeTimeline !== null && (!d.incomeTimeline.every(i => hasShape(i, period) && (i.annualGrossOverride === null || typeof i.annualGrossOverride === 'number')
       && (!i.contributions || hasShape(i.contributions, { employeeRate: 0, employerRate: 0, treatment: '', continueAfterFire: false }))) || validateIncome(d.incomeTimeline))) return null
     if (!d.mortgageExtras.refinances.every(r => hasShape(r, { id: '', year: 0, annualRate: 0, termYears: 0, enabled: false }))) return null
-    if (!d.childEvents.every(c => hasShape(c, { id: '', birthYear: 0, enabled: false, birthCost: 0, costs: { ages0to2: 0, ages3to4: 0, ages5to11: 0, ages12to18: 0 }, workAdjustments: [] })
+    if (!d.childEvents.every(c => (c.name === undefined || typeof c.name === 'string') && hasShape(c, { id: '', birthYear: 0, enabled: false, birthCost: 0, costs: { ages0to2: 0, ages3to4: 0, ages5to11: 0, ages12to18: 0 }, workAdjustments: [] })
       && c.workAdjustments.every(a => hasShape(a, { id: '', personId: '', startYear: 0, endYear: 0, workingFraction: 0 }) && (a.annualGrossOverride === null || typeof a.annualGrossOverride === 'number')))) return null
     if (!d.moves.every(m => hasShape(m, { id: '', name: '', year: 0, enabled: false, purchasePrice: 0, stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0 }) && [m.saleValue, m.annualRate, m.termYears].every(n => n === null || (typeof n === 'number' && Number.isFinite(n))))) return null
     if (!d.spendingEvents.every(e => hasShape(e, { id: '', name: '', startYear: 0, endYear: 0, annualChange: 0, enabled: false }))) return null
-    if (validatePlanning(d.planning) || validateTaxRules(d.tax) || validateMortgagePlan({ ...d.mortgageExtras, annualRate: null, termYears: null }) || validateMoves(d.moves) || validateChildren(d.childEvents) || validateSpending({ baseline: annual(d.snapshot.spending, d.snapshot.spendingFrequency) ?? 0, events: d.spendingEvents })) return null
+    if (!d.purchaseEvents.every(p => hasShape(p, { id: '', name: '', preset: '', enabled: false, year: 0, upfrontCost: 0 })
+      && (p.recurring === null || hasShape(p.recurring, { annualCost: 0, startYear: 0, endYear: 0 }))) || validatePurchases(d.purchaseEvents)) return null
+    if (validatePlanning(d.planning) || validateTaxRules(d.tax) || validateMortgagePlan({ ...d.mortgageExtras, annualRate: null, termYears: null }) || validateMoves(d.moves) || validateChildren(d.childEvents) || validateSpending({ baseline: annual(d.snapshot.spending, d.snapshot.spendingFrequency) ?? 0, events: [...d.spendingEvents, ...purchaseSpending(d.purchaseEvents)] })) return null
     return d
   } catch { return null }
 }

@@ -36,11 +36,10 @@ it('creates a single-adult renter household from a genuinely empty first load', 
   enter('Living costs (£)', '0')
   click(/Continue/)
   expect(screen.queryByText('Still to add')).not.toBeInTheDocument()
-  click(/Create household picture/)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your starting position')
+  click(/Open your dashboard/)
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your future, in perspective.')
   expect(screen.getAllByText('£0.00').length).toBeGreaterThan(2)
-  click(/Plan your future/)
-  expect(screen.getByRole('heading', { name: 'Deterministic annual forecast' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Net worth through time' })).toBeVisible()
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
 })
 
@@ -67,19 +66,19 @@ it('shows incomplete totals and actionable missing details after skipping financ
   click('Skip for now')
   click(/Review/)
   expect(screen.getByText('Incomplete')).toBeVisible()
-  click(/Create household picture/)
-  const card = screen.getByRole('heading', { name: 'Net worth' }).parentElement!
-  expect(within(card).getByText('Not added')).toBeVisible()
+  click(/Open your dashboard/)
+  const card = screen.getByRole('heading', { name: 'Net worth today' }).parentElement!
+  expect(within(card).getByText('Incomplete')).toBeVisible()
   expect(screen.getByText(/Known assets: £520,000.00/)).toBeVisible()
-  click(/Plan your future/)
-  expect(screen.getByText(/Forecast unavailable/)).toHaveTextContent('pension balance')
+  expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('pension balance')
 })
 
 it('blocks child forecasts until later age bands are explicitly configured', () => {
   const d = completeDocument(); d.step = 9
   const p = emptyPerson('child'); Object.assign(p, { name: 'Jamie', dob: '2020-02-22', childCost: '400' }); d.snapshot.people.push(p)
   localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  expect(screen.getByText(/Forecast unavailable/)).toHaveTextContent('future annual costs')
+  expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('future annual costs')
+  click('Plan settings')
   enter('Jamie Ages 12–18 annual cost (£)', '0')
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
   expect(JSON.parse(localStorage.getItem(storageKey)!).snapshot.people[1].futureCosts.ages12to18).toBe('0')
@@ -102,14 +101,14 @@ it('requires explicit confirmation for removal and removes shared ownership refe
 })
 
 it('persists planner edits and reflects current income changes in the overview', () => {
-  const d = completeDocument(); d.step = 9
+  const d = completeDocument(); d.step = 10
   localStorage.setItem(storageKey, JSON.stringify(d)); const view = render(<App />)
   enter('Alex Annual salary (GBP)', '72000')
   enter('FIRE age', '55')
-  click(/Back to your starting position/)
+  click('Household')
   expect(screen.getByText('£72,000.00')).toBeVisible()
   view.unmount(); render(<App />)
-  click(/Plan your future/)
+  click('Plan settings')
   expect(screen.getByLabelText('FIRE age')).toHaveValue('55')
   expect(screen.getByLabelText('Alex Annual salary (GBP)')).toHaveValue('72000')
 })

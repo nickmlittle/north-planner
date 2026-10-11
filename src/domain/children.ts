@@ -3,6 +3,7 @@ import { validateIncome } from './income'
 import { nonNegative } from './timeline'
 export interface ChildEvent {
   id: string
+  name?: string
   birthYear: number
   enabled: boolean
   birthCost: number
