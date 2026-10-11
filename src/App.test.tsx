@@ -37,7 +37,7 @@ it('creates a single-adult renter household from a genuinely empty first load', 
   click(/Continue/)
   expect(screen.queryByText('Still to add')).not.toBeInTheDocument()
   click(/Open your dashboard/)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your future, in perspective.')
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your route ahead')
   expect(screen.getAllByText('£0.00').length).toBeGreaterThan(2)
   expect(screen.getByRole('heading', { name: 'Net worth through time' })).toBeVisible()
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()

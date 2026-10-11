@@ -5,7 +5,7 @@ import { eventKey, eventName, eventYear } from '../domain/events'
 import { forecastChartPoints } from '../engine/dashboard'
 import { formatGBP } from '../formatting/money'
 
-const colours = { isa: '#426c53', pension: '#97ae79', cash: '#d6bc7a', equity: '#a5bbc2' }
+const colours = { isa: '#203e32', pension: '#70836a', cash: '#bc653d', equity: '#a5bbc2' }
 const names = { isa: 'ISAs', pension: 'Pensions', cash: 'Cash / unfunded need', equity: 'Home equity' }
 const keys = ['isa', 'pension', 'cash', 'equity'] as const
 const compact = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', notation: 'compact', maximumFractionDigits: 1 }).format(n)
@@ -32,10 +32,10 @@ export function ForecastCharts({ input, rows, events }: { input: ForecastInput; 
   const milestones = input.household.people.map(p => ({ id: p.id, name: `${p.name} reaches FIRE`, year: p.birthYear! + (p.targetFireAge ?? input.planning.fireAge) }))
   return <section className="charts-section" aria-label="Projected balances"><div className="setup-card chart-card"><div className="section-heading"><div><p className="eyebrow">The bigger picture</p><h2>Net worth through time</h2></div><span className="chart-basis">Real 2026 GBP</span></div>
     <p className="muted">Today is your opening position; future values are annual closing balances.</p><div className="chart-scroll"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Net worth line chart. Select a year below for exact values."><title>Projected net worth through time</title>{axes(line)}
-      {milestones.map(m => { const i = points.findIndex((p, index) => index > 0 && p.year === m.year); return i < 0 ? null : <g key={m.id}><title>{m.name} · {m.year}</title><line x1={x(i)} x2={x(i)} y1={top} y2={height - bottom} stroke="#9bad83" strokeDasharray="5 5" /><text x={x(i)} y={18} textAnchor="middle">FIRE</text></g> })}
-      <path d={points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${line.y(p.netWorth)}`).join(' ')} fill="none" stroke="#264c3c" strokeWidth="3" />
-      {enabled.map(e => { const i = points.findIndex((p, index) => index > 0 && p.year === eventYear(e)); return i < 0 ? null : <circle key={eventKey(e)} cx={x(i)} cy={line.y(points[i]!.netWorth)} r="5" fill="#d6bc7a" stroke="#fff"><title>{eventName(e)} · {eventYear(e)}</title></circle> })}
-      <line x1={x(selected)} x2={x(selected)} y1={top} y2={height - bottom} stroke="#264c3c" strokeDasharray="3 4" /><circle cx={x(selected)} cy={line.y(point.netWorth)} r="5" fill="#264c3c" />
+      {milestones.map((m, markerIndex) => { const i = points.findIndex((p, index) => index > 0 && p.year === m.year); return i < 0 ? null : <g key={m.id}><title>{m.name} · {m.year}</title><line x1={x(i)} x2={x(i)} y1={top} y2={height - bottom} stroke="#9bad83" strokeDasharray="5 5" /><text x={x(i)} y={markerIndex % 2 ? 29 : 17} textAnchor="middle">FIRE</text></g> })}
+      <path d={points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${line.y(p.netWorth)}`).join(' ')} fill="none" stroke="#203e32" strokeWidth="3" />
+      {enabled.map(e => { const i = points.findIndex((p, index) => index > 0 && p.year === eventYear(e)); return i < 0 ? null : <circle key={eventKey(e)} cx={x(i)} cy={line.y(points[i]!.netWorth)} r="5" fill="#bc653d" stroke="#fff"><title>{eventName(e)} · {eventYear(e)}</title></circle> })}
+      <line x1={x(selected)} x2={x(selected)} y1={top} y2={height - bottom} stroke="#203e32" strokeDasharray="3 4" /><circle cx={x(selected)} cy={line.y(point.netWorth)} r="5" fill="#203e32" />
       {points.map((p, i) => <rect key={p.label} x={x(i) - plotWidth / points.length / 2} y={top} width={plotWidth / points.length} height={plotHeight} fill="transparent" onMouseEnter={() => setSelection(i)} onClick={() => setSelection(i)}><title>{p.label}: {formatGBP(p.netWorth)}</title></rect>)}
     </svg></div>
     <div className="chart-inspector"><label htmlFor={id}>Explore a year</label><select id={id} value={selected} onChange={e => setSelection(Number(e.target.value))}>{points.map((p, i) => <option key={p.label} value={i}>{p.label === 'Today' ? 'Today · opening balances' : `${p.label} · year-end`}</option>)}</select><strong>{formatGBP(point.netWorth)}</strong></div>
