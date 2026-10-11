@@ -5,7 +5,7 @@ import { completeDocument } from './setupFixture'
 
 export function renderPlanner() {
   const doc = completeDocument()
-  doc.step = 9
+  doc.step = 10
   localStorage.setItem(storageKey, JSON.stringify(doc))
   return render(<App />)
 }

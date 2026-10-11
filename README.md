@@ -33,7 +33,7 @@ npm run check    # lint, tests, and production build
 - `src/engine`: pure deterministic financial engines and annual composition.
 - `src/simulation`: extension point for seeded Monte Carlo orchestration.
 - `src/components`: reusable layout and presentation components.
-- `src/pages`: household setup, current overview and future planner screens.
+- `src/pages`: household setup, current overview, dashboard and plan settings screens.
 - `src/test`: shared test setup; tests sit beside the behavior they verify.
 
 UI consumes domain data; financial calculations belong in the engine, never in
@@ -52,7 +52,7 @@ nominal and must be handled separately by future mortgage logic.
 
 First load starts with an empty household. The setup journey collects people and
 full dates of birth, current earnings, defined-contribution pensions, ISAs, cash,
-housing and regular spending. Review and overview screens keep unknown amounts
+housing and regular spending. Review, overview and dashboard screens keep unknown amounts
 separate from explicit zero; incomplete balances do not produce complete net worth.
 Adult ownership is explicit for cash, property and mortgages. Children are tracked
 separately from adult accounts, with later age-band costs required for forecasts.
@@ -162,4 +162,34 @@ show an actionable message. Earnings/spending start at zero/unconfigured.
 
 V1 supports one home/mortgage and one individually owned ISA/pension per adult;
 inconsistent ownership, conflicting move/refinance years and unsupported generic
-events are reported, not silently ignored. Inputs stay in memory until reload.
+events are reported, not silently ignored. Inputs are saved in browser-local storage.
+
+## Dashboard and life events
+
+Completing setup opens the dashboard. Main navigation separates the dashboard,
+current household picture and detailed plan settings. The dashboard shows current
+net worth, projected net worth at household FIRE, an indicative annual withdrawal
+estimate and the first unfunded year. FIRE is anchored to the year the last adult
+reaches their configured FIRE age (or the base year if already retired). Estimates
+use year-end balances. Withdrawal estimates apply the chosen rate to ISAs, positive
+cash and pensions accessible by each owner's age; locked pensions and home equity
+are excluded. This does not introduce pension drawdown or retirement tax modelling.
+
+SVG charts show opening balances today and annual closing net worth, with FIRE
+and event markers, plus stacked bars for ISAs, pensions, cash and home equity.
+Negative balances appear below zero. A keyboard-accessible year picker exposes
+exact values; annual results and reconciliation remain available below the charts.
+
+The shared goal/life-event dialog supports existing-home moves, future children
+with parental work changes, purchases with optional recurring costs, and lifestyle
+spending changes. It previews the candidate against the saved plan before saving.
+Cancel discards the draft; saved events can be edited, toggled or deleted. Incomplete
+households can save valid events with an unavailable preview. Move/refinance and
+parental work conflicts are rejected. Final years for purchase running costs and
+spending changes are inclusive in the dialog and converted to exclusive model ends.
+
+Purchases are cost-only: car resale value, rental property assets, rental income
+and additional property financing are not modelled. Purchase costs are stored as
+grouped events and translated into spending only when forecasting, avoiding double
+counting. Existing version-1 saved documents default missing purchases to an empty
+list; original event collections remain the source of truth.
