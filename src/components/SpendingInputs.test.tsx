@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import App from '../App'
+import { afterEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { renderPlanner } from '../test/renderPlanner'
+vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 afterEach(cleanup)
 it('updates spending/surplus and preserves assumptions while toggling events', () => {
-  render(<App />)
+  renderPlanner()
   const equity = screen.getByLabelText('Equity expected real return (%)')
   fireEvent.change(equity, { target: { value: '6' } }); fireEvent.blur(equity)
   fireEvent.change(screen.getByLabelText('Annual baseline lifestyle spending (GBP)'), { target: { value: '30000' } })

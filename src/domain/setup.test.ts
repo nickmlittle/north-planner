@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ageOn, amount, decodeDocument, emptyPerson, householdErrors, missingDetails, newDocument, snapshotTotals, toForecastInput, validDOB } from './setup'
+import { ageOn, amount, decodeDocument, emptyPerson, householdErrors, missingDetails, newDocument, snapshotTotals, toForecastInput, validDOB, withSnapshot } from './setup'
 import { forecastResult } from '../engine/forecast'
 
-export function completeDocument() {
-  const d = newDocument(); const p = emptyPerson('you')
-  Object.assign(p, { name: 'Alex', dob: '1990-06-14', incomeKind: 'paye', pay: '5000', frequency: 'month', pensionStatus: 'yes', pension: '100000', employee: '5', employer: '3', treatment: 'salary-sacrifice', isaType: 'stocks-and-shares', isa: '20000' })
-  Object.assign(d.snapshot, { name: 'Alex household', people: [p], housing: 'own', homeValue: '500000', homeOwners: [p.id], mortgageStatus: 'yes', mortgageBalance: '250000', rate: '4.5', term: '25', borrowers: [p.id], spending: '2000', noCash: true })
-  return d
-}
+import { completeDocument } from '../test/setupFixture'
+
 describe('household setup', () => {
   it('starts empty and distinguishes zero, unknown and invalid amounts', () => {
     expect(newDocument().snapshot.people).toEqual([])
@@ -57,6 +53,19 @@ describe('household setup', () => {
     const input = toForecastInput(d)
     expect(input.household.people).toHaveLength(1)
     expect(input.children[0]!.costs).toMatchObject({ ages5to11: 4800, ages12to18: 3000 })
+  })
+  it('preserves future jobs and valid timelines during current draft edits', () => {
+    const d = completeDocument()
+    const first = toForecastInput(d).income[0]!
+    d.incomeTimeline = [{ ...first, endYear: 2030 }, { ...first, id: 'later-job', startYear: 2030, annualSalary: 80000 }]
+    const nameEdit = withSnapshot(d, { ...d.snapshot, people: d.snapshot.people.map(p => ({ ...p, name: 'Alexandra' })) })
+    expect(nameEdit.incomeTimeline).toEqual(d.incomeTimeline)
+    const payEdit = withSnapshot(d, { ...d.snapshot, people: d.snapshot.people.map(p => ({ ...p, pay: '6000' })) })
+    expect(payEdit.incomeTimeline!.find(i => i.id === first.id)).toMatchObject({ annualSalary: 72000, endYear: 2030 })
+    expect(payEdit.incomeTimeline!.find(i => i.id === 'later-job')).toMatchObject({ annualSalary: 80000 })
+    const invalid = withSnapshot(payEdit, { ...payEdit.snapshot, people: payEdit.snapshot.people.map(p => ({ ...p, employee: 'abc' })) })
+    expect(decodeDocument(JSON.stringify(invalid))).toEqual(invalid)
+    expect(() => toForecastInput(invalid)).toThrow('contributions')
   })
   it('rejects corrupted saved documents and preserves legitimate drafts', () => {
     const d = completeDocument()
