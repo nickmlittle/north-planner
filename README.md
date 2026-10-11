@@ -28,12 +28,12 @@ npm run check    # lint, tests, and production build
 
 - `src/domain`: shared TypeScript models; no framework dependencies.
 - `src/config`: default household fixture and independent configuration loader.
-- `src/state`: React application state, initialized from configuration.
+- `src/state`: persisted household document and legacy configuration helpers.
 - `src/formatting`: reusable GBP display formatting.
 - `src/engine`: pure deterministic financial engines and annual composition.
 - `src/simulation`: extension point for seeded Monte Carlo orchestration.
 - `src/components`: reusable layout and presentation components.
-- `src/pages`: page-level presentation; the single home page needs no router yet.
+- `src/pages`: household setup, current overview and future planner screens.
 - `src/test`: shared test setup; tests sit beside the behavior they verify.
 
 UI consumes domain data; financial calculations belong in the engine, never in
@@ -50,35 +50,27 @@ and real terms at the type level. Annual real asset returns use decimal rates
 (e.g. 0.03 for 3% above inflation). Mortgage contractual interest is explicitly
 nominal and must be handled separately by future mortgage logic.
 
-The default household uses the supplied starting values: Nick age 32, Immy age
-31, ISAs £88,000 / £1,000, pensions £117,000 / £25,000, house £850,000,
-mortgage £446,000, and cash £0, at base year 2026. ISAs provisionally use the
-stocks-and-shares type and property/cash use joint owner IDs. These classifications
-have no calculated effects yet. Unknown FIRE ages, pension access ages, returns,
-and mortgage interest/term remain `null`. The 2026–2100 horizon is provisional.
+First load starts with an empty household. The setup journey collects people and
+full dates of birth, current earnings, defined-contribution pensions, ISAs, cash,
+housing and regular spending. Review and overview screens keep unknown amounts
+separate from explicit zero; incomplete balances do not produce complete net worth.
+Adult ownership is explicit for cash, property and mortgages. Children are tracked
+separately from adult accounts, with later age-band costs required for forecasts.
 
-Ages are whole years at the base year, represented by approximate birth years
-(1994 / 1995 initially); no birthday precision is implied. Changing the base year
-preserves birth years and therefore changes displayed ages. The base year must
-not exceed the planning horizon or put a person's age outside 1–120. Changing it
-does not change the real 2026 GBP price basis or inflate balances.
+Progress and planner edits are stored in localStorage under `north.household.v1`.
+Reload resumes the last screen. Invalid amount text is preserved in drafts. A
+malformed or unsupported saved document is preserved until the user chooses to
+replace it; unavailable browser storage falls back to a session draft. This is
+browser-local storage: there is no account, cross-device sync or backend.
 
-Starting-position parsing and immutable updates live in `src/domain`, independent
-of React. Valid edits immediately update the household. Invalid text stays in the
-input with an accessible error while the last valid numeric domain value is
-retained. Money inputs show formatted GBP when idle and plain decimal pounds when
-focused; enter without currency symbols or separators, with up to two decimals.
-Negative, blank, malformed, non-finite, and out-of-range numbers are rejected.
-Zero balances are valid. Changes stay in memory and reset to defaults on reload.
+The planner uses annual calendar-year ages derived from DOB and real 2026 GBP.
+Current earnings initially continue until FIRE; the income timeline supports later
+changes. Starting-picture edits reconcile current earnings while preserving future
+periods. Pension income, defined-benefit pensions, pension withdrawals,
+self-employment and outside-IR35 earnings are not supported in this version.
+The legacy Nick/Immy configuration remains a test fixture, not first-load user data.
 
-Each load deep-clones the fixture. Asset ownership and mortgage/property
-relationships use stable IDs. Financial events represent one-off signed cash
-flows; life events carry descriptive context. Their effects are not implemented.
-
-There is no simulation, persistence, backend or authentication. Annual forecasts
-and tax outputs are planning estimates, with explicit limitations below.
-
-KAN-7 adds session-owned planning assumptions, separate from the starting household.
+KAN-7 adds editable planning assumptions, separate from the starting household.
 Illustrative defaults: equity 4% real / 15% volatility, bonds 1% / 5%, house 0%,
 cash fixed 0%, FIRE 50, pension access 58, horizon 95, withdrawal rate 3.5%.
 These are editable modelling inputs, not financial recommendations. Forecast
@@ -87,7 +79,7 @@ recalculation is integrated by KAN-16; scenario toggles arrive in later tickets.
 KAN-8 uses inclusive start/exclusive end calendar-year income periods. Multiple
 sequential jobs are supported per person, with an optional working fraction and
 gross override. Overlapping jobs or linked work adjustments are rejected rather
-than silently stacked. No earnings are invented; configure income in the UI.
+than silently stacked. Current earnings come from setup and can be edited in the UI.
 Inside-IR35 day rates are assumed to be taxable worker gross pay, not umbrella
 assignment rates inclusive of employer NI/fees. Partial-year payroll is excluded.
 
@@ -111,7 +103,7 @@ employer NI recycling are excluded. See [HMRC pension relief](https://www.gov.uk
 KAN-11 adds baseline lifestyle spending and stacking annual spending-change
 periods, with start inclusive/end exclusive. Combined spending cannot be negative.
 Mortgage, child costs and tax remain separate. Base-year surplus before mortgage
-and children updates immediately. Baseline zero is explicitly unconfigured.
+and children updates immediately. Explicit zero spending is accepted.
 
 KAN-12 adds individually toggleable children, one-off birth costs, editable
 annual age bands 0–2/3–4/5–11/12–18 and linked parental work changes. No child
@@ -122,7 +114,7 @@ Calendar-year approximation includes a full cost year at birth and age 18.
 KAN-13 implements nominal monthly repayment amortisation, capped overpayments
 and year-boundary remortgages. Overpayments retain the contractual monthly
 payment and shorten payoff; refinancing recalculates it using remaining principal.
-Personal interest/term start blank and must be entered. Inflation for nominal
+Mortgage interest and term come from household setup. Inflation for nominal
 mortgage conversion is explicit, initially 0% (nominal equals real). Nominal debt
 is carried between years; payments use each year's opening price index and
 closing debt the next year's index. No lender fees, ERCs or interest-only loans.

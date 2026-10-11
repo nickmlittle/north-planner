@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import App from '../App'
 import { StartingPosition } from './StartingPosition'
 import { useHousehold } from '../state/useHousehold'
 
@@ -13,7 +12,7 @@ function StateHarness() {
 }
 
 it('displays all default inputs and formats every balance as GBP', () => {
-  render(<App />)
+  render(<StateHarness />)
   for (const [label, value] of [
     ['Nick age', '32'], ['Immy age', '31'], ['Base year', '2026'],
     ['Nick ISA balance (GBP)', '£88,000.00'], ['Immy ISA balance (GBP)', '£1,000.00'],
@@ -59,12 +58,11 @@ it('accepts zero mortgage and updates age edits in the household model', () => {
 })
 
 it('updates displayed ages when editing the base year and flags invalid years', () => {
-  render(<App />)
+  render(<StateHarness />)
   const year = screen.getByLabelText('Base year')
   fireEvent.change(year, { target: { value: '2027' } })
   expect(screen.getByLabelText('Nick age')).toHaveValue('33')
   expect(screen.getByLabelText('Immy age')).toHaveValue('32')
-  expect(screen.getByText('Planning basis: real 2026 GBP.')).toBeVisible()
   fireEvent.change(year, { target: { value: '2101' } })
   expect(year).toHaveAttribute('aria-invalid', 'true')
   expect(screen.getByLabelText('Nick age')).toHaveValue('33')
