@@ -51,6 +51,13 @@ h1:focus, .error-summary:focus { outline: none; }
 .brand-button { border: 0; background: none; padding: 0; margin: 0; }
 .header-caption { margin-left: auto; text-transform: uppercase; font-size: 11px; letter-spacing: 1.7px; color: #5e7065; }
 .save-status { font-size: 12px; color: #617861; background: #f0f4eb; padding: 7px 12px; border-radius: 20px; white-space: nowrap; }
+.account-screen { max-width: 620px; margin: 12vh auto 0; padding: 40px; background: #fff; border: 1px solid #e4e9e1; border-radius: 12px; }
+.account-screen h1 { margin: 8px 0 12px; }
+.account-form { display: grid; gap: 12px; margin-top: 28px; }
+.account-form input { min-height: 46px; border: 1px solid #9eaa9e; border-radius: 6px; padding: 10px 12px; font: inherit; }
+.account-bar { display: flex; align-items: center; justify-content: flex-end; gap: 18px; min-height: 42px; padding: 4px 5vw; background: #f5f7f3; color: #536256; font-size: 12px; }
+.account-bar .text-button { font-size: 12px; }
+.cloud-warning { position: sticky; top: 0; z-index: 2; }
 .journey-layout { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 56px; padding: 48px; }
 .journey-layout.without-sidebar { display: block; }
 .journey-sidebar { align-self: start; position: sticky; top: 32px; }
@@ -175,6 +182,8 @@ h1:focus, .error-summary:focus { outline: none; }
   .planner-main .household-card { padding: 20px; }
   .storage-warning { padding: 16px 20px; }
   .storage-warning button { margin: 10px 0 0; }
+  .account-screen { margin: 7vh 16px 0; padding: 26px 20px; }
+  .account-bar { gap: 8px; padding: 8px 16px; flex-wrap: wrap; justify-content: space-between; }
   .journey-footer { line-height: 1.8; }
 }
 

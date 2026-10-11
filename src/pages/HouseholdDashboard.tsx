@@ -10,8 +10,8 @@ import { PlanEvents } from '../components/PlanEvents'
 import { ForecastCharts } from '../components/ForecastCharts'
 import { ForecastResults } from '../components/ForecastResults'
 
-export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void
+export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus(); window.scrollTo?.(0, 0) }, [])
@@ -26,7 +26,7 @@ export function HouseholdDashboard({ document: doc, setDocument, warning, replac
     { title: 'Indicative annual withdrawal at FIRE', value: money(metrics?.annualWithdrawal), detail: `${Number((doc.planning.withdrawalRate * 100).toFixed(2))}% of accessible investments` },
     { title: 'First unfunded year', value: metrics ? metrics.firstUnfundedYear?.toString() ?? 'None' : 'Not available', detail: metrics?.firstUnfundedYear ? 'Cash and ISAs no longer cover planned costs' : 'Within the projection horizon' },
   ]
-  return <div className="north-shell dashboard-shell"><PlannerHeader step={9} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} />
+  return <div className="north-shell dashboard-shell"><PlannerHeader step={9} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} />
     <main className="dashboard-main"><p className="eyebrow">{doc.snapshot.name} · A little direction</p><h1 ref={heading} tabIndex={-1}>Your future, in perspective.</h1><p className="page-description">See where your household is heading. Make room for the life you want along the way.</p>
       <div className="dashboard-tiles">{tiles.map(tile => <section className="dashboard-tile" key={tile.title}><h2>{tile.title}</h2><p>{tile.value}</p><small>{tile.detail}</small></section>)}</div>
       <details className="metric-explanation"><summary>How the FIRE withdrawal estimate works</summary><p>We use year-end balances when the youngest adult reaches the configured FIRE age, or the base year if everyone has already reached it. The estimate applies your withdrawal rate to ISAs, positive cash and pensions whose owners have reached pension access age. Home equity and locked pensions are excluded.</p>{metrics && <p>Accessible investments: {money(metrics.accessible)}. Locked pensions excluded: {money(metrics.lockedPension)}.</p>}<p>This is an indicative estimate, not a model of sustainable retirement income. Pension withdrawals and retirement tax are not modelled; the forecast continues to fund costs from cash and ISAs.</p></details>
@@ -35,6 +35,6 @@ export function HouseholdDashboard({ document: doc, setDocument, warning, replac
       {input && !result.error && <ForecastCharts input={input} rows={result.rows} events={planEvents(doc)} />}
       <PlanEvents document={doc} setDocument={setDocument} />
       <details className="forecast-details"><summary>Explore annual forecast and reconciliation</summary><ForecastResults result={result} people={input?.household.people ?? []} /></details>
-      <footer className="journey-footer">Deterministic projection · Real 2026 GBP · Saved on this device</footer>
+      <footer className="journey-footer">Deterministic projection · Real 2026 GBP · {accountBacked ? 'Saved to your account' : 'Saved on this device'}</footer>
     </main></div>
 }

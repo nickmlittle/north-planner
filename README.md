@@ -57,11 +57,30 @@ separate from explicit zero; incomplete balances do not produce complete net wor
 Adult ownership is explicit for cash, property and mortgages. Children are tracked
 separately from adult accounts, with later age-band costs required for forecasts.
 
-Progress and planner edits are stored in localStorage under `north.household.v1`.
-Reload resumes the last screen. Invalid amount text is preserved in drafts. A
-malformed or unsupported saved document is preserved until the user chooses to
-replace it; unavailable browser storage falls back to a session draft. This is
-browser-local storage: there is no account, cross-device sync or backend.
+Progress and planner edits are stored in localStorage under `north.household.v1`
+when Supabase is not configured. For account-backed persistence, set
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env.example`, apply
+`supabase/migrations/202610110001_households.sql`, and configure the Supabase
+email provider plus the app's deployed URL as an allowed redirect URL. Users
+sign in with an emailed link; their versioned household document is stored in a
+row protected by Postgres row-level security. Existing browser data is imported
+when the account has no household. When both versions exist, the user chooses
+which to keep. Concurrent edits are detected by revision and require an explicit
+choice. Cloud saves are automatic; a failed save keeps the draft in this browser
+and displays an error. No offline write queue is provided.
+
+## Preview on GitHub Pages
+
+The repository includes a GitHub Actions workflow that builds and publishes
+`main` to GitHub Pages. In repository **Settings → Pages**, choose **GitHub
+Actions** as the deployment source and optionally set a custom domain such as
+`north.nicklittle.co`. Add the repository Actions variables `VITE_SUPABASE_URL`
+and `VITE_SUPABASE_ANON_KEY`; these are public browser configuration values,
+and database access is restricted by row-level security. In Supabase
+**Authentication → URL Configuration**, set the site URL to the deployed URL
+and add it to the allowed redirect URLs. The workflow builds for the root of the
+custom domain; local development also uses `/` and reads configuration from
+`.env.local`.
 
 The planner uses annual calendar-year ages derived from DOB and real 2026 GBP.
 Current earnings initially continue until FIRE; the income timeline supports later
