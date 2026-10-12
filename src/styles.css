@@ -124,11 +124,6 @@ h1:focus, .error-summary:focus { outline: none; }
 .missing-list { margin: 0; padding: 0; list-style: none; }
 .missing-list li { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid #edf0e7; padding: 12px 0; font-size: 14px; }
 .missing-list button { flex-shrink: 0; }
-.totals-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.total-card { padding: 24px; background: white; border: 1px solid #dfe5d8; border-radius: 12px; }
-.total-card:last-child { background: #e9efe3; border-color: #d5e0cb; }
-.total-card h2 { color: #6d7e66; font-size: 13px; font-weight: 500; margin: 0 0 12px; }
-.total-card p { color: #2d4b35; font-size: clamp(21px, 2.5vw, 30px); font-weight: 600; letter-spacing: -.7px; margin: 0; }
 .overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .overview-grid .setup-card { min-width: 0; }
 .overview-grid .balance-row { align-items: flex-start; }
@@ -180,10 +175,6 @@ h1:focus, .error-summary:focus { outline: none; }
   .welcome-grid { grid-template-columns: 1fr; gap: 24px; margin-top: 32px; }
   .welcome-visual { min-height: 280px; }
   .visual-ring { height: 210px; }
-  .totals-grid { grid-template-columns: 1fr; gap: 10px; }
-  .total-card { padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .total-card h2 { margin: 0; }
-  .total-card p { font-size: 23px; }
   .people-summary li { flex-direction: column; gap: 4px; }
   .review-row { flex-wrap: wrap; gap: 10px; }
   .planner-main { padding: 32px 20px; }
@@ -333,11 +324,11 @@ body { background: var(--cream); color: var(--charcoal); }
 .dashboard-main h1, .journey-main h1, .planner-main h1, .welcome-main h1, .account-screen h1 { font-family: var(--font-family); color: var(--pine); font-weight: 500; letter-spacing: -.6px; }
 .dashboard-main h1 { margin-bottom: 0; font-size: clamp(36px, 4vw, 48px); }
 .page-description { color: #59665a; }
-.setup-card, .household-card, .dashboard-tile, .total-card, .account-screen { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 6px #28382a0a; }
+.setup-card, .household-card, .dashboard-tile, .account-screen { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 6px #28382a0a; }
 .dashboard-tile { padding: 20px; }
 .dashboard-tile:nth-child(3) { background: var(--soft-fern); border-color: #c7cbbb; }
-.dashboard-tile h2, .total-card h2 { color: #52644f; }
-.dashboard-tile > p, .total-card p { color: var(--pine); font-variant-numeric: tabular-nums lining-nums; }
+.dashboard-tile h2 { color: #52644f; }
+.dashboard-tile > p { color: var(--pine); font-variant-numeric: tabular-nums lining-nums; }
 .dashboard-tiles { gap: 14px; }
 .setup-card { padding: 24px; margin: 18px 0; }
 .setup-card h2, .household-card h2, .chart-card h2 { font-family: var(--font-family); font-weight: 500; color: var(--pine); letter-spacing: 0; }
@@ -385,7 +376,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .journey-sidebar button[aria-current] { background: #dfe5d6; color: var(--pine); }
 .journey-sidebar button[aria-current] .step-number { background: var(--pine); border-color: var(--pine); }
 .step-number { border-color: #aeb8a5; }
-.total-card:last-child { background: var(--soft-fern); border-color: #c6ccba; }
 .next-journey { background: #e5e8d9; border-radius: 10px; }
 .welcome-visual { background: #e5e8d9; border-color: var(--line); border-radius: 10px; }
 .status-chip { color: var(--pine); background: #e5eadf; }
@@ -724,6 +714,19 @@ small, .muted, footer { color: #59665a; }
 .settings-heading { align-items: flex-start; margin-top: 4px; margin-bottom: 20px; }
 .settings-heading .page-description { margin-top: 10px; }
 .settings-content > :first-child { margin-top: 0; }
+.household-summary-layout { display: block; padding: 0; }
+.household-summary-main { max-width: none; }
+.household-summary-content { margin-inline: auto; }
+.household-summary-content .dashboard-tiles { margin-bottom: 20px; }
+.household-summary-content .household-total-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.household-summary-content .overview-grid { align-items: start; }
+.household-summary-content .overview-grid .setup-card { margin-top: 0; }
+@media (max-width: 1050px) {
+  .household-summary-content .household-total-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .household-summary-content .household-total-tiles { grid-template-columns: 1fr; }
+}
 .settings-nav-item { position: relative; display: flex; align-items: center; }
 .settings-dropdown { position: absolute; top: 100%; left: 0; z-index: 50; display: grid; width: max-content; min-width: 230px; max-width: min(320px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 10px 24px #203e3230; }
 .settings-dropdown button { width: 100%; margin: 0; padding: 9px 12px; border: 0; border-radius: 5px; background: transparent; color: var(--pine); text-align: left; font-size: 13px; font-weight: 500; }
