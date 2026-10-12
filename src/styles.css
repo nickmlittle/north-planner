@@ -55,6 +55,12 @@ h1:focus, .error-summary:focus { outline: none; }
 .account-screen h1 { margin: 8px 0 12px; }
 .account-form { display: grid; gap: 12px; margin-top: 28px; }
 .account-form input { min-height: 46px; border: 1px solid #9eaa9e; border-radius: 6px; padding: 10px 12px; font: inherit; }
+.account-options { display: grid; gap: 12px; margin-top: 28px; }
+.account-options .account-hint { margin: 0; color: #6d7e66; font-size: 13px; }
+.account-options .text-button { justify-self: start; }
+.passkey-setup { display: flex; align-items: center; gap: 10px; }
+.passkey-setup .secondary-button { min-height: 36px; padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+.passkey-setup [role="status"] { max-width: 280px; font-size: 11px; }
 .account-bar { display: flex; align-items: center; justify-content: flex-end; gap: 18px; min-height: 42px; padding: 4px 5vw; background: #f5f7f3; color: #536256; font-size: 12px; }
 .account-bar .text-button { font-size: 12px; }
 .cloud-warning { position: sticky; top: 0; z-index: 2; }
@@ -184,6 +190,7 @@ h1:focus, .error-summary:focus { outline: none; }
   .storage-warning button { margin: 10px 0 0; }
   .account-screen { margin: 7vh 16px 0; padding: 26px 20px; }
   .account-bar { gap: 8px; padding: 8px 16px; flex-wrap: wrap; justify-content: space-between; }
+  .passkey-setup { order: 3; width: 100%; flex-wrap: wrap; }
   .journey-footer { line-height: 1.8; }
 }
 

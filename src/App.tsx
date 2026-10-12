@@ -7,6 +7,7 @@ import { useAppDocument } from './state/useAppDocument'
 import { useCloudDocument } from './state/useCloudDocument'
 import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
+import { PasskeySetup } from './components/PasskeySetup'
 import { DocumentConflict } from './components/DocumentConflict'
 
 function PlannerApp() {
@@ -21,7 +22,7 @@ function CloudPlanner({ session }: { session: Session }) {
   if (!state.document) return <main className="account-screen"><h1>{state.status || 'Household unavailable'}</h1>{state.error && <p role="alert" className="error-summary">{state.error}</p>}<div className="button-row"><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => void signOut()}>Sign out</button></div></main>
   const document = state.document
   const props = { ...state, document, warning: state.error, saveStatus: state.status, replaceSavedDraft: () => {}, accountBacked: true }
-  return <><div className="account-bar"><span>Signed in as {session.user.email ?? 'your account'}</span><span role="status">{state.status}</span><button className="text-button" onClick={() => void signOut()}>Sign out</button></div>
+  return <><div className="account-bar"><span>Signed in as {session.user.email ?? 'your account'}</span><span role="status">{state.status}</span><PasskeySetup /><button className="text-button" onClick={() => void signOut()}>Sign out</button></div>
     {document.step === 9 ? <HouseholdDashboard {...props} /> : document.step === 10 ? <HouseholdPlanner {...props} /> : <HouseholdJourney {...props} />}
     {state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}
   </>

@@ -61,13 +61,35 @@ Progress and planner edits are stored in localStorage under `north.household.v1`
 when Supabase is not configured. For account-backed persistence, set
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env.example`, apply
 `supabase/migrations/202610110001_households.sql`, and configure the Supabase
-email provider plus the app's deployed URL as an allowed redirect URL. Users
-sign in with an emailed link; their versioned household document is stored in a
-row protected by Postgres row-level security. Existing browser data is imported
-when the account has no household. When both versions exist, the user chooses
-which to keep. Concurrent edits are detected by revision and require an explicit
-choice. Cloud saves are automatic; a failed save keeps the draft in this browser
-and displays an error. No offline write queue is provided.
+Google and email providers plus the app's deployed URL as an allowed redirect
+URL. Users sign in with a passkey, or use Google to create/sign in to an account
+before adding a passkey. Email sign-in links remain available as a recovery path
+for accounts without a usable passkey. Their versioned household document is
+stored in a row protected by Postgres row-level security. Existing browser data
+is imported when the account has no household. When both versions exist, the
+user chooses which to keep. Concurrent edits are detected by revision and
+require an explicit choice. Cloud saves are automatic; a failed save keeps the
+draft in this browser and displays an error. No offline write queue is provided.
+
+### Supabase passkey and Google setup
+
+In Supabase **Authentication → Providers → Google**, enable Google and enter the
+OAuth client ID and secret. Create a Web application OAuth client in Google
+Cloud Console and set its authorized redirect URI to
+`https://<project-ref>.supabase.co/auth/v1/callback` (copy the exact callback
+shown in the Supabase provider settings). In Supabase **Authentication → URL
+Configuration**, set the Site URL to `https://north.nicklittle.co` and allow
+that URL as a redirect. Also allow your local development URL if you use OAuth
+locally.
+
+In Supabase **Authentication → Passkeys**, enable passkey authentication and
+configure the relying party display name as `North Planner`, relying party ID
+as `north.nicklittle.co`, and allowed origin as
+`https://north.nicklittle.co`. The relying party ID is bound into enrolled
+credentials; choose the final production domain before users add passkeys and
+keep it stable. If the site is served from another hostname, update both the
+origin and relying party ID before enrollment. Passkeys use Supabase's
+experimental `supabase-js` API, which is enabled in the client configuration.
 
 ## Preview on GitHub Pages
 
@@ -81,6 +103,10 @@ and database access is restricted by row-level security. In Supabase
 and add it to the allowed redirect URLs. The workflow builds for the root of the
 custom domain; local development also uses `/` and reads configuration from
 `.env.local`.
+
+For passkey sign-in, point the custom domain to GitHub Pages and configure
+`north.nicklittle.co` as the relying party ID and `https://north.nicklittle.co`
+as the allowed origin in Supabase **Authentication → Passkeys**.
 
 The planner uses annual calendar-year ages derived from DOB and real 2026 GBP.
 Current earnings initially continue until FIRE; the income timeline supports later
