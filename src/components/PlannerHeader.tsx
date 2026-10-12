@@ -21,7 +21,7 @@ export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBac
   const status = warning ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus && /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
   const nav = <nav className="app-nav" aria-label="Main navigation">{links.map(([n, label]) => <button key={n} aria-current={step === n ? 'page' : undefined} onClick={() => { go(n); setMobileOpen(false) }}>{label}</button>)}</nav>
   return <><header className="north-header"><div className="header-inner">
-    <button className="brand brand-button" onClick={() => go(9)} aria-label="North dashboard"><span>north</span></button>
+    <button className="brand brand-button" onClick={() => go(9)} aria-label="North dashboard"><span>north.</span></button>
     {nav}
     <span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>
     {onSignOut && <div className="account-control"><button ref={accountButton} className="account-button" aria-label="Account menu" aria-haspopup="true" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button>

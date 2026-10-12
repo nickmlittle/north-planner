@@ -1,6 +1,6 @@
 import type { ForecastYear, Ledger } from '../domain/forecast'
 import type { Person } from '../domain/models'
-import { formatGBP } from '../formatting/money'
+import { formatGBPWhole as formatGBP } from '../formatting/money'
 
 function BalanceRow({ name, value }: { name: string; value: Ledger }) {
   return <tr><th scope="row">{name}</th><td>{formatGBP(value.opening)}</td><td>{formatGBP(value.flows)}</td><td>{formatGBP(value.returns)}</td><td>{formatGBP(value.closing)}</td></tr>

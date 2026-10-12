@@ -1,14 +1,13 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ForecastInput, ForecastYear } from '../domain/forecast'
 import type { PlanEvent } from '../domain/events'
 import { eventKey, eventName, eventYear } from '../domain/events'
 import { forecastChartPoints } from '../engine/dashboard'
-import { formatGBP } from '../formatting/money'
+import { formatGBPWhole, formatGBPAxis } from '../formatting/money'
 
 const colours = { isa: '#203e32', pension: '#70836a', cash: '#bc653d', equity: '#a5bbc2' }
-const names = { isa: 'ISAs', pension: 'Pensions', cash: 'Cash / unfunded need', equity: 'Home equity' }
+const names = { isa: 'ISAs', pension: 'Pensions', cash: 'Cash / shortfall', equity: 'Home equity' }
 const keys = ['isa', 'pension', 'cash', 'equity'] as const
-const compact = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
 export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: { input: ForecastInput; rows: ForecastYear[]; events: PlanEvent[]; onAddGoal: () => void; comparison?: { input: ForecastInput; rows: ForecastYear[] } }) {
   const normalizeCash = (points: ReturnType<typeof forecastChartPoints>) => points.map(point => ({
@@ -22,7 +21,23 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
   const point = scenarioPoints[selected]!
   const currentPoint = points[selected]!
   const id = useId()
-  const width = 1000, height = 360, left = 82, right = 24, top = 24, bottom = 42
+  const plotContainer = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(1000)
+  const [height, setHeight] = useState(360)
+  useEffect(() => {
+    const element = plotContainer.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(entries => {
+      const rect = entries[0]?.contentRect
+      if (!rect) return
+      if (rect.width) setWidth(Math.round(rect.width))
+      const isViewportFittedChart = window.matchMedia('(min-width: 1100px) and (min-height: 800px)').matches
+      setHeight(isViewportFittedChart && rect.height ? Math.round(rect.height) : 360)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const left = 60, right = 20, top = 44, bottom = 32
   const plotWidth = width - left - right, plotHeight = height - top - bottom
   const x = (i: number) => left + i / Math.max(1, points.length - 1) * plotWidth
   const cumulative = (p: typeof points[number], keyIndex: number) => keys.slice(0, keyIndex).reduce((sum, key) => sum + (p[key] >= 0 ? p[key] : 0), 0)
@@ -35,9 +50,10 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
   const low = minimum < 0 ? minimum - margin : 0, high = maximum + margin
   const y = (value: number) => top + (high - value) / (high - low) * plotHeight
   const ticks = Array.from({ length: 5 }, (_, i) => low + (high - low) * i / 4)
-  const tickIndexes = [...new Set([0, ...Array.from({ length: 5 }, (_, i) => Math.round((scenarioPoints.length - 1) * (i + 1) / 5))])]
+  const tickCount = width < 480 ? 3 : width < 800 ? 4 : 6
+  const tickIndexes = [...new Set(Array.from({ length: tickCount }, (_, i) => Math.round((scenarioPoints.length - 1) * i / (tickCount - 1))))]
   const enabled = events.filter(e => e.value.enabled)
-  const fireMilestones = input.household.people.map(p => ({ id: p.id, name: `${p.name} reaches FIRE`, year: p.birthYear! + (p.targetFireAge ?? input.planning.fireAge) }))
+  const fireMilestones = input.household.people.map(p => ({ id: p.id, name: `${p.name} reaches FIRE`, label: `${p.name.split(/\s+/)[0]} · FIRE`, year: p.birthYear! + (p.targetFireAge ?? input.planning.fireAge) }))
   const areaPath = (keyIndex: number) => {
     const key = keys[keyIndex]!
     const topPath = scenarioPoints.map((p, i) => {
@@ -72,25 +88,26 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
   }).join(' ')
   return <section className="charts-section" aria-labelledby="net-worth-chart-heading">
     <div className="setup-card chart-card">
-      <div className="section-heading chart-title-row"><div><p className="eyebrow">The bigger picture</p><h2 id="net-worth-chart-heading">Net worth through time</h2></div><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
+      <div className="section-heading chart-title-row"><h2 id="net-worth-chart-heading">Net worth over time</h2><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
+      <p className="chart-basis">Today’s money · real 2026 GBP</p>
       <ul className="chart-legend" aria-label="Chart legend"><li><span className="net-worth-key"/>{comparison ? 'What-if net worth' : 'Net worth'}</li>{comparison && <li><span className="current-plan-key"/>Current plan</li>}{keys.map(k => <li key={k}><span style={{ background: colours[k] }} />{names[k]}</li>)}</ul>
-      <div className="chart-scroll"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Combined net worth and asset category chart. Select a year below for exact values."><title>Net worth and account categories over time</title>
-        {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{compact(v)}</text></g>)}
+      <div className="chart-scroll" ref={plotContainer}><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Combined net worth and asset category chart. Select a year below for exact values."><title>Net worth and account categories over time</title>
+        {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{formatGBPAxis(v)}</text></g>)}
         <line x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#93a18c"/>
         {tickIndexes.map(i => <text key={i} x={x(i)} y={height - 10} textAnchor={i === 0 ? 'start' : i === scenarioPoints.length - 1 ? 'end' : 'middle'}>{scenarioPoints[i]!.label}</text>)}
         {keys.slice(0, 2).map((key, i) => <path key={key} d={areaPath(i)} fill={colours[key]} fillOpacity=".66" stroke={colours[key]} strokeWidth="1"/>)}
         <path className="cash-positive-area" d={cashAreaPaths(1)} fill={colours.cash} fillOpacity=".66"/>
         <path className="cash-negative-area" d={cashAreaPaths(-1)} fill={colours.cash} fillOpacity=".66"/>
         <path d={areaPath(3)} fill={colours.equity} fillOpacity=".66" stroke={colours.equity} strokeWidth="1"/>
-        {fireMilestones.map((m, markerIndex) => { const i = scenarioPoints.findIndex((p, index) => index > 0 && p.year === m.year); return i < 0 ? null : <g key={m.id}><title>{m.name} · {m.year}</title><line x1={x(i)} x2={x(i)} y1={top} y2={height - bottom} stroke="#50684c" strokeDasharray="5 5"/><text x={x(i)} y={markerIndex % 2 ? 13 : 9} textAnchor="middle">FIRE</text></g> })}
+        {fireMilestones.map((m, markerIndex) => { const i = scenarioPoints.findIndex((p, index) => index > 0 && p.year === m.year); return i < 0 ? null : <g key={m.id}><title>{m.name} · {m.year}</title><line x1={x(i)} x2={x(i)} y1={top} y2={height - bottom} stroke="#50684c" strokeDasharray="5 5"/><text className="marker-label" x={x(i)} y={markerIndex % 2 ? 31 : 14} textAnchor={i < 4 ? 'start' : i > scenarioPoints.length - 5 ? 'end' : 'middle'}>{m.label}</text></g> })}
         {comparison && <path d={points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.netWorth)}`).join(' ')} fill="none" stroke="#bc653d" strokeWidth="3" strokeDasharray="8 6" strokeLinejoin="round"/>}
         <path d={scenarioPoints.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.netWorth)}`).join(' ')} fill="none" stroke="#172f27" strokeWidth="4" strokeLinejoin="round"/>
         {enabled.map(e => { const i = scenarioPoints.findIndex((p, index) => index > 0 && p.year === eventYear(e)); return i < 0 ? null : <circle key={eventKey(e)} cx={x(i)} cy={y(scenarioPoints[i]!.netWorth)} r="5" fill="#bc653d" stroke="#fff" strokeWidth="2"><title>{eventName(e)} · {eventYear(e)}</title></circle> })}
         <line x1={x(selected)} x2={x(selected)} y1={top} y2={height - bottom} stroke="#172f27" strokeDasharray="3 4"/><circle cx={x(selected)} cy={y(point.netWorth)} r="5" fill="#172f27"/>
-        {scenarioPoints.map((p, i) => <rect key={p.label} x={x(i) - plotWidth / scenarioPoints.length / 2} y={top} width={plotWidth / scenarioPoints.length} height={plotHeight} fill="transparent" onMouseEnter={() => setSelection(i)} onClick={() => setSelection(i)}><title>{p.label}: {formatGBP(p.netWorth)}</title></rect>)}
+        {scenarioPoints.map((p, i) => <rect key={p.label} x={x(i) - plotWidth / scenarioPoints.length / 2} y={top} width={plotWidth / scenarioPoints.length} height={plotHeight} fill="transparent" onMouseEnter={() => setSelection(i)} onClick={() => setSelection(i)}><title>{p.label} · Net worth {formatGBPWhole(p.netWorth)} · ISAs {formatGBPWhole(p.isa)} · Pensions {formatGBPWhole(p.pension)} · {p.cash < 0 ? `Funding shortfall ${formatGBPWhole(Math.abs(p.cash))}` : `Cash ${formatGBPWhole(p.cash)}`} · Home equity {formatGBPWhole(p.equity)}</title></rect>)}
       </svg></div>
-      <div className="chart-inspector"><label htmlFor={id}>Explore a year</label><select id={id} value={selected} onChange={e => setSelection(Number(e.target.value))}>{scenarioPoints.map((p, i) => <option key={p.label} value={i}>{p.label === 'Today' ? 'Today · opening balances' : `${p.label} · year-end`}</option>)}</select><strong>{comparison ? `What-if ${formatGBP(point.netWorth)} · Current ${formatGBP(currentPoint.netWorth)}` : formatGBP(point.netWorth)}</strong></div>
-      <div className="category-values" aria-live="polite"><strong>{point.label}</strong>{keys.map(k => <span key={k}>{names[k]} <b>{formatGBP(point[k])}</b></span>)}</div>
+      <div className="selected-year-panel"><div className="chart-inspector"><div className="selected-year-control"><label htmlFor={id}>Selected year</label><select id={id} value={selected} onChange={e => setSelection(Number(e.target.value))}>{scenarioPoints.map((p, i) => <option key={p.label} value={i}>{p.label === 'Today' ? 'Today · opening balances' : `${p.label} · year-end`}</option>)}</select></div><div className="selected-total"><span>Total net worth · {point.label}</span><strong>{comparison ? `What-if ${formatGBPWhole(point.netWorth)} · Current ${formatGBPWhole(currentPoint.netWorth)}` : formatGBPWhole(point.netWorth)}</strong></div></div>
+      <div className="category-values" aria-live="polite">{keys.map(k => <span key={k}>{k === 'cash' ? point.cash < 0 ? 'Funding shortfall' : 'Cash' : names[k]} <b>{k === 'cash' && point.cash < 0 ? `−${formatGBPWhole(Math.abs(point.cash))}` : formatGBPWhole(point[k])}</b></span>)}</div></div>
     </div>
   </section>
 }

@@ -4,7 +4,7 @@ import { ageBands, householdErrors, missingDetails } from '../domain/setup'
 import type { EventKind, PlanEvent } from '../domain/events'
 import { eventName, eventYear, putPlanEvent, validatePlanEvents } from '../domain/events'
 import { documentForecast } from '../state/forecast'
-import { formatGBP } from '../formatting/money'
+import { formatGBPWhole as formatGBP } from '../formatting/money'
 import { MoneyField, SetupField } from './SetupFields'
 import { defaultPropertyFeeRates, pricedPropertyMove, stampDutyLandTax } from '../domain/property'
 
@@ -68,7 +68,7 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
     }
     const year = (key: string) => { const n = number(key); if (!Number.isInteger(n) || n < 1900 || n > 9998) throw new Error('Enter whole calendar years from 1900 to 9998.'); return n }
     if (!(fields.name ?? '').trim()) throw new Error('Give this event a name.')
-    const common = { id, name: (fields.name ?? '').trim(), enabled: event?.value.enabled ?? true }
+    const common = { id, name: (fields.name ?? '').trim(), enabled: fields.__enabled === undefined ? event?.value.enabled ?? true : fields.__enabled === 'true' }
     switch (kind) {
       case 'move': return { kind, value: pricedPropertyMove({ ...common, year: year('year'), purchasePrice: number('purchasePrice'), stampDuty: 0, agentFees: 0, legalFees: 0,
         movingCosts: number('movingCosts'), renovation: 0, agentFeeRate: number('agentFeeRate') / 100, legalFeeRate: number('legalFeeRate') / 100,
@@ -128,6 +128,14 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
       {stage === 0 && <div className="event-choices">{choices.map(c => <button key={c.kind} className="event-choice" disabled={c.kind === 'move' && doc.snapshot.housing !== 'own'} onClick={() => { setKind(c.kind); setStage(1); title.current?.focus() }}><strong>{c.title}</strong><span>{c.description}</span>{c.kind === 'move' && doc.snapshot.housing !== 'own' && <small>Requires an existing home to sell. First-home buying comes later.</small>}</button>)}</div>}
       {stage === 1 && <form onSubmit={e => { e.preventDefault(); preview() }}>
         <p className="muted">{choices.find(c => c.kind === kind)?.title} · All costs in real 2026 GBP. Enter explicit zero where there is no cost.</p>
+        {event && <label className="checkbox-label event-enabled"><input type="checkbox" checked={fields.__enabled === undefined ? event.value.enabled : fields.__enabled === 'true'} onChange={e => {
+          const enabled = e.target.checked
+          const updated: PlanEvent = event.kind === 'move' ? { kind: 'move', value: { ...event.value, enabled } }
+            : event.kind === 'child' ? { kind: 'child', value: { ...event.value, enabled } }
+              : event.kind === 'purchase' ? { kind: 'purchase', value: { ...event.value, enabled } }
+                : { kind: 'spending', value: { ...event.value, enabled } }
+          setFields(f => ({ ...f, __enabled: String(enabled) })); setCandidate(updated)
+        }} />Include this event in the forecast</label>}
         {text('name', 'Event name')}
         {kind !== 'spending' && text('year', kind === 'child' ? 'Birth year' : kind === 'move' ? 'Move year' : 'Purchase year')}
         {kind === 'purchase' && <><SetupField label="Purchase type" value={fields.preset!} onChange={v => field('preset', v)}><option value="car">Car</option><option value="rental-costs">Rental-property purchase costs</option><option value="other">Other</option></SetupField>
