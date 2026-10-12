@@ -304,17 +304,18 @@ h1:focus, .error-summary:focus { outline: none; }
 }
 body { background: var(--cream); color: var(--charcoal); }
 .north-shell { max-width: none; }
-.north-header { background: var(--pine); color: var(--cream); border: 0; padding: 16px max(32px, calc((100vw - 1320px) / 2)); min-height: 72px; }
+.north-header { background: var(--pine); color: var(--cream); border: 0; padding: 16px max(32px, calc((100vw - 1480px) / 2 + 32px)); min-height: 72px; }
 .brand { color: var(--cream); font: 600 25px var(--serif); letter-spacing: .1px; gap: 9px; }
 .brand-mark { width: 34px; height: 34px; fill: none; stroke: var(--cream); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transform: none; }
 .brand-mark circle { stroke: #a9b79c; }
 .brand-mark path:first-of-type { fill: #a9b79c; stroke: #a9b79c; }
 .brand-dot { color: #d18860; margin-left: -9px; }
 .app-nav { gap: 5px; }
-.app-nav button { color: #e3e7d9; padding: 9px 14px; border-radius: 6px; }
+.app-nav button { color: #e3e7d9; padding: 9px 14px; border-radius: 6px; font-weight: 600; }
 .app-nav button:hover { background: #ffffff12; }
-.app-nav button[aria-current] { background: #f3eedf; color: var(--pine); }
+.app-nav button[aria-current] { background: #f3eedf; color: var(--pine); font-weight: 600; }
 .save-status { color: #e5eadf; background: #ffffff14; border: 1px solid #ffffff2e; border-radius: 5px; }
+.north-header > .save-status { box-sizing: border-box; flex: 0 0 clamp(164px, 14vw, 190px); text-align: center; }
 .dashboard-main, .planner-main { max-width: 1320px; padding: 40px 48px 64px; }
 .route-heading { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin: 4px 0 28px; }
 .route-heading .eyebrow { margin-bottom: 8px; }
@@ -388,8 +389,12 @@ small, .muted, footer { color: #59665a; }
   .north-header { padding: 16px 24px; }
   .dashboard-main, .planner-main { padding: 32px 24px 48px; }
 }
+@media (min-width: 901px) and (max-width: 1099px) {
+  .north-header { padding-inline: 48px; }
+}
 @media (max-width: 700px) {
   .north-header { background: var(--pine); }
+  .north-header { padding-inline: 18px; }
   .dashboard-main, .planner-main { padding: 26px 18px 40px; }
   .route-heading { align-items: flex-start; margin-bottom: 20px; }
   .route-illustration { flex-basis: 92px; width: 92px; height: 64px; }
