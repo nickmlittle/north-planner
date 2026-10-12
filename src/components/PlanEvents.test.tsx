@@ -130,11 +130,12 @@ it('previews a property move scenario without persistence until explicitly saved
   click('Dashboard')
   click('Explore a move')
   expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeDisabled()
+  const fireTile = screen.getByRole('heading', { name: 'Net worth at retirement' }).parentElement!
+  const currentFireValue = within(fireTile).getByText(/£|Not available/).textContent
   fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
   expect(saved().moves[0].year).toBe(2028)
   expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeEnabled()
-  const fireTile = screen.getByRole('heading', { name: 'Net worth at retirement' }).parentElement!
-  expect(within(fireTile).getByText(/What-if · current plan/)).toBeVisible()
+  expect(within(fireTile).getByText(/£|Not available/).textContent).not.toBe(currentFireValue)
   expect(screen.getByRole('list', { name: 'Chart legend' })).toHaveTextContent('Current plan')
   click('Reset to current plan')
   expect(saved().moves[0].year).toBe(2028)
