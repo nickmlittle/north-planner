@@ -48,7 +48,7 @@ export function useCloudDocument(user: User) {
           setState({ document: local, revision: data.revision, status: '', error: '', conflict: remote, needsChoice: true, dirty: false }); return
         }
         removeValidLocalCopies(user.id)
-        setState({ document: remote, revision: data.revision, status: 'Saved to your account', error: '', conflict: null, needsChoice: false, dirty: false }); return
+        setState({ document: remote, revision: data.revision, status: 'Saved', error: '', conflict: null, needsChoice: false, dirty: false }); return
       }
       const initial = local ?? newDocument()
       const { data: inserted, error: insertError } = await client.from('households').insert({ user_id: user.id, document: initial, revision: 1 }).select('revision').single()
@@ -59,14 +59,14 @@ export function useCloudDocument(user: User) {
           const remote = raced ? decodeDocument(JSON.stringify(raced.document)) : null
           if (!readError && raced && remote) {
             if (local && JSON.stringify(local) !== JSON.stringify(remote)) setState({ document: local, revision: raced.revision, status: '', error: '', conflict: remote, needsChoice: true, dirty: false })
-            else { removeValidLocalCopies(user.id); setState({ document: remote, revision: raced.revision, status: 'Saved to your account', error: '', conflict: null, needsChoice: false, dirty: false }) }
+            else { removeValidLocalCopies(user.id); setState({ document: remote, revision: raced.revision, status: 'Saved', error: '', conflict: null, needsChoice: false, dirty: false }) }
             return
           }
         }
         setState(s => ({ ...s, status: '', error: `Could not create your account household: ${insertError.message}` })); return
       }
       removeValidLocalCopies(user.id)
-      setState({ document: initial, revision: inserted.revision, status: 'Saved to your account', error: '', conflict: null, needsChoice: false, dirty: false })
+      setState({ document: initial, revision: inserted.revision, status: 'Saved', error: '', conflict: null, needsChoice: false, dirty: false })
     }
     void load()
     return () => { active = false }
@@ -89,7 +89,7 @@ export function useCloudDocument(user: User) {
           return
         }
         removeValidLocalCopies(user.id)
-        setState(s => ({ ...s, revision: data.revision, dirty: s.document !== document, status: s.document === document ? 'Saved to your account' : 'Saving…', error: '' }))
+        setState(s => ({ ...s, revision: data.revision, dirty: s.document !== document, status: s.document === document ? 'Saved' : 'Saving…', error: '' }))
       })
     }, 500)
     return () => window.clearTimeout(timer)
@@ -107,7 +107,7 @@ export function useCloudDocument(user: User) {
     if (!cloud || !supabase) return
     if (choice === 'cloud') {
       removeValidLocalCopies(user.id)
-      setState(s => ({ ...s, document: cloud, conflict: null, needsChoice: false, dirty: false, status: 'Saved to your account', error: '' }))
+      setState(s => ({ ...s, document: cloud, conflict: null, needsChoice: false, dirty: false, status: 'Saved', error: '' }))
       return
     }
     const next = state.document ?? newDocument()
@@ -120,7 +120,7 @@ export function useCloudDocument(user: User) {
       savePending(user.id, next); return
     }
     removeValidLocalCopies(user.id)
-    setState(s => ({ ...s, revision: data.revision, dirty: s.document !== next, status: s.document === next ? 'Saved to your account' : 'Unsaved changes', error: '' }))
+    setState(s => ({ ...s, revision: data.revision, dirty: s.document !== next, status: s.document === next ? 'Saved' : 'Unsaved changes', error: '' }))
   }
   return { ...state, setDocument, chooseConflict }
 }
