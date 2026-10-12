@@ -22,7 +22,18 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
-  useEffect(() => { heading.current?.focus(); window.scrollTo?.(0, 0) }, [])
+  useEffect(() => {
+    const target = window.location.hash.slice(1)
+    const field = target ? window.document.getElementById(target) as HTMLInputElement | null : null
+    if (field) {
+      field.scrollIntoView?.({ block: 'center' })
+      field.focus()
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    } else {
+      heading.current?.focus()
+      window.scrollTo?.(0, 0)
+    }
+  }, [])
   const go = (step: number) => setDocument(d => ({ ...d, step, completed: d.completed || step >= 8 }))
   const { input, result } = documentForecast(doc)
   const missing = missingDetails(doc.snapshot, true)
