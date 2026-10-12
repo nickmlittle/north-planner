@@ -46,8 +46,6 @@ h1:focus, .error-summary:focus { outline: none; }
 .north-shell { max-width: 1440px; margin: auto; min-height: 100vh; }
 .north-header { display: flex; align-items: center; gap: 32px; padding: 24px 48px; border-bottom: 1px solid #e0e5db; background: #fff; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-size: 29px; font-weight: 720; letter-spacing: -.8px; }
-.brand-mark { display: grid; place-items: center; background: #264c3c; color: white; width: 35px; height: 35px; border-radius: 10px; font-size: 19px; font-weight: 600; transform: rotate(-5deg); }
-.brand-dot { color: #889f72; margin-left: -10px; }
 .brand-button { border: 0; background: none; padding: 0; margin: 0; }
 .header-caption { margin-left: auto; text-transform: uppercase; font-size: 11px; letter-spacing: 1.7px; color: #5e7065; }
 .save-status { font-size: 12px; color: #617861; background: #f0f4eb; padding: 7px 12px; border-radius: 20px; white-space: nowrap; }
@@ -280,6 +278,14 @@ h1:focus, .error-summary:focus { outline: none; }
   .event-dialog { max-height: calc(100dvh - 24px); }
   .event-dialog .input-grid { grid-template-columns: 1fr; }
 }
+
+/* Shared Manrope heading and wordmark treatment. */
+h1, h2, h3 { font-family: var(--font-family); font-weight: 500; }
+.brand { color: var(--cream); font-family: var(--font-family); font-size: clamp(21px, 2vw, 25px); font-weight: 600; letter-spacing: -.03em; }
+.wordmark { color: var(--pine); font-family: var(--font-family); font-weight: 600; letter-spacing: -.03em; }
+@media (max-width: 700px) {
+  .brand { font-size: 22px; }
+}
 @media (max-width: 380px) { .dashboard-tiles { grid-template-columns: 1fr; } }
 
 /* North woodland field guide theme */
@@ -293,13 +299,13 @@ h1:focus, .error-summary:focus { outline: none; }
   --line: #d6d2c3;
   --soft-fern: #e7e9dc;
   --muted: #59665a;
-  --serif: Georgia, 'Times New Roman', serif;
-  --sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sans: var(--font-family);
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
   --space-4: 32px;
-  font-family: var(--sans);
+  font-family: var(--font-family);
   color: var(--charcoal);
   background: var(--cream);
   line-height: 1.55;
@@ -309,11 +315,7 @@ h1:focus, .error-summary:focus { outline: none; }
 body { background: var(--cream); color: var(--charcoal); }
 .north-shell { max-width: none; }
 .north-header { background: var(--pine); color: var(--cream); border: 0; padding: 16px max(32px, calc((100vw - 1480px) / 2 + 32px)); min-height: 72px; }
-.brand { color: var(--cream); font: 600 25px var(--serif); letter-spacing: .1px; gap: 9px; }
-.brand-mark { width: 34px; height: 34px; fill: none; stroke: var(--cream); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transform: none; }
-.brand-mark circle { stroke: #a9b79c; }
-.brand-mark path:first-of-type { fill: #a9b79c; stroke: #a9b79c; }
-.brand-dot { color: #d18860; margin-left: -9px; }
+.brand { color: var(--cream); font: 600 25px/1 var(--font-family); letter-spacing: -.03em; gap: 0; }
 .app-nav { gap: 5px; }
 .app-nav button { color: #e3e7d9; padding: 9px 14px; border-radius: 6px; font-weight: 600; }
 .app-nav button:hover { background: #ffffff12; }
@@ -326,7 +328,7 @@ body { background: var(--cream); color: var(--charcoal); }
 .route-heading .page-description { margin: 10px 0 0; }
 .route-illustration { flex: 0 0 250px; width: 250px; height: 106px; fill: #70836a26; stroke: var(--fern); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .eyebrow { color: #586d55; letter-spacing: 1.5px; }
-.dashboard-main h1, .journey-main h1, .planner-main h1, .welcome-main h1, .account-screen h1 { font-family: var(--serif); color: var(--pine); font-weight: 500; letter-spacing: -.6px; }
+.dashboard-main h1, .journey-main h1, .planner-main h1, .welcome-main h1, .account-screen h1 { font-family: var(--font-family); color: var(--pine); font-weight: 500; letter-spacing: -.6px; }
 .dashboard-main h1 { margin-bottom: 0; font-size: clamp(36px, 4vw, 48px); }
 .page-description { color: #59665a; }
 .setup-card, .household-card, .dashboard-tile, .total-card, .account-screen { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 6px #28382a0a; }
@@ -336,7 +338,7 @@ body { background: var(--cream); color: var(--charcoal); }
 .dashboard-tile > p, .total-card p { color: var(--pine); font-variant-numeric: tabular-nums lining-nums; }
 .dashboard-tiles { gap: 14px; }
 .setup-card { padding: 24px; margin: 18px 0; }
-.setup-card h2, .household-card h2, .chart-card h2 { font-family: var(--serif); font-weight: 600; color: var(--pine); letter-spacing: 0; }
+.setup-card h2, .household-card h2, .chart-card h2 { font-family: var(--font-family); font-weight: 500; color: var(--pine); letter-spacing: 0; }
 .household-card { padding: 24px; margin: 20px 0; }
 .input-field input, .input-field select, .account-form input, .chart-inspector select { border-color: #a9ae9c; border-radius: 6px; background-color: #fffdf8; color: var(--charcoal); }
 .input-field input:focus-visible, .input-field select:focus-visible, .account-form input:focus-visible, .chart-inspector select:focus-visible { outline-color: var(--orange); }
@@ -370,7 +372,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .event-list > li { border-color: var(--line); }
 .events-empty { color: #52644f; }
 .events-empty > span { color: var(--orange); }
-.events-empty h3 { color: var(--pine); font-family: var(--serif); }
+.events-empty h3 { color: var(--pine); font-family: var(--font-family); font-weight: 500; }
 .event-dialog { background: var(--cream); border-color: var(--line); border-radius: 10px; color: var(--charcoal); }
 .event-choice { border-color: #b9bead; border-radius: 8px; background: var(--card); }
 .event-choice:hover:not(:disabled) { background: var(--soft-fern); border-color: var(--fern); }
