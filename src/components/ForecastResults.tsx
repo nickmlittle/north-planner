@@ -5,9 +5,9 @@ import { formatGBPWhole as formatGBP } from '../formatting/money'
 function BalanceRow({ name, value }: { name: string; value: Ledger }) {
   return <tr><th scope="row">{name}</th><td>{formatGBP(value.opening)}</td><td>{formatGBP(value.flows)}</td><td>{formatGBP(value.returns)}</td><td>{formatGBP(value.closing)}</td></tr>
 }
-export function ForecastResults({ result, people }: { result: { rows: ForecastYear[]; error?: string }; people: Person[] }) {
+export function ForecastResults({ result, people, priceYear = 2026 }: { result: { rows: ForecastYear[]; error?: string }; people: Person[]; priceYear?: number }) {
   return <section className="household-card" aria-labelledby="forecast-heading"><h2 id="forecast-heading">Deterministic annual forecast</h2>
-    <p>All amounts are real 2026 GBP. This projection uses fixed returns and is not a FIRE probability. Year-end balances are shown. Volatility, bond allocation, pension withdrawals and State Pension are not modelled yet.</p>
+    <p>All amounts are real {priceYear} GBP. This projection uses fixed returns and is not a FIRE probability. Year-end balances are shown. Volatility, bond allocation, pension withdrawals and State Pension are not modelled yet.</p>
     <p>Use the income, lifestyle spending and mortgage details from your household picture. Explicit zero earnings and costs are included as entered. Negative cash is a cumulative unfunded plan need, not an assumed loan; mortgage payments remain planned contractual payments.</p>
     {result.error ? <p role="status">Forecast unavailable: {result.error}</p> : <>
       {result.rows.some(row => row.unfundedCash > 0) && <p role="status" className="input-error">This plan has unfunded cash needs. Pension assets are not drawn down in this version; these results do not establish retirement affordability.</p>}

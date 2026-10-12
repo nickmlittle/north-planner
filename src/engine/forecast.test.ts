@@ -59,6 +59,52 @@ it('recalculates when returns/spending change and stops income and contributions
   expect(annualForecast({ ...input, planning: { ...input.planning, equityReturn: 0 } })[0]!.pension).toBe(29000)
   expect(annualForecast({ ...input, spending: { baseline: 21000, events: [] } })[0]!.netWorth).toBeCloseTo(rows[0]!.netWorth - 1000)
 })
+it('prorates start-year income, pension saving and monthly spending by inclusive calendar days', () => {
+  const input = completeForecastFixture()
+  input.household.isas.forEach(a => { a.value = 0 })
+  input.household.pensions.forEach(a => { a.value = 0 })
+  input.household.cash.forEach(a => { a.value = 0 })
+  input.household.properties.forEach(a => { a.value = 0 })
+  input.household.mortgages.forEach(a => { a.balance = 0 })
+  const fullYear = annualForecast(input)[0]!
+  input.household.assumptions.startDate = '2026-10-01'
+  input.household.assumptions.startYear = 2026
+  input.household.isas.forEach(a => { a.asOfDate = '2026-09-30' })
+  input.household.pensions.forEach(a => { a.asOfDate = '2026-09-30' })
+  input.household.properties.forEach(a => { a.asOfDate = '2026-09-30' })
+  input.household.mortgages.forEach(a => { a.asOfDate = '2026-09-30' })
+  const first = annualForecast(input)[0]!
+  const fraction = 92 / 365
+  expect(first.gross).toBeCloseTo(60000 * fraction)
+  expect(first.people.reduce((sum, p) => sum + p.pensionContribution, 0)).toBeCloseTo(9000 * fraction)
+  expect(first.lifestyle).toBeCloseTo(20000 * fraction)
+  expect(first.people.reduce((sum, p) => sum + p.isaContribution, 0)).toBeCloseTo(fullYear.people.reduce((sum, p) => sum + p.isaContribution, 0) * fraction)
+})
+it('uses the explicit planning year and keeps unknown dated balances outside the forecast', () => {
+  const input = completeForecastFixture()
+  input.household.assumptions.startDate = '2030-01-01'
+  input.household.assumptions.startYear = 2030
+  input.household.assumptions.moneyBasis.priceYear = 2028
+  input.moneyBasis.priceYear = 2028
+  input.household.isas[0]!.asOfDate = null
+  input.household.isas[0]!.value = 5000
+  const rows = annualForecast(input)
+  expect(rows[0]!.year).toBe(2030)
+  expect(rows[0]!.people[0]!.isa.opening).toBe(0)
+  expect(input.household.isas[0]!.value).toBe(5000)
+})
+it('prorates planned mortgage overpayments from a mid-year start', () => {
+  const input = completeForecastFixture()
+  input.household.mortgages[0]!.balance = 100000
+  input.mortgage = { ...input.mortgage, annualRate: 0, termYears: 20, monthlyOverpayment: 100 }
+  const fullYear = annualForecast(input)[0]!
+  input.household.assumptions.startDate = '2026-10-01'
+  input.household.assumptions.startYear = 2026
+  input.household.mortgages[0]!.asOfDate = '2026-09-30'
+  const partialYear = annualForecast(input)[0]!
+  expect(fullYear.mortgage.closing).toBeCloseTo(100000 - (100000 / 240 + 100) * 12)
+  expect(partialYear.mortgage.closing).toBeCloseTo(100000 - (100000 / 240 + 100) * 12 * (92 / 365))
+})
 it('integrates child/work/spending events, property moves, debt inflation and remortgages while reconciling', () => {
   const input = completeForecastFixture()
   input.mortgage = { ...input.mortgage, annualRate: 0.04, inflation: 0.02, monthlyOverpayment: 10, refinances: [{ id: 'r', year: 2027, annualRate: 0.03, termYears: 5, enabled: true }] }

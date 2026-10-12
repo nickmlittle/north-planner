@@ -8,7 +8,7 @@ it('anchors FIRE to the last adult and excludes locked pensions, home equity and
   const input = toForecastInput(completeDocument())
   const younger = input.household.people[0]!
   input.household.people.push({ id: 'older', name: 'Older', birthYear: 1980, targetFireAge: null })
-  input.household.pensions.push({ id: 'older-pension', kind: 'pension', name: 'Older pension', ownerIds: ['older'], value: 0, accessAge: null })
+  input.household.pensions.push({ id: 'older-pension', kind: 'pension', name: 'Older pension', ownerIds: ['older'], value: 0, asOfDate: input.household.assumptions.startDate, accessAge: null })
   const rows = annualForecast(input)
   const index = rows.findIndex(r => r.year === 2040)
   const row = rows[index]!

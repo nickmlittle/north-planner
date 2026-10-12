@@ -2,8 +2,8 @@ import { useId } from 'react'
 import type { PropertyMove } from '../domain/property'
 import { formatGBP } from '../formatting/money'
 
-export function PropertyMoveScenario({ move, base, moves, maxYear, onChange, onSelect, onSave, onReset, onClose, dirty, error }: {
-  move: PropertyMove; base: PropertyMove; moves: PropertyMove[]; maxYear: number; onChange: (next: PropertyMove) => void; onSelect: (id: string) => void
+export function PropertyMoveScenario({ move, base, moves, minYear, maxYear, onChange, onSelect, onSave, onReset, onClose, dirty, error }: {
+  move: PropertyMove; base: PropertyMove; moves: PropertyMove[]; minYear: number; maxYear: number; onChange: (next: PropertyMove) => void; onSelect: (id: string) => void
   onSave: () => void; onReset: () => void; onClose: () => void; dirty: boolean; error?: string
 }) {
   const id = useId()
@@ -19,7 +19,7 @@ export function PropertyMoveScenario({ move, base, moves, maxYear, onChange, onS
     </div>
     <div className="scenario-controls">
       <label htmlFor={`${id}-year`}>Move year <strong>{move.year}</strong>{changedLabel('year')}</label>
-      <input id={`${id}-year`} type="range" min="2026" max={maxYear} step="1" value={Math.min(maxYear, Math.max(2026, move.year))}
+      <input id={`${id}-year`} type="range" min={minYear} max={maxYear} step="1" value={Math.min(maxYear, Math.max(minYear, move.year))}
         onChange={e => change({ year: Number(e.target.value) })} aria-valuetext={String(move.year)} />
       <label htmlFor={`${id}-price`}>New home purchase price <strong>{formatGBP(move.purchasePrice)}</strong>{changedLabel('purchasePrice')}</label>
       <input id={`${id}-price`} type="range" min="0" max={priceMax} step="5000" value={Math.min(priceMax, Math.max(0, move.purchasePrice))}
