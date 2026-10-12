@@ -699,9 +699,9 @@ small, .muted, footer { color: #59665a; }
 .account-menu-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
 .account-menu button { justify-self: start; margin: 8px 0 0; padding: 6px 0 0; border: 0; border-top: 1px solid var(--line); width: 100%; background: transparent; color: var(--pine); text-align: left; font-size: 13px; }
 .account-menu button:hover { text-decoration: underline; }
-.dashboard-tile { position: relative; min-height: 0; padding: 8px 12px; }
+.dashboard-tile { position: relative; min-height: 80px; padding: 8px 12px; }
 .dashboard-tile h2 { line-height: 1.2; }
-.dashboard-tile > p { margin: 3px 0; line-height: 1.05; }
+.dashboard-tile > p { margin: auto 0 0; line-height: 1.05; }
 .dashboard-tile small { min-height: 0; line-height: 1.25; }
 .metric-help { position: absolute; z-index: 5; top: 8px; right: 8px; }
 .metric-help-trigger { display: grid; width: 20px; height: 20px; place-items: center; margin: 0; padding: 0; border: 1px solid #8b9584; border-radius: 50%; color: var(--pine); background: var(--card); font: 700 12px/1 var(--font-family); cursor: help; }
