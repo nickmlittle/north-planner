@@ -61,7 +61,7 @@ h1:focus, .error-summary:focus { outline: none; }
 .passkey-setup { display: flex; align-items: center; gap: 10px; }
 .passkey-setup .secondary-button { min-height: 36px; padding: 7px 12px; font-size: 12px; white-space: nowrap; }
 .passkey-setup [role="status"] { max-width: 280px; font-size: 11px; }
-.account-bar { display: flex; align-items: center; justify-content: flex-end; gap: 18px; min-height: 42px; padding: 4px 5vw; background: #f5f7f3; color: #536256; font-size: 12px; }
+.account-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 42px; padding: 4px 5vw; background: #f5f7f3; color: #536256; font-size: 12px; }
 .account-bar .text-button { font-size: 12px; }
 .cloud-warning { position: sticky; top: 0; z-index: 2; }
 .journey-layout { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 56px; padding: 48px; }
