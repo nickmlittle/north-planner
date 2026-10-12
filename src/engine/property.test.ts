@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { propertyMove } from './property'
 import type { PropertyMove } from '../domain/property'
-const move: PropertyMove = { id: 'm', name: 'Surrey', year: 2033, enabled: true, saleValue: null, purchasePrice: 900000, stampDuty: 35000, agentFees: 15000, legalFees: 5000, movingCosts: 5000, renovation: 10000, annualRate: 0.04, termYears: 25 }
+const move: PropertyMove = { id: 'm', name: 'Surrey', year: 2033, enabled: true, saleValue: null, purchasePrice: 900000, stampDuty: 35000, agentFees: 15000, legalFees: 5000, movingCosts: 5000, renovation: 10000, annualRate: 0.04, termYears: 25, agentFeeRate: 0, legalFeeRate: 0, renovationRate: 0 }
 it('repays old loan/costs then uses equity, ISA and a new loan in order', () => {
   const result = propertyMove(850000, 446000, [88000, 1000], move)
   expect(result.equity).toBe(389000)

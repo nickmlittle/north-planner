@@ -6,6 +6,7 @@ import { eventName, eventYear, putPlanEvent, validatePlanEvents } from '../domai
 import { documentForecast } from '../state/forecast'
 import { formatGBP } from '../formatting/money'
 import { MoneyField, SetupField } from './SetupFields'
+import { defaultPropertyFeeRates, pricedPropertyMove, stampDutyLandTax } from '../domain/property'
 
 type Fields = Record<string, string>
 type WorkDraft = { id: string; personId: string; startYear: string; endYear: string; workingFraction: string; annualGrossOverride: string }
@@ -17,7 +18,8 @@ const choices: { kind: EventKind; title: string; description: string }[] = [
 ]
 function initialFields(event?: PlanEvent): Fields {
   const f: Fields = { name: '', year: '2027', preset: 'car', upfrontCost: '', recurring: 'no', annualCost: '', startYear: '2027', finalYear: '2027',
-    annualChange: '', birthCost: '', purchasePrice: '', stampDuty: '', agentFees: '', legalFees: '', movingCosts: '', renovation: '', annualRate: '', termYears: '', saleValue: '' }
+    annualChange: '', birthCost: '', purchasePrice: '', movingCosts: '', agentFeeRate: String(defaultPropertyFeeRates.agentFeeRate * 100),
+    legalFeeRate: String(defaultPropertyFeeRates.legalFeeRate * 100), renovationRate: String(defaultPropertyFeeRates.renovationRate * 100), annualRate: '', termYears: '', saleValue: '' }
   ageBands.forEach(b => { f[b.key] = '' })
   if (!event) return f
   f.name = eventName(event); f.year = String(eventYear(event))
@@ -26,7 +28,7 @@ function initialFields(event?: PlanEvent): Fields {
     Object.assign(f, { preset: event.value.preset, upfrontCost: String(event.value.upfrontCost), recurring: event.value.recurring ? 'yes' : 'no',
       annualCost: String(event.value.recurring?.annualCost ?? ''), startYear: String(event.value.recurring?.startYear ?? event.value.year), finalYear: String((event.value.recurring?.endYear ?? event.value.year + 1) - 1) })
   } else if (event.kind === 'move') {
-    for (const [key, value] of Object.entries(v)) if (typeof value === 'number') f[key] = String(key === 'annualRate' ? value * 100 : value)
+    for (const [key, value] of Object.entries(v)) if (typeof value === 'number') f[key] = String(['annualRate', 'agentFeeRate', 'legalFeeRate', 'renovationRate'].includes(key) ? value * 100 : value)
   } else if (event.kind === 'child') {
     f.birthCost = String(event.value.birthCost)
     for (const [key, value] of Object.entries(event.value.costs)) f[key] = String(value)
@@ -68,9 +70,10 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
     if (!(fields.name ?? '').trim()) throw new Error('Give this event a name.')
     const common = { id, name: (fields.name ?? '').trim(), enabled: event?.value.enabled ?? true }
     switch (kind) {
-      case 'move': return { kind, value: { ...common, year: year('year'), purchasePrice: number('purchasePrice'), stampDuty: number('stampDuty'), agentFees: number('agentFees'),
-        legalFees: number('legalFees'), movingCosts: number('movingCosts'), renovation: number('renovation'),
-        annualRate: fields.annualRate?.trim() ? number('annualRate') / 100 : null, termYears: fields.termYears?.trim() ? number('termYears') : null, saleValue: (fields.saleValue ?? '').trim() ? number('saleValue') : null } }
+      case 'move': return { kind, value: pricedPropertyMove({ ...common, year: year('year'), purchasePrice: number('purchasePrice'), stampDuty: 0, agentFees: 0, legalFees: 0,
+        movingCosts: number('movingCosts'), renovation: 0, agentFeeRate: number('agentFeeRate') / 100, legalFeeRate: number('legalFeeRate') / 100,
+        renovationRate: number('renovationRate') / 100, annualRate: fields.annualRate?.trim() ? number('annualRate') / 100 : null,
+        termYears: fields.termYears?.trim() ? number('termYears') : null, saleValue: (fields.saleValue ?? '').trim() ? number('saleValue') : null }) }
       case 'child': return { kind, value: { ...common, birthYear: year('year'), birthCost: number('birthCost'),
         costs: { ages0to2: number('ages0to2'), ages3to4: number('ages3to4'), ages5to11: number('ages5to11'), ages12to18: number('ages12to18') },
         workAdjustments: work.map(a => {
@@ -133,7 +136,7 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
           <label className="checkbox-label"><input type="checkbox" checked={fields.recurring === 'yes'} onChange={e => field('recurring', e.target.checked ? 'yes' : 'no')} />Include recurring running costs</label>
           {fields.recurring === 'yes' && <div className="input-grid">{money('annualCost', 'Annual running cost (£)')}{text('startYear', 'Running costs start year')}{text('finalYear', 'Running costs final year', 'Includes this whole year.')}</div>}</>}
         {kind === 'spending' && <div className="input-grid">{text('startYear', 'Start year')}{text('finalYear', 'Final year', 'Includes this whole year.')}{text('annualChange', 'Annual spending change (£)', 'Positive increases costs; negative reduces them.')}</div>}
-        {kind === 'move' && <><div className="input-grid">{money('purchasePrice', 'New home purchase price (£)')}{money('stampDuty', 'Stamp duty (£)')}{money('agentFees', 'Estate-agent fees (£)')}{money('legalFees', 'Legal fees (£)')}{money('movingCosts', 'Moving costs (£)')}{money('renovation', 'Renovation and furnishing (£)')}{money('annualRate', 'New mortgage rate (%)', 'Required if this move needs a new mortgage.')}{money('termYears', 'New mortgage term (years)', 'Required if this move needs a new mortgage.')}{money('saleValue', 'Sale value override (£)', 'Optional: leave blank to use the projected home value.')}</div><p className="muted">Sale equity funds the purchase, then ISAs, then a new mortgage. Existing cash is not used. Stamp duty is entered manually; borrowing is not checked against lender criteria.</p></>}
+        {kind === 'move' && <><div className="input-grid">{money('purchasePrice', 'New home purchase price (£)')}{money('agentFeeRate', 'Estate-agent fee (% of purchase price)')}{money('legalFeeRate', 'Legal fees (% of purchase price)')}{money('renovationRate', 'Renovation and furnishing (% of purchase price)')}{money('movingCosts', 'Moving costs (£)')}{money('annualRate', 'New mortgage rate (%)', 'Required if this move needs a new mortgage.')}{money('termYears', 'New mortgage term (years)')}{money('saleValue', 'Sale value override (£)', 'Optional: leave blank to use the projected home value.')}</div><p className="context-note">Estimated SDLT: {formatGBP(stampDutyLandTax(Number(fields.purchasePrice) || 0))}. Estate-agent, legal, and renovation costs scale with purchase price. SDLT uses England and Northern Ireland main-home rates; additional-property and non-resident surcharges are not included.</p><p className="muted">Sale equity funds the purchase, then ISAs, then a new mortgage. Existing cash is not used. Borrowing is not checked against lender criteria.</p></>}
         {kind === 'child' && <><div className="input-grid">{money('birthCost', 'One-off baby cost (£)')}{ageBands.map(b => money(b.key, `${b.label} annual cost (£)`))}</div><h3>Parental work changes</h3><p className="muted">Optional. End years are exclusive; a change from 2027 to 2028 applies in 2027.</p>
           {work.map((a, index) => <fieldset className="work-change" key={a.id}><legend>Work change {index + 1}</legend><SetupField label={`Parent ${index + 1}`} value={a.personId} onChange={personId => setWork(w => w.map(v => v.id === a.id ? { ...v, personId } : v))}>{doc.snapshot.people.filter(p => p.role !== 'child').map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</SetupField>
             <div className="input-grid">{(['startYear', 'endYear', 'workingFraction', 'annualGrossOverride'] as const).map(key => <SetupField key={key} label={`${{ startYear: 'Start year', endYear: 'End year (exclusive)', workingFraction: 'Working fraction (0–1)', annualGrossOverride: 'Annual gross override (£, optional)' }[key]} · work change ${index + 1}`} value={a[key]} onChange={value => setWork(w => w.map(v => v.id === a.id ? { ...v, [key]: value } : v))} />)}</div><button type="button" className="text-button" onClick={() => setWork(w => w.filter(v => v.id !== a.id))}>Remove work change {index + 1}</button></fieldset>)}

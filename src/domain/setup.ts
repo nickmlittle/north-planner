@@ -5,7 +5,7 @@ import { validateTaxRules } from './tax'
 import type { TaxRules } from './tax'
 import { validateMortgagePlan } from './mortgage'
 import type { MortgagePlan } from './mortgage'
-import { validateMoves } from './property'
+import { pricedPropertyMove, validateMoves } from './property'
 import type { PropertyMove } from './property'
 import { validateIncome } from './income'
 import type { IncomePeriod } from './income'
@@ -172,7 +172,7 @@ export function toForecastInput(doc: AppDocument): ForecastInput {
     children: s.people.filter(p => p.role === 'child').map<ChildEvent>(p => ({ id: p.id, birthYear: Number(p.dob.slice(0, 4)), enabled: true, birthCost: 0,
       costs: Object.fromEntries(ageBands.map(b => [b.key, b.key === currentBand(p) ? annual(p.childCost, p.childFrequency)! : amount(p.futureCosts[b.key]) ?? 0])) as Record<AgeBand, number>, workAdjustments: [] })).concat(doc.childEvents),
     mortgage: { ...doc.mortgageExtras, annualRate: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.rate) / 100 : null, termYears: s.housing === 'own' && s.mortgageStatus === 'yes' ? Number(s.term) : null },
-    moves: doc.moves, allowances: Object.fromEntries(adults.map(p => [p.id, doc.allowances[p.id] ?? 20000])) }
+    moves: doc.moves.map(pricedPropertyMove), allowances: Object.fromEntries(adults.map(p => [p.id, doc.allowances[p.id] ?? 20000])) }
 }
 
 /** Retain future timeline edits when editing people; reconcile only changed current earnings. */
@@ -208,8 +208,20 @@ function hasShape(value: unknown, template: unknown): boolean {
 export function decodeDocument(raw: string): AppDocument | null {
   try {
     const parsed: unknown = JSON.parse(raw); const base = newDocument()
-    const v: unknown = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? { ...parsed, purchaseEvents: 'purchaseEvents' in parsed ? parsed.purchaseEvents : [] } : parsed
+    let v: unknown = parsed
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const data = parsed as Record<string, unknown>
+      const moves = Array.isArray(data.moves) ? data.moves.map((rawMove: unknown) => {
+          if (!rawMove || typeof rawMove !== 'object' || Array.isArray(rawMove)) return rawMove
+          const move = rawMove as Record<string, unknown>
+          const price = typeof move.purchasePrice === 'number' ? move.purchasePrice : 0
+          const rateFor = (amountKey: string, rateKey: string) => typeof move[rateKey] === 'number'
+            ? move[rateKey] : price > 0 && typeof move[amountKey] === 'number' ? (move[amountKey] as number) / price : 0
+          return { ...move, agentFeeRate: rateFor('agentFees', 'agentFeeRate'),
+            legalFeeRate: rateFor('legalFees', 'legalFeeRate'), renovationRate: rateFor('renovation', 'renovationRate') }
+        }) : data.moves
+      v = { ...data, purchaseEvents: 'purchaseEvents' in data ? data.purchaseEvents : [], moves }
+    }
     if (!hasShape(v, { ...base, incomeTimeline: [] }) && !hasShape(v, base)) return null
     const d = v as AppDocument
     const enums = (value: string, options: string[]) => options.includes(value)
@@ -229,7 +241,7 @@ export function decodeDocument(raw: string): AppDocument | null {
     if (!d.mortgageExtras.refinances.every(r => hasShape(r, { id: '', year: 0, annualRate: 0, termYears: 0, enabled: false }))) return null
     if (!d.childEvents.every(c => (c.name === undefined || typeof c.name === 'string') && hasShape(c, { id: '', birthYear: 0, enabled: false, birthCost: 0, costs: { ages0to2: 0, ages3to4: 0, ages5to11: 0, ages12to18: 0 }, workAdjustments: [] })
       && c.workAdjustments.every(a => hasShape(a, { id: '', personId: '', startYear: 0, endYear: 0, workingFraction: 0 }) && (a.annualGrossOverride === null || typeof a.annualGrossOverride === 'number')))) return null
-    if (!d.moves.every(m => hasShape(m, { id: '', name: '', year: 0, enabled: false, purchasePrice: 0, stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0 }) && [m.saleValue, m.annualRate, m.termYears].every(n => n === null || (typeof n === 'number' && Number.isFinite(n))))) return null
+    if (!d.moves.every(m => hasShape(m, { id: '', name: '', year: 0, enabled: false, purchasePrice: 0, stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0, agentFeeRate: 0, legalFeeRate: 0, renovationRate: 0 }) && [m.saleValue, m.annualRate, m.termYears].every(n => n === null || (typeof n === 'number' && Number.isFinite(n))))) return null
     if (!d.spendingEvents.every(e => hasShape(e, { id: '', name: '', startYear: 0, endYear: 0, annualChange: 0, enabled: false }))) return null
     if (!d.purchaseEvents.every(p => hasShape(p, { id: '', name: '', preset: '', enabled: false, year: 0, upfrontCost: 0 })
       && (p.recurring === null || hasShape(p.recurring, { annualCost: 0, startYear: 0, endYear: 0 }))) || validatePurchases(d.purchaseEvents)) return null

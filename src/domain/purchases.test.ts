@@ -51,7 +51,7 @@ it('replaces, toggles and removes grouped events without duplicating costs', () 
 it('rejects move/refinance and overlapping parental work conflicts', () => {
   const doc = completeDocument(), personId = doc.snapshot.people[0]!.id
   doc.moves = [{ id: 'move', name: 'Next home', enabled: true, year: 2028, saleValue: null, purchasePrice: 500000,
-    stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0, annualRate: .04, termYears: 25 }]
+    stampDuty: 0, agentFees: 0, legalFees: 0, movingCosts: 0, renovation: 0, annualRate: .04, termYears: 25, agentFeeRate: 0, legalFeeRate: 0, renovationRate: 0 }]
   doc.mortgageExtras.refinances = [{ id: 'refi', enabled: true, year: 2028, annualRate: .03, termYears: 25 }]
   expect(validatePlanEvents(doc)).toContain('move or a remortgage')
   doc.moves = []

@@ -87,7 +87,7 @@ it('saves home moves and blocks a second move or remortgage in the same year', (
   const doc = completeDocument(); doc.moves = [{ ...newPropertyMove(2027), name: 'Existing move', enabled: true, purchasePrice: 400000, annualRate: .04, termYears: 25 }]
   open(doc); click(/Add goal or life event/); click(/^House move/)
   enter('Event name', 'Next home'); enter('Move year', '2027'); enter('New home purchase price (£)', '450000')
-  for (const label of ['Stamp duty (£)', 'Estate-agent fees (£)', 'Legal fees (£)', 'Moving costs (£)', 'Renovation and furnishing (£)']) enter(label, '0')
+  for (const label of ['Estate-agent fee (% of purchase price)', 'Legal fees (% of purchase price)', 'Moving costs (£)', 'Renovation and furnishing (% of purchase price)']) enter(label, '0')
   enter('New mortgage rate (%)', '4'); enter('New mortgage term (years)', '25'); click(/Preview impact/)
   expect(screen.getByRole('alert')).toHaveTextContent('Only one property move')
   enter('Move year', '2030'); click(/Preview impact/); click('Save event')
@@ -119,6 +119,25 @@ it('supports keyboard year selection and shows exact chart category balances', (
   const chart = screen.getByRole('heading', { name: 'Net worth through time' }).closest('.chart-card')!
   expect(within(chart as HTMLElement).getByText(formatGBP(result.rows[1]!.isa))).toBeVisible()
   expect(screen.getByRole('img', { name: /Combined net worth and asset category chart/ })).toBeVisible()
+})
+
+it('previews a property move scenario without persistence until explicitly saved', () => {
+  const doc = completeDocument(); doc.moves = [{ ...newPropertyMove(2028), name: 'Family home', enabled: true, purchasePrice: 400000, annualRate: .04, termYears: 25 }]
+  open(doc)
+  click('Dashboard')
+  click('Explore a move')
+  expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
+  expect(saved().moves[0].year).toBe(2028)
+  expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeEnabled()
+  const fireTile = screen.getByRole('heading', { name: 'Projected net worth at FIRE' }).parentElement!
+  expect(within(fireTile).getByText(/What-if · current plan/)).toBeVisible()
+  expect(screen.getByRole('list', { name: 'Chart legend' })).toHaveTextContent('Current plan')
+  click('Reset to current plan')
+  expect(saved().moves[0].year).toBe(2028)
+  fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
+  click('Save changes to Family home')
+  expect(saved().moves[0]).toMatchObject({ year: 2030, enabled: true })
 })
 
 it('adds goals from the dashboard and opens milestones at their edit controls', () => {

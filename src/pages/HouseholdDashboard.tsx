@@ -9,12 +9,18 @@ import { formatGBP } from '../formatting/money'
 import { PlannerHeader } from '../components/PlannerHeader'
 import { ForecastCharts } from '../components/ForecastCharts'
 import { EventDialog } from '../components/EventDialog'
+import { PropertyMoveScenario } from '../components/PropertyMoveScenario'
+import type { PropertyMove } from '../domain/property'
+import { pricedPropertyMove } from '../domain/property'
 
 export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   const [editingEvent, setEditingEvent] = useState<PlanEvent | 'new' | null>(null)
+  const [scenarioOpen, setScenarioOpen] = useState(false)
+  const [scenarioMoveId, setScenarioMoveId] = useState(() => doc.moves.find(m => m.enabled)?.id ?? doc.moves[0]?.id ?? '')
+  const [scenarioDraft, setScenarioDraft] = useState<{ id: string; value: PropertyMove } | null>(null)
   useEffect(() => { heading.current?.focus(); window.scrollTo?.(0, 0) }, [])
   const go = (step: number) => setDocument(d => ({ ...d, step, completed: d.completed || step >= 8 }))
   const setGoalEnabled = (event: PlanEvent, enabled: boolean) => {
@@ -25,15 +31,24 @@ export function HouseholdDashboard({ document: doc, setDocument, warning, replac
     setDocument(d => putPlanEvent(d, updated))
   }
   const { input, result, metrics } = documentForecast(doc)
+  const baseMove = doc.moves.find(m => m.id === scenarioMoveId) ?? doc.moves[0]
+  const scenarioMove = baseMove ? (scenarioDraft?.id === baseMove.id ? scenarioDraft.value : baseMove) : undefined
+  const scenarioDirty = Boolean(baseMove && scenarioMove && JSON.stringify(baseMove) !== JSON.stringify(scenarioMove))
+  const scenarioDocument = scenarioDirty && baseMove && scenarioMove ? { ...doc, moves: doc.moves.map(m => m.id === baseMove.id ? pricedPropertyMove(scenarioMove) : m) } : undefined
+  const scenarioForecast = scenarioDocument ? documentForecast(scenarioDocument) : undefined
+  const shownResult = scenarioDirty ? scenarioForecast!.result : result
+  const shownMetrics = scenarioDirty ? scenarioForecast?.metrics : metrics
   const goals = planEvents(doc)
+  const chartGoals = scenarioDirty && scenarioMove ? goals.map(event => event.kind === 'move' && event.value.id === scenarioMove.id
+    ? { kind: 'move' as const, value: scenarioMove } : event) : goals
   const totals = snapshotTotals(doc.snapshot)
   const missing = missingDetails(doc.snapshot, true)
   const money = (n: number | null | undefined) => n == null ? 'Not available' : formatGBP(n)
   const tiles = [
     { title: 'Net worth today', value: totals.netWorth === null ? 'Incomplete' : money(totals.netWorth), detail: totals.netWorth === null ? `Known assets: ${money(totals.knownAssets)}` : 'Your current assets, less mortgage debt' },
-    { title: 'Projected net worth at FIRE', value: money(metrics?.fireNetWorth), detail: metrics ? `Current plan · year-end ${metrics.fireYear} · all adults reach FIRE` : 'Complete your details to project ahead' },
-    { title: 'Indicative annual withdrawal at FIRE', value: money(metrics?.annualWithdrawal), detail: `${Number((doc.planning.withdrawalRate * 100).toFixed(2))}% of accessible investments` },
-    { title: 'First unfunded year', value: metrics ? metrics.firstUnfundedYear?.toString() ?? 'None' : 'Not available', detail: metrics?.firstUnfundedYear ? 'Cash and ISAs run short; later values include the cumulative need. Pensions are not drawn down.' : 'Within the projection horizon' },
+    { title: 'Projected net worth at FIRE', value: money(shownMetrics?.fireNetWorth), detail: scenarioDirty ? `What-if · current plan ${money(metrics?.fireNetWorth)} · year-end ${shownMetrics?.fireYear}` : metrics ? `Current plan · year-end ${metrics.fireYear} · all adults reach FIRE` : 'Complete your details to project ahead' },
+    { title: 'Indicative annual withdrawal at FIRE', value: money(shownMetrics?.annualWithdrawal), detail: scenarioDirty ? `What-if · current plan ${money(metrics?.annualWithdrawal)} · ${Number((doc.planning.withdrawalRate * 100).toFixed(2))}% rate` : `${Number((doc.planning.withdrawalRate * 100).toFixed(2))}% of accessible investments` },
+    { title: 'First unfunded year', value: shownMetrics ? shownMetrics.firstUnfundedYear?.toString() ?? 'None' : 'Not available', detail: scenarioDirty ? `What-if · current plan ${metrics?.firstUnfundedYear?.toString() ?? 'None'}` : shownMetrics?.firstUnfundedYear ? 'Cash and ISAs run short; later values include the cumulative need. Pensions are not drawn down.' : 'Within the projection horizon' },
   ]
   const milestones = [
     ...goals.map(e => ({ id: eventKey(e), year: eventYear(e), label: eventName(e), kind: 'Life event', event: e, target: undefined as string | undefined })),
@@ -43,14 +58,23 @@ export function HouseholdDashboard({ document: doc, setDocument, warning, replac
     ]),
   ].sort((a, b) => a.year - b.year)
   return <div className="north-shell dashboard-shell"><PlannerHeader step={9} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} />
-    <main className="dashboard-main"><div className="route-heading"><div><p className="eyebrow">{doc.snapshot.name} · Your household outlook</p><h1 ref={heading} tabIndex={-1}>Your route ahead</h1><p className="page-description">Toggle goals in Milestones to include or exclude them; the chart and forecast estimates update to show the current plan.</p></div><svg className="route-illustration" viewBox="0 0 260 110" role="img" aria-label="Woodland hills and a winding trail"><path d="M0 88 43 43l29 34 37-58 47 63 28-34 76 40H0Z"/><path d="M0 96h260M73 77c25-14 39-4 49-16s-4-18 14-26 25-3 31-14"/><path d="M113 82v-19m-8 9h16m-8-20v-9m-7 5h14"/><path d="M42 83V62m-9 10h18m-9-23V40m-6 5h12m125 39V64m-9 9h18m-9-25V38m-6 6h12"/></svg></div>
-      <div className="dashboard-tiles">{tiles.map(tile => <section className="dashboard-tile" key={tile.title}><h2>{tile.title}</h2><p>{tile.value}</p><small>{tile.detail}</small>{tile.title === 'Indicative annual withdrawal at FIRE' && <details className="metric-explanation"><summary>How this estimate works</summary><p>Applies your withdrawal rate to ISAs, positive cash and pensions accessible at FIRE. Home equity and locked pensions are excluded; pension withdrawals and retirement tax are not modelled.</p>{metrics && <p>Accessible investments: {money(metrics.accessible)}. Locked pensions: {money(metrics.lockedPension)}.</p>}</details>}</section>)}</div>
-      {result.error && <section className="dashboard-alert" aria-labelledby="complete-heading"><strong id="complete-heading">Complete your picture</strong><span role="status">Forecast unavailable: {result.error}</span><div>{missing.slice(0, 2).map((m, i) => <button className="text-button" key={i} onClick={() => go(m.step === 9 ? 10 : m.step)}>Add {m.label.toLowerCase()}</button>)}{!missing.length && <button className="text-button" onClick={() => go(10)}>Review plan settings</button>}</div></section>}
+    <main className="dashboard-main"><div className="route-heading"><div><p className="eyebrow">{doc.snapshot.name} · Your household outlook</p><h1 ref={heading} tabIndex={-1}>Your route ahead</h1><p className="page-description">Adjust a property move to explore its forecast impact. Save changes to update the plan; Milestones controls include or exclude saved goals.</p></div><svg className="route-illustration" viewBox="0 0 260 110" role="img" aria-label="Woodland hills and a winding trail"><path d="M0 88 43 43l29 34 37-58 47 63 28-34 76 40H0Z"/><path d="M0 96h260M73 77c25-14 39-4 49-16s-4-18 14-26 25-3 31-14"/><path d="M113 82v-19m-8 9h16m-8-20v-9m-7 5h14"/><path d="M42 83V62m-9 10h18m-9-23V40m-6 5h12m125 39V64m-9 9h18m-9-25V38m-6 6h12"/></svg></div>
+      <div className="dashboard-tiles">{tiles.map(tile => <section className="dashboard-tile" key={tile.title}><h2>{tile.title}</h2><p>{tile.value}</p><small>{tile.detail}</small>{tile.title === 'Indicative annual withdrawal at FIRE' && <details className="metric-explanation"><summary>How this estimate works</summary><p>Applies your withdrawal rate to ISAs, positive cash and pensions accessible at FIRE. Home equity and locked pensions are excluded; pension withdrawals and retirement tax are not modelled.</p>{shownMetrics && <p>Accessible investments: {money(shownMetrics.accessible)}. Locked pensions: {money(shownMetrics.lockedPension)}.</p>}</details>}</section>)}</div>
+      {shownResult.error && <section className="dashboard-alert" aria-labelledby="complete-heading"><strong id="complete-heading">Complete your picture</strong><span role="status">Forecast unavailable: {shownResult.error}</span><div>{missing.slice(0, 2).map((m, i) => <button className="text-button" key={i} onClick={() => go(m.step === 9 ? 10 : m.step)}>Add {m.label.toLowerCase()}</button>)}{!missing.length && <button className="text-button" onClick={() => go(10)}>Review plan settings</button>}</div></section>}
       <div className="dashboard-overview">
-        {input && !result.error ? <ForecastCharts input={input} rows={result.rows} events={goals} onAddGoal={() => setEditingEvent('new')} /> : <section className="setup-card dashboard-chart-placeholder"><div className="section-heading"><h2>Net worth through time</h2><button className="primary-button add-goal-button" onClick={() => setEditingEvent('new')}>+ Add goal</button></div><p className="muted">Complete your household details to see your projected net worth and asset breakdown.</p></section>}
-        <section className="setup-card milestone-card" aria-labelledby="milestones-heading"><div className="section-heading"><div><p className="eyebrow">Waypoints</p><h2 id="milestones-heading">Milestones</h2></div></div>{milestones.length ? <ol className="milestone-list">{milestones.map(m => {
+        {input && !result.error ? <ForecastCharts input={input} rows={result.rows} events={chartGoals} onAddGoal={() => setEditingEvent('new')}
+          comparison={scenarioDirty && scenarioForecast?.input && !scenarioForecast.result.error ? { input: scenarioForecast.input, rows: scenarioForecast.result.rows } : undefined} /> : <section className="setup-card dashboard-chart-placeholder"><div className="section-heading"><h2>Net worth through time</h2><button className="primary-button add-goal-button" onClick={() => setEditingEvent('new')}>+ Add goal</button></div><p className="muted">Complete your household details to see your projected net worth and asset breakdown.</p></section>}
+        {scenarioOpen ? baseMove && scenarioMove ? <PropertyMoveScenario move={pricedPropertyMove(scenarioMove)} base={baseMove} moves={doc.moves} maxYear={input?.household.assumptions.endYear ?? Math.max(2026, baseMove.year)}
+            onSelect={id => { setScenarioMoveId(id); setScenarioDraft(null) }} onChange={value => setScenarioDraft({ id: value.id, value })}
+            onReset={() => setScenarioDraft(null)} dirty={scenarioDirty} error={scenarioDirty ? scenarioForecast?.result.error : undefined}
+            onSave={() => {
+              const next = pricedPropertyMove({ ...scenarioMove, enabled: true })
+              setDocument(d => ({ ...d, moves: d.moves.map(m => m.id === next.id ? next : m) }))
+              setScenarioDraft(null)
+            }} onClose={() => setScenarioOpen(false)} /> : <section className="setup-card move-scenario scenario-panel"><div className="section-heading"><div><p className="eyebrow">Explore a what-if</p><h2>Property move scenario</h2></div><button className="secondary-button" onClick={() => setScenarioOpen(false)}>Close</button></div><p className="muted">Add a house move to adjust its timing, price, and cost assumptions against your current plan.</p><button className="primary-button" onClick={() => setEditingEvent('new')}>+ Add house move</button></section>
+          : <section className="setup-card milestone-card" aria-labelledby="milestones-heading"><div className="section-heading"><div><p className="eyebrow">Waypoints</p><h2 id="milestones-heading">Milestones</h2></div><button className="secondary-button scenario-launch" onClick={() => setScenarioOpen(true)}>Explore a move</button></div>{milestones.length ? <ol className="milestone-list">{milestones.map(m => {
           return <li key={m.id} className={m.event && !m.event.value.enabled ? 'milestone-excluded' : undefined}><span className="milestone-year">{m.year}</span><span className="milestone-pin" aria-hidden="true"/><span className="milestone-copy">{m.event ? <button className="milestone-link" onClick={() => setEditingEvent(m.event!)}>{m.label}</button> : <button className="milestone-link" onClick={() => { window.location.hash = m.target!; go(10) }}>{m.label}</button>}<small>{m.kind}</small>{m.event && <label className="milestone-toggle"><input type="checkbox" checked={m.event.value.enabled} onChange={e => setGoalEnabled(m.event!, e.target.checked)} /><span>{m.event.value.enabled ? 'Included in forecast' : 'Excluded from forecast'}</span></label>}</span></li>
-        })}</ol> : <p className="muted">Add a goal to mark a waypoint.</p>}</section>
+        })}</ol> : <p className="muted">Add a goal to mark a waypoint.</p>}</section>}
       </div>
       {editingEvent && <EventDialog document={doc} event={editingEvent === 'new' ? undefined : editingEvent} onClose={() => setEditingEvent(null)} onSave={event => { setDocument(d => putPlanEvent(d, event)); setEditingEvent(null) }} />}
     </main></div>
