@@ -5,7 +5,7 @@ import App from '../App'
 import { storageKey } from '../state/useAppDocument'
 import { completeDocument } from '../test/setupFixture'
 import { documentForecast } from '../state/forecast'
-import { formatGBP } from '../formatting/money'
+import { formatGBPWhole } from '../formatting/money'
 import { newPropertyMove } from '../config/defaultMoves'
 
 beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
@@ -39,8 +39,8 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   expect(saved().purchaseEvents[0].recurring).toMatchObject({ startYear: 2027, endYear: 2029 })
   expect(saved().spendingEvents).toEqual([])
   click('Dashboard')
-  const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal at FIRE' }).parentElement!
-  expect(within(tile).getByText(withdrawal!)).toBeVisible()
+  const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal' }).parentElement!
+  expect(within(tile).getByText(`${withdrawal}/yr`)).toBeVisible()
   click('Plan settings')
   click('Edit Family car'); enter('One-off purchase cost (£)', '5000'); click(/Preview impact/); click('Save event')
   expect(saved().purchaseEvents).toHaveLength(1)
@@ -115,9 +115,9 @@ it('supports keyboard year selection and shows exact chart category balances', (
   const doc = completeDocument(); doc.completed = true; doc.step = 9
   localStorage.setItem(storageKey, JSON.stringify(doc)); render(<App />)
   const { result } = documentForecast(doc)
-  fireEvent.change(screen.getByLabelText('Explore a year'), { target: { value: '2' } })
-  const chart = screen.getByRole('heading', { name: 'Net worth through time' }).closest('.chart-card')!
-  expect(within(chart as HTMLElement).getByText(formatGBP(result.rows[1]!.isa))).toBeVisible()
+  fireEvent.change(screen.getByLabelText('Selected year'), { target: { value: '2' } })
+  const chart = screen.getByRole('heading', { name: 'Net worth over time' }).closest('.chart-card')!
+  expect(within(chart as HTMLElement).getByText(formatGBPWhole(result.rows[1]!.isa))).toBeVisible()
   expect(screen.getByRole('img', { name: /Combined net worth and asset category chart/ })).toBeVisible()
 })
 
@@ -130,7 +130,7 @@ it('previews a property move scenario without persistence until explicitly saved
   fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
   expect(saved().moves[0].year).toBe(2028)
   expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeEnabled()
-  const fireTile = screen.getByRole('heading', { name: 'Projected net worth at FIRE' }).parentElement!
+  const fireTile = screen.getByRole('heading', { name: 'Net worth at retirement' }).parentElement!
   expect(within(fireTile).getByText(/What-if · current plan/)).toBeVisible()
   expect(screen.getByRole('list', { name: 'Chart legend' })).toHaveTextContent('Current plan')
   click('Reset to current plan')
@@ -150,6 +150,6 @@ it('adds goals from the dashboard and opens milestones at their edit controls', 
   click('Family car')
   expect(screen.getByRole('heading', { name: 'Edit Family car' })).toBeVisible()
   click('Close event dialog')
-  click('Alex reaches FIRE')
+  click('Alex · Work optional')
   expect(screen.getByLabelText('FIRE age')).toHaveFocus()
 })

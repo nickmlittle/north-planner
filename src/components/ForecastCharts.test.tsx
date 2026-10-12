@@ -20,7 +20,7 @@ it('splits cash areas at zero crossings and suppresses tiny signed-zero balances
   expect(positiveArea.getAttribute('d')).toContain(' Z M')
   expect(negativeArea.getAttribute('d')).toContain(' Z M')
 
-  fireEvent.change(screen.getByLabelText('Explore a year'), { target: { value: '4' } })
+  fireEvent.change(screen.getByLabelText('Selected year'), { target: { value: '4' } })
   const categories = chart.closest('.chart-card')!.querySelector('.category-values')!
-  expect(categories.textContent).toContain('Cash / unfunded need £0.00')
+  expect(categories.textContent).toContain('Cash £0')
 })

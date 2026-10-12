@@ -38,8 +38,8 @@ it('creates a single-adult renter household from a genuinely empty first load', 
   expect(screen.queryByText('Still to add')).not.toBeInTheDocument()
   click(/Open your dashboard/)
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your route ahead')
-  expect(screen.getAllByText('£0.00').length).toBeGreaterThan(2)
-  expect(screen.getByRole('heading', { name: 'Net worth through time' })).toBeVisible()
+  expect(screen.getAllByText('£0').length).toBeGreaterThan(2)
+  expect(screen.getByRole('heading', { name: 'Net worth over time' })).toBeVisible()
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
 })
 
@@ -69,7 +69,7 @@ it('shows incomplete totals and actionable missing details after skipping financ
   click(/Open your dashboard/)
   const card = screen.getByRole('heading', { name: 'Net worth today' }).parentElement!
   expect(within(card).getByText('Incomplete')).toBeVisible()
-  expect(screen.getByText(/Known assets: £520,000.00/)).toBeVisible()
+  expect(screen.getByText(/Known assets: £520,000/)).toBeVisible()
   expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('pension balance')
 })
 
