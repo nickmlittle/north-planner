@@ -12,6 +12,7 @@ const compact = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency
 
 export function ForecastCharts({ input, rows, events, onAddGoal }: { input: ForecastInput; rows: ForecastYear[]; events: PlanEvent[]; onAddGoal: () => void }) {
   const points = forecastChartPoints(input, rows)
+  const includedGoals = events.filter(e => e.value.enabled).length
   const [selection, setSelection] = useState(0)
   const selected = Math.min(selection, points.length - 1)
   const point = points[selected]!
@@ -50,7 +51,7 @@ export function ForecastCharts({ input, rows, events, onAddGoal }: { input: Fore
   return <section className="charts-section" aria-labelledby="net-worth-chart-heading">
     <div className="setup-card chart-card">
       <div className="section-heading chart-title-row"><div><p className="eyebrow">The bigger picture</p><h2 id="net-worth-chart-heading">Net worth through time</h2></div><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
-      <p className="muted chart-caption">Real 2026 GBP · Today is your opening position; future values are annual closing balances.</p>
+      <p className="muted chart-caption">Real 2026 GBP · Today is your opening position; future values are annual closing balances. {includedGoals} included {includedGoals === 1 ? 'goal' : 'goals'}. Toggle goals in Milestones to update the forecast.</p>
       <ul className="chart-legend" aria-label="Chart legend"><li><span className="net-worth-key"/>Net worth</li>{keys.map(k => <li key={k}><span style={{ background: colours[k] }} />{names[k]}</li>)}</ul>
       <div className="chart-scroll"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Combined net worth and asset category chart. Select a year below for exact values."><title>Net worth and account categories over time</title>
         {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{compact(v)}</text></g>)}
