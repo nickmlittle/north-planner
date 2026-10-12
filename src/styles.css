@@ -646,7 +646,7 @@ small, .muted, footer { color: #59665a; }
 }
 
 /* Restore the header row used by PlannerHeader's inner wrapper. */
-.header-inner { box-sizing: border-box; width: 100%; min-width: 0; display: flex; align-items: center; gap: 24px; }
+.header-inner { box-sizing: border-box; width: 100%; min-width: 0; display: flex; align-items: center; gap: 12px; }
 .mobile-menu-button, .mobile-header-menu { display: none !important; }
 .header-inner > .app-nav { order: 0; width: auto; flex: 0 1 auto; margin: 0 0 0 auto; }
 .header-inner > .save-status { margin-left: 0; }
@@ -683,7 +683,7 @@ small, .muted, footer { color: #59665a; }
 .selected-year-panel .category-values { padding-bottom: 12px; }
 /* Header-only finishing styles. */
 .north-header .app-nav button[aria-current] { background: rgba(243, 238, 223, 0.10); color: var(--cream); }
-.north-header .header-inner > .save-status { display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px; flex: 0 0 auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--cream); text-align: left; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+.north-header .header-inner > .save-status { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex: 0 0 112px; width: 112px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--cream); text-align: right; font-size: 12px; line-height: 1.2; white-space: nowrap; }
 .north-header .save-icon { display: inline-block; margin: 0; line-height: 1; }
 .account-control { position: relative; z-index: 20; flex: 0 0 auto; }
 .account-button { display: grid; place-items: center; width: 36px; height: 36px; margin: 0; padding: 0; border: 1px solid #ffffff70; border-radius: 50%; background: #ffffff18; color: var(--cream); font-size: 14px; font-weight: 650; line-height: 1; }
