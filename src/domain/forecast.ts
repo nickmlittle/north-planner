@@ -11,6 +11,8 @@ import type { ISAAllowances } from './surplus'
 export interface ForecastInput {
   household: Household; planning: ReturnAssumptions; income: IncomePeriod[]; tax: TaxRules
   spending: SpendingPlan; children: ChildEvent[]; mortgage: MortgagePlan; moves: PropertyMove[]; allowances: ISAAllowances
+  /** GBP amounts are real in this explicit price year at every annual conversion boundary. */
+  moneyBasis: { currency: 'GBP'; priceYear: number; terms: 'real' }
 }
 export interface Ledger { opening: number; flows: number; returns: number; closing: number }
 export interface PersonForecast {

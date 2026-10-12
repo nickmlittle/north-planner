@@ -85,4 +85,30 @@ describe('household setup', () => {
     expect(decoded.moves[0]).toMatchObject({ agentFeeRate: 0.015, legalFeeRate: 0.005, renovationRate: 0.025 })
     expect(toForecastInput(decoded).moves[0]).toMatchObject({ stampDuty: 10000, agentFees: 6000, legalFees: 2000, renovation: 10000 })
   })
+  it('migrates legacy base years to an explicit planning date while leaving old balance dates unknown', () => {
+    const doc = completeDocument()
+    const old = JSON.parse(JSON.stringify(doc)) as { moneyBasis?: unknown; balanceDatesReviewed?: boolean; snapshot: Record<string, unknown> }
+    delete old.moneyBasis
+    delete old.balanceDatesReviewed
+    delete old.snapshot.planningStartDate
+    const people = old.snapshot.people as Record<string, unknown>[]
+    delete people[0]!.isaAsOfDate
+    delete people[0]!.pensionAsOfDate
+    delete old.snapshot.homeAsOfDate
+    delete old.snapshot.mortgageAsOfDate
+    const decoded = decodeDocument(JSON.stringify(old))!
+    expect(decoded.snapshot.planningStartDate).toBe('2026-01-01')
+    expect(decoded.snapshot.people[0]).toMatchObject({ isa: '20000', isaAsOfDate: '', pension: '100000', pensionAsOfDate: '' })
+    expect(decoded.moneyBasis).toEqual({ currency: 'GBP', priceYear: 2026, terms: 'real' })
+    expect(decoded.balanceDatesReviewed).toBe(false)
+    expect(toForecastInput(decoded).household.isas[0]).toMatchObject({ value: 20000, asOfDate: null })
+  })
+  it('rejects invalid planning and observation dates while accepting blank dates and zero balances', () => {
+    const doc = completeDocument()
+    doc.snapshot.people[0]!.isa = '0'
+    expect(toForecastInput(doc).household.isas[0]).toMatchObject({ value: 0, asOfDate: null })
+    expect(decodeDocument(JSON.stringify({ ...doc, snapshot: { ...doc.snapshot, planningStartDate: '2026-02-30' } }))).toBeNull()
+    const invalidBalance = structuredClone(doc); invalidBalance.snapshot.people[0]!.isaAsOfDate = '2026-02-30'
+    expect(decodeDocument(JSON.stringify(invalidBalance))).toBeNull()
+  })
 })

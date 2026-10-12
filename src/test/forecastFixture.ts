@@ -15,7 +15,7 @@ export function completeForecastFixture(): ForecastInput {
   household.mortgages[0]!.balance = 12000
   household.cash[0]!.value = 500
   return {
-    household, planning: { ...defaultPlanning, houseGrowth: 0.01 }, tax: structuredClone(defaultTax),
+    household, planning: { ...defaultPlanning, houseGrowth: 0.01 }, tax: structuredClone(defaultTax), moneyBasis: household.assumptions.moneyBasis,
     income: household.people.map(p => ({ id: `${p.id}-work`, personId: p.id, kind: 'paye', startYear: 2026, endYear: 2091, annualSalary: 30000, dayRate: 0, billableDays: 0, workingFraction: 1, annualGrossOverride: null,
       contributions: { ...defaultContributions, employeeRate: 0.1, employerRate: 0.05 } })),
     spending: { baseline: 20000, events: [] }, children: [], moves: [],

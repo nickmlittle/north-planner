@@ -19,6 +19,7 @@ export function StartingPosition({ household, onChange }: {
             {group.inputs.map(definition => (
               <StartingPositionInput key={definition.key} definition={definition}
                 value={getStartingPositionValue(household, definition.field)}
+                priceYear={household.assumptions.moneyBasis.priceYear}
                 onChange={raw => onChange(definition.field, raw)} />
             ))}
           </div>

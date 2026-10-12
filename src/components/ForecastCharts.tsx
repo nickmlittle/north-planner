@@ -89,7 +89,7 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
   return <section className="charts-section" aria-labelledby="net-worth-chart-heading">
     <div className="setup-card chart-card">
       <div className="section-heading chart-title-row"><h2 id="net-worth-chart-heading">Net worth over time</h2><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
-      <p className="chart-basis">Today’s money · real 2026 GBP</p>
+      <p className="chart-basis">Today’s money · real {input.moneyBasis.priceYear} GBP</p>
       <ul className="chart-legend" aria-label="Chart legend"><li><span className="net-worth-key"/>{comparison ? 'What-if net worth' : 'Net worth'}</li>{comparison && <li><span className="current-plan-key"/>Current plan</li>}{keys.map(k => <li key={k}><span style={{ background: colours[k] }} />{names[k]}</li>)}</ul>
       <div className="chart-scroll" ref={plotContainer}><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Combined net worth and asset category chart. Select a year below for exact values."><title>Net worth and account categories over time</title>
         {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{formatGBPAxis(v)}</text></g>)}

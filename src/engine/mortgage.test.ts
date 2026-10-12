@@ -33,8 +33,8 @@ it('remortgages at the year boundary without replacing outstanding principal', (
   expect(year.state.remainingMonths).toBe(108)
 })
 it('requires missing terms and explicitly converts nominal debt to real pounds', () => {
-  expect(() => initialMortgage(446000, 2026, defaultMortgage)).toThrow(/Enter mortgage/)
-  expect(mortgagePreview(0, 2026, defaultMortgage).payment).toBe(0)
+  expect(() => initialMortgage(446000, 2026, defaultMortgage, 2026)).toThrow(/Enter mortgage/)
+  expect(mortgagePreview(0, 2026, defaultMortgage, 2026).payment).toBe(0)
   const plan = { ...defaultMortgage, annualRate: 0, termYears: 10, inflation: 0.1 }
-  expect(mortgagePreview(12000, 2026, plan).closing).toBeCloseTo(10800 / 1.1)
+  expect(mortgagePreview(12000, 2026, plan, 2026).closing).toBeCloseTo(10800 / 1.1)
 })

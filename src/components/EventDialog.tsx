@@ -106,8 +106,9 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
   }
   const before = documentForecast(doc)
   const after = candidate ? documentForecast(putPlanEvent(doc, candidate)) : undefined
-  const horizon = Math.max(2026, ...doc.snapshot.people.filter(p => p.role !== 'child').map(p => Number(p.dob.slice(0, 4)) + doc.planning.horizonAge))
-  const outside = candidate && (eventYear(candidate) < 2026 || eventYear(candidate) > horizon)
+  const baseYear = Number(doc.snapshot.planningStartDate.slice(0, 4))
+  const horizon = Math.max(baseYear, ...doc.snapshot.people.filter(p => p.role !== 'child').map(p => Number(p.dob.slice(0, 4)) + doc.planning.horizonAge))
+  const outside = candidate && (eventYear(candidate) < baseYear || eventYear(candidate) > horizon)
   const money = (key: string, label: string, help?: string) => <MoneyField key={key} label={label} value={fields[key] ?? ''} onChange={v => field(key, v)} help={help} />
   const text = (key: string, label: string, help?: string) => <SetupField key={key} label={label} value={fields[key] ?? ''} onChange={v => field(key, v)} help={help} />
   const metric = (n: number | null | undefined) => n == null ? 'Unavailable' : formatGBP(n)
@@ -127,7 +128,7 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
       {error && <p className="error-summary" role="alert">{error}</p>}
       {stage === 0 && <div className="event-choices">{choices.map(c => <button key={c.kind} className="event-choice" disabled={c.kind === 'move' && doc.snapshot.housing !== 'own'} onClick={() => { setKind(c.kind); setStage(1); title.current?.focus() }}><strong>{c.title}</strong><span>{c.description}</span>{c.kind === 'move' && doc.snapshot.housing !== 'own' && <small>Requires an existing home to sell. First-home buying comes later.</small>}</button>)}</div>}
       {stage === 1 && <form onSubmit={e => { e.preventDefault(); preview() }}>
-        <p className="muted">{choices.find(c => c.kind === kind)?.title} · All costs in real 2026 GBP. Enter explicit zero where there is no cost.</p>
+        <p className="muted">{choices.find(c => c.kind === kind)?.title} · All costs in real {doc.moneyBasis.priceYear} GBP. Enter explicit zero where there is no cost.</p>
         {event && <label className="checkbox-label event-enabled"><input type="checkbox" checked={fields.__enabled === undefined ? event.value.enabled : fields.__enabled === 'true'} onChange={e => {
           const enabled = e.target.checked
           const updated: PlanEvent = event.kind === 'move' ? { kind: 'move', value: { ...event.value, enabled } }
@@ -152,7 +153,7 @@ export function EventDialog({ document: doc, event, onClose, onSave }: {
         <div className="dialog-actions">{!event && <button type="button" className="secondary-button" onClick={() => { setStage(0); setError(''); title.current?.focus() }}>Back</button>}<button type="submit" className="primary-button">Preview impact →</button></div>
       </form>}
       {stage === 2 && candidate && <><h3>{eventName(candidate)} · {eventYear(candidate)}</h3>
-        {outside && <p className="context-note">This event starts outside the projection horizon (2026–{horizon}). Only costs within the projection are shown.</p>}
+        {outside && <p className="context-note">This event starts outside the projection horizon ({baseYear}–{horizon}). Only costs within the projection are shown.</p>}
         {!candidate.value.enabled && <p className="context-note">This event is excluded from the plan. Enable it from your event list to see its impact.</p>}
         {after?.result.error && <p role="status">Preview unavailable: {after.result.error} You can save this event and complete your household details later.</p>}
         <div className="table-scroll"><table><caption>Projected impact · year-end FIRE balances</caption><thead><tr><th>Measure</th><th>Saved plan</th><th>With this event</th></tr></thead><tbody>

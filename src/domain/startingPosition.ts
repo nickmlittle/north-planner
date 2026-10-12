@@ -49,7 +49,10 @@ export function updateStartingPosition(household: Household, field: StartingPosi
     }
   }
   const next = structuredClone(household)
-  if (field.kind === 'year') next.assumptions.startYear = value
+  if (field.kind === 'year') {
+    next.assumptions.startYear = value
+    next.assumptions.startDate = `${value}-01-01`
+  }
   else if (field.kind === 'age') {
     const person = next.people.find(person => person.id === field.personId)
     if (!person) return { household, error: 'Person could not be found.' }

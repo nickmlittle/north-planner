@@ -5,7 +5,7 @@ import { grossIncome } from './income'
 import { activeInYear } from '../domain/timeline'
 import { estimateTax } from './tax'
 
-export function employmentCashFlow(periods: IncomePeriod[], personId: string, year: number, age: number, fireAge: number, rules: TaxRules, adjustments: IncomeAdjustment[] = []) {
+export function employmentCashFlow(periods: IncomePeriod[], personId: string, year: number, age: number, fireAge: number, rules: TaxRules, adjustments: IncomeAdjustment[] = [], yearFraction = 1) {
   const period = periods.find(p => p.personId === personId && activeInYear(p, year))
   const contributions = period?.contributions ?? defaultContributions
   const configuredGross = grossIncome(periods, personId, year, adjustments)
@@ -21,10 +21,11 @@ export function employmentCashFlow(periods: IncomePeriod[], personId: string, ye
   const estimate = estimateTax(taxableIncome, taxRules, niEarnings, gross - employee)
   const employeeCash = reliefAtSource ? employee * 0.8 : employee
   const disposable = gross - employeeCash - estimate.tax - estimate.ni
-  return { gross, taxableIncome, niEarnings, tax: estimate.tax, ni: estimate.ni, employee, employeeCash, employer, totalPension: employee + employer, disposable }
+  const flow = { gross, taxableIncome, niEarnings, tax: estimate.tax, ni: estimate.ni, employee, employeeCash, employer, totalPension: employee + employer, disposable }
+  return Object.fromEntries(Object.entries(flow).map(([key, value]) => [key, value * yearFraction])) as typeof flow
 }
 
-export function householdEmployment(household: import('../domain/models').Household, periods: IncomePeriod[], year: number, fireAge: number, rules: TaxRules, adjustments: IncomeAdjustment[] = []) {
-  const byPerson = household.people.map(person => ({ personId: person.id, ...employmentCashFlow(periods, person.id, year, year - (person.birthYear ?? year), person.targetFireAge ?? fireAge, rules, adjustments) }))
+export function householdEmployment(household: import('../domain/models').Household, periods: IncomePeriod[], year: number, fireAge: number, rules: TaxRules, adjustments: IncomeAdjustment[] = [], yearFraction = 1) {
+  const byPerson = household.people.map(person => ({ personId: person.id, ...employmentCashFlow(periods, person.id, year, year - (person.birthYear ?? year), person.targetFireAge ?? fireAge, rules, adjustments, yearFraction) }))
   return { byPerson, disposable: byPerson.reduce((sum, flow) => sum + flow.disposable, 0) }
 }

@@ -1,5 +1,7 @@
-/** All money is in pounds of 2026 purchasing power, never nominal future pounds. */
-export type Real2026GBP = number
+/** Amounts are in the explicitly declared GBP price basis at each record boundary. */
+export type RealGBP = number
+/** @deprecated Retained for source compatibility; use RealGBP with an explicit moneyBasis. */
+export type Real2026GBP = RealGBP
 /** Annual real rates are decimals: 0.03 means 3% above inflation. */
 export type AnnualRealRate = number
 export type PersonId = string
@@ -16,7 +18,9 @@ interface OwnedAsset {
   id: string
   name: string
   ownerIds: PersonId[]
-  value: Real2026GBP
+  value: RealGBP
+  /** Balance observation cutoff; null means unknown and excludes it from dated projections. */
+  asOfDate: string | null
 }
 
 export interface ISA extends OwnedAsset {
@@ -42,7 +46,8 @@ export interface Mortgage {
   id: string
   propertyId: string
   borrowerIds: PersonId[]
-  balance: Real2026GBP
+  balance: RealGBP
+  asOfDate: string | null
   /** Contractual nominal annual interest rate, unlike real asset returns. */
   annualInterestRate: number | null
   endYear: CalendarYear | null
@@ -58,7 +63,7 @@ interface EventBase {
 export interface FinancialEvent extends EventBase {
   kind: 'financial'
   /** Positive for inflows, negative for outflows; a one-off event. */
-  amount: Real2026GBP
+  amount: RealGBP
 }
 
 export interface LifeEvent extends EventBase {
@@ -69,7 +74,9 @@ export interface LifeEvent extends EventBase {
 export type PlanningEvent = FinancialEvent | LifeEvent
 
 export interface PlanningAssumptions {
-  moneyBasis: { currency: 'GBP'; priceYear: 2026; terms: 'real' }
+  moneyBasis: { currency: 'GBP'; priceYear: number; terms: 'real' }
+  /** Inclusive start of projection day. */
+  startDate: string
   startYear: CalendarYear
   endYear: CalendarYear
   annualRealReturns: {

@@ -5,10 +5,11 @@ import { formatGBP } from '../formatting/money'
 interface Props {
   definition: InputDefinition
   value: number
+  priceYear: number
   onChange: (raw: string) => string | undefined
 }
 
-export function StartingPositionInput({ definition, value, onChange }: Props) {
+export function StartingPositionInput({ definition, value, onChange, priceYear }: Props) {
   const [draft, setDraft] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const isMoney = definition.field.kind === 'money'
@@ -32,7 +33,7 @@ export function StartingPositionInput({ definition, value, onChange }: Props) {
         }}
         onBlur={() => { if (!error) setDraft(null) }}
       />
-      <small id={hintId}>{isMoney ? 'Real 2026 pounds; enter an amount without £ or commas.' : definition.field.kind === 'age' ? 'Whole years at the base year (1–120).' : 'Changes ages; purchasing power stays at 2026.'}</small>
+      <small id={hintId}>{isMoney ? `Real ${priceYear} pounds; enter an amount without £ or commas.` : definition.field.kind === 'age' ? 'Whole years at the base year (1–120).' : `Changes ages; purchasing power stays at ${priceYear}.`}</small>
       {error && <small id={errorId} role="alert" className="input-error">{error} Last valid value retained.</small>}
     </div>
   )

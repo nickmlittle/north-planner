@@ -5,12 +5,12 @@ import { mortgagePreview } from '../engine/mortgage'
 import { formatGBP } from '../formatting/money'
 import { NumericInput } from './NumericInput'
 
-export function MortgageInputs({ value, onChange, balance, year }: { value: MortgagePlan; onChange: (value: MortgagePlan) => void; balance: number; year: number }) {
+export function MortgageInputs({ value, onChange, balance, year, priceYear }: { value: MortgagePlan; onChange: (value: MortgagePlan) => void; balance: number; year: number; priceYear: number }) {
   const [error, setError] = useState<string>()
   function apply(next: MortgagePlan) { const error = validateMortgagePlan(next); setError(error); if (!error) onChange(next); return error }
-  const preview = mortgagePreview(balance, year, value)
+  const preview = mortgagePreview(balance, year, value, priceYear)
   return <section className="household-card"><h2>Mortgage</h2>
-    <p>Contractual rate is nominal; inflation converts debt and payments into real 2026 GBP. Inflation starts at 0% (nominal equals real) and is editable. Rate and term are required for an outstanding mortgage. Monthly overpayment is in real 2026 GBP.</p>
+    <p>Contractual rate is nominal; inflation converts debt and payments into real {priceYear} GBP. Inflation starts at 0% (nominal equals real) and is editable. Rate and term are required for an outstanding mortgage. Monthly overpayment is in real {priceYear} GBP.</p>
     <div className="input-grid">
       <NumericInput label="Mortgage interest rate (%)" value={value.annualRate === null ? null : value.annualRate * 100} onChange={n => apply({ ...value, annualRate: n / 100 })} />
       <NumericInput label="Remaining mortgage term (years)" value={value.termYears} onChange={n => apply({ ...value, termYears: n })} />
@@ -24,6 +24,6 @@ export function MortgageInputs({ value, onChange, balance, year }: { value: Mort
     </fieldset>)}
     <button type="button" onClick={() => apply({ ...value, refinances: [...value.refinances, { id: crypto.randomUUID(), year, annualRate: value.annualRate ?? 0, termYears: value.termYears ?? 1, enabled: false }] })}>Add remortgage</button>
     {error && <p role="alert">{error}</p>}
-    {preview.error ? <p>{preview.error}</p> : <p>Base-year payments: {formatGBP(preview.payment!)}; closing mortgage: {formatGBP(preview.closing!)} (real 2026 GBP).</p>}
+    {preview.error ? <p>{preview.error}</p> : <p>Base-year payments: {formatGBP(preview.payment!)}; closing mortgage: {formatGBP(preview.closing!)} (real {priceYear} GBP).</p>}
   </section>
 }
