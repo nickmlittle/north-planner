@@ -18,8 +18,8 @@ import { SpendingInputs } from '../components/SpendingInputs'
 import { ForecastResults } from '../components/ForecastResults'
 import { SetupCard, MoneyField } from '../components/SetupFields'
 
-export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
+export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
@@ -47,7 +47,7 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
         employee: c ? String(Number((c.employeeRate * 100).toFixed(2))) : p.employee, employer: c ? String(Number((c.employerRate * 100).toFixed(2))) : p.employer, treatment: c?.treatment ?? p.treatment }
     }) } }))
   }
-  return <div className="north-shell planner-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} />
+  return <div className="north-shell planner-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
     <main className="planner-main"><p className="eyebrow">{doc.snapshot.name} · Your next chapter</p><h1 ref={heading} tabIndex={-1}>Your plan settings.</h1><p className="page-description">Adjust the assumptions and timelines behind your dashboard.</p><button className="secondary-button" onClick={() => go(9)}>← Back to dashboard</button>
       <p className="context-note">Forecasts use annual calendar-year ages derived from DOB, in real 2026 GBP. Current earnings initially continue unchanged in real terms until FIRE; you can change the timeline below. Returns and retirement ages are illustrative assumptions, not recommendations.</p>
       {missing.filter(m => m.step !== 9).length > 0 && <SetupCard title="Complete your current picture"><ul className="missing-list">{missing.filter(m => m.step !== 9).map((m, i) => <li key={i}><span>{m.label}</span><button className="text-button" onClick={() => go(m.step)}>Add details</button></li>)}</ul></SetupCard>}

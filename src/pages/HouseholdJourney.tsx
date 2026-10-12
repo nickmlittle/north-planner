@@ -4,6 +4,7 @@ import { ageOn, annual, annualIncome, emptyPerson, householdErrors, isPersonLink
 import type { AppDocument, SetupPerson, SetupSnapshot } from '../domain/setup'
 import { formatGBP } from '../formatting/money'
 import { FrequencyField, MoneyField, SetupCard, SetupField } from '../components/SetupFields'
+import { PlannerHeader } from '../components/PlannerHeader'
 
 const headings = ['A clearer picture of your future starts here.', 'Your household', 'Current income', 'Your pensions', 'Savings and cash', 'Your home', 'Current household spending', 'Review your starting position', 'Your starting position']
 const descriptions = ['Start with the people in your household and the finances you have today.', 'Who are you planning for? Add the people who are part of your household.', 'What each adult earns now, before tax. Future job changes come later.', 'The pension pots you have today, and contributions going into them.', 'Add what you have saved or invested today, with clear ownership.', 'Your current home and any mortgage still outstanding.', 'What your household spends regularly today.', 'Check your details. You can still add anything you have skipped.', 'Your household’s current financial picture, all in one place.']
@@ -11,8 +12,8 @@ function Owners({ people, value, onChange, label }: { people: SetupPerson[]; val
   return <fieldset className="owner-picker"><legend>{label}</legend>{people.map(p => <label key={p.id}><input type="checkbox" checked={value.includes(p.id)} onChange={e => onChange(e.target.checked ? [...value, p.id] : value.filter(id => id !== p.id))} />{p.name || 'Unnamed adult'}</label>)}{!value.length && <small>Choose at least one owner. Select multiple people for joint ownership.</small>}</fieldset>
 }
 function Money({ value }: { value: number | null }) { return <>{value === null ? 'Not added' : formatGBP(value)}</> }
-export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
+export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
 }) {
   const s = doc.snapshot; const adults = s.people.filter(p => p.role !== 'child'); const children = s.people.filter(p => p.role === 'child')
   const [attempted, setAttempted] = useState(false); const [error, setError] = useState(''); const [removing, setRemoving] = useState<string | null>(null)
@@ -43,8 +44,7 @@ export function HouseholdJourney({ document: doc, setDocument, warning, replaceS
   const missing = missingDetails(s); const totals = snapshotTotals(s)
   const linkedPerson = s.people.find(p => p.id === removing)
   return <div className="north-shell">
-    <header className="north-header"><a href="#" onClick={e => { e.preventDefault(); go(doc.completed ? 9 : 0) }} className="brand"><svg className="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18"/><path d="M20 6 11 21h6l-4 8 7-5 7 5-4-8h6L20 6Z"/><path d="M20 24v9"/></svg><span>north</span><span className="brand-dot">.</span></a>{doc.completed && <nav className="app-nav" aria-label="Main navigation"><button onClick={() => go(9)}>Dashboard</button><button aria-current="page" onClick={() => go(8)}>Household</button><button onClick={() => go(10)}>Plan settings</button></nav>}{!doc.completed && <span className="header-caption">Your starting position</span>}<span className="save-status" aria-live="polite">{warning ? 'Unsaved changes' : saveStatus ?? (accountBacked ? 'Saved' : 'Saved in this browser')}</span></header>
-    {warning && <aside className="storage-warning" role="status">{warning}{warning.startsWith('Saved data') && <button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button>}</aside>}
+    <PlannerHeader step={doc.step === 8 ? 8 : doc.completed ? doc.step : -1} go={step => { if (step === 8) go(8); else go(step) }} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
     <div className={`journey-layout ${doc.step === 0 || doc.step === 8 ? 'without-sidebar' : ''}`}>
       {doc.step > 0 && doc.step < 8 && <nav className="journey-sidebar" aria-label="Household setup"><p className="eyebrow">Getting started</p><ol>{setupSteps.slice(1, 8).map((name, i) => <li key={name}><button type="button" aria-current={doc.step === i + 1 ? 'step' : undefined} onClick={() => go(i + 1)}><span className="step-number">{doc.step > i + 1 && (i === 0 ? !householdErrors(s).length : !missing.some(m => m.step === i + 1)) ? '✓' : i + 1}</span>{name}</button></li>)}</ol><p className="sidebar-note">Build a picture of today.<br />Plan the future next.</p></nav>}
       <main className={`journey-main ${doc.step === 0 ? 'welcome-main' : ''}`}>
