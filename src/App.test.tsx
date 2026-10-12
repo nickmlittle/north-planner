@@ -69,7 +69,7 @@ it('shows incomplete totals and actionable missing details after skipping financ
   click(/Open your dashboard/)
   const card = screen.getByRole('heading', { name: 'Net worth today' }).parentElement!
   expect(within(card).getByText('Incomplete')).toBeVisible()
-  expect(screen.getByText(/Known assets: £520,000/)).toBeVisible()
+  expect(within(card).queryByText(/Known assets:/)).not.toBeInTheDocument()
   expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('pension balance')
 })
 
