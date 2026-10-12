@@ -3,6 +3,7 @@ import { ageOn, amount, decodeDocument, emptyPerson, householdErrors, missingDet
 import { forecastResult } from '../engine/forecast'
 
 import { completeDocument } from '../test/setupFixture'
+import { newPropertyMove } from '../config/defaultMoves'
 
 describe('household setup', () => {
   it('starts empty and distinguishes zero, unknown and invalid amounts', () => {
@@ -71,5 +72,17 @@ describe('household setup', () => {
     const d = completeDocument()
     expect(decodeDocument(JSON.stringify(d))).toEqual(d)
     for (const bad of ['{}', '{', JSON.stringify({ ...d, version: 2 }), JSON.stringify({ ...d, snapshot: { ...d.snapshot, people: [null] } })]) expect(decodeDocument(bad)).toBeNull()
+  })
+  it('migrates legacy move amounts to purchase-price rates when decoding', () => {
+    const doc = completeDocument()
+    const move = { ...newPropertyMove(2030), enabled: true, purchasePrice: 400000, stampDuty: 1, agentFees: 6000, legalFees: 2000, renovation: 10000 }
+    doc.moves = [move]
+    const legacy = JSON.parse(JSON.stringify(doc)) as typeof doc
+    delete (legacy.moves[0] as Partial<typeof move>).agentFeeRate
+    delete (legacy.moves[0] as Partial<typeof move>).legalFeeRate
+    delete (legacy.moves[0] as Partial<typeof move>).renovationRate
+    const decoded = decodeDocument(JSON.stringify(legacy))!
+    expect(decoded.moves[0]).toMatchObject({ agentFeeRate: 0.015, legalFeeRate: 0.005, renovationRate: 0.025 })
+    expect(toForecastInput(decoded).moves[0]).toMatchObject({ stampDuty: 10000, agentFees: 6000, legalFees: 2000, renovation: 10000 })
   })
 })

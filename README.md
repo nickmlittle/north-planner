@@ -119,7 +119,8 @@ KAN-7 adds editable planning assumptions, separate from the starting household.
 Illustrative defaults: equity 4% real / 15% volatility, bonds 1% / 5%, house 0%,
 cash fixed 0%, FIRE 50, pension access 58, horizon 95, withdrawal rate 3.5%.
 These are editable modelling inputs, not financial recommendations. Forecast
-recalculation is integrated by KAN-16; scenario toggles arrive in later tickets.
+recalculation is integrated by KAN-16; the dashboard supports live property-move
+what-if scenarios with explicit save and reset controls.
 
 KAN-8 uses inclusive start/exclusive end calendar-year income periods. Multiple
 sequential jobs are supported per person, with an optional working fraction and
@@ -169,9 +170,12 @@ sale, old debt and selling fees funds purchase/costs, then proportional ISA draw
 then a new mortgage. Excess equity becomes cash; existing cash is not a purchase
 funding source under the specified order. Optional sale overrides are explicit
 valuation changes. Renovations are expensed, not automatically added to value.
-Stamp duty is a user-entered amount, not an automatic tax estimate. Borrowing is
-the residual funding need, with no lender affordability/LTV constraint. Multiple
-moves are supported in different years; conflicting same-year moves are flagged.
+The dashboard estimates SDLT using England and Northern Ireland main-home rates,
+and estimates agent, legal, and renovation/furnishing costs from editable purchase-
+price percentages. These estimates exclude additional-property and non-resident
+surcharges. Borrowing is the residual funding need, with no lender affordability/
+LTV constraint. Multiple moves are supported in different years; conflicting
+same-year moves are flagged.
 
 KAN-15 uses deterministic water-filling toward equal projected FIRE ISA values,
 with each owner's allowance cap. Surplus after tax/pensions/lifestyle/children/

@@ -64,7 +64,7 @@ it('integrates child/work/spending events, property moves, debt inflation and re
   input.mortgage = { ...input.mortgage, annualRate: 0.04, inflation: 0.02, monthlyOverpayment: 10, refinances: [{ id: 'r', year: 2027, annualRate: 0.03, termYears: 5, enabled: true }] }
   input.children = [{ id: 'child', birthYear: 2027, enabled: true, birthCost: 1000, costs: { ages0to2: 10000, ages3to4: 8000, ages5to11: 5000, ages12to18: 6000 }, workAdjustments: [{ id: 'leave', personId: 'immy', startYear: 2027, endYear: 2028, workingFraction: 0.6, annualGrossOverride: null }] }]
   input.spending.events = [{ id: 'spend', name: 'spend', startYear: 2027, endYear: 2030, annualChange: 1000, enabled: true }]
-  input.moves = [{ id: 'move', name: 'Surrey', year: 2033, enabled: true, saleValue: null, purchasePrice: 500000, stampDuty: 20000, agentFees: 5000, legalFees: 1000, movingCosts: 1000, renovation: 1000, annualRate: 0.04, termYears: 25 }]
+  input.moves = [{ id: 'move', name: 'Surrey', year: 2033, enabled: true, saleValue: null, purchasePrice: 500000, stampDuty: 20000, agentFees: 5000, legalFees: 1000, movingCosts: 1000, renovation: 1000, annualRate: 0.04, termYears: 25, agentFeeRate: 0, legalFeeRate: 0, renovationRate: 0 }]
   const rows = annualForecast(input)
   rows.forEach((row, i) => {
     reconcile(row, rows[i - 1])
@@ -104,7 +104,7 @@ it('safely reports missing mortgage terms and inconsistent configurations', () =
 
 it('accounts for property sale overrides as explicit valuation changes and rejects conflicting transactions', () => {
   const input = completeForecastFixture()
-  input.moves = [{ id: 'm', name: 'Move', year: 2026, enabled: true, saleValue: 320000, purchasePrice: 350000, stampDuty: 10000, agentFees: 2000, legalFees: 1000, movingCosts: 1000, renovation: 0, annualRate: 0.04, termYears: 10 }]
+  input.moves = [{ id: 'm', name: 'Move', year: 2026, enabled: true, saleValue: 320000, purchasePrice: 350000, stampDuty: 10000, agentFees: 2000, legalFees: 1000, movingCosts: 1000, renovation: 0, annualRate: 0.04, termYears: 10, agentFeeRate: 0, legalFeeRate: 0, renovationRate: 0 }]
   const first = annualForecast(input)[0]!
   expect(first.propertyValuationChange).toBe(20000)
   reconcile(first)

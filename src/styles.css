@@ -479,3 +479,48 @@ small, .muted, footer { color: #59665a; }
   .account-bar { height: 42px; min-height: 42px; padding-block: 0; }
   .account-bar + .dashboard-shell { height: calc(100dvh - 42px); min-height: min(578px, calc(100dvh - 42px)); }
 }
+
+/* Optional property move scenario controls and current-plan chart comparison. */
+.chart-legend .current-plan-key { height: 0; border-radius: 0; border-top: 2px dashed #bc653d; background: transparent; }
+.move-scenario { padding: 16px 18px; }
+.move-scenario h2 { margin: 0; }
+.move-scenario .section-heading { align-items: center; margin-bottom: 10px; }
+.scenario-launch { flex: 0 0 auto; margin: 0; padding: 7px 10px; font-size: 11px; }
+.scenario-panel-actions { display: flex; align-items: center; gap: 8px; }
+.scenario-panel-actions > .secondary-button { flex: 0 0 auto; margin: 0; padding: 7px 10px; font-size: 11px; }
+.scenario-select { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #52644f; }
+.scenario-select select { min-width: 0; max-width: 150px; }
+.scenario-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; align-items: center; }
+.scenario-controls > label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #52644f; }
+.scenario-controls input[type="range"] { width: 100%; accent-color: var(--pine); }
+.scenario-numeric { display: flex; align-items: center; gap: 8px; grid-column: 2; }
+.scenario-numeric label { font-size: 11px; white-space: nowrap; }
+.scenario-numeric input, .scenario-fees input { box-sizing: border-box; min-width: 0; width: 100%; padding: 7px 9px; border: 1px solid #cbd5c4; border-radius: 6px; background: white; color: var(--pine); }
+.scenario-fees { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; margin-top: 10px; }
+.scenario-fees h3 { grid-column: 1 / -1; margin: 0; font-size: 12px; }
+.scenario-fees label { display: flex; align-items: center; gap: 7px; color: #52644f; font-size: 11px; }
+.scenario-cost-note { margin: 8px 0 0; font-size: 11px; color: #52644f; }
+.move-scenario > .muted { margin: 4px 0 0; font-size: 10px; }
+.scenario-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.scenario-actions button { margin: 0; padding: 7px 10px; font-size: 11px; }
+.scenario-actions button:disabled { opacity: .55; cursor: default; }
+@media (min-width: 1100px) {
+  .dashboard-overview { align-items: stretch; }
+  .scenario-panel { box-sizing: border-box; height: 100%; min-height: 0; margin: 0; overflow-y: auto; }
+  .scenario-panel .section-heading { align-items: stretch; flex-direction: column; }
+  .scenario-panel-actions { width: 100%; justify-content: space-between; }
+  .scenario-panel-actions .scenario-select { flex: 1; min-width: 0; }
+  .scenario-panel-actions .scenario-select select { flex: 1; }
+  .scenario-controls { gap: 4px 10px; }
+  .scenario-controls > label { min-width: 0; }
+  .scenario-numeric { grid-column: 1 / -1; }
+  .scenario-fees { grid-template-columns: 1fr 1fr; }
+  .scenario-actions { flex-direction: column-reverse; }
+}
+@media (max-width: 700px) {
+  .scenario-controls { grid-template-columns: 1fr; }
+  .scenario-numeric { grid-column: 1; }
+  .scenario-fees { grid-template-columns: 1fr; }
+  .scenario-fees h3 { grid-column: 1; }
+  .scenario-actions { flex-direction: column-reverse; }
+}
