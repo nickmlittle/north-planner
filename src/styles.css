@@ -716,3 +716,47 @@ small, .muted, footer { color: #59665a; }
 /* Dashboard content and its header share one responsive container. */
 .dashboard-shell > .north-header { padding-inline: 0; }
 .dashboard-main { max-width: none; }
+
+/* Plan settings share the dashboard's content frame and page heading alignment. */
+.settings-shell { min-height: 100vh; }
+.north-shell > .north-header { padding-inline: 0; }
+.settings-main { max-width: none; }
+.settings-heading { align-items: flex-start; margin-top: 4px; margin-bottom: 20px; }
+.settings-heading .page-description { margin-top: 10px; }
+.settings-content > :first-child { margin-top: 0; }
+.settings-nav-item { position: relative; display: flex; align-items: center; }
+.settings-dropdown { position: absolute; top: 100%; left: 0; z-index: 50; display: grid; width: max-content; min-width: 230px; max-width: min(320px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 10px 24px #203e3230; }
+.settings-dropdown button { width: 100%; margin: 0; padding: 9px 12px; border: 0; border-radius: 5px; background: transparent; color: var(--pine); text-align: left; font-size: 13px; font-weight: 500; }
+.settings-dropdown button:hover, .settings-dropdown button[aria-current] { background: var(--soft-fern); }
+.settings-dropdown button[aria-current] { font-weight: 650; }
+.north-header .settings-dropdown button[aria-current] { background: var(--soft-fern); color: var(--pine); }
+.settings-nav-item > button span { padding-left: 3px; font-size: 12px; }
+@media (max-width: 700px) {
+  .settings-nav-item { flex: 1 1 0; }
+  .app-nav .settings-nav-item > button { width: 100%; padding: 8px 6px; font-size: 12px; }
+  .settings-dropdown { top: 100%; left: auto; right: 0; min-width: 220px; }
+}
+
+/* Keep the title frame fixed so page content starts at the same dashboard row. */
+.dashboard-main > .route-heading, .settings-main > .route-heading {
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 38px;
+  flex: 0 0 38px;
+  align-items: flex-start;
+  margin: 0 0 24px;
+}
+.route-heading > .route-illustration { align-self: center; }
+@media (min-width: 701px) and (max-width: 1099px) {
+  .dashboard-main > .route-heading, .settings-main > .route-heading { height: 106px; min-height: 106px; flex-basis: 106px; }
+}
+@media (max-width: 700px) {
+  .dashboard-main > .route-heading, .settings-main > .route-heading { height: 128px; min-height: 128px; flex-basis: 128px; }
+  .dashboard-main > .route-heading .page-description, .settings-main > .route-heading .page-description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .dashboard-main > .route-heading h1, .settings-main > .route-heading h1 { font-size: clamp(26px, 5vw, 32px); }
+}

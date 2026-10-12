@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { HouseholdJourney } from './pages/HouseholdJourney'
 import { HouseholdDashboard } from './pages/HouseholdDashboard'
@@ -8,21 +8,43 @@ import { useCloudDocument } from './state/useCloudDocument'
 import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
+import { isSettingsSection, navigateToSettings } from './state/navigation'
+
+function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
+function getLocationSearch() { return window.location.search }
 
 function PlannerApp() {
   const state = useAppDocument()
-  return state.document.step === 9 ? <HouseholdDashboard {...state} /> : state.document.step === 10 ? <HouseholdPlanner {...state} /> : <HouseholdJourney {...state} />
+  const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
+  const params = new URLSearchParams(search)
+  const route = params.get('settings')
+  const view = params.get('view')
+  const settingsSection = isSettingsSection(route) ? route : 'planning'
+  const chooseSettings = (section: typeof settingsSection) => {
+    navigateToSettings(section)
+  }
+  if (view === 'settings' && isSettingsSection(route)) return <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} />
+  if (view === 'dashboard') return <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} />
+  return state.document.step === 9 ? <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : state.document.step === 10 ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : <HouseholdJourney {...state} />
 }
 
 function CloudPlanner({ session }: { session: Session }) {
   const state = useCloudDocument(session.user)
+  const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
   async function signOut() { await supabase?.auth.signOut() }
   if (state.needsChoice) return <DocumentConflict onChoose={choice => void state.chooseConflict(choice)} />
   if (!state.document) return <main className="account-screen"><h1>{state.status || 'Household unavailable'}</h1>{state.error && <p role="alert" className="error-summary">{state.error}</p>}<div className="button-row"><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => void signOut()}>Sign out</button></div></main>
   const document = state.document
   const props = { ...state, document, warning: state.error, saveStatus: state.status, replaceSavedDraft: () => {}, accountBacked: true, email: session.user.email ?? undefined, onSignOut: () => void signOut() }
+  const params = new URLSearchParams(search)
+  const route = params.get('settings')
+  const view = params.get('view')
+  const settingsSection = isSettingsSection(route) ? route : 'planning'
+  const chooseSettings = (section: typeof settingsSection) => {
+    navigateToSettings(section)
+  }
   return <>
-    {document.step === 9 ? <HouseholdDashboard {...props} /> : document.step === 10 ? <HouseholdPlanner {...props} /> : <HouseholdJourney {...props} />}
+    {view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : view === 'dashboard' ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : document.step === 9 ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : document.step === 10 ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : <HouseholdJourney {...props} />}
     {state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}
   </>
 }

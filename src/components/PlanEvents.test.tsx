@@ -8,13 +8,14 @@ import { documentForecast } from '../state/forecast'
 import { formatGBPWhole } from '../formatting/money'
 import { newPropertyMove } from '../config/defaultMoves'
 
-beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
+beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
-const click = (name: string | RegExp) => { const button = screen.getByRole('button', { name }); button.focus(); fireEvent.click(button) }
+const click = (name: string | RegExp) => { const button = screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }); button.focus(); fireEvent.click(button) }
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const saved = () => JSON.parse(localStorage.getItem(storageKey)!)
 function open(doc = completeDocument()) {
   doc.completed = true; doc.step = 10
+  window.history.replaceState(null, '', '/?view=settings&settings=events')
   localStorage.setItem(storageKey, JSON.stringify(doc)); return render(<App />)
 }
 function purchase() {
@@ -42,11 +43,13 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal' }).parentElement!
   expect(within(tile).getByText(`${withdrawal}/yr`)).toBeVisible()
   click('Plan settings')
+  click('Goals & life events')
   click('Edit Family car'); enter('One-off purchase cost (£)', '5000'); click(/Preview impact/); click('Save event')
   expect(saved().purchaseEvents).toHaveLength(1)
   expect(saved().purchaseEvents[0].upfrontCost).toBe(5000)
   view.unmount(); render(<App />)
   click('Plan settings')
+  click('Goals & life events')
   expect(screen.getByRole('button', { name: 'Edit Family car' })).toBeVisible()
   fireEvent.click(screen.getByLabelText('Include Family car'))
   expect(saved().purchaseEvents[0].enabled).toBe(false)
