@@ -11,8 +11,12 @@ const keys = ['isa', 'pension', 'cash', 'equity'] as const
 const compact = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
 export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: { input: ForecastInput; rows: ForecastYear[]; events: PlanEvent[]; onAddGoal: () => void; comparison?: { input: ForecastInput; rows: ForecastYear[] } }) {
-  const points = forecastChartPoints(input, rows)
-  const scenarioPoints = comparison ? forecastChartPoints(comparison.input, comparison.rows) : points
+  const normalizeCash = (points: ReturnType<typeof forecastChartPoints>) => points.map(point => ({
+    ...point,
+    cash: Math.abs(point.cash) < 1e-8 ? 0 : point.cash,
+  }))
+  const points = normalizeCash(forecastChartPoints(input, rows))
+  const scenarioPoints = comparison ? normalizeCash(forecastChartPoints(comparison.input, comparison.rows)) : points
   const [selection, setSelection] = useState(0)
   const selected = Math.min(selection, scenarioPoints.length - 1)
   const point = scenarioPoints[selected]!
@@ -49,6 +53,23 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
     }).join(' ')
     return `${topPath} ${bottomPath} Z`
   }
+  const cashAreaPaths = (sign: 1 | -1) => scenarioPoints.slice(0, -1).flatMap((point, i) => {
+    const next = scenarioPoints[i + 1]!
+    const startValue = point.cash * sign, endValue = next.cash * sign
+    if (startValue < 0 && endValue < 0) return []
+    const crossing = startValue / (startValue - endValue)
+    const startT = startValue < 0 ? crossing : 0
+    const endT = endValue < 0 ? crossing : 1
+    if (endT - startT < 1e-12) return []
+    const sample = (t: number) => {
+      const value = point.cash + (next.cash - point.cash) * t
+      const positiveBase = cumulative(point, 2) + (cumulative(next, 2) - cumulative(point, 2)) * t
+      const negativeBase = negativeCumulative(point, 2) + (negativeCumulative(next, 2) - negativeCumulative(point, 2)) * t
+      return { x: x(i) + (x(i + 1) - x(i)) * t, value, base: sign > 0 ? positiveBase : negativeBase }
+    }
+    const a = sample(startT), b = sample(endT)
+    return [`M${a.x},${y(a.base + a.value)} L${b.x},${y(b.base + b.value)} L${b.x},${y(b.base)} L${a.x},${y(a.base)} Z`]
+  }).join(' ')
   return <section className="charts-section" aria-labelledby="net-worth-chart-heading">
     <div className="setup-card chart-card">
       <div className="section-heading chart-title-row"><div><p className="eyebrow">The bigger picture</p><h2 id="net-worth-chart-heading">Net worth through time</h2></div><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
@@ -57,7 +78,10 @@ export function ForecastCharts({ input, rows, events, onAddGoal, comparison }: {
         {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{compact(v)}</text></g>)}
         <line x1={left} x2={width - right} y1={y(0)} y2={y(0)} stroke="#93a18c"/>
         {tickIndexes.map(i => <text key={i} x={x(i)} y={height - 10} textAnchor={i === 0 ? 'start' : i === scenarioPoints.length - 1 ? 'end' : 'middle'}>{scenarioPoints[i]!.label}</text>)}
-        {keys.map((key, i) => <path key={key} d={areaPath(i)} fill={colours[key]} fillOpacity=".66" stroke={colours[key]} strokeWidth="1"/>)}
+        {keys.slice(0, 2).map((key, i) => <path key={key} d={areaPath(i)} fill={colours[key]} fillOpacity=".66" stroke={colours[key]} strokeWidth="1"/>)}
+        <path className="cash-positive-area" d={cashAreaPaths(1)} fill={colours.cash} fillOpacity=".66"/>
+        <path className="cash-negative-area" d={cashAreaPaths(-1)} fill={colours.cash} fillOpacity=".66"/>
+        <path d={areaPath(3)} fill={colours.equity} fillOpacity=".66" stroke={colours.equity} strokeWidth="1"/>
         {fireMilestones.map((m, markerIndex) => { const i = scenarioPoints.findIndex((p, index) => index > 0 && p.year === m.year); return i < 0 ? null : <g key={m.id}><title>{m.name} · {m.year}</title><line x1={x(i)} x2={x(i)} y1={top} y2={height - bottom} stroke="#50684c" strokeDasharray="5 5"/><text x={x(i)} y={markerIndex % 2 ? 13 : 9} textAnchor="middle">FIRE</text></g> })}
         {comparison && <path d={points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.netWorth)}`).join(' ')} fill="none" stroke="#bc653d" strokeWidth="3" strokeDasharray="8 6" strokeLinejoin="round"/>}
         <path d={scenarioPoints.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.netWorth)}`).join(' ')} fill="none" stroke="#172f27" strokeWidth="4" strokeLinejoin="round"/>
