@@ -93,6 +93,17 @@ it('uses the explicit planning year and keeps unknown dated balances outside the
   expect(rows[0]!.people[0]!.isa.opening).toBe(0)
   expect(input.household.isas[0]!.value).toBe(5000)
 })
+it('rejects asset or mortgage observations after the inclusive planning start date', () => {
+  const input = completeForecastFixture()
+  input.household.assumptions.startDate = '2026-01-01'
+  input.household.assumptions.startYear = 2026
+  input.household.isas[0]!.asOfDate = '2026-12-31'
+  expect(forecastResult(input).error).toMatch(/on or before the planning start date/)
+  input.household.isas[0]!.asOfDate = '2026-01-01'
+  expect(forecastResult(input).error).toBeUndefined()
+  input.household.mortgages[0]!.asOfDate = '2026-12-31'
+  expect(forecastResult(input).error).toMatch(/on or before the planning start date/)
+})
 it('prorates planned mortgage overpayments from a mid-year start', () => {
   const input = completeForecastFixture()
   input.household.mortgages[0]!.balance = 100000
