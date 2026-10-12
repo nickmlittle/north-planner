@@ -14,7 +14,7 @@ it('shows the deterministic table after terms are entered and recalculates outpu
   fireEvent.change(screen.getByLabelText('Equity expected real return (%)'), { target: { value: '6' } })
   expect(row.textContent).not.toBe(before)
   fireEvent.change(screen.getByLabelText('Alex Annual salary (GBP)'), { target: { value: '110000' } })
-  expect(within(row).getByText('£110,000.00')).toBeVisible()
+  expect(within(row).getByText('£110,000')).toBeVisible()
   const updated = row.textContent
   fireEvent.change(screen.getByLabelText('Annual baseline lifestyle spending (GBP)'), { target: { value: '30000' } })
   expect(row.textContent).not.toBe(updated)
