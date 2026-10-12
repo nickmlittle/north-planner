@@ -12,12 +12,11 @@ const compact = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency
 
 export function ForecastCharts({ input, rows, events, onAddGoal }: { input: ForecastInput; rows: ForecastYear[]; events: PlanEvent[]; onAddGoal: () => void }) {
   const points = forecastChartPoints(input, rows)
-  const includedGoals = events.filter(e => e.value.enabled).length
   const [selection, setSelection] = useState(0)
   const selected = Math.min(selection, points.length - 1)
   const point = points[selected]!
   const id = useId()
-  const width = 1000, height = 270, left = 82, right = 24, top = 20, bottom = 36
+  const width = 1000, height = 360, left = 82, right = 24, top = 24, bottom = 42
   const plotWidth = width - left - right, plotHeight = height - top - bottom
   const x = (i: number) => left + i / Math.max(1, points.length - 1) * plotWidth
   const cumulative = (p: typeof points[number], keyIndex: number) => keys.slice(0, keyIndex).reduce((sum, key) => sum + (p[key] >= 0 ? p[key] : 0), 0)
@@ -51,7 +50,6 @@ export function ForecastCharts({ input, rows, events, onAddGoal }: { input: Fore
   return <section className="charts-section" aria-labelledby="net-worth-chart-heading">
     <div className="setup-card chart-card">
       <div className="section-heading chart-title-row"><div><p className="eyebrow">The bigger picture</p><h2 id="net-worth-chart-heading">Net worth through time</h2></div><button className="primary-button add-goal-button" onClick={onAddGoal}>+ Add goal</button></div>
-      <p className="muted chart-caption">Real 2026 GBP · Today is your opening position; future values are annual closing balances. {includedGoals} included {includedGoals === 1 ? 'goal' : 'goals'}. Toggle goals in Milestones to update the forecast.</p>
       <ul className="chart-legend" aria-label="Chart legend"><li><span className="net-worth-key"/>Net worth</li>{keys.map(k => <li key={k}><span style={{ background: colours[k] }} />{names[k]}</li>)}</ul>
       <div className="chart-scroll"><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Combined net worth and asset category chart. Select a year below for exact values."><title>Net worth and account categories over time</title>
         {ticks.map(v => <g key={v}><line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke="#e4e9df"/><text x={left - 12} y={y(v) + 4} textAnchor="end">{compact(v)}</text></g>)}
@@ -66,7 +64,6 @@ export function ForecastCharts({ input, rows, events, onAddGoal }: { input: Fore
       </svg></div>
       <div className="chart-inspector"><label htmlFor={id}>Explore a year</label><select id={id} value={selected} onChange={e => setSelection(Number(e.target.value))}>{points.map((p, i) => <option key={p.label} value={i}>{p.label === 'Today' ? 'Today · opening balances' : `${p.label} · year-end`}</option>)}</select><strong>{formatGBP(point.netWorth)}</strong></div>
       <div className="category-values" aria-live="polite"><strong>{point.label}</strong>{keys.map(k => <span key={k}>{names[k]} <b>{formatGBP(point[k])}</b></span>)}</div>
-      <p className="chart-markers muted">Orange dots mark included goals and life events. Dashed lines mark FIRE ages.</p>
     </div>
   </section>
 }
