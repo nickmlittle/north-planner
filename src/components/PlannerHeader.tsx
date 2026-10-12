@@ -20,7 +20,7 @@ export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBac
   }, [accountOpen])
   const status = warning ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus && /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
   const nav = <nav className="app-nav" aria-label="Main navigation">{links.map(([n, label]) => <button key={n} aria-current={step === n ? 'page' : undefined} onClick={() => { go(n); setMobileOpen(false) }}>{label}</button>)}</nav>
-  return <><header className="north-header"><div className="header-inner">
+  return <><header className="north-header"><div className={`header-inner${step === 9 ? ' dashboard-container' : ''}`}>
     <button className="brand brand-button" onClick={() => go(9)} aria-label="North dashboard"><span>north.</span></button>
     {nav}
     <span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>
