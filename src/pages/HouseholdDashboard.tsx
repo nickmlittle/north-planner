@@ -13,8 +13,8 @@ import { PropertyMoveScenario } from '../components/PropertyMoveScenario'
 import type { PropertyMove } from '../domain/property'
 import { pricedPropertyMove } from '../domain/property'
 
-export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string
+export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   const [editingEvent, setEditingEvent] = useState<PlanEvent | 'new' | null>(null)
@@ -57,7 +57,7 @@ export function HouseholdDashboard({ document: doc, setDocument, warning, replac
       { id: `${p.id}-pension`, year: Number(p.dob.slice(0, 4)) + doc.planning.pensionAccessAge, label: `${p.name} pension access`, kind: 'Pension access', event: undefined, target: 'planning-pension-age' },
     ]),
   ].sort((a, b) => a.year - b.year)
-  return <div className="north-shell dashboard-shell"><PlannerHeader step={9} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} />
+  return <div className="north-shell dashboard-shell"><PlannerHeader step={9} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
     <main className="dashboard-main"><div className="route-heading"><div><p className="eyebrow">{doc.snapshot.name} · Your household outlook</p><h1 ref={heading} tabIndex={-1}>Your route ahead</h1><p className="page-description">Adjust a property move to explore its forecast impact. Save changes to update the plan; Milestones controls include or exclude saved goals.</p></div><svg className="route-illustration" viewBox="0 0 260 110" role="img" aria-label="Woodland hills and a winding trail"><path d="M0 88 43 43l29 34 37-58 47 63 28-34 76 40H0Z"/><path d="M0 96h260M73 77c25-14 39-4 49-16s-4-18 14-26 25-3 31-14"/><path d="M113 82v-19m-8 9h16m-8-20v-9m-7 5h14"/><path d="M42 83V62m-9 10h18m-9-23V40m-6 5h12m125 39V64m-9 9h18m-9-25V38m-6 6h12"/></svg></div>
       <div className="dashboard-tiles">{tiles.map(tile => <section className="dashboard-tile" key={tile.title}><h2>{tile.title}</h2><p>{tile.value}</p><small>{tile.detail}</small>{tile.title === 'Indicative annual withdrawal at FIRE' && <details className="metric-explanation"><summary>How this estimate works</summary><p>Applies your withdrawal rate to ISAs, positive cash and pensions accessible at FIRE. Home equity and locked pensions are excluded; pension withdrawals and retirement tax are not modelled.</p>{shownMetrics && <p>Accessible investments: {money(shownMetrics.accessible)}. Locked pensions: {money(shownMetrics.lockedPension)}.</p>}</details>}</section>)}</div>
       {shownResult.error && <section className="dashboard-alert" aria-labelledby="complete-heading"><strong id="complete-heading">Complete your picture</strong><span role="status">Forecast unavailable: {shownResult.error}</span><div>{missing.slice(0, 2).map((m, i) => <button className="text-button" key={i} onClick={() => go(m.step === 9 ? 10 : m.step)}>Add {m.label.toLowerCase()}</button>)}{!missing.length && <button className="text-button" onClick={() => go(10)}>Review plan settings</button>}</div></section>}
