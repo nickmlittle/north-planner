@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { storageKey } from './state/useAppDocument'
 import { completeDocument } from './test/setupFixture'
 import { emptyPerson } from './domain/setup'
 
-beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
+beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
-const click = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }))
+const click = (name: string | RegExp) => fireEvent.click(screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }))
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 
 it('creates a single-adult renter household from a genuinely empty first load', () => {
@@ -79,9 +79,25 @@ it('blocks child forecasts until later age bands are explicitly configured', () 
   localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
   expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('future annual costs')
   click('Plan settings')
+  click('Child costs')
   enter('Jamie Ages 12–18 annual cost (£)', '0')
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
   expect(JSON.parse(localStorage.getItem(storageKey)!).snapshot.people[1].futureCosts.ages12to18).toBe('0')
+})
+
+it('opens plan settings as a menu, then supports URL-backed pages and browser history', async () => {
+  const d = completeDocument(); d.step = 9
+  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
+  click('Plan settings')
+  expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible()
+  expect(window.location.search).toBe('')
+  click('Tax estimates')
+  expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible()
+  expect(window.location.search).toContain('settings=tax')
+  window.history.back()
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible())
+  window.history.forward()
+  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible())
 })
 
 it('requires explicit confirmation for removal and removes shared ownership references', () => {
@@ -103,13 +119,17 @@ it('requires explicit confirmation for removal and removes shared ownership refe
 it('persists planner edits and reflects current income changes in the overview', () => {
   const d = completeDocument(); d.step = 10
   localStorage.setItem(storageKey, JSON.stringify(d)); const view = render(<App />)
+  click('Plan settings'); click('Income timeline')
   enter('Alex Annual salary (GBP)', '72000')
+  click('Plan settings'); click('Planning assumptions')
   enter('FIRE age', '55')
   click('Household')
   expect(screen.getByText('£72,000.00')).toBeVisible()
   view.unmount(); render(<App />)
   click('Plan settings')
+  click('Planning assumptions')
   expect(screen.getByLabelText('FIRE age')).toHaveValue('55')
+  click('Plan settings'); click('Income timeline')
   expect(screen.getByLabelText('Alex Annual salary (GBP)')).toHaveValue('72000')
 })
 

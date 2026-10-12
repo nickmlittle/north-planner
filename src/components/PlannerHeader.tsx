@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
+import { navigateToSettings, settingsSections } from '../state/navigation'
+import type { SettingsSection } from '../state/navigation'
 
-const links = [[9, 'Dashboard'], [8, 'Household'], [10, 'Plan settings']] as const
+const links = [[9, 'Dashboard'], [8, 'Household']] as const
 
-export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut }: {
+export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
   step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
+  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const accountButton = useRef<HTMLButtonElement>(null)
   const accountMenu = useRef<HTMLDivElement>(null)
+  const settingsButton = useRef<HTMLButtonElement>(null)
+  const settingsMenu = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!accountOpen) return
     accountMenu.current?.querySelector('button')?.focus()
@@ -18,9 +24,23 @@ export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBac
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
   }, [accountOpen])
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onPointer = (event: PointerEvent) => { if (!settingsMenu.current?.contains(event.target as Node) && !settingsButton.current?.contains(event.target as Node)) setSettingsOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setSettingsOpen(false); settingsButton.current?.focus() } }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
+  }, [settingsOpen])
   const status = warning ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus && /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
-  const nav = <nav className="app-nav" aria-label="Main navigation">{links.map(([n, label]) => <button key={n} aria-current={step === n ? 'page' : undefined} onClick={() => { go(n); setMobileOpen(false) }}>{label}</button>)}</nav>
-  return <><header className="north-header"><div className={`header-inner${step === 9 ? ' dashboard-container' : ''}`}>
+  const nav = <nav className="app-nav" aria-label="Main navigation">
+    {links.map(([n, label]) => <button key={n} aria-current={step === n ? 'page' : undefined} onClick={() => { go(n); setMobileOpen(false); setSettingsOpen(false) }}>{label}</button>)}
+    <div className="settings-nav-item" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSettingsOpen(false) }}>
+      <button ref={settingsButton} type="button" aria-current={step === 10 ? 'page' : undefined} aria-haspopup="menu" aria-expanded={settingsOpen} onFocus={() => setSettingsOpen(true)} onClick={() => setSettingsOpen(true)}>Plan settings <span aria-hidden="true">⌄</span></button>
+      {settingsOpen && <div ref={settingsMenu} className="settings-dropdown" role="menu" aria-label="Plan settings pages">{settingsSections.map(section => <button key={section.id} type="button" role="menuitem" aria-current={step === 10 && settingsSection === section.id ? 'page' : undefined} onClick={() => { if (onSelectSettings) onSelectSettings(section.id); else navigateToSettings(section.id); setSettingsOpen(false); setMobileOpen(false) }}>{section.label}</button>)}</div>}
+    </div>
+  </nav>
+  return <><header className="north-header"><div className="header-inner dashboard-container">
     <button className="brand brand-button" onClick={() => go(9)} aria-label="North dashboard"><span>north.</span></button>
     {nav}
     <span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>
