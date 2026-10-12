@@ -14,7 +14,7 @@ const click = (name: string | RegExp) => { const button = screen.getByRole('butt
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const saved = () => JSON.parse(localStorage.getItem(storageKey)!)
 function open(doc = completeDocument()) {
-  doc.completed = true; doc.step = 9
+  doc.completed = true; doc.step = 10
   localStorage.setItem(storageKey, JSON.stringify(doc)); return render(<App />)
 }
 function purchase() {
@@ -36,14 +36,17 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   const withdrawal = within(preview).getByRole('row', { name: /Indicative annual withdrawal/ }).lastElementChild!.textContent
   click('Save event')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal at FIRE' }).parentElement!
-  expect(within(tile).getByText(withdrawal!)).toBeVisible()
   expect(saved().purchaseEvents[0].recurring).toMatchObject({ startYear: 2027, endYear: 2029 })
   expect(saved().spendingEvents).toEqual([])
+  click('Dashboard')
+  const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal at FIRE' }).parentElement!
+  expect(within(tile).getByText(withdrawal!)).toBeVisible()
+  click('Plan settings')
   click('Edit Family car'); enter('One-off purchase cost (£)', '5000'); click(/Preview impact/); click('Save event')
   expect(saved().purchaseEvents).toHaveLength(1)
   expect(saved().purchaseEvents[0].upfrontCost).toBe(5000)
   view.unmount(); render(<App />)
+  click('Plan settings')
   expect(screen.getByRole('button', { name: 'Edit Family car' })).toBeVisible()
   fireEvent.click(screen.getByLabelText('Include Family car'))
   expect(saved().purchaseEvents[0].enabled).toBe(false)
@@ -109,10 +112,25 @@ it('offers costs-only rental purchases and makes home moves unavailable to rente
 })
 
 it('supports keyboard year selection and shows exact chart category balances', () => {
-  const doc = completeDocument(); open(doc)
+  const doc = completeDocument(); doc.completed = true; doc.step = 9
+  localStorage.setItem(storageKey, JSON.stringify(doc)); render(<App />)
   const { result } = documentForecast(doc)
   fireEvent.change(screen.getByLabelText('Explore a year'), { target: { value: '2' } })
-  const chart = screen.getByRole('heading', { name: 'Where your net worth sits' }).closest('.chart-card')!
+  const chart = screen.getByRole('heading', { name: 'Net worth through time' }).closest('.chart-card')!
   expect(within(chart as HTMLElement).getByText(formatGBP(result.rows[1]!.isa))).toBeVisible()
-  expect(screen.getByRole('img', { name: /Net worth line chart/ })).toBeVisible()
+  expect(screen.getByRole('img', { name: /Combined net worth and asset category chart/ })).toBeVisible()
+})
+
+it('adds goals from the dashboard and opens milestones at their edit controls', () => {
+  const doc = completeDocument(); doc.completed = true; doc.step = 9
+  doc.purchaseEvents = [{ id: 'car', name: 'Family car', preset: 'car', enabled: true, year: 2030, upfrontCost: 10000, recurring: null }]
+  localStorage.setItem(storageKey, JSON.stringify(doc)); render(<App />)
+  click('+ Add goal')
+  expect(screen.getByRole('heading', { name: 'Add goal or life event' })).toBeVisible()
+  click('Close event dialog')
+  click('Family car')
+  expect(screen.getByRole('heading', { name: 'Edit Family car' })).toBeVisible()
+  click('Close event dialog')
+  click('Alex reaches FIRE')
+  expect(screen.getByLabelText('FIRE age')).toHaveFocus()
 })

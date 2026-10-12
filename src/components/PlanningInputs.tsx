@@ -13,7 +13,7 @@ const fields: [Exclude<keyof ReturnAssumptions, 'cashReturn'>, string, boolean][
 export function PlanningInputs({ value, onChange }: { value: ReturnAssumptions; onChange: (value: ReturnAssumptions) => void }) {
   return <section className="household-card"><h2>Planning assumptions</h2>
     <p>Illustrative real returns. Volatility and withdrawal rate are retained for later modelling; no probability is calculated.</p>
-    <div className="input-grid">{fields.map(([key, label, percent]) => <NumericInput key={key} label={label}
+    <div className="input-grid">{fields.map(([key, label, percent]) => <NumericInput key={key} label={label} id={key === 'fireAge' ? 'planning-fire-age' : key === 'pensionAccessAge' ? 'planning-pension-age' : undefined}
       value={value[key] * (percent ? 100 : 1)} suffix={percent ? ' (%)' : ''}
       onChange={number => {
         const next = { ...value, [key]: number / (percent ? 100 : 1) }
