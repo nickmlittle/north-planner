@@ -21,8 +21,8 @@ import { ForecastResults } from '../components/ForecastResults'
 import { SetupCard, MoneyField, SetupField } from '../components/SetupFields'
 import { BalanceDateReview } from '../components/BalanceDateReview'
 
-export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
+export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
   settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
@@ -65,7 +65,7 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
   }
   const page = settingsSections.find(section => section.id === settingsSection) ?? settingsSections[0]!
   const futureCosts = doc.snapshot.people.filter(p => p.role === 'child' && currentBand(p, doc.snapshot.planningStartDate))
-  return <div className="north-shell settings-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection={settingsSection} onSelectSettings={onSelectSettings} />
+  return <div className="north-shell settings-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection={settingsSection} onSelectSettings={onSelectSettings} />
     <main className="dashboard-main dashboard-container settings-main">
       <div className="route-heading settings-heading"><div><h1 ref={heading} tabIndex={-1}>{page.label}</h1><p className="page-description">{page.description}</p></div></div>
       <div className="settings-content">

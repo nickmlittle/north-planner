@@ -33,7 +33,7 @@ function CloudPlanner({ session }: { session: Session }) {
   const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
   async function signOut() { await supabase?.auth.signOut() }
   if (state.needsChoice) return <DocumentConflict onChoose={choice => void state.chooseConflict(choice)} />
-  if (!state.document) return <main className="account-screen"><h1>{state.status || 'Household unavailable'}</h1>{state.error && <p role="alert" className="error-summary">{state.error}</p>}<div className="button-row"><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => void signOut()}>Sign out</button></div></main>
+  if (!state.document) return <main className="account-screen"><h1>{state.status || 'Household unavailable'}</h1>{state.error && <p role="alert" className="error-summary">{state.error}</p>}<div className="button-row">{state.recoveryOriginal && <><button className="secondary-button" onClick={state.downloadOriginal}>Download original JSON</button><button className="danger-button" onClick={() => void state.replaceUnreadableWithFreshDraft()}>Replace unreadable save with a fresh household</button></>}<button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => void signOut()}>Sign out</button></div></main>
   const document = state.document
   const props = { ...state, document, warning: state.error, saveStatus: state.status, replaceSavedDraft: () => {}, accountBacked: true, email: session.user.email ?? undefined, onSignOut: () => void signOut() }
   const params = new URLSearchParams(search)

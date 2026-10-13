@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageOn, amount, decodeDocument, emptyPerson, householdErrors, missingDetails, newDocument, snapshotTotals, toForecastInput, validDOB, withSnapshot } from './setup'
+import { ageOn, amount, decodeDocument, decodePersistedDocument, emptyPerson, encodeDocument, householdErrors, missingDetails, newDocument, snapshotTotals, toForecastInput, validDOB, withSnapshot } from './setup'
 import { forecastResult } from '../engine/forecast'
 
 import { completeDocument } from '../test/setupFixture'
@@ -105,10 +105,36 @@ describe('household setup', () => {
   })
   it('rejects invalid planning and observation dates while accepting blank dates and zero balances', () => {
     const doc = completeDocument()
-    doc.snapshot.people[0]!.isa = '0'
+    doc.snapshot.people[0]!.isa = '0'; doc.snapshot.people[0]!.isaAsOfDate = ''
     expect(toForecastInput(doc).household.isas[0]).toMatchObject({ value: 0, asOfDate: null })
     expect(decodeDocument(JSON.stringify({ ...doc, snapshot: { ...doc.snapshot, planningStartDate: '2026-02-30' } }))).toBeNull()
     const invalidBalance = structuredClone(doc); invalidBalance.snapshot.people[0]!.isaAsOfDate = '2026-02-30'
     expect(decodeDocument(JSON.stringify(invalidBalance))).toBeNull()
+  })
+  it('migrates v1 inputs into stable v2 records and resolves current income from the snapshot', () => {
+    const doc = completeDocument(); const person = doc.snapshot.people[0]!
+    const current = { id: 'legacy-current', personId: person.id, kind: 'paye' as const, startYear: 2026, endYear: 2030, annualSalary: 10, dayRate: 0, billableDays: 0, workingFraction: 1, annualGrossOverride: null, contributions: { employeeRate: 0, employerRate: 0, treatment: 'salary-sacrifice' as const, continueAfterFire: false } }
+    const future = { ...current, id: 'future-role', startYear: 2030, annualSalary: 80000 }
+    doc.incomeTimeline = [current, future]
+    const encoded = encodeDocument(doc)
+    expect(encoded.version).toBe(2)
+    expect(encoded.balances.find(b => b.accountId === `isa-${person.id}`)).toMatchObject({ amountMinor: 2000000, asOfDate: '2026-01-01' })
+    expect(encoded.accounts.find(a => a.id === 'home')).toMatchObject({ ownerPersonIds: [person.id] })
+    expect(encoded.accounts.find(a => a.id === 'mortgage')).toMatchObject({ classification: 'liability', borrowerPersonIds: [person.id], propertyId: 'home' })
+    expect(encoded.household).toMatchObject({ mortgageRate: '4.5', mortgageTerm: '25' })
+    expect(encoded.earnings.periods.map(p => p.id)).toEqual(['future-role'])
+    const restored = decodePersistedDocument(JSON.stringify(encoded))
+    expect(restored).toMatchObject({ sourceVersion: 2, document: { snapshot: { rate: '4.5', term: '25' }, incomeTimeline: [{ id: `income-${person.id}`, annualSalary: 60000 }, { id: 'future-role', annualSalary: 80000 }] } })
+    expect(decodePersistedDocument(JSON.stringify(encoded))).toEqual(restored)
+  })
+  it('requires missing v1 balance dates before migration is complete and preserves invalid draft text in v2', () => {
+    const doc = completeDocument(); doc.snapshot.people[0]!.isaAsOfDate = ''
+    const legacy = decodePersistedDocument(JSON.stringify(doc))
+    expect(legacy).toMatchObject({ sourceVersion: 1, needsMigration: true, missingDates: ['ISA for Alex'] })
+    const draft = completeDocument(); draft.snapshot.spending = 'not entered yet'
+    const encoded = encodeDocument(draft)
+    expect(encoded.spending).toMatchObject({ amountMinor: null, draftValue: 'not entered yet' })
+    const restored = decodePersistedDocument(JSON.stringify(encoded))
+    expect(restored).toMatchObject({ document: { snapshot: { spending: 'not entered yet' } } })
   })
 })

@@ -4,8 +4,8 @@ import type { SettingsSection } from '../state/navigation'
 
 const links = [[9, 'Dashboard'], [8, 'Household']] as const
 
-export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
-  step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
+export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
+  step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
   settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -48,7 +48,7 @@ export function PlannerHeader({ step, go, warning, replaceSavedDraft, accountBac
       {accountOpen && <div ref={accountMenu} className="account-menu" aria-label="Account options"><span className="account-menu-label">Signed in as</span><span className="account-menu-email">{email ?? 'Signed in'}</span><button onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
     <button className="mobile-menu-button" aria-expanded={mobileOpen} aria-controls="mobile-header-menu" onClick={() => setMobileOpen(value => !value)}><span className="menu-glyph" aria-hidden="true">{mobileOpen ? '×' : '☰'}</span>{mobileOpen ? 'Close menu' : 'Menu'}</button>
   </div>{mobileOpen && <div id="mobile-header-menu" className="mobile-header-menu">{nav}<div className="mobile-header-actions"><span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>{onSignOut && <><span className="mobile-account-email">{email ?? 'Signed in'}</span><button className="mobile-signout" onClick={() => { setMobileOpen(false); onSignOut() }}>Sign out</button></>}</div></div>}</header>
-    {warning && !accountBacked && <aside className="storage-warning" role="status">{warning}{warning.startsWith('Saved data') && <button onClick={replaceSavedDraft}>Replace saved data with this draft</button>}</aside>}
-    {warning && accountBacked && warning.startsWith('Saved data') && <aside className="storage-warning" role="status">{warning}{<button onClick={replaceSavedDraft}>Replace saved data with this draft</button>}</aside>}
+    {warning && !accountBacked && <aside className="storage-warning" role="status">{warning}{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</aside>}
+    {warning && accountBacked && warning.startsWith('Saved data') && <aside className="storage-warning" role="status">{warning}{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</aside>}
   </>
 }

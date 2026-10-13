@@ -4,12 +4,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from './App'
 import { storageKey } from './state/useAppDocument'
 import { completeDocument } from './test/setupFixture'
-import { emptyPerson } from './domain/setup'
+import { decodePersistedDocument, emptyPerson } from './domain/setup'
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const click = (name: string | RegExp) => fireEvent.click(screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }))
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
+const savedDocument = () => decodePersistedDocument(localStorage.getItem(storageKey)!)
 
 it('creates a single-adult renter household from a genuinely empty first load', () => {
   render(<App />)
@@ -82,7 +83,7 @@ it('blocks child forecasts until later age bands are explicitly configured', () 
   click('Child costs')
   enter('Jamie Ages 12–18 annual cost (£)', '0')
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
-  expect(JSON.parse(localStorage.getItem(storageKey)!).snapshot.people[1].futureCosts.ages12to18).toBe('0')
+  expect(savedDocument()).toMatchObject({ document: { snapshot: { people: [{}, { futureCosts: { ages12to18: '0' } }] } } })
 })
 
 it('opens plan settings as a menu, then supports URL-backed pages and browser history', async () => {
@@ -110,9 +111,8 @@ it('requires explicit confirmation for removal and removes shared ownership refe
   click('Keep person')
   expect(screen.getByLabelText('Alex name')).toBeVisible()
   click('Remove Alex'); click('Confirm removal')
-  const saved = JSON.parse(localStorage.getItem(storageKey)!)
-  expect(saved.snapshot.people).toHaveLength(1)
-  expect(saved.snapshot.homeOwners).toEqual([other.id])
+  const saved = savedDocument()
+  expect(saved).toMatchObject({ document: { snapshot: { people: [expect.objectContaining({ id: other.id })], homeOwners: [other.id] } } })
   expect(screen.queryByLabelText('Alex name')).not.toBeInTheDocument()
 })
 
@@ -136,11 +136,11 @@ it('persists planner edits and reflects current income changes in the overview',
 it('preserves corrupted storage and uses session state when storage fails', () => {
   localStorage.setItem(storageKey, '{broken')
   const view = render(<App />)
-  expect(screen.getByRole('status')).toHaveTextContent('Saved data could not be read')
+  expect(screen.getByRole('status')).toHaveTextContent('saved document is not valid JSON')
   click(/Create your household/)
   expect(localStorage.getItem(storageKey)).toBe('{broken')
   click('Replace saved data with this draft')
-  expect(JSON.parse(localStorage.getItem(storageKey)!).version).toBe(1)
+  expect(JSON.parse(localStorage.getItem(storageKey)!).version).toBe(2)
   view.unmount(); localStorage.clear()
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
   render(<App />); click(/Create your household/)
