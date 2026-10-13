@@ -69,7 +69,11 @@ export function useCloudDocument(user: User) {
           const remote = raced ? decodePersistedDocument(JSON.stringify(raced.document)) : null
           if (!readError && raced && remote && !('error' in remote)) {
             if (local && JSON.stringify(local.document) !== JSON.stringify(remote.document)) setState({ document: local.document, revision: raced.revision, status: '', error: '', conflict: remote.document, needsChoice: true, dirty: false, recoveryOriginal: '', migrationPending, conflictNeedsMigration: remote.sourceVersion === 1, conflictOriginal: remote.sourceVersion === 1 ? JSON.stringify(raced.document) : '' })
-            else { removeValidLocalCopies(user.id); setState({ document: remote.document, revision: raced.revision, status: 'Saved', error: '', conflict: null, needsChoice: false, dirty: remote.sourceVersion === 1, recoveryOriginal: '', migrationPending: remote.sourceVersion === 1 && remote.missingDates.length > 0, conflictNeedsMigration: false, conflictOriginal: '' }) }
+            else {
+              const migrationPending = remote.sourceVersion === 1 && remote.missingDates.length > 0
+              removeValidLocalCopies(user.id)
+              setState({ document: migrationPending ? { ...remote.document, balanceDatesReviewed: false } : remote.document, revision: raced.revision, status: migrationPending ? '' : 'Saved', error: '', conflict: null, needsChoice: false, dirty: remote.sourceVersion === 1 && !migrationPending, recoveryOriginal: migrationPending ? JSON.stringify(raced.document) : '', migrationPending, conflictNeedsMigration: false, conflictOriginal: '' })
+            }
             return
           }
         }
