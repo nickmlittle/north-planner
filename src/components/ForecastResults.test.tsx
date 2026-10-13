@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { renderPlanner } from '../test/renderPlanner'
 import { remainingYearFraction } from '../domain/dates'
+import { decodePersistedDocument } from '../domain/setup'
 import { formatGBPWhole } from '../formatting/money'
 vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 afterEach(cleanup)
@@ -23,7 +24,7 @@ it('shows detailed results and recalculates them from settings on their separate
 
   const row = screen.getByTestId('forecast-2026')
   expect(row.textContent).not.toBe(before)
-  const document = JSON.parse(localStorage.getItem('north.household.v1')!)
+  const document = (decodePersistedDocument(localStorage.getItem('north.household.v2')!) as { document: import('../domain/setup').AppDocument }).document
   expect(within(row).getByText(formatGBPWhole(110000 * remainingYearFraction(document.snapshot.planningStartDate)))).toBeVisible()
   expect(screen.getByText(/not a FIRE probability/)).toBeVisible()
 })

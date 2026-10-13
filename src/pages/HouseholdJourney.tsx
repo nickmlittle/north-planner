@@ -12,8 +12,8 @@ function Owners({ people, value, onChange, label }: { people: SetupPerson[]; val
   return <fieldset className="owner-picker"><legend>{label}</legend>{people.map(p => <label key={p.id}><input type="checkbox" checked={value.includes(p.id)} onChange={e => onChange(e.target.checked ? [...value, p.id] : value.filter(id => id !== p.id))} />{p.name || 'Unnamed adult'}</label>)}{!value.length && <small>Choose at least one owner. Select multiple people for joint ownership.</small>}</fieldset>
 }
 function Money({ value }: { value: number | null }) { return <>{value === null ? 'Not added' : formatGBP(value)}</> }
-export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, accountBacked = false, saveStatus, email, onSignOut }: {
-  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
+export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut }: {
+  document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
 }) {
   const s = doc.snapshot; const adults = s.people.filter(p => p.role !== 'child'); const children = s.people.filter(p => p.role === 'child')
   const [attempted, setAttempted] = useState(false); const [error, setError] = useState(''); const [removing, setRemoving] = useState<string | null>(null)
@@ -44,7 +44,7 @@ export function HouseholdJourney({ document: doc, setDocument, warning, replaceS
   const missing = missingDetails(s); const totals = snapshotTotals(s)
   const linkedPerson = s.people.find(p => p.id === removing)
   return <div className={`north-shell ${doc.step === 8 ? 'settings-shell' : ''}`}>
-    <PlannerHeader step={doc.step === 8 ? 8 : doc.completed ? doc.step : -1} go={step => { if (step === 8) go(8); else go(step) }} warning={warning} replaceSavedDraft={replaceSavedDraft} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
+    <PlannerHeader step={doc.step === 8 ? 8 : doc.completed ? doc.step : -1} go={step => { if (step === 8) go(8); else go(step) }} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
     <div className={`journey-layout ${doc.step === 0 || doc.step === 8 ? 'without-sidebar' : ''} ${doc.step === 8 ? 'household-summary-layout' : ''}`}>
       {doc.step > 0 && doc.step < 8 && <nav className="journey-sidebar" aria-label="Household setup"><p className="eyebrow">Getting started</p><ol>{setupSteps.slice(1, 8).map((name, i) => <li key={name}><button type="button" aria-current={doc.step === i + 1 ? 'step' : undefined} onClick={() => go(i + 1)}><span className="step-number">{doc.step > i + 1 && (i === 0 ? !householdErrors(s).length : !missing.some(m => m.step === i + 1)) ? '✓' : i + 1}</span>{name}</button></li>)}</ol><p className="sidebar-note">Build a picture of today.<br />Plan the future next.</p></nav>}
       <main className={`journey-main ${doc.step === 0 ? 'welcome-main' : ''} ${doc.step === 8 ? 'dashboard-main dashboard-container settings-main household-summary-main' : ''}`}>

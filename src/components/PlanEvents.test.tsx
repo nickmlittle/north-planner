@@ -7,12 +7,13 @@ import { completeDocument } from '../test/setupFixture'
 import { documentForecast } from '../state/forecast'
 import { formatGBPWhole } from '../formatting/money'
 import { newPropertyMove } from '../config/defaultMoves'
+import { decodePersistedDocument } from '../domain/setup'
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const click = (name: string | RegExp) => { const button = screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }); button.focus(); fireEvent.click(button) }
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
-const saved = () => JSON.parse(localStorage.getItem(storageKey)!)
+const saved = () => { const result = decodePersistedDocument(localStorage.getItem(storageKey)!); if ('error' in result) throw new Error(result.error); return result.document }
 function open(doc = completeDocument()) {
   doc.completed = true; doc.step = 10
   window.history.replaceState(null, '', '/?view=settings&settings=events')
@@ -37,7 +38,7 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   const withdrawal = within(preview).getByRole('row', { name: /Indicative annual withdrawal/ }).lastElementChild!.textContent
   click('Save event')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(saved().purchaseEvents[0].recurring).toMatchObject({ startYear: 2027, endYear: 2029 })
+  expect(saved().purchaseEvents[0]!.recurring).toMatchObject({ startYear: 2027, endYear: 2029 })
   expect(saved().spendingEvents).toEqual([])
   click('Dashboard')
   const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal' }).parentElement!
@@ -46,13 +47,13 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   click('Goals & life events')
   click('Edit Family car'); enter('One-off purchase cost (£)', '5000'); click(/Preview impact/); click('Save event')
   expect(saved().purchaseEvents).toHaveLength(1)
-  expect(saved().purchaseEvents[0].upfrontCost).toBe(5000)
+  expect(saved().purchaseEvents[0]!.upfrontCost).toBe(5000)
   view.unmount(); render(<App />)
   click('Plan settings')
   click('Goals & life events')
   expect(screen.getByRole('button', { name: 'Edit Family car' })).toBeVisible()
   fireEvent.click(screen.getByLabelText('Include Family car'))
-  expect(saved().purchaseEvents[0].enabled).toBe(false)
+  expect(saved().purchaseEvents[0]!.enabled).toBe(false)
   click('Delete Family car'); click('Keep event')
   expect(saved().purchaseEvents).toHaveLength(1)
   click('Delete Family car'); click('Confirm deletion')
@@ -133,12 +134,12 @@ it('previews a property move scenario without persistence until explicitly saved
   const fireTile = screen.getByRole('heading', { name: 'Net worth at retirement' }).parentElement!
   const currentFireValue = within(fireTile).getByText(/£|Not available/).textContent
   fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
-  expect(saved().moves[0].year).toBe(2028)
+  expect(saved().moves[0]!.year).toBe(2028)
   expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeEnabled()
   expect(within(fireTile).getByText(/£|Not available/).textContent).not.toBe(currentFireValue)
   expect(screen.getByRole('list', { name: 'Chart legend' })).toHaveTextContent('Current plan')
   click('Reset to current plan')
-  expect(saved().moves[0].year).toBe(2028)
+  expect(saved().moves[0]!.year).toBe(2028)
   fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
   click('Save changes to Family home')
   expect(saved().moves[0]).toMatchObject({ year: 2030, enabled: true })
