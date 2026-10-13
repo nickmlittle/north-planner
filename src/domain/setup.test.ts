@@ -121,9 +121,10 @@ describe('household setup', () => {
     expect(encoded.balances.find(b => b.accountId === `isa-${person.id}`)).toMatchObject({ amountMinor: 2000000, asOfDate: '2026-01-01' })
     expect(encoded.accounts.find(a => a.id === 'home')).toMatchObject({ ownerPersonIds: [person.id] })
     expect(encoded.accounts.find(a => a.id === 'mortgage')).toMatchObject({ classification: 'liability', borrowerPersonIds: [person.id], propertyId: 'home' })
+    expect(encoded.household).toMatchObject({ mortgageRate: '4.5', mortgageTerm: '25' })
     expect(encoded.earnings.periods.map(p => p.id)).toEqual(['future-role'])
     const restored = decodePersistedDocument(JSON.stringify(encoded))
-    expect(restored).toMatchObject({ sourceVersion: 2, document: { incomeTimeline: [{ id: `income-${person.id}`, annualSalary: 60000 }, { id: 'future-role', annualSalary: 80000 }] } })
+    expect(restored).toMatchObject({ sourceVersion: 2, document: { snapshot: { rate: '4.5', term: '25' }, incomeTimeline: [{ id: `income-${person.id}`, annualSalary: 60000 }, { id: 'future-role', annualSalary: 80000 }] } })
     expect(decodePersistedDocument(JSON.stringify(encoded))).toEqual(restored)
   })
   it('requires missing v1 balance dates before migration is complete and preserves invalid draft text in v2', () => {

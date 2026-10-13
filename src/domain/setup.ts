@@ -283,7 +283,7 @@ export function decodeDocument(raw: string): AppDocument | null {
 export interface HouseholdDocumentV2 {
   version: 2
   workflow: { step: number; completed: boolean }
-  household: { id: string; name: string; moneyBasis: AppDocument['moneyBasis']; planningStartDate: string; housing: SetupSnapshot['housing']; noCash: boolean; mortgageStatus: SetupSnapshot['mortgageStatus'] }
+  household: { id: string; name: string; moneyBasis: AppDocument['moneyBasis']; planningStartDate: string; housing: SetupSnapshot['housing']; noCash: boolean; mortgageStatus: SetupSnapshot['mortgageStatus']; mortgageRate: string; mortgageTerm: string }
   people: Array<{ id: string; householdId: string; name: string; dateOfBirth: string; role: SetupPerson['role']; setup: Omit<SetupPerson, 'id' | 'name' | 'dob' | 'role' | 'incomeKind' | 'pay' | 'frequency' | 'days' | 'payOverride' | 'employee' | 'employer' | 'treatment' | 'pension' | 'isa' | 'isaAsOfDate' | 'pensionAsOfDate'> }>
   accounts: Array<{ id: string; householdId: string; name: string; classification: 'asset' | 'liability'; kind: 'cash' | 'cashISA' | 'investmentISA' | 'pension' | 'property' | 'mortgage'; ownerPersonIds: string[]; borrowerPersonIds: string[]; propertyId?: string; balanceId: string }>
   balances: Array<{ id: string; accountId: string; amountMinor: number | null; draftValue?: string; asOfDate: string | null; basis: 'user-entered' }>
@@ -322,7 +322,9 @@ export function missingOpeningBalanceDates(document: AppDocument): string[] {
 
 export function encodeDocument(document: AppDocument): HouseholdDocumentV2 {
   const s = document.snapshot; const householdId = 'household'
-  const people = s.people.map(({ id, name, dob, role, incomeKind: _incomeKind, pay: _pay, frequency: _frequency, days: _days, payOverride: _payOverride, employee: _employee, employer: _employer, treatment: _treatment, pension: _pension, isa: _isa, isaAsOfDate: _isaDate, pensionAsOfDate: _pensionDate, ...setup }) => ({ id, householdId, name, dateOfBirth: dob, role, setup }))
+  const editorOnly = new Set(['id', 'name', 'dob', 'role', 'incomeKind', 'pay', 'frequency', 'days', 'payOverride', 'employee', 'employer', 'treatment', 'pension', 'isa', 'isaAsOfDate', 'pensionAsOfDate'])
+  const people = s.people.map(p => ({ id: p.id, householdId, name: p.name, dateOfBirth: p.dob, role: p.role,
+    setup: Object.fromEntries(Object.entries(p).filter(([key]) => !editorOnly.has(key))) as HouseholdDocumentV2['people'][number]['setup'] }))
   const accounts: HouseholdDocumentV2['accounts'] = []; const balances: HouseholdDocumentV2['balances'] = []
   const addBalance = (id: string, label: string, kind: HouseholdDocumentV2['accounts'][number]['kind'], raw: string, owners: string[], date: string, status = 'yes', classification: 'asset' | 'liability' = 'asset', borrowers: string[] = [], propertyId?: string) => {
     if (status !== 'yes') return
@@ -346,7 +348,7 @@ export function encodeDocument(document: AppDocument): HouseholdDocumentV2 {
     contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: (p.treatment || 'salary-sacrifice') as PensionContributions['treatment'], continueAfterFire: false } }))
   const future = timeline?.filter(period => period.startYear > startYear) ?? []
   const periods = timeline === null ? derived : [...derived.map(period => ({ ...period, endYear: Math.min(period.endYear, ...future.filter(next => next.personId === period.personId).map(next => next.startYear), period.endYear) })), ...future]
-  return { version: 2, workflow: { step: document.step, completed: document.completed }, household: { id: householdId, name: s.name, moneyBasis: document.moneyBasis, planningStartDate: s.planningStartDate, housing: s.housing, noCash: s.noCash, mortgageStatus: s.mortgageStatus }, people, accounts, balances,
+  return { version: 2, workflow: { step: document.step, completed: document.completed }, household: { id: householdId, name: s.name, moneyBasis: document.moneyBasis, planningStartDate: s.planningStartDate, housing: s.housing, noCash: s.noCash, mortgageStatus: s.mortgageStatus, mortgageRate: s.rate, mortgageTerm: s.term }, people, accounts, balances,
     earnings: { timelineMode: timeline === null ? 'snapshot' : 'timeline', snapshotInputs: Object.fromEntries(s.people.map(p => [p.id, { incomeKind: p.incomeKind, pay: p.pay, frequency: p.frequency, days: p.days, payOverride: p.payOverride, employee: p.employee, employer: p.employer, treatment: p.treatment }])), periods: timeline === null ? [] : periods.filter(period => period.startYear > startYear) }, planning: document.planning, tax: document.tax, mortgageExtras: document.mortgageExtras,
     spending: { amountMinor: toMinor(s.spending), ...(s.spending && toMinor(s.spending) === null ? { draftValue: s.spending } : {}), frequency: s.spendingFrequency }, childEvents: document.childEvents, spendingEvents: document.spendingEvents, purchaseEvents: document.purchaseEvents, moves: document.moves, allowances: document.allowances,
     migration: { fromVersion: document.migration?.fromVersion ?? null, gaps: document.balanceDatesReviewed ? [] : missingOpeningBalanceDates(document) } }
@@ -366,7 +368,7 @@ export function projectDocumentV2(v2: HouseholdDocumentV2): AppDocument {
   })
   const cash = v2.accounts.filter(a => a.kind === 'cash').map(a => ({ id: a.id, name: a.name, balance: value(a.id), ownerIds: a.ownerPersonIds, asOfDate: date(a.id) }))
   const snapshot: SetupSnapshot = { ...base.snapshot, name: v2.household.name, people, cash, noCash: v2.household.noCash, housing: v2.household.housing,
-    homeValue: value('home'), homeOwners: accountById(v2, 'home')?.ownerPersonIds ?? [], mortgageStatus: v2.household.mortgageStatus, mortgageBalance: value('mortgage'), borrowers: accountById(v2, 'mortgage')?.borrowerPersonIds ?? [],
+    homeValue: value('home'), homeOwners: accountById(v2, 'home')?.ownerPersonIds ?? [], mortgageStatus: v2.household.mortgageStatus, mortgageBalance: value('mortgage'), rate: v2.household.mortgageRate, term: v2.household.mortgageTerm, borrowers: accountById(v2, 'mortgage')?.borrowerPersonIds ?? [],
     spending: v2.spending.draftValue ?? fromMinor(v2.spending.amountMinor), spendingFrequency: v2.spending.frequency, planningStartDate: v2.household.planningStartDate,
     homeAsOfDate: date('home'), mortgageAsOfDate: date('mortgage') }
   const startYear = Number(snapshot.planningStartDate.slice(0, 4))
@@ -390,7 +392,7 @@ export function decodePersistedDocument(raw: string): PersistedDocumentResult {
       // Shape checking treats null as a literal null, while these values are
       // intentionally nullable in persisted records.
       example.spending.amountMinor = null
-      const { id: _id, name: _name, dob: _dob, role: _role, incomeKind: _ik, pay: _pay, frequency: _freq, days: _days, payOverride: _override, employee: _employee, employer: _employer, treatment: _treatment, pension: _pension, isa: _isa, isaAsOfDate: _isaDate, pensionAsOfDate: _pensionDate, ...setupTemplate } = emptyPerson()
+      const setupTemplate = Object.fromEntries(Object.entries(emptyPerson()).filter(([key]) => !['id', 'name', 'dob', 'role', 'incomeKind', 'pay', 'frequency', 'days', 'payOverride', 'employee', 'employer', 'treatment', 'pension', 'isa', 'isaAsOfDate', 'pensionAsOfDate'].includes(key)))
       const earningTemplate = { incomeKind: '', pay: '', frequency: 'year', days: '', payOverride: '', employee: '', employer: '', treatment: '' }
       const rootShape = hasShape(d, example)
       const peopleShape = d.people.every(p => hasShape(p, { id: '', householdId: '', name: '', dateOfBirth: '', role: 'adult', setup: setupTemplate }) && p.householdId === d.household.id)
