@@ -19,6 +19,25 @@ export function navigateToSettings(section: SettingsSection) {
   const url = new URL(window.location.href)
   url.searchParams.set('view', 'settings')
   url.searchParams.set('settings', section)
+  url.searchParams.delete('section')
+  window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+export function navigateToHousehold(section = 8) {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'household')
+  url.searchParams.set('section', String(section))
+  url.searchParams.delete('settings')
+  window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+export function navigateToDashboard() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'dashboard')
+  url.searchParams.delete('settings')
+  url.searchParams.delete('section')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
@@ -28,6 +47,7 @@ export function navigateToStep(step: number) {
   if (step === 9) url.searchParams.set('view', 'dashboard')
   else url.searchParams.delete('view')
   url.searchParams.delete('settings')
+  url.searchParams.delete('section')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }

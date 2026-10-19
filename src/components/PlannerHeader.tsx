@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { navigateToSettings, settingsSections } from '../state/navigation'
 import type { SettingsSection } from '../state/navigation'
 
-const links = [[9, 'Dashboard'], [8, 'Household']] as const
+const links = [['dashboard', 'Dashboard'], ['household', 'Household']] as const
 
-export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
+export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, currentView, onSelectView }: {
   step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void
+  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void; currentView?: 'dashboard' | 'household'; onSelectView?: (view: 'dashboard' | 'household') => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
@@ -34,14 +34,14 @@ export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOr
   }, [settingsOpen])
   const status = warning ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus && /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
   const nav = <nav className="app-nav" aria-label="Main navigation">
-    {links.map(([n, label]) => <button key={n} aria-current={step === n ? 'page' : undefined} onClick={() => { go(n); setMobileOpen(false); setSettingsOpen(false) }}>{label}</button>)}
+    {links.map(([view, label]) => <button key={view} aria-current={currentView === view ? 'page' : undefined} onClick={() => { if (onSelectView) onSelectView(view); else go(view === 'dashboard' ? 9 : 8); setMobileOpen(false); setSettingsOpen(false) }}>{label}</button>)}
     <div className="settings-nav-item" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSettingsOpen(false) }}>
       <button ref={settingsButton} type="button" aria-current={step === 10 ? 'page' : undefined} aria-haspopup="menu" aria-expanded={settingsOpen} onFocus={() => setSettingsOpen(true)} onClick={() => setSettingsOpen(true)}>Plan settings <span aria-hidden="true">⌄</span></button>
       {settingsOpen && <div ref={settingsMenu} className="settings-dropdown" role="menu" aria-label="Plan settings pages">{settingsSections.map(section => <button key={section.id} type="button" role="menuitem" aria-current={step === 10 && settingsSection === section.id ? 'page' : undefined} onClick={() => { if (onSelectSettings) onSelectSettings(section.id); else navigateToSettings(section.id); setSettingsOpen(false); setMobileOpen(false) }}>{section.label}</button>)}</div>}
     </div>
   </nav>
   return <><header className="north-header"><div className="header-inner dashboard-container">
-    <button className="brand brand-button" onClick={() => go(9)} aria-label="North dashboard"><span>north.</span></button>
+    <button className="brand brand-button" onClick={() => onSelectView ? onSelectView('dashboard') : go(9)} aria-label="North dashboard"><span>north.</span></button>
     {nav}
     <span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>
     {onSignOut && <div className="account-control"><button ref={accountButton} className="account-button" aria-label="Account menu" aria-haspopup="true" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button>
