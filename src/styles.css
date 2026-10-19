@@ -78,6 +78,7 @@ h1:focus, .error-summary:focus { outline: none; }
 .journey-sidebar button[aria-current] .step-number { border-color: #264c3c; background: #264c3c; color: white; }
 .sidebar-note { border-top: 1px solid #dfe5d8; padding: 24px 12px; color: #788276; font-size: 13px; }
 .journey-main { min-width: 0; max-width: 920px; }
+.household-mobile-section { display: none; }
 .journey-main h1, .planner-main h1 { font-size: clamp(30px, 3.3vw, 44px); line-height: 1.14; letter-spacing: -1.2px; margin: 0 0 16px; font-weight: 650; }
 .page-description { color: #68776a; font-size: 17px; max-width: 660px; margin: 0 0 32px; }
 .setup-card { background: #fff; border: 1px solid #dfe5d8; border-radius: 12px; padding: 28px; margin: 20px 0; }
@@ -166,6 +167,8 @@ h1:focus, .error-summary:focus { outline: none; }
   .save-status { margin-left: auto; font-size: 10px; padding: 6px 9px; }
   .journey-layout { display: block; padding: 32px 20px; }
   .journey-sidebar { display: none; }
+  .household-mobile-section { display: grid; gap: 8px; margin: 0 0 24px; font-size: 13px; font-weight: 600; }
+  .household-mobile-section select { width: 100%; min-height: 46px; border: 1px solid #cbd5c4; border-radius: 7px; background: #fff; padding: 10px 12px; color: #293e34; font: inherit; }
   .journey-main h1, .planner-main h1 { font-size: 32px; letter-spacing: -.8px; }
   .page-description { font-size: 15px; }
   .setup-card { padding: 20px; }

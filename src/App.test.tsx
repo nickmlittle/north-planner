@@ -101,6 +101,34 @@ it('opens plan settings as a menu, then supports URL-backed pages and browser hi
   await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible())
 })
 
+it('opens Household as an independent editor without changing completed setup or future income', async () => {
+  const d = completeDocument(); d.step = 9; d.completed = true
+  d.incomeTimeline = [{ id: 'future-role', personId: d.snapshot.people[0]!.id, kind: 'paye', startYear: 2031, endYear: 2038, annualSalary: 80000, dayRate: 0, billableDays: 0, workingFraction: 1, annualGrossOverride: null }]
+  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
+  click('Household')
+  expect(window.location.search).toContain('view=household')
+  expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true, snapshot: { people: [expect.objectContaining({ pay: '5000' })] }, incomeTimeline: expect.arrayContaining([expect.objectContaining({ id: 'future-role', annualSalary: 80000 })]) } })
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Household records' })).getByRole('button', { name: /Income/ }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Current income' })).toBeVisible()
+  fireEvent.change(screen.getByLabelText('Household section'), { target: { value: '5' } })
+  expect(screen.getByRole('heading', { level: 1, name: 'Your home' })).toBeVisible()
+  fireEvent.change(screen.getByLabelText('Household section'), { target: { value: '2' } })
+  enter('Alex gross pay (£)', '6000')
+  await waitFor(() => expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true, snapshot: { people: [expect.objectContaining({ pay: '6000' })] }, incomeTimeline: [expect.objectContaining({ id: 'income-' + d.snapshot.people[0]!.id }), expect.objectContaining({ id: 'future-role', annualSalary: 80000 })] } }))
+  click('Dashboard')
+  expect(screen.getByRole('heading', { level: 1, name: 'Your route ahead' })).toBeVisible()
+  expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true } })
+})
+
+it('keeps incomplete onboarding progress when routes change', () => {
+  const d = completeDocument(); d.step = 3; d.completed = false
+  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
+  click('Household')
+  expect(savedDocument()).toMatchObject({ document: { step: 3, completed: false, snapshot: { name: 'Alex household' } } })
+  click('Dashboard')
+  expect(savedDocument()).toMatchObject({ document: { step: 3, completed: false, snapshot: { name: 'Alex household' } } })
+})
+
 it('requires explicit confirmation for removal and removes shared ownership references', () => {
   const d = completeDocument(); d.step = 1
   const other = emptyPerson('partner'); Object.assign(other, { name: 'Sam', dob: '1992-11-03' }); d.snapshot.people.push(other)

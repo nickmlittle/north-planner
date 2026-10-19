@@ -4,7 +4,7 @@ import type { AppDocument } from '../domain/setup'
 import { ageBands, currentBand, missingDetails } from '../domain/setup'
 import type { IncomePeriod } from '../domain/income'
 import { documentForecast } from '../state/forecast'
-import { navigateToSettings, navigateToStep, settingsSections } from '../state/navigation'
+import { navigateToDashboard, navigateToHousehold, navigateToSettings, settingsSections } from '../state/navigation'
 import type { SettingsSection } from '../state/navigation'
 import { PlannerHeader } from '../components/PlannerHeader'
 import { PlanEvents } from '../components/PlanEvents'
@@ -21,9 +21,9 @@ import { ForecastResults } from '../components/ForecastResults'
 import { SetupCard, MoneyField, SetupField } from '../components/SetupFields'
 import { BalanceDateReview } from '../components/BalanceDateReview'
 
-export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings }: {
+export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, onSelectView, currentView = 'dashboard' }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void
+  settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void; onSelectView?: (view: 'dashboard' | 'household') => void; currentView?: 'dashboard' | 'household'
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
@@ -39,9 +39,9 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
     }
   }, [settingsSection])
   const go = (step: number) => {
-    setDocument(d => ({ ...d, step, completed: d.completed || step >= 8 }))
-    if (step === 10) navigateToSettings('planning')
-    else navigateToStep(step)
+    if (step === 9) { if (onSelectView) onSelectView('dashboard'); else navigateToDashboard() }
+    else if (step === 10) navigateToSettings('planning')
+    else navigateToHousehold(step)
   }
   const { input, result } = documentForecast(doc)
   const baseYear = Number(doc.snapshot.planningStartDate.slice(0, 4))
@@ -65,7 +65,7 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
   }
   const page = settingsSections.find(section => section.id === settingsSection) ?? settingsSections[0]!
   const futureCosts = doc.snapshot.people.filter(p => p.role === 'child' && currentBand(p, doc.snapshot.planningStartDate))
-  return <div className="north-shell settings-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection={settingsSection} onSelectSettings={onSelectSettings} />
+  return <div className="north-shell settings-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection={settingsSection} onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView={currentView} />
     <main className="dashboard-main dashboard-container settings-main">
       <div className="route-heading settings-heading"><div><h1 ref={heading} tabIndex={-1}>{page.label}</h1><p className="page-description">{page.description}</p></div></div>
       <div className="settings-content">

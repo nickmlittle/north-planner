@@ -8,7 +8,7 @@ import { useCloudDocument } from './state/useCloudDocument'
 import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
-import { isSettingsSection, navigateToSettings } from './state/navigation'
+import { isSettingsSection, navigateToDashboard, navigateToHousehold, navigateToSettings } from './state/navigation'
 
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
 function getLocationSearch() { return window.location.search }
@@ -23,9 +23,11 @@ function PlannerApp() {
   const chooseSettings = (section: typeof settingsSection) => {
     navigateToSettings(section)
   }
-  if (view === 'settings' && isSettingsSection(route)) return <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} />
-  if (view === 'dashboard') return <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} />
-  return state.document.step === 9 ? <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : state.document.step === 10 ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : <HouseholdJourney {...state} />
+  const chooseView = (target: 'dashboard' | 'household') => target === 'dashboard' ? navigateToDashboard() : navigateToHousehold()
+  if (view === 'household') return <HouseholdJourney {...state} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />
+  if (view === 'settings' && isSettingsSection(route)) return <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+  if (view === 'dashboard') return <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+  return state.document.step === 9 ? <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : state.document.step === 10 ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...state} onSelectView={chooseView} />
 }
 
 function CloudPlanner({ session }: { session: Session }) {
@@ -43,8 +45,10 @@ function CloudPlanner({ session }: { session: Session }) {
   const chooseSettings = (section: typeof settingsSection) => {
     navigateToSettings(section)
   }
+  const chooseView = (target: 'dashboard' | 'household') => target === 'dashboard' ? navigateToDashboard() : navigateToHousehold()
+  if (view === 'household') return <><HouseholdJourney {...props} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />{state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}</>
   return <>
-    {view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : view === 'dashboard' ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : document.step === 9 ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : document.step === 10 ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} /> : <HouseholdJourney {...props} />}
+    {view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : view === 'dashboard' ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : document.step === 9 ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : document.step === 10 ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...props} onSelectView={chooseView} />}
     {state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}
   </>
 }
