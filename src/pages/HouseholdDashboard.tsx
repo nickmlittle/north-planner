@@ -18,7 +18,7 @@ import { BalanceDateReview } from '../components/BalanceDateReview'
 
 export function HouseholdDashboard({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, onSelectView, currentView = 'dashboard' }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void; onSelectView?: (view: 'dashboard' | 'household') => void; currentView?: 'dashboard' | 'household'
+  settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void; currentView?: 'dashboard' | 'household' | 'budget'
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   const [editingEvent, setEditingEvent] = useState<PlanEvent | 'new' | null>(null)

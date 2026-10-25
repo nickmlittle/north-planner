@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { navigateToSettings, settingsSections } from '../state/navigation'
 import type { SettingsSection } from '../state/navigation'
 
-const links = [['dashboard', 'Dashboard'], ['household', 'Household']] as const
+const links = [['dashboard', 'Dashboard'], ['household', 'Household'], ['budget', 'Budget']] as const
 
 export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, currentView, onSelectView }: {
   step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void; currentView?: 'dashboard' | 'household'; onSelectView?: (view: 'dashboard' | 'household') => void
+  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void; currentView?: 'dashboard' | 'household' | 'budget'; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)

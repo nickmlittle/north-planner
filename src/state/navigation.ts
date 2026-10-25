@@ -41,6 +41,13 @@ export function navigateToDashboard() {
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
+export function navigateToBudget() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('view', 'budget')
+  url.searchParams.delete('settings'); url.searchParams.delete('section')
+  window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
 
 export function navigateToStep(step: number) {
   const url = new URL(window.location.href)

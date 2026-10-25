@@ -15,7 +15,7 @@ function Owners({ people, value, onChange, label }: { people: SetupPerson[]; val
 function Money({ value }: { value: number | null }) { return <>{value === null ? 'Not added' : formatGBP(value)}</> }
 export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, standalone = false, householdSection = 8, onSelectHouseholdSection, onSelectView }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  standalone?: boolean; householdSection?: number; onSelectHouseholdSection?: (section: number) => void; onSelectView?: (view: 'dashboard' | 'household') => void
+  standalone?: boolean; householdSection?: number; onSelectHouseholdSection?: (section: number) => void; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void
 }) {
   const activeStep = standalone ? Math.max(1, Math.min(8, Math.trunc(householdSection))) : doc.step
   const s = doc.snapshot; const adults = s.people.filter(p => p.role !== 'child'); const children = s.people.filter(p => p.role === 'child')
