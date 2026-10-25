@@ -4,9 +4,18 @@ export interface BudgetIncome { personId: string; monthlyNetPence: number; mode:
 export interface BudgetLine { id: string; name: string; amountPence: number; potId: string; funding: FundingRule; singleFunderId?: string; customShares?: Record<string, number> }
 export interface BudgetTransaction { id: string; date: string; description: string; amountPence: number; potId: string }
 export interface BudgetStatement { id: string; fileName: string; period: string; statementBalancePence: number | null; transactions: BudgetTransaction[] }
-export interface MonthlyBudget { pots: BudgetPot[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[] }
+export interface MonthlyBudget { pots: BudgetPot[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
 export function defaultMonthlyBudget(): MonthlyBudget {
-  return { pots: [{ id: 'bills', name: 'Bills', kind: 'spending' }, { id: 'amex', name: 'Amex', kind: 'credit-card' }, { id: 'nick-isa', name: 'Nick ISA', kind: 'savings' }, { id: 'immy-isa', name: 'Immy ISA', kind: 'savings' }], incomes: [], lines: [], statements: [] }
+  return { pots: [{ id: 'bills', name: 'Bills', kind: 'spending' }, { id: 'amex', name: 'Amex', kind: 'credit-card' }, { id: 'nick-isa', name: 'Nick ISA', kind: 'savings' }, { id: 'immy-isa', name: 'Immy ISA', kind: 'savings' }], incomes: [], lines: [], statements: [], monthOverrides: {} }
+}
+export function resolveMonthBudget(budget: MonthlyBudget, month: string): MonthlyBudget {
+  const override = budget.monthOverrides?.[month]
+  return { ...budget, incomes: override?.incomes ?? budget.incomes, lines: override?.lines ?? budget.lines }
+}
+export function updateMonthBudget(budget: MonthlyBudget, month: string, change: (resolved: MonthlyBudget) => Pick<MonthlyBudget, 'incomes' | 'lines'>): MonthlyBudget {
+  const resolved = resolveMonthBudget(budget, month)
+  const updated = change(resolved)
+  return { ...budget, monthOverrides: { ...budget.monthOverrides, [month]: { incomes: updated.incomes, lines: updated.lines } } }
 }
 export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (!value || typeof value !== 'object') return false
@@ -16,5 +25,6 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (!Array.isArray(b.incomes) || b.incomes.some(i => !i || typeof i.personId !== 'string' || !Number.isSafeInteger(i.monthlyNetPence) || i.monthlyNetPence < 0 || !Number.isSafeInteger(i.liveOnPence) || i.liveOnPence < 0 || !['all-income', 'live-on'].includes(i.mode) || typeof i.surplusPotId !== 'string')) return false
   if (!Array.isArray(b.lines) || !ids(b.lines) || b.lines.some(l => typeof l.name !== 'string' || !Number.isSafeInteger(l.amountPence) || l.amountPence < 0 || typeof l.potId !== 'string' || !['proportional', 'equal', 'custom', 'single'].includes(l.funding) || l.customShares !== undefined && Object.values(l.customShares).some(n => !Number.isFinite(n) || n < 0))) return false
   if (!Array.isArray(b.statements) || !ids(b.statements) || b.statements.some(s => typeof s.fileName !== 'string' || !/^\d{4}-\d{2}$/.test(s.period) || s.statementBalancePence !== null && !Number.isSafeInteger(s.statementBalancePence) || !Array.isArray(s.transactions) || !ids(s.transactions) || s.transactions.some(t => typeof t.date !== 'string' || typeof t.description !== 'string' || !Number.isSafeInteger(t.amountPence) || typeof t.potId !== 'string'))) return false
+  if (b.monthOverrides !== undefined && (!b.monthOverrides || typeof b.monthOverrides !== 'object' || Object.entries(b.monthOverrides).some(([month, override]) => !/^\d{4}-\d{2}$/.test(month) || !override || typeof override !== 'object' || override.incomes !== undefined && !Array.isArray(override.incomes) || override.lines !== undefined && !Array.isArray(override.lines)))) return false
   return true
 }
