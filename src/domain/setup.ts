@@ -19,6 +19,8 @@ import type { PurchaseEvent } from './purchases'
 import { defaultPlanning } from '../config/defaultPlanning'
 import { defaultTax } from '../config/defaultTax'
 import { defaultMortgage } from '../config/defaultMortgage'
+import { defaultMonthlyBudget, validMonthlyBudget } from './monthlyBudget'
+import type { MonthlyBudget } from './monthlyBudget'
 
 export const setupSteps = ['Welcome', 'Household', 'Income', 'Pensions', 'Savings', 'Home', 'Spending', 'Review', 'Overview', 'Dashboard', 'Plan settings'] as const
 export type Frequency = 'month' | 'year'
@@ -53,6 +55,7 @@ export interface AppDocument {
   planning: ReturnAssumptions; tax: TaxRules; mortgageExtras: Pick<MortgagePlan, 'monthlyOverpayment' | 'inflation' | 'refinances'>
   moves: PropertyMove[]; allowances: Record<string, number>; incomeTimeline: IncomePeriod[] | null
   childEvents: ChildEvent[]; spendingEvents: SpendingEvent[]; purchaseEvents: PurchaseEvent[]
+  budget: MonthlyBudget
   migration?: { fromVersion: number | null; gaps: string[] }
 }
 export function emptyPerson(role: SetupPerson['role'] = 'adult'): SetupPerson {
@@ -65,7 +68,7 @@ export function newDocument(): AppDocument {
     snapshot: { name: '', people: [], cash: [], noCash: false, housing: '', homeValue: '', homeOwners: [], mortgageStatus: '', mortgageBalance: '', rate: '', term: '', borrowers: [], spending: '', spendingFrequency: 'month', planningStartDate: new Date().toISOString().slice(0, 10), homeAsOfDate: '', mortgageAsOfDate: '' },
     planning: structuredClone(defaultPlanning), tax: structuredClone(defaultTax),
     mortgageExtras: { monthlyOverpayment: defaultMortgage.monthlyOverpayment, inflation: defaultMortgage.inflation, refinances: [] },
-    moves: [], allowances: {}, incomeTimeline: null, childEvents: [], spendingEvents: [], purchaseEvents: [] }
+    moves: [], allowances: {}, incomeTimeline: null, childEvents: [], spendingEvents: [], purchaseEvents: [], budget: defaultMonthlyBudget() }
 }
 export function amount(raw: string): number | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(raw.trim())) return null
@@ -247,9 +250,9 @@ export function decodeDocument(raw: string): AppDocument | null {
       const balanceDatesReviewed = typeof data.balanceDatesReviewed === 'boolean' ? data.balanceDatesReviewed : !['homeAsOfDate', 'mortgageAsOfDate'].some(key => !(key in rawSnapshot))
         && Array.isArray(rawSnapshot.people) && rawSnapshot.people.every(p => !p || typeof p !== 'object' || ('isaAsOfDate' in p && 'pensionAsOfDate' in p))
         && Array.isArray(rawSnapshot.cash) && rawSnapshot.cash.every(c => !c || typeof c !== 'object' || 'asOfDate' in c)
-      v = { ...data, snapshot, moneyBasis, balanceDatesReviewed, purchaseEvents: 'purchaseEvents' in data ? data.purchaseEvents : [], moves }
+      v = { ...base, ...data, snapshot, moneyBasis, balanceDatesReviewed, purchaseEvents: 'purchaseEvents' in data ? data.purchaseEvents : [], moves, budget: data.budget ?? defaultMonthlyBudget() }
     }
-    if (!hasShape(v, { ...base, incomeTimeline: [] }) && !hasShape(v, base)) return null
+    if ((!hasShape(v, { ...base, incomeTimeline: [] }) && !hasShape(v, base)) || !validMonthlyBudget((v as AppDocument).budget)) return null
     const d = v as AppDocument
     const enums = (value: string, options: string[]) => options.includes(value)
     if (d.version !== 1 || !Number.isInteger(d.step) || d.step < 0 || d.step >= setupSteps.length || !validISODate(d.snapshot.planningStartDate) || d.moneyBasis.currency !== 'GBP' || d.moneyBasis.terms !== 'real' || !Number.isInteger(d.moneyBasis.priceYear) || d.moneyBasis.priceYear < 1900 || d.moneyBasis.priceYear > 9999) return null
@@ -298,6 +301,7 @@ export interface HouseholdDocumentV2 {
   moves: PropertyMove[]
   allowances: Record<string, number>
   migration: { fromVersion: number | null; gaps: string[] }
+  budget?: MonthlyBudget
 }
 
 function toMinor(raw: string): number | null {
@@ -351,7 +355,7 @@ export function encodeDocument(document: AppDocument): HouseholdDocumentV2 {
   return { version: 2, workflow: { step: document.step, completed: document.completed }, household: { id: householdId, name: s.name, moneyBasis: document.moneyBasis, planningStartDate: s.planningStartDate, housing: s.housing, noCash: s.noCash, mortgageStatus: s.mortgageStatus, mortgageRate: s.rate, mortgageTerm: s.term }, people, accounts, balances,
     earnings: { timelineMode: timeline === null ? 'snapshot' : 'timeline', snapshotInputs: Object.fromEntries(s.people.map(p => [p.id, { incomeKind: p.incomeKind, pay: p.pay, frequency: p.frequency, days: p.days, payOverride: p.payOverride, employee: p.employee, employer: p.employer, treatment: p.treatment }])), periods: timeline === null ? [] : periods.filter(period => period.startYear > startYear) }, planning: document.planning, tax: document.tax, mortgageExtras: document.mortgageExtras,
     spending: { amountMinor: toMinor(s.spending), ...(s.spending && toMinor(s.spending) === null ? { draftValue: s.spending } : {}), frequency: s.spendingFrequency }, childEvents: document.childEvents, spendingEvents: document.spendingEvents, purchaseEvents: document.purchaseEvents, moves: document.moves, allowances: document.allowances,
-    migration: { fromVersion: document.migration?.fromVersion ?? null, gaps: document.balanceDatesReviewed ? [] : missingOpeningBalanceDates(document) } }
+    budget: document.budget, migration: { fromVersion: document.migration?.fromVersion ?? null, gaps: document.balanceDatesReviewed ? [] : missingOpeningBalanceDates(document) } }
 }
 
 export function projectDocumentV2(v2: HouseholdDocumentV2): AppDocument {
@@ -376,7 +380,7 @@ export function projectDocumentV2(v2: HouseholdDocumentV2): AppDocument {
     annualSalary: annual(p.pay, p.frequency) ?? 0, dayRate: amount(p.pay) ?? 0, billableDays: Number(p.days) || 0, workingFraction: 1, annualGrossOverride: p.payOverride ? amount(p.payOverride) : null,
     contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: (p.treatment || 'salary-sacrifice') as PensionContributions['treatment'], continueAfterFire: false } }))
   const timeline = v2.earnings.timelineMode === 'snapshot' ? null : [...currentPeriods, ...v2.earnings.periods]
-  return { version: 1, step: v2.workflow.step, completed: v2.workflow.completed, snapshot, moneyBasis: v2.household.moneyBasis, balanceDatesReviewed: v2.migration.gaps.length === 0, migration: v2.migration,
+  return { ...base, version: 1, step: v2.workflow.step, completed: v2.workflow.completed, snapshot, moneyBasis: v2.household.moneyBasis, balanceDatesReviewed: v2.migration.gaps.length === 0, migration: v2.migration, budget: v2.budget ?? defaultMonthlyBudget(),
     planning: v2.planning, tax: v2.tax, mortgageExtras: v2.mortgageExtras, moves: v2.moves, allowances: v2.allowances, incomeTimeline: timeline,
     childEvents: v2.childEvents, spendingEvents: v2.spendingEvents, purchaseEvents: v2.purchaseEvents }
 }
@@ -389,12 +393,14 @@ export function decodePersistedDocument(raw: string): PersistedDocumentResult {
     if (parsed?.version === 2) {
       const d = parsed as HouseholdDocumentV2
       const example = encodeDocument(newDocument())
+      const legacyExample = structuredClone(example)
+      delete legacyExample.budget
       // Shape checking treats null as a literal null, while these values are
       // intentionally nullable in persisted records.
       example.spending.amountMinor = null
       const setupTemplate = Object.fromEntries(Object.entries(emptyPerson()).filter(([key]) => !['id', 'name', 'dob', 'role', 'incomeKind', 'pay', 'frequency', 'days', 'payOverride', 'employee', 'employer', 'treatment', 'pension', 'isa', 'isaAsOfDate', 'pensionAsOfDate'].includes(key)))
       const earningTemplate = { incomeKind: '', pay: '', frequency: 'year', days: '', payOverride: '', employee: '', employer: '', treatment: '' }
-      const rootShape = hasShape(d, example)
+      const rootShape = hasShape(d, example) || (!('budget' in d) && hasShape(d, legacyExample))
       const peopleShape = d.people.every(p => hasShape(p, { id: '', householdId: '', name: '', dateOfBirth: '', role: 'adult', setup: setupTemplate }) && p.householdId === d.household.id)
       const accountShape = d.accounts.every(a => hasShape(a, { id: '', householdId: '', name: '', classification: 'asset', kind: 'cash', ownerPersonIds: [], borrowerPersonIds: [], balanceId: '' }) && a.householdId === d.household.id)
       const balanceShape = d.balances.every(b => typeof b.id === 'string' && typeof b.accountId === 'string' && (b.amountMinor === null || typeof b.amountMinor === 'number') && (b.draftValue === undefined || typeof b.draftValue === 'string') && (b.asOfDate === null || typeof b.asOfDate === 'string') && b.basis === 'user-entered')
@@ -403,6 +409,7 @@ export function decodePersistedDocument(raw: string): PersistedDocumentResult {
       const accountIds = new Set(d.accounts.map(a => a.id)); const personIds = new Set(d.people.map(p => p.id))
       if (accountIds.size !== d.accounts.length || new Set(d.balances.map(b => b.id)).size !== d.balances.length || d.accounts.some(a => !d.balances.some(b => b.id === a.balanceId && b.accountId === a.id) || [...a.ownerPersonIds, ...a.borrowerPersonIds].some(id => !personIds.has(id)) || a.propertyId && !accountIds.has(a.propertyId)) || d.balances.some(b => !accountIds.has(b.accountId))) return { error: 'The saved version 2 document has broken record references.', original: raw }
       const doc = projectDocumentV2(d)
+      if (!validMonthlyBudget(doc.budget)) return { error: 'The saved monthly budget contains invalid values.', original: raw }
       if (!validISODate(doc.snapshot.planningStartDate) || d.people.some(p => !p.id || !validISODate(p.dateOfBirth)) || d.balances.some(b => b.asOfDate !== null && !validISODate(b.asOfDate) || b.amountMinor !== null && (!Number.isSafeInteger(b.amountMinor) || b.amountMinor < 0) || b.draftValue !== undefined && typeof b.draftValue !== 'string')) return { error: 'The saved version 2 document has invalid records or dates.', original: raw }
       return { document: doc, sourceVersion: 2, original: raw, needsMigration: false, missingDates: missingOpeningBalanceDates(doc) }
     }
