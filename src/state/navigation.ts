@@ -20,6 +20,7 @@ export function navigateToSettings(section: SettingsSection) {
   url.searchParams.set('view', 'settings')
   url.searchParams.set('settings', section)
   url.searchParams.delete('section')
+  url.searchParams.delete('budgetView')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
@@ -29,6 +30,7 @@ export function navigateToHousehold(section = 8) {
   url.searchParams.set('view', 'household')
   url.searchParams.set('section', String(section))
   url.searchParams.delete('settings')
+  url.searchParams.delete('budgetView')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
@@ -38,12 +40,14 @@ export function navigateToDashboard() {
   url.searchParams.set('view', 'dashboard')
   url.searchParams.delete('settings')
   url.searchParams.delete('section')
+  url.searchParams.delete('budgetView')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
-export function navigateToBudget() {
+export function navigateToBudget(budgetView: 'planning' | 'amex' = 'planning') {
   const url = new URL(window.location.href)
   url.searchParams.set('view', 'budget')
+  url.searchParams.set('budgetView', budgetView)
   url.searchParams.delete('settings'); url.searchParams.delete('section')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -55,6 +59,7 @@ export function navigateToStep(step: number) {
   else url.searchParams.delete('view')
   url.searchParams.delete('settings')
   url.searchParams.delete('section')
+  url.searchParams.delete('budgetView')
   window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }

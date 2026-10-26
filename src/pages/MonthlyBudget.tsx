@@ -8,6 +8,8 @@ import { monthlyContributionPence, resolveMonthBudget, updateMonthBudget } from 
 import { formatGBPSummary } from '../formatting/money'
 import { PlannerHeader } from '../components/PlannerHeader'
 import type { SettingsSection } from '../state/navigation'
+import { navigateToBudget } from '../state/navigation'
+import { SummaryTile, SummaryTiles } from '../components/SummaryTiles'
 
 type BudgetView = 'planning' | 'amex'
 type BudgetDialog = 'item' | 'categories' | 'destinations' | null
@@ -24,7 +26,7 @@ type BudgetProps = {
 export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, onSelectSettings, onSelectView }: BudgetProps) {
   const today = new Date()
   const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
-  const [view, setView] = useState<BudgetView>('planning')
+  const [view, setView] = useState<BudgetView>(() => new URLSearchParams(window.location.search).get('budgetView') === 'amex' ? 'amex' : 'planning')
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1099px)').matches)
   const [configOpen, setConfigOpen] = useState(false)
   const [dialog, setDialog] = useState<BudgetDialog>(null)
@@ -188,9 +190,16 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   })
 
   return <div className="north-shell dashboard-shell budget-shell">
-    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} saveStatus={saveStatus} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" />
+    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} saveStatus={saveStatus} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { setView(budgetView); navigateToBudget(budgetView) }} />
     <main className="dashboard-main budget-page">
       <div className="route-heading budget-heading"><div><p className="eyebrow">Monthly plan</p><h1>Budget your month</h1><p className="page-description">Plan what each pot needs and review transfers before payday.</p></div></div>
+
+      <SummaryTiles label="Monthly budget summary" className="budget-metrics">
+        <SummaryTile label="Household income" value={pounds(totalIncome)} />
+        <SummaryTile label="Planned allocations" value={pounds(transfers.plannedPence)} />
+        <SummaryTile label={transfers.remainingPence < 0 ? 'Monthly shortfall' : 'Monthly surplus'} value={pounds(Math.abs(transfers.remainingPence))} />
+        <SummaryTile label="Savings allocation" value={`${savingsRate}%`} />
+      </SummaryTiles>
 
       <div className="budget-layout">
         <details className="budget-config" open={!compact || configOpen} onToggle={event => { if (compact) setConfigOpen(event.currentTarget.open) }}>
@@ -216,20 +225,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
         </details>
 
         <section className="budget-workspace" aria-label="Monthly budget workspace">
-          <div className="budget-workspace-header">
-            <div className="budget-metrics" aria-label="Monthly budget summary">
-              <article><span>Household income</span><strong>{pounds(totalIncome)}</strong></article>
-              <article><span>Planned allocations</span><strong>{pounds(transfers.plannedPence)}</strong></article>
-              <article><span>{transfers.remainingPence < 0 ? 'Monthly shortfall' : 'Monthly surplus'}</span><strong>{pounds(Math.abs(transfers.remainingPence))}</strong></article>
-              <article><span>Savings allocation</span><strong>{savingsRate}%</strong></article>
-            </div>
-            <div className="budget-tabs" role="tablist" aria-label="Budget workspace">
-              <button type="button" role="tab" id="budget-planning-tab" aria-selected={view === 'planning'} aria-controls="budget-planning-panel" onClick={() => setView('planning')}>Planning</button>
-              <button type="button" role="tab" id="budget-amex-tab" aria-selected={view === 'amex'} aria-controls="budget-amex-panel" onClick={() => setView('amex')}>Amex</button>
-            </div>
-          </div>
-
-          {view === 'planning' ? <div className="budget-work-grid" role="tabpanel" id="budget-planning-panel" aria-labelledby="budget-planning-tab">
+          {view === 'planning' ? <div className="budget-work-grid" id="budget-planning-panel" role="region" aria-label="Planning budget">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Budget items</h2><p>Plan monthly expenses, savings and allocations by category.</p></div><button className="primary-button" onClick={openAddItem}>Add budget item</button></div>
               <div className="budget-table-toolbar"><div className="budget-disclosure-actions" aria-label="Budget table sections"><span>Sections</span><button type="button" disabled={!budget.lines.length} onClick={expandBudgetSections}>Expand all</button><button type="button" disabled={!budget.lines.length} onClick={collapseBudgetSections}>Collapse all</button></div><div className="budget-table-settings"><button type="button" onClick={() => setDialog('categories')}>Manage categories</button><button type="button" onClick={() => setDialog('destinations')}>Manage destinations</button></div></div>
@@ -264,7 +260,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
                 return <Fragment key={group.key}><tr className="budget-transfer-bank-row"><th scope="row">{disclosure ? <button className="budget-transfer-disclosure" type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} pots`} onClick={() => setExpandedTransferGroups(current => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next })}><span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span className="budget-transfer-label">{group.label}</span></button> : <span className="budget-transfer-label">{group.label}</span>}{!disclosure && onlyPotLabel && <small>{onlyPotLabel}</small>}</th>{adults.map(person => <td key={person.id}>{pounds(group.amountFor(person.id))}</td>)}<td>{pounds(group.total)}</td></tr>{disclosure && expanded && group.pots.map(({ row, pot }) => <tr className="budget-transfer-pot-row" key={row.potId}><th scope="row"><span className="budget-transfer-label">{group.potLabel(pot?.name ?? 'Unassigned', pot)}</span></th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.find(item => item.potId === row.potId)?.amountPence ?? 0)}</td>)}<td>{pounds(row.amountPence)}</td></tr>)}</Fragment>
               })}<tr className="budget-transfer-total-row"><th scope="row">Total</th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.reduce((sum, row) => sum + row.amountPence, 0) ?? 0)}</td>)}<td>{pounds(transfers.pots.reduce((sum, row) => sum + row.amountPence, 0))}</td></tr></tbody></table></div> : <p className="budget-empty-state">Payday transfers will appear here as you add planned items.</p>}{transfers.remainingPence < 0 ? <p className="budget-shortfall" role="status">Planned items exceed the available monthly amount by {pounds(-transfers.remainingPence)}.</p> : <p className="budget-remaining">{pounds(transfers.remainingPence)} left to allocate</p>}</section>
             </aside>
-          </div> : <div className="budget-work-grid" role="tabpanel" id="budget-amex-panel" aria-labelledby="budget-amex-tab">
+          </div> : <div className="budget-work-grid" id="budget-amex-panel" role="region" aria-label="Amex statement review">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Amex statement</h2><p>Upload a CSV and assign each transaction to the pot it came from.</p></div></div>
               <label className="secondary-button budget-upload-button">Upload statement CSV<input type="file" accept=".csv,text/csv" onChange={event => void upload(event.target.files?.[0])} /></label>

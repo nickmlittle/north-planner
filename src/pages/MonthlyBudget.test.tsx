@@ -6,7 +6,12 @@ import type { AppDocument } from '../domain/setup'
 import { newDocument } from '../domain/setup'
 import { MonthlyBudget } from './MonthlyBudget'
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals() })
+
+function selectAmexView() {
+  fireEvent.focus(screen.getByRole('button', { name: /Budget/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Amex' }))
+}
 
 function Harness({ grouped = false }: { grouped?: boolean } = {}) {
   const [document, setDocument] = useState<AppDocument>(() => {
@@ -117,7 +122,7 @@ it('renames a category across its rows and closes the item form with Escape', ()
 
 it('keeps the income rail and shows statement settlement in the Amex tab', () => {
   render(<Harness />)
-  fireEvent.click(screen.getByRole('tab', { name: 'Amex' }))
+  selectAmexView()
   expect(screen.getByLabelText('Alex net income per month')).toBeVisible()
   expect(screen.getByRole('heading', { name: 'Card settlement by pot' })).toBeVisible()
   expect(screen.getByText('amex.csv')).toBeVisible()
@@ -158,6 +163,6 @@ it('uses a readable month and year to select the budget and statement period', (
   expect(screen.getByLabelText('Budget month')).toHaveValue(String(nextDate.getMonth() + 1))
   fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
   expect(screen.getByText('Rent')).toBeVisible()
-  fireEvent.click(screen.getByRole('tab', { name: 'Amex' }))
+  selectAmexView()
   expect(screen.getByText(`No Amex statement uploaded for ${nextPeriod}. Upload a CSV to assign transactions to pots.`)).toBeVisible()
 })
