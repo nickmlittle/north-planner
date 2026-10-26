@@ -30,6 +30,7 @@ it('adds a monthly item to an existing destination and updates transfer summarie
   fireEvent.change(within(dialog).getByLabelText('Bill amount'), { target: { value: '12' } })
   fireEvent.change(within(dialog).getByLabelText('Bill destination'), { target: { value: 'bills' } })
   fireEvent.click(within(dialog).getByRole('button', { name: 'Add budget item' }))
+  fireEvent.click(screen.getAllByRole('button', { name: 'Expand Joint' }).at(-1)!)
   expect(screen.getByRole('button', { name: 'Edit Music' })).toBeVisible()
   expect(screen.getAllByText('£12').length).toBeGreaterThan(0)
   expect(screen.getAllByText('Bills').length).toBeGreaterThan(0)
@@ -40,14 +41,17 @@ it('adds a monthly item to an existing destination and updates transfer summarie
 
 it('collapses and expands category and owner levels in the budget table', () => {
   render(<Harness />)
-  expect(screen.getByText('Rent')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Collapse Other Living Expenses' })).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('button', { name: 'Expand Joint' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByText('Rent')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse Other Living Expenses' }))
   expect(screen.queryByText('Rent')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Expand Other Living Expenses' }))
+  fireEvent.click(screen.getAllByRole('button', { name: 'Expand Joint' }).at(-1)!)
   expect(screen.getByText('Rent')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse Joint' }))
   expect(screen.queryByText('Rent')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
+  fireEvent.click(screen.getAllByRole('button', { name: 'Expand Joint' }).at(-1)!)
   expect(screen.getByText('Rent')).toBeVisible()
 })
 
@@ -64,6 +68,7 @@ it('saves an annual item at one twelfth per month and creates its destination in
   fireEvent.change(within(dialog).getByLabelText('New destination name'), { target: { value: 'Car Fund' } })
   fireEvent.change(within(dialog).getByLabelText('New destination type'), { target: { value: 'savings' } })
   fireEvent.click(within(dialog).getByRole('button', { name: 'Add budget item' }))
+  fireEvent.click(screen.getAllByRole('button', { name: 'Expand Joint' }).at(-1)!)
   expect(screen.getByRole('button', { name: 'Edit Car insurance' })).toBeVisible()
   expect(screen.getByText('£720/yr')).toBeVisible()
   expect(screen.getAllByText('£60').length).toBeGreaterThan(0)
@@ -73,6 +78,7 @@ it('saves an annual item at one twelfth per month and creates its destination in
 
 it('edits an existing item and manages destination owner and provider separately', () => {
   render(<Harness />)
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
   fireEvent.click(screen.getByRole('button', { name: 'Edit Rent' }))
   const dialog = screen.getByRole('dialog', { name: 'Edit budget item' })
   fireEvent.change(within(dialog).getByLabelText('Bill name'), { target: { value: 'Home rent' } })
@@ -131,6 +137,7 @@ it('uses a readable month and year to select the budget and statement period', (
   if (nextDate.getFullYear() !== new Date().getFullYear()) fireEvent.change(screen.getByLabelText('Year'), { target: { value: String(nextDate.getFullYear()) } })
   const nextPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
   expect(screen.getByLabelText('Budget month')).toHaveValue(String(nextDate.getMonth() + 1))
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
   expect(screen.getByText('Rent')).toBeVisible()
   fireEvent.click(screen.getByRole('tab', { name: 'Amex' }))
   expect(screen.getByText(`No Amex statement uploaded for ${nextPeriod}. Upload a CSV to assign transactions to pots.`)).toBeVisible()

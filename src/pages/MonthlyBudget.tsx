@@ -36,7 +36,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [lineOwner, setLineOwner] = useState('Joint')
   const [lineFrequency, setLineFrequency] = useState<BudgetFrequency>('monthly')
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set())
-  const [collapsedOwners, setCollapsedOwners] = useState<Set<string>>(() => new Set())
+  const [expandedOwners, setExpandedOwners] = useState<Set<string>>(() => new Set())
   const [createDestination, setCreateDestination] = useState(false)
   const [newPotName, setNewPotName] = useState('')
   const [newPotKind, setNewPotKind] = useState<BudgetPot['kind']>('spending')
@@ -212,9 +212,9 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
                 return <Fragment key={category}><tr className="budget-category-row"><th colSpan={5} scope="rowgroup"><button type="button" aria-expanded={!categoryCollapsed} aria-label={`${categoryCollapsed ? 'Expand' : 'Collapse'} ${category}`} onClick={() => setCollapsedCategories(current => { const next = new Set(current); if (next.has(category)) next.delete(category); else next.add(category); return next })}><span className="budget-disclosure-icon" aria-hidden="true">{categoryCollapsed ? '▸' : '▾'}</span><span>{category}</span></button><small>{pounds(categoryTotal)} / month</small></th></tr>{!categoryCollapsed && owners.map(owner => {
                   const ownerLines = categoryLines.filter(line => line.ownerName === owner)
                   const ownerKey = `${category}::${owner}`
-                  const ownerCollapsed = collapsedOwners.has(ownerKey)
+                  const ownerCollapsed = !expandedOwners.has(ownerKey)
                   const ownerTotal = ownerLines.reduce((sum, line) => sum + line.amountPence, 0)
-                  return <Fragment key={ownerKey}><tr className="budget-owner-row"><th colSpan={5} scope="rowgroup"><button type="button" aria-expanded={!ownerCollapsed} aria-label={`${ownerCollapsed ? 'Expand' : 'Collapse'} ${owner}`} onClick={() => setCollapsedOwners(current => { const next = new Set(current); if (next.has(ownerKey)) next.delete(ownerKey); else next.add(ownerKey); return next })}><span className="budget-disclosure-icon" aria-hidden="true">{ownerCollapsed ? '▸' : '▾'}</span><span>{owner}</span></button><small>{pounds(ownerTotal)}</small></th></tr>{!ownerCollapsed && ownerLines.map(line => <tr key={line.id}>
+                  return <Fragment key={ownerKey}><tr className="budget-owner-row"><th colSpan={5} scope="rowgroup"><button type="button" aria-expanded={!ownerCollapsed} aria-label={`${ownerCollapsed ? 'Expand' : 'Collapse'} ${owner}`} onClick={() => setExpandedOwners(current => { const next = new Set(current); if (next.has(ownerKey)) next.delete(ownerKey); else next.add(ownerKey); return next })}><span className="budget-disclosure-icon" aria-hidden="true">{ownerCollapsed ? '▸' : '▾'}</span><span>{owner}</span></button><small>{pounds(ownerTotal)}</small></th></tr>{!ownerCollapsed && ownerLines.map(line => <tr key={line.id}>
                   <td><span className="budget-line-name">{line.name}</span>{line.frequency === 'annually' && <small className="budget-line-frequency">{pounds(line.entryAmountPence)}/yr</small>}</td>
                   <td><strong>{pounds(line.amountPence)}<small> / month</small></strong></td>
                   <td><div className="budget-line-split"><label><span className="visually-hidden">Funding split for {line.name}</span><select aria-label={`Funding split for ${line.name}`} value={line.funding} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, funding: event.target.value as FundingRule } : row) })) }))}><option value="proportional">Income ratio</option><option value="equal">Equal</option><option value="custom">Custom</option><option value="single">One person</option></select></label>
