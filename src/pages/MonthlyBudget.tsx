@@ -157,6 +157,26 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const reconciledBalance = enteredBalances.reduce((sum, statement) => sum + (statement.statementBalancePence ?? 0), 0)
   const reconciliationDifference = enteredBalances.length ? reconciledBalance - currentStatements.filter(statement => statement.statementBalancePence !== null).reduce((sum, statement) => sum + statement.transactions.reduce((part, transaction) => part + transaction.amountPence, 0), 0) : null
   const assignedTotals = budget.pots.map(pot => ({ pot, amount: statementTransactions.filter(transaction => transaction.potId === pot.id).reduce((sum, transaction) => sum + transaction.amountPence, 0) })).filter(row => row.amount !== 0)
+  const transferGroups = [...new Set(transfers.pots.map(row => {
+    const pot = budget.pots.find(item => item.id === row.potId)
+    return `${pot?.ownerName ?? 'Household'}::${pot?.provider ?? 'Bank not set'}::${pot?.kind ?? 'spending'}`
+  }))].map(key => {
+    const [owner, provider, kind] = key.split('::') as [string, string, string]
+    const pots = transfers.pots.map(row => ({ row, pot: budget.pots.find(item => item.id === row.potId) })).filter(entry => `${entry.pot?.ownerName ?? 'Household'}::${entry.pot?.provider ?? 'Bank not set'}::${entry.pot?.kind ?? 'spending'}` === key)
+    const label = `${owner} · ${provider === 'Bank not set' ? kind === 'savings' ? 'Savings account' : kind === 'credit-card' ? 'Credit card' : 'Bank not set' : provider}`
+    const amountFor = (personId: string) => pots.reduce((sum, entry) => sum + (transfers.people.find(person => person.personId === personId)?.pots.find(item => item.potId === entry.row.potId)?.amountPence ?? 0), 0)
+    const total = pots.reduce((sum, entry) => sum + entry.row.amountPence, 0)
+    const potLabel = (name: string, pot?: BudgetPot) => {
+      if (!pot) return name
+      const tokens = [pot.ownerName, pot.provider].filter((value): value is string => !!value)
+      const tokenSet = new Set(tokens.map(token => token.toLowerCase()))
+      const cleaned = name.split(/\s+/).filter(part => !tokenSet.has(part.replace(/[.,:]/g, '').toLowerCase())).join(' ').replace(/[·|–—-]/g, ' ').replace(/\s+/g, ' ').trim()
+      const normalizedName = name.replace(/[·|–—-]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase()
+      const accountName = tokens.join(' ').toLowerCase()
+      return cleaned || (normalizedName === accountName ? '' : name)
+    }
+    return { key, label, pots, amountFor, total, potLabel }
+  })
 
   return <div className="north-shell dashboard-shell budget-shell">
     <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} saveStatus={saveStatus} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" />
@@ -227,8 +247,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
               })}</tbody></table></div> : <p className="budget-empty-state">No budget items yet. Add an item to start assigning this month’s income.</p>}
             </section>
             <aside className="budget-summary-rail" aria-label="Payday transfer summary">
-              <section className="budget-summary-card"><div className="budget-section-heading"><div><h2>Pot funding</h2><p>Monthly transfers into each destination.</p></div></div>{transfers.pots.length ? <ul className="budget-summary-list">{transfers.pots.map(row => <li key={row.potId}><span>{budget.pots.find(pot => pot.id === row.potId)?.name ?? 'Unassigned'}</span><strong>{pounds(row.amountPence)}</strong></li>)}</ul> : <p className="budget-empty-state">Pot transfers will appear here as you add planned items.</p>}</section>
-              <section className="budget-summary-card"><div className="budget-section-heading"><div><h2>Payday transfers</h2><p>Contribution by person.</p></div></div>{transfers.people.filter(person => person.pots.length).map(person => <div className="budget-person-transfer" key={person.personId}><h3>{adults.find(row => row.id === person.personId)?.name || 'Adult'}</h3>{person.pots.map(row => <p key={row.potId}><span>{budget.pots.find(pot => pot.id === row.potId)?.name ?? 'Unassigned'}</span><strong>{pounds(row.amountPence)}</strong></p>)}</div>)}{transfers.remainingPence < 0 ? <p className="budget-shortfall" role="status">Planned items exceed the available monthly amount by {pounds(-transfers.remainingPence)}.</p> : <p className="budget-remaining">{pounds(transfers.remainingPence)} left to allocate</p>}</section>
+              <section className="budget-summary-card budget-transfer-card"><div className="budget-section-heading"><div><h2>Payday transfers</h2><p>Monthly transfers by account and pot.</p></div></div>{transfers.pots.length ? <div className="budget-transfer-table-wrap"><table className="budget-transfer-table" aria-label="Payday transfers by account and pot"><thead><tr><th scope="col">Transfer to</th>{adults.map(person => <th scope="col" key={person.id}>{person.name}</th>)}<th scope="col">Total</th></tr></thead><tbody>{transferGroups.map(group => <Fragment key={group.key}><tr className="budget-transfer-bank-row"><th scope="row">{group.label}{group.pots.length === 1 && group.potLabel(group.pots[0]!.pot?.name ?? 'Unassigned', group.pots[0]!.pot) && <small>{group.potLabel(group.pots[0]!.pot?.name ?? 'Unassigned', group.pots[0]!.pot)}</small>}</th>{adults.map(person => <td key={person.id}>{pounds(group.amountFor(person.id))}</td>)}<td>{pounds(group.total)}</td></tr>{group.pots.length > 1 && group.pots.map(({ row, pot }) => <tr className="budget-transfer-pot-row" key={row.potId}><th scope="row">{group.potLabel(pot?.name ?? 'Unassigned', pot)}</th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.find(item => item.potId === row.potId)?.amountPence ?? 0)}</td>)}<td>{pounds(row.amountPence)}</td></tr>)}</Fragment>)}<tr className="budget-transfer-total-row"><th scope="row">Total</th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.reduce((sum, row) => sum + row.amountPence, 0) ?? 0)}</td>)}<td>{pounds(transfers.pots.reduce((sum, row) => sum + row.amountPence, 0))}</td></tr></tbody></table></div> : <p className="budget-empty-state">Payday transfers will appear here as you add planned items.</p>}{transfers.remainingPence < 0 ? <p className="budget-shortfall" role="status">Planned items exceed the available monthly amount by {pounds(-transfers.remainingPence)}.</p> : <p className="budget-remaining">{pounds(transfers.remainingPence)} left to allocate</p>}</section>
             </aside>
           </div> : <div className="budget-work-grid" role="tabpanel" id="budget-amex-panel" aria-labelledby="budget-amex-tab">
             <section className="budget-editor-card">

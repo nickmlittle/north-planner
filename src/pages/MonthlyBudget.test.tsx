@@ -12,6 +12,7 @@ function Harness() {
   const [document, setDocument] = useState<AppDocument>(() => {
     const doc = newDocument()
     doc.snapshot.people = [{ ...doc.snapshot.people[0]!, id: 'alex', name: 'Alex', role: 'you' }]
+    doc.budget.pots[0] = { ...doc.budget.pots[0]!, ownerName: 'Joint', provider: 'Nationwide' }
     doc.budget.incomes = [{ personId: 'alex', monthlyNetPence: 400000, mode: 'all-income', liveOnPence: 0, surplusPotId: 'nick-isa' }]
     doc.budget.lines = [{ id: 'rent', category: 'Other Living Expenses', ownerName: 'Joint', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }]
     doc.budget.statements = [{ id: 'statement', fileName: 'amex.csv', period: new Date().toISOString().slice(0, 7), statementBalancePence: 2500, transactions: [{ id: 'tx', date: '2026-10-01', description: 'Cafe', amountPence: 2500, potId: 'bills' }] }]
@@ -118,6 +119,16 @@ it('keeps the income rail and shows statement settlement in the Amex tab', () =>
   expect(screen.getByText('amex.csv')).toBeVisible()
   expect(screen.getAllByText('£25').length).toBeGreaterThan(0)
   expect(screen.getByLabelText('Pot for Cafe')).toHaveValue('bills')
+})
+
+it('shows payday transfers as an owner and bank matrix with person and total columns', () => {
+  render(<Harness />)
+  const matrix = screen.getByRole('table', { name: 'Payday transfers by account and pot' })
+  expect(within(matrix).getByRole('columnheader', { name: 'Alex' })).toBeVisible()
+  expect(within(matrix).getByRole('columnheader', { name: 'Total' })).toBeVisible()
+  expect(within(matrix).getByRole('row', { name: /Joint · Nationwide/ })).toHaveTextContent('Bills')
+  expect(within(matrix).getByRole('row', { name: /Joint · Nationwide/ })).toHaveTextContent('£1,000')
+  expect(screen.queryByRole('heading', { name: 'Pot funding' })).not.toBeInTheDocument()
 })
 
 it('collapses the configuration rail on compact screens and lets the user reopen it', () => {
