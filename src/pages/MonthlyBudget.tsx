@@ -10,6 +10,7 @@ import { PlannerHeader } from '../components/PlannerHeader'
 import type { SettingsSection } from '../state/navigation'
 
 type BudgetView = 'planning' | 'amex'
+const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 type BudgetProps = {
   document: AppDocument
   setDocument: Dispatch<SetStateAction<AppDocument>>
@@ -20,7 +21,8 @@ type BudgetProps = {
 }
 
 export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, onSelectSettings, onSelectView }: BudgetProps) {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
+  const today = new Date()
+  const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
   const [view, setView] = useState<BudgetView>('planning')
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1099px)').matches)
   const [configOpen, setConfigOpen] = useState(false)
@@ -39,6 +41,9 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   }, [])
 
   const adults = document.snapshot.people.filter(person => person.role !== 'child')
+  const [selectedYear, selectedMonth] = month.split('-').map(Number)
+  const years = Array.from(new Set([...Array.from({ length: 16 }, (_, index) => today.getFullYear() - 5 + index), selectedYear!])).sort((a, b) => a - b)
+  const setBudgetMonth = (year: number, monthNumber: number) => setMonth(`${year}-${String(monthNumber).padStart(2, '0')}`)
   const budget = resolveMonthBudget(document.budget, month)
   const transfers = budgetTransfers(budget, adults.map(person => person.id))
   const pounds = (pence: number) => formatGBPSummary(pence / 100)
@@ -94,7 +99,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
         <details className="budget-config" open={!compact || configOpen} onToggle={event => { if (compact) setConfigOpen(event.currentTarget.open) }}>
           <summary>Income and month setup</summary>
           <div className="budget-config-content">
-            <div className="budget-month-control"><p className="eyebrow">MONTHLY PLAN</p><label>Budget month<input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label></div>
+            <div className="budget-month-control"><p className="eyebrow">BUDGET PERIOD</p><p className="budget-period-help">Choose the month for income and item overrides, and for Amex statements and settlement totals.</p><div className="budget-period-selects"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div></div>
             <div className="budget-income-settings"><h2>Household income</h2><p className="muted">Set monthly take-home and choose how much to budget.</p>
               {adults.length ? adults.map(person => {
                 const income = budget.incomes.find(row => row.personId === person.id)

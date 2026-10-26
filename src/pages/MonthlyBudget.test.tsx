@@ -54,3 +54,16 @@ it('collapses the configuration rail on compact screens and lets the user reopen
   fireEvent.click(summary)
   expect(screen.getByLabelText('Alex net income per month')).toBeVisible()
 })
+
+it('uses a readable month and year to select the budget and statement period', () => {
+  render(<Harness />)
+  expect(screen.getByText(/Choose the month for income and item overrides/)).toBeVisible()
+  const nextDate = new Date(); nextDate.setMonth(nextDate.getMonth() + 1)
+  fireEvent.change(screen.getByLabelText('Month'), { target: { value: String(nextDate.getMonth() + 1) } })
+  if (nextDate.getFullYear() !== new Date().getFullYear()) fireEvent.change(screen.getByLabelText('Year'), { target: { value: String(nextDate.getFullYear()) } })
+  const nextPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`
+  expect(screen.getByLabelText('Budget month')).toHaveValue(String(nextDate.getMonth() + 1))
+  expect(screen.getByText('Rent')).toBeVisible()
+  fireEvent.click(screen.getByRole('tab', { name: 'Amex' }))
+  expect(screen.getByText(`No Amex statement uploaded for ${nextPeriod}. Upload a CSV to assign transactions to pots.`)).toBeVisible()
+})
