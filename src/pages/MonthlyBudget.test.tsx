@@ -13,7 +13,7 @@ function Harness() {
     const doc = newDocument()
     doc.snapshot.people = [{ ...doc.snapshot.people[0]!, id: 'alex', name: 'Alex', role: 'you' }]
     doc.budget.incomes = [{ personId: 'alex', monthlyNetPence: 400000, mode: 'all-income', liveOnPence: 0, surplusPotId: 'nick-isa' }]
-    doc.budget.lines = [{ id: 'rent', category: 'Other Living Expenses', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }]
+    doc.budget.lines = [{ id: 'rent', category: 'Other Living Expenses', ownerName: 'Joint', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }]
     doc.budget.statements = [{ id: 'statement', fileName: 'amex.csv', period: new Date().toISOString().slice(0, 7), statementBalancePence: 2500, transactions: [{ id: 'tx', date: '2026-10-01', description: 'Cafe', amountPence: 2500, potId: 'bills' }] }]
     return doc
   })
@@ -33,8 +33,22 @@ it('adds a monthly item to an existing destination and updates transfer summarie
   expect(screen.getByRole('button', { name: 'Edit Music' })).toBeVisible()
   expect(screen.getAllByText('£12').length).toBeGreaterThan(0)
   expect(screen.getAllByText('Bills').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('Joint').length).toBeGreaterThan(0)
   fireEvent.change(screen.getByLabelText('Funding split for Music'), { target: { value: 'equal' } })
   expect(screen.getByLabelText('Funding split for Music')).toHaveValue('equal')
+})
+
+it('collapses and expands category and owner levels in the budget table', () => {
+  render(<Harness />)
+  expect(screen.getByText('Rent')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse Other Living Expenses' }))
+  expect(screen.queryByText('Rent')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Other Living Expenses' }))
+  expect(screen.getByText('Rent')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse Joint' }))
+  expect(screen.queryByText('Rent')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
+  expect(screen.getByText('Rent')).toBeVisible()
 })
 
 it('saves an annual item at one twelfth per month and creates its destination in the same dialog', () => {

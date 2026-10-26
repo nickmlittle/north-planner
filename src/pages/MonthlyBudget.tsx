@@ -33,7 +33,10 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [lineAmount, setLineAmount] = useState('')
   const [linePot, setLinePot] = useState('bills')
   const [lineCategory, setLineCategory] = useState('Other Living Expenses')
+  const [lineOwner, setLineOwner] = useState('Joint')
   const [lineFrequency, setLineFrequency] = useState<BudgetFrequency>('monthly')
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set())
+  const [collapsedOwners, setCollapsedOwners] = useState<Set<string>>(() => new Set())
   const [createDestination, setCreateDestination] = useState(false)
   const [newPotName, setNewPotName] = useState('')
   const [newPotKind, setNewPotKind] = useState<BudgetPot['kind']>('spending')
@@ -60,13 +63,14 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const allocatedSavings = budget.lines.filter(line => budget.pots.find(pot => pot.id === line.potId)?.kind === 'savings').reduce((sum, line) => sum + line.amountPence, 0) + transfers.surplusPence
   const savingsRate = totalIncome > 0 ? Math.round(allocatedSavings / totalIncome * 100) : 0
   const tableCategories = [...budget.categories, ...[...new Set(budget.lines.map(line => line.category))].filter(category => !budget.categories.includes(category))]
+  const ownerNames = ['Joint', ...adults.map(person => person.name).filter((name): name is string => !!name && name !== 'Joint')]
 
   const openAddItem = () => {
-    setEditingLineId(null); setLineName(''); setLineAmount(''); setLineCategory(budget.categories.includes('Other Living Expenses') ? 'Other Living Expenses' : budget.categories[0] ?? '')
+    setEditingLineId(null); setLineName(''); setLineAmount(''); setLineCategory(budget.categories.includes('Other Living Expenses') ? 'Other Living Expenses' : budget.categories[0] ?? ''); setLineOwner('Joint')
     setLineFrequency('monthly'); setLinePot(budget.pots[0]?.id ?? ''); setCreateDestination(false); setNewPotName(''); setNewPotKind('spending'); setNewPotOwner(''); setNewPotProvider(''); setDialog('item')
   }
   const openEditItem = (line: typeof budget.lines[number]) => {
-    setEditingLineId(line.id); setLineName(line.name); setLineAmount((line.entryAmountPence / 100).toString()); setLineCategory(line.category)
+    setEditingLineId(line.id); setLineName(line.name); setLineAmount((line.entryAmountPence / 100).toString()); setLineCategory(line.category); setLineOwner(line.ownerName)
     setLineFrequency(line.frequency); setLinePot(line.potId); setCreateDestination(false); setNewPotName(''); setDialog('item')
   }
   const saveItem = (event: FormEvent<HTMLFormElement>) => {
@@ -82,7 +86,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
     setDocument(current => {
       const base = newPot ? { ...current.budget, pots: [...current.budget.pots, newPot] } : current.budget
       return { ...current, budget: updateMonthBudget(base, month, resolved => {
-        const updated = { category: lineCategory, name: lineName.trim(), entryAmountPence, frequency: lineFrequency, amountPence, potId }
+        const updated = { category: lineCategory, ownerName: lineOwner, name: lineName.trim(), entryAmountPence, frequency: lineFrequency, amountPence, potId }
         return { incomes: resolved.incomes, lines: editingLineId
           ? resolved.lines.map(line => line.id === editingLineId ? { ...line, ...updated } : line)
           : [...resolved.lines, { id: crypto.randomUUID(), ...updated, funding: 'proportional' }] }
@@ -199,11 +203,18 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
           {view === 'planning' ? <div className="budget-work-grid" role="tabpanel" id="budget-planning-panel" aria-labelledby="budget-planning-tab">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Budget items</h2><p>Plan monthly expenses, savings and allocations by category.</p></div><div className="budget-table-actions"><button className="secondary-button" onClick={() => setDialog('destinations')}>Manage destinations</button><button className="secondary-button" onClick={() => setDialog('categories')}>Manage categories</button><button className="primary-button" onClick={openAddItem}>Add budget item</button></div></div>
-              {budget.lines.length > 0 ? <div className="budget-table-wrap"><table className="budget-items-table"><thead><tr><th scope="col">Item</th><th scope="col">Monthly amount</th><th scope="col">Split rule</th><th scope="col">Destination</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{tableCategories.map(category => {
-                const lines = budget.lines.filter(line => line.category === category)
-                if (!lines.length) return null
-                const categoryTotal = lines.reduce((sum, line) => sum + line.amountPence, 0)
-                return <Fragment key={category}><tr className="budget-category-row"><th colSpan={5} scope="rowgroup"><span>{category}</span><small>{pounds(categoryTotal)} / month</small></th></tr>{lines.map(line => <tr key={line.id}>
+              {budget.lines.length > 0 ? <div className="budget-table-wrap"><table className="budget-items-table"><thead><tr><th scope="col">Bill</th><th scope="col">Monthly amount</th><th scope="col">Split rule</th><th scope="col">Destination</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{tableCategories.map(category => {
+                const categoryLines = budget.lines.filter(line => line.category === category)
+                if (!categoryLines.length) return null
+                const categoryTotal = categoryLines.reduce((sum, line) => sum + line.amountPence, 0)
+                const categoryCollapsed = collapsedCategories.has(category)
+                const owners = [...new Set([...ownerNames, ...categoryLines.map(line => line.ownerName)])].filter(owner => categoryLines.some(line => line.ownerName === owner))
+                return <Fragment key={category}><tr className="budget-category-row"><th colSpan={5} scope="rowgroup"><button type="button" aria-expanded={!categoryCollapsed} aria-label={`${categoryCollapsed ? 'Expand' : 'Collapse'} ${category}`} onClick={() => setCollapsedCategories(current => { const next = new Set(current); if (next.has(category)) next.delete(category); else next.add(category); return next })}><span className="budget-disclosure-icon" aria-hidden="true">{categoryCollapsed ? '▸' : '▾'}</span><span>{category}</span></button><small>{pounds(categoryTotal)} / month</small></th></tr>{!categoryCollapsed && owners.map(owner => {
+                  const ownerLines = categoryLines.filter(line => line.ownerName === owner)
+                  const ownerKey = `${category}::${owner}`
+                  const ownerCollapsed = collapsedOwners.has(ownerKey)
+                  const ownerTotal = ownerLines.reduce((sum, line) => sum + line.amountPence, 0)
+                  return <Fragment key={ownerKey}><tr className="budget-owner-row"><th colSpan={5} scope="rowgroup"><button type="button" aria-expanded={!ownerCollapsed} aria-label={`${ownerCollapsed ? 'Expand' : 'Collapse'} ${owner}`} onClick={() => setCollapsedOwners(current => { const next = new Set(current); if (next.has(ownerKey)) next.delete(ownerKey); else next.add(ownerKey); return next })}><span className="budget-disclosure-icon" aria-hidden="true">{ownerCollapsed ? '▸' : '▾'}</span><span>{owner}</span></button><small>{pounds(ownerTotal)}</small></th></tr>{!ownerCollapsed && ownerLines.map(line => <tr key={line.id}>
                   <td><span className="budget-line-name">{line.name}</span>{line.frequency === 'annually' && <small className="budget-line-frequency">{pounds(line.entryAmountPence)}/yr</small>}</td>
                   <td><strong>{pounds(line.amountPence)}<small> / month</small></strong></td>
                   <td><div className="budget-line-split"><label><span className="visually-hidden">Funding split for {line.name}</span><select aria-label={`Funding split for ${line.name}`} value={line.funding} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, funding: event.target.value as FundingRule } : row) })) }))}><option value="proportional">Income ratio</option><option value="equal">Equal</option><option value="custom">Custom</option><option value="single">One person</option></select></label>
@@ -212,6 +223,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
                   </div></td>
                   <td>{(() => { const pot = budget.pots.find(row => row.id === line.potId); return pot ? <><span>{pot.name}</span>{(pot.ownerName || pot.provider) && <small className="budget-pot-context">{[pot.ownerName, pot.provider].filter(Boolean).join(' · ')}</small>}</> : 'Unassigned' })()}</td><td><button className="budget-edit-action" aria-label={`Edit ${line.name}`} onClick={() => openEditItem(line)}>Edit</button></td>
                 </tr>)}</Fragment>
+                })}</Fragment>
               })}</tbody></table></div> : <p className="budget-empty-state">No budget items yet. Add an item to start assigning this month’s income.</p>}
             </section>
             <aside className="budget-summary-rail" aria-label="Payday transfer summary">
@@ -237,6 +249,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
         <form onSubmit={saveItem}>
           <div className="budget-dialog-fields">
             <label>Bill category<select autoFocus aria-label="Bill category" value={lineCategory} onChange={event => setLineCategory(event.target.value)}>{budget.categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label>Budget owner<select aria-label="Budget owner" value={lineOwner} onChange={event => setLineOwner(event.target.value)}>{[...new Set([...ownerNames, lineOwner])].map(owner => <option key={owner} value={owner}>{owner}</option>)}</select></label>
             <label>Bill name<input aria-label="Bill name" value={lineName} onChange={event => setLineName(event.target.value)} placeholder="e.g. Car insurance" required /></label>
             <div className="budget-frequency-fields"><label>Amount (£)<input aria-label="Bill amount" type="number" min="0" step="0.01" value={lineAmount} onChange={event => setLineAmount(event.target.value)} required /></label><label>Frequency<select aria-label="Bill frequency" value={lineFrequency} onChange={event => setLineFrequency(event.target.value as BudgetFrequency)}><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label></div>
             {lineFrequency === 'annually' && lineAmount !== '' && Number.isFinite(Number(lineAmount)) && Number(lineAmount) >= 0 && <p className="budget-annual-hint">Monthly saving: <strong>{pounds(monthlyContributionPence(Math.round(Number(lineAmount) * 100), 'annually'))}</strong></p>}

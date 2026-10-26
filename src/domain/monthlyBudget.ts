@@ -3,7 +3,7 @@ export type BudgetFrequency = 'monthly' | 'annually'
 export const starterBudgetCategories = ['Financing Activities', 'Other Living Expenses', 'Subscriptions', 'Entertainment', 'Savings', 'Living Expenses']
 export interface BudgetPot { id: string; name: string; kind: 'spending' | 'savings' | 'credit-card'; ownerName?: string; provider?: string }
 export interface BudgetIncome { personId: string; monthlyNetPence: number; mode: 'all-income' | 'live-on'; liveOnPence: number; surplusPotId: string }
-export interface BudgetLine { id: string; category: string; name: string; entryAmountPence: number; frequency: BudgetFrequency; amountPence: number; potId: string; funding: FundingRule; singleFunderId?: string; customShares?: Record<string, number> }
+export interface BudgetLine { id: string; category: string; ownerName: string; name: string; entryAmountPence: number; frequency: BudgetFrequency; amountPence: number; potId: string; funding: FundingRule; singleFunderId?: string; customShares?: Record<string, number> }
 export interface BudgetTransaction { id: string; date: string; description: string; amountPence: number; potId: string }
 export interface BudgetStatement { id: string; fileName: string; period: string; statementBalancePence: number | null; transactions: BudgetTransaction[] }
 export interface MonthlyBudget { pots: BudgetPot[]; categories: string[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
@@ -16,10 +16,15 @@ export function monthlyContributionPence(amountPence: number, frequency: BudgetF
 export function migrateMonthlyBudget(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const raw = value as Record<string, unknown>
+  const ownerForPot = (potId: unknown) => {
+    const pot = Array.isArray(raw.pots) ? raw.pots.find(candidate => candidate && typeof candidate === 'object' && (candidate as Record<string, unknown>).id === potId) as Record<string, unknown> | undefined : undefined
+    const potName = typeof pot?.name === 'string' ? pot.name : ''
+    return typeof pot?.ownerName === 'string' ? pot.ownerName : /\bjoint\b/i.test(potName) ? 'Joint' : /\bnick\b/i.test(potName) ? 'Nick' : /\bimmy\b/i.test(potName) ? 'Immy' : 'Joint'
+  }
   const migrateLines = (lines: unknown) => Array.isArray(lines) ? lines.map(line => {
     if (!line || typeof line !== 'object' || Array.isArray(line)) return line
     const row = line as Record<string, unknown>
-    return { ...row, category: row.category ?? 'Uncategorised', entryAmountPence: row.entryAmountPence ?? row.amountPence, frequency: row.frequency ?? 'monthly' }
+    return { ...row, category: row.category ?? 'Uncategorised', ownerName: row.ownerName ?? ownerForPot(row.potId), entryAmountPence: row.entryAmountPence ?? row.amountPence, frequency: row.frequency ?? 'monthly' }
   }) : lines
   const migratedLines = migrateLines(raw.lines)
   const migratedOverrides = raw.monthOverrides && typeof raw.monthOverrides === 'object' && !Array.isArray(raw.monthOverrides)
@@ -58,7 +63,7 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (!Array.isArray(b.categories) || b.categories.some(category => typeof category !== 'string' || !category.trim()) || new Set(b.categories).size !== b.categories.length) return false
   if (!Array.isArray(b.pots) || !ids(b.pots) || b.pots.some(p => typeof p.name !== 'string' || !['spending', 'savings', 'credit-card'].includes(p.kind) || p.ownerName !== undefined && typeof p.ownerName !== 'string' || p.provider !== undefined && typeof p.provider !== 'string')) return false
   if (!Array.isArray(b.incomes) || b.incomes.some(i => !i || typeof i.personId !== 'string' || !Number.isSafeInteger(i.monthlyNetPence) || i.monthlyNetPence < 0 || !Number.isSafeInteger(i.liveOnPence) || i.liveOnPence < 0 || !['all-income', 'live-on'].includes(i.mode) || typeof i.surplusPotId !== 'string')) return false
-  const validLines = (lines: unknown): lines is BudgetLine[] => Array.isArray(lines) && ids(lines) && lines.every(l => typeof l.category === 'string' && b.categories.includes(l.category) && typeof l.name === 'string' && Number.isSafeInteger(l.entryAmountPence) && l.entryAmountPence >= 0 && ['monthly', 'annually'].includes(l.frequency) && Number.isSafeInteger(l.amountPence) && l.amountPence === monthlyContributionPence(l.entryAmountPence, l.frequency) && typeof l.potId === 'string' && ['proportional', 'equal', 'custom', 'single'].includes(l.funding) && (l.customShares === undefined || (typeof l.customShares === 'object' && l.customShares !== null && Object.values(l.customShares as Record<string, unknown>).every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0))))
+  const validLines = (lines: unknown): lines is BudgetLine[] => Array.isArray(lines) && ids(lines) && lines.every(l => typeof l.category === 'string' && b.categories.includes(l.category) && typeof l.ownerName === 'string' && !!l.ownerName.trim() && typeof l.name === 'string' && Number.isSafeInteger(l.entryAmountPence) && l.entryAmountPence >= 0 && ['monthly', 'annually'].includes(l.frequency) && Number.isSafeInteger(l.amountPence) && l.amountPence === monthlyContributionPence(l.entryAmountPence, l.frequency) && typeof l.potId === 'string' && ['proportional', 'equal', 'custom', 'single'].includes(l.funding) && (l.customShares === undefined || (typeof l.customShares === 'object' && l.customShares !== null && Object.values(l.customShares as Record<string, unknown>).every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0))))
   if (!validLines(b.lines)) return false
   if (!Array.isArray(b.statements) || !ids(b.statements) || b.statements.some(s => typeof s.fileName !== 'string' || !/^\d{4}-\d{2}$/.test(s.period) || s.statementBalancePence !== null && !Number.isSafeInteger(s.statementBalancePence) || !Array.isArray(s.transactions) || !ids(s.transactions) || s.transactions.some(t => typeof t.date !== 'string' || typeof t.description !== 'string' || !Number.isSafeInteger(t.amountPence) || typeof t.potId !== 'string'))) return false
   if (b.monthOverrides !== undefined && (!b.monthOverrides || typeof b.monthOverrides !== 'object' || Object.entries(b.monthOverrides).some(([month, override]) => !/^\d{4}-\d{2}$/.test(month) || !override || typeof override !== 'object' || override.incomes !== undefined && !Array.isArray(override.incomes) || override.lines !== undefined && !validLines(override.lines)))) return false

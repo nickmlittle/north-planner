@@ -909,6 +909,11 @@ small, .muted, footer { color: #59665a; }
 .budget-items-table td:nth-child(2)>strong{color:var(--pine)}
 .budget-items-table td:nth-child(2) small{color:var(--muted);font-size:11px;font-weight:400}
 .budget-category-row th{padding-top:5px;padding-bottom:5px;background:#e9e9eb;color:var(--charcoal);font-size:12px}
+.budget-category-row th>button,.budget-owner-row th>button{display:inline-flex;align-items:center;gap:7px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;cursor:pointer}
+.budget-category-row th>button:focus-visible,.budget-owner-row th>button:focus-visible{outline:2px solid var(--pine);outline-offset:3px}
+.budget-disclosure-icon{width:12px;color:var(--muted);font-size:11px}
+.budget-owner-row th{padding:4px 10px 4px 24px;background:#f6f6f3;color:var(--charcoal);font-size:11px}
+.budget-owner-row th small{float:right;color:var(--muted);font-size:11px;font-weight:500}
 .budget-category-row th small{float:right;color:var(--muted);font-size:12px;font-weight:500}
 .budget-line-edit{padding:0;border:0;background:transparent;color:var(--charcoal);font:600 13px var(--font-family);text-align:left;cursor:pointer}
 .budget-line-edit:hover{text-decoration:underline;text-underline-offset:3px}
