@@ -1,15 +1,16 @@
-import type { Dispatch, SetStateAction } from 'react'
-import { useEffect, useState } from 'react'
+import type { Dispatch, FormEvent, SetStateAction } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { AppDocument } from '../domain/setup'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { parseAmexCsv } from '../domain/amexCsv'
-import type { BudgetPot, BudgetStatement, FundingRule } from '../domain/monthlyBudget'
-import { resolveMonthBudget, updateMonthBudget } from '../domain/monthlyBudget'
+import type { BudgetFrequency, BudgetPot, BudgetStatement, FundingRule } from '../domain/monthlyBudget'
+import { monthlyContributionPence, resolveMonthBudget, updateMonthBudget } from '../domain/monthlyBudget'
 import { formatGBPSummary } from '../formatting/money'
 import { PlannerHeader } from '../components/PlannerHeader'
 import type { SettingsSection } from '../state/navigation'
 
 type BudgetView = 'planning' | 'amex'
+type BudgetDialog = 'item' | 'categories' | null
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 type BudgetProps = {
   document: AppDocument
@@ -26,11 +27,17 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [view, setView] = useState<BudgetView>('planning')
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1099px)').matches)
   const [configOpen, setConfigOpen] = useState(false)
-  const [newPotName, setNewPotName] = useState('')
-  const [newPotKind, setNewPotKind] = useState<BudgetPot['kind']>('spending')
+  const [dialog, setDialog] = useState<BudgetDialog>(null)
+  const [editingLineId, setEditingLineId] = useState<string | null>(null)
   const [lineName, setLineName] = useState('')
   const [lineAmount, setLineAmount] = useState('')
   const [linePot, setLinePot] = useState('bills')
+  const [lineCategory, setLineCategory] = useState('Other Living Expenses')
+  const [lineFrequency, setLineFrequency] = useState<BudgetFrequency>('monthly')
+  const [createDestination, setCreateDestination] = useState(false)
+  const [newPotName, setNewPotName] = useState('')
+  const [newPotKind, setNewPotKind] = useState<BudgetPot['kind']>('spending')
+  const [newCategory, setNewCategory] = useState('')
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
@@ -50,6 +57,53 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const totalIncome = budget.incomes.reduce((sum, income) => sum + income.monthlyNetPence, 0)
   const allocatedSavings = budget.lines.filter(line => budget.pots.find(pot => pot.id === line.potId)?.kind === 'savings').reduce((sum, line) => sum + line.amountPence, 0) + transfers.surplusPence
   const savingsRate = totalIncome > 0 ? Math.round(allocatedSavings / totalIncome * 100) : 0
+  const tableCategories = [...budget.categories, ...[...new Set(budget.lines.map(line => line.category))].filter(category => !budget.categories.includes(category))]
+
+  const openAddItem = () => {
+    setEditingLineId(null); setLineName(''); setLineAmount(''); setLineCategory(budget.categories.includes('Other Living Expenses') ? 'Other Living Expenses' : budget.categories[0] ?? '')
+    setLineFrequency('monthly'); setLinePot(budget.pots[0]?.id ?? ''); setCreateDestination(false); setNewPotName(''); setNewPotKind('spending'); setDialog('item')
+  }
+  const openEditItem = (line: typeof budget.lines[number]) => {
+    setEditingLineId(line.id); setLineName(line.name); setLineAmount((line.entryAmountPence / 100).toString()); setLineCategory(line.category)
+    setLineFrequency(line.frequency); setLinePot(line.potId); setCreateDestination(false); setNewPotName(''); setDialog('item')
+  }
+  const saveItem = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const enteredAmount = Number(lineAmount)
+    if (!lineName.trim() || !lineCategory || lineAmount.trim() === '' || !Number.isFinite(enteredAmount) || enteredAmount < 0 || enteredAmount > Number.MAX_SAFE_INTEGER / 100) return
+    if (createDestination && !newPotName.trim()) return
+    if (!createDestination && !linePot) return
+    const entryAmountPence = Math.round(enteredAmount * 100)
+    const amountPence = monthlyContributionPence(entryAmountPence, lineFrequency)
+    const newPot: BudgetPot | null = createDestination ? { id: crypto.randomUUID(), name: newPotName.trim(), kind: newPotKind } : null
+    const potId = newPot?.id ?? linePot
+    setDocument(current => {
+      const base = newPot ? { ...current.budget, pots: [...current.budget.pots, newPot] } : current.budget
+      return { ...current, budget: updateMonthBudget(base, month, resolved => {
+        const updated = { category: lineCategory, name: lineName.trim(), entryAmountPence, frequency: lineFrequency, amountPence, potId }
+        return { incomes: resolved.incomes, lines: editingLineId
+          ? resolved.lines.map(line => line.id === editingLineId ? { ...line, ...updated } : line)
+          : [...resolved.lines, { id: crypto.randomUUID(), ...updated, funding: 'proportional' }] }
+      }) }
+    })
+    setDialog(null)
+  }
+  const addCategory = () => {
+    const category = newCategory.trim()
+    if (!category || budget.categories.includes(category)) return
+    setDocument(current => ({ ...current, budget: { ...current.budget, categories: [...current.budget.categories, category] } }))
+    setNewCategory('')
+  }
+  const renameCategory = (oldName: string, newName: string) => {
+    const category = newName.trim()
+    if (!category || (category !== oldName && budget.categories.includes(category))) return
+    setDocument(current => ({ ...current, budget: {
+      ...current.budget,
+      categories: current.budget.categories.map(item => item === oldName ? category : item),
+      lines: current.budget.lines.map(line => line.category === oldName ? { ...line, category } : line),
+      monthOverrides: Object.fromEntries(Object.entries(current.budget.monthOverrides ?? {}).map(([key, override]) => [key, { ...override, lines: override.lines?.map(line => line.category === oldName ? { ...line, category } : line) }])),
+    } }))
+  }
 
   const updateIncome = (personId: string, key: 'monthlyNetPence' | 'liveOnPence' | 'mode' | 'surplusPotId', value: number | string) => {
     setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({
@@ -134,24 +188,21 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
 
           {view === 'planning' ? <div className="budget-work-grid" role="tabpanel" id="budget-planning-panel" aria-labelledby="budget-planning-tab">
             <section className="budget-editor-card">
-              <div className="budget-section-heading"><div><h2>Pots and budget items</h2><p>Set up destinations, then add what you plan to fund this month.</p></div></div>
-              <div className="budget-pot-create-row"><label>New pot name<input aria-label="New pot name" value={newPotName} onChange={event => setNewPotName(event.target.value)} placeholder="e.g. Holidays" /></label><label>Pot type<select aria-label="New pot type" value={newPotKind} onChange={event => setNewPotKind(event.target.value as BudgetPot['kind'])}><option value="spending">Spending</option><option value="savings">Savings</option><option value="credit-card">Credit card</option></select></label><button className="secondary-button" onClick={() => { if (!newPotName.trim()) return; setDocument(current => ({ ...current, budget: { ...current.budget, pots: [...current.budget.pots, { id: crypto.randomUUID(), name: newPotName.trim(), kind: newPotKind }] } })); setNewPotName('') }}>Add pot</button></div>
-              <div className="budget-pot-grid">{budget.pots.map(pot => {
-                const allocated = budget.lines.filter(line => line.potId === pot.id).reduce((sum, line) => sum + line.amountPence, 0)
-                const referenced = budget.lines.some(line => line.potId === pot.id) || budget.incomes.some(income => income.surplusPotId === pot.id) || document.budget.statements.some(statement => statement.transactions.some(transaction => transaction.potId === pot.id))
-                return <article className="budget-pot-card" key={pot.id}>
-                  <label>{pot.name}<input aria-label={`${pot.name} pot name`} value={pot.name} onChange={event => setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === pot.id ? { ...row, name: event.target.value } : row) } }))} /></label>
-                  <strong>{pounds(allocated)}<span> planned</span></strong>
-                  {!referenced && <button className="text-button" aria-label={`Remove ${pot.name} pot`} onClick={() => setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.filter(row => row.id !== pot.id) } }))}>Remove</button>}
-                </article>
-              })}</div>
-              <div className="budget-add-line"><h3>Add a budget item</h3><div className="budget-pot-create-row"><label>Item name<input aria-label="Budget item name" value={lineName} onChange={event => setLineName(event.target.value)} placeholder="e.g. Mortgage" /></label><label>Monthly amount (£)<input aria-label="Budget item amount" type="number" min="0" step="0.01" value={lineAmount} onChange={event => setLineAmount(event.target.value)} /></label><label>Destination pot<select aria-label="Budget item destination pot" value={linePot} onChange={event => setLinePot(event.target.value)}>{budget.pots.map(pot => <option key={pot.id} value={pot.id}>{pot.name}</option>)}</select></label><button className="primary-button" disabled={!budget.pots.length} onClick={() => { if (!lineName.trim() || !Number.isFinite(Number(lineAmount)) || Number(lineAmount) <= 0) return; setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: [...resolved.lines, { id: crypto.randomUUID(), name: lineName.trim(), amountPence: Math.round(Number(lineAmount) * 100), potId: linePot, funding: 'proportional' }] })) })); setLineName(''); setLineAmount('') }}>Add item</button></div></div>
-              {budget.lines.length > 0 ? <div className="budget-line-list"><div className="budget-line-header"><span>Budget item</span><span>Amount</span><span>Pot</span><span>Split</span><span /></div>{budget.lines.map(line => <div className="budget-line-row" key={line.id}>
-                <strong>{line.name}</strong><span>{pounds(line.amountPence)}</span><span>{budget.pots.find(pot => pot.id === line.potId)?.name ?? 'Unassigned'}</span>
-                <label className="budget-split-control"><span className="visually-hidden">Funding split for {line.name}</span><select aria-label={`Funding split for ${line.name}`} value={line.funding} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, funding: event.target.value as FundingRule } : row) })) }))}><option value="proportional">Income ratio</option><option value="equal">Equal</option><option value="custom">Custom</option><option value="single">One person</option></select></label>
-                {line.funding === 'single' ? <label><span className="visually-hidden">Funder for {line.name}</span><select aria-label={`Funder for ${line.name}`} value={line.singleFunderId ?? ''} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, singleFunderId: event.target.value } : row) })) }))}><option value="">Choose person</option>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label> : line.funding === 'custom' ? <div className="budget-custom-split">{adults.map(person => <label key={person.id}>{person.name} %<input type="number" min="0" max="100" value={line.customShares?.[person.id] ?? ''} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, customShares: { ...row.customShares, [person.id]: Number(event.target.value) } } : row) })) }))} /></label>)}</div> : null}
-                <button className="text-button" onClick={() => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.filter(row => row.id !== line.id) })) }))}>Remove</button>
-              </div>)}</div> : <p className="budget-empty-state">No items planned for {month}. Add a budget item above to start assigning this month’s income.</p>}
+              <div className="budget-section-heading"><div><h2>Budget items</h2><p>Plan monthly expenses, savings and allocations by category.</p></div><div className="budget-table-actions"><button className="secondary-button" onClick={() => setDialog('categories')}>Manage categories</button><button className="primary-button" onClick={openAddItem}>Add budget item</button></div></div>
+              {budget.lines.length > 0 ? <div className="budget-table-wrap"><table className="budget-items-table"><thead><tr><th scope="col">Item</th><th scope="col">Monthly amount</th><th scope="col">Split rule</th><th scope="col">Destination</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{tableCategories.map(category => {
+                const lines = budget.lines.filter(line => line.category === category)
+                if (!lines.length) return null
+                const categoryTotal = lines.reduce((sum, line) => sum + line.amountPence, 0)
+                return <Fragment key={category}><tr className="budget-category-row"><th colSpan={5} scope="rowgroup"><span>{category}</span><small>{pounds(categoryTotal)} / month</small></th></tr>{lines.map(line => <tr key={line.id}>
+                  <td><button className="budget-line-edit" onClick={() => openEditItem(line)}>{line.name}</button>{line.frequency === 'annually' && <small className="budget-line-frequency">{pounds(line.entryAmountPence)} per year · saved monthly</small>}</td>
+                  <td><strong>{pounds(line.amountPence)}<small> / month</small></strong></td>
+                  <td><div className="budget-line-split"><label><span className="visually-hidden">Funding split for {line.name}</span><select aria-label={`Funding split for ${line.name}`} value={line.funding} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, funding: event.target.value as FundingRule } : row) })) }))}><option value="proportional">Income ratio</option><option value="equal">Equal</option><option value="custom">Custom</option><option value="single">One person</option></select></label>
+                    {line.funding === 'single' && <label><span className="visually-hidden">Funder for {line.name}</span><select aria-label={`Funder for ${line.name}`} value={line.singleFunderId ?? ''} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, singleFunderId: event.target.value } : row) })) }))}><option value="">Choose person</option>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
+                    {line.funding === 'custom' && <div className="budget-custom-split">{adults.map(person => <label key={person.id}>{person.name} %<input aria-label={`${person.name} share for ${line.name}`} type="number" min="0" max="100" value={line.customShares?.[person.id] ?? ''} onChange={event => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.map(row => row.id === line.id ? { ...row, customShares: { ...row.customShares, [person.id]: Number(event.target.value) } } : row) })) }))} /></label>)}</div>}
+                  </div></td>
+                  <td>{budget.pots.find(pot => pot.id === line.potId)?.name ?? 'Unassigned'}</td><td><button className="text-button" aria-label={`Remove ${line.name}`} onClick={() => setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.filter(row => row.id !== line.id) })) }))}>Remove</button></td>
+                </tr>)}</Fragment>
+              })}</tbody></table></div> : <p className="budget-empty-state">No budget items yet. Add an item to start assigning this month’s income.</p>}
             </section>
             <aside className="budget-summary-rail" aria-label="Payday transfer summary">
               <section className="budget-summary-card"><div className="budget-section-heading"><div><h2>Pot funding</h2><p>Monthly transfers into each destination.</p></div></div>{transfers.pots.length ? <ul className="budget-summary-list">{transfers.pots.map(row => <li key={row.potId}><span>{budget.pots.find(pot => pot.id === row.potId)?.name ?? 'Unassigned'}</span><strong>{pounds(row.amountPence)}</strong></li>)}</ul> : <p className="budget-empty-state">Pot transfers will appear here as you add planned items.</p>}</section>
@@ -171,6 +222,27 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
           </div>}
         </section>
       </div>
+      {dialog === 'item' && <div className="budget-dialog-backdrop"><section className="budget-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-item-dialog-title" onKeyDown={event => { if (event.key === 'Escape') setDialog(null) }}>
+        <div className="budget-dialog-heading"><div><p className="eyebrow">BUDGET ITEM</p><h2 id="budget-item-dialog-title">{editingLineId ? 'Edit budget item' : 'Add budget item'}</h2></div><button className="text-button" type="button" aria-label="Close dialog" onClick={() => setDialog(null)}>Close</button></div>
+        <form onSubmit={saveItem}>
+          <div className="budget-dialog-fields">
+            <label>Bill category<select autoFocus aria-label="Bill category" value={lineCategory} onChange={event => setLineCategory(event.target.value)}>{budget.categories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label>Bill name<input aria-label="Bill name" value={lineName} onChange={event => setLineName(event.target.value)} placeholder="e.g. Car insurance" required /></label>
+            <div className="budget-frequency-fields"><label>Amount (£)<input aria-label="Bill amount" type="number" min="0" step="0.01" value={lineAmount} onChange={event => setLineAmount(event.target.value)} required /></label><label>Frequency<select aria-label="Bill frequency" value={lineFrequency} onChange={event => setLineFrequency(event.target.value as BudgetFrequency)}><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label></div>
+            {lineFrequency === 'annually' && lineAmount !== '' && Number.isFinite(Number(lineAmount)) && Number(lineAmount) >= 0 && <p className="budget-annual-hint">Monthly saving: <strong>{pounds(monthlyContributionPence(Math.round(Number(lineAmount) * 100), 'annually'))}</strong></p>}
+            <label>Destination<select aria-label="Bill destination" value={createDestination ? '__create__' : linePot} onChange={event => { const value = event.target.value; setCreateDestination(value === '__create__'); if (value !== '__create__') setLinePot(value) }}><option value="">Choose destination</option>{budget.pots.map(pot => <option key={pot.id} value={pot.id}>{pot.name}</option>)}<option value="__create__">Create new destination…</option></select></label>
+            {createDestination && <div className="budget-new-destination"><p>Create a destination and assign this item to it.</p><label>Destination name<input aria-label="New destination name" autoFocus value={newPotName} onChange={event => setNewPotName(event.target.value)} placeholder="e.g. Joint Monzo Bills" required /></label><label>Destination type<select aria-label="New destination type" value={newPotKind} onChange={event => setNewPotKind(event.target.value as BudgetPot['kind'])}><option value="spending">Spending</option><option value="savings">Savings</option><option value="credit-card">Credit card</option></select></label></div>}
+          </div>
+          <div className="budget-dialog-actions"><button className="secondary-button" type="button" onClick={() => setDialog(null)}>Cancel</button><button className="primary-button" type="submit">{editingLineId ? 'Save changes' : 'Add budget item'}</button></div>
+        </form>
+      </section></div>}
+      {dialog === 'categories' && <div className="budget-dialog-backdrop"><section className="budget-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-categories-dialog-title" onKeyDown={event => { if (event.key === 'Escape') setDialog(null) }}>
+        <div className="budget-dialog-heading"><div><p className="eyebrow">BUDGET SETUP</p><h2 id="budget-categories-dialog-title">Manage categories</h2></div><button className="text-button" type="button" aria-label="Close dialog" onClick={() => setDialog(null)}>Close</button></div>
+        <p className="muted">Rename a category to update all its budget items, or add another category.</p>
+        <div className="budget-category-manager">{budget.categories.map((category, index) => <label key={index}>Category {index + 1}<input aria-label={`Category ${index + 1}`} value={category} onChange={event => renameCategory(category, event.target.value)} /></label>)}</div>
+        <form className="budget-add-category" onSubmit={event => { event.preventDefault(); addCategory() }}><label>New category<input aria-label="New category" value={newCategory} onChange={event => setNewCategory(event.target.value)} /></label><button className="secondary-button" type="submit" disabled={!newCategory.trim() || budget.categories.includes(newCategory.trim())}>Add category</button></form>
+        <div className="budget-dialog-actions"><button className="primary-button" type="button" onClick={() => setDialog(null)}>Done</button></div>
+      </section></div>}
     </main>
   </div>
 }

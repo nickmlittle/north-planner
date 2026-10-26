@@ -19,7 +19,7 @@ import type { PurchaseEvent } from './purchases'
 import { defaultPlanning } from '../config/defaultPlanning'
 import { defaultTax } from '../config/defaultTax'
 import { defaultMortgage } from '../config/defaultMortgage'
-import { defaultMonthlyBudget, validMonthlyBudget } from './monthlyBudget'
+import { defaultMonthlyBudget, migrateMonthlyBudget, validMonthlyBudget } from './monthlyBudget'
 import type { MonthlyBudget } from './monthlyBudget'
 
 export const setupSteps = ['Welcome', 'Household', 'Income', 'Pensions', 'Savings', 'Home', 'Spending', 'Review', 'Overview', 'Dashboard', 'Plan settings'] as const
@@ -250,7 +250,7 @@ export function decodeDocument(raw: string): AppDocument | null {
       const balanceDatesReviewed = typeof data.balanceDatesReviewed === 'boolean' ? data.balanceDatesReviewed : !['homeAsOfDate', 'mortgageAsOfDate'].some(key => !(key in rawSnapshot))
         && Array.isArray(rawSnapshot.people) && rawSnapshot.people.every(p => !p || typeof p !== 'object' || ('isaAsOfDate' in p && 'pensionAsOfDate' in p))
         && Array.isArray(rawSnapshot.cash) && rawSnapshot.cash.every(c => !c || typeof c !== 'object' || 'asOfDate' in c)
-      v = { ...base, ...data, snapshot, moneyBasis, balanceDatesReviewed, purchaseEvents: 'purchaseEvents' in data ? data.purchaseEvents : [], moves, budget: data.budget ?? defaultMonthlyBudget() }
+      v = { ...base, ...data, snapshot, moneyBasis, balanceDatesReviewed, purchaseEvents: 'purchaseEvents' in data ? data.purchaseEvents : [], moves, budget: data.budget === undefined ? defaultMonthlyBudget() : migrateMonthlyBudget(data.budget) }
     }
     if ((!hasShape(v, { ...base, incomeTimeline: [] }) && !hasShape(v, base)) || !validMonthlyBudget((v as AppDocument).budget)) return null
     const d = v as AppDocument
@@ -380,7 +380,7 @@ export function projectDocumentV2(v2: HouseholdDocumentV2): AppDocument {
     annualSalary: annual(p.pay, p.frequency) ?? 0, dayRate: amount(p.pay) ?? 0, billableDays: Number(p.days) || 0, workingFraction: 1, annualGrossOverride: p.payOverride ? amount(p.payOverride) : null,
     contributions: { employeeRate: p.pensionStatus === 'yes' ? Number(p.employee) / 100 : 0, employerRate: p.pensionStatus === 'yes' ? Number(p.employer) / 100 : 0, treatment: (p.treatment || 'salary-sacrifice') as PensionContributions['treatment'], continueAfterFire: false } }))
   const timeline = v2.earnings.timelineMode === 'snapshot' ? null : [...currentPeriods, ...v2.earnings.periods]
-  return { ...base, version: 1, step: v2.workflow.step, completed: v2.workflow.completed, snapshot, moneyBasis: v2.household.moneyBasis, balanceDatesReviewed: v2.migration.gaps.length === 0, migration: v2.migration, budget: v2.budget ?? defaultMonthlyBudget(),
+  return { ...base, version: 1, step: v2.workflow.step, completed: v2.workflow.completed, snapshot, moneyBasis: v2.household.moneyBasis, balanceDatesReviewed: v2.migration.gaps.length === 0, migration: v2.migration, budget: migrateMonthlyBudget(v2.budget ?? defaultMonthlyBudget()) as MonthlyBudget,
     planning: v2.planning, tax: v2.tax, mortgageExtras: v2.mortgageExtras, moves: v2.moves, allowances: v2.allowances, incomeTimeline: timeline,
     childEvents: v2.childEvents, spendingEvents: v2.spendingEvents, purchaseEvents: v2.purchaseEvents }
 }
@@ -391,7 +391,8 @@ export function decodePersistedDocument(raw: string): PersistedDocumentResult {
   try {
     const parsed = JSON.parse(raw) as { version?: unknown }
     if (parsed?.version === 2) {
-      const d = parsed as HouseholdDocumentV2
+      const rawDocument = parsed as HouseholdDocumentV2
+      const d = rawDocument.budget === undefined ? rawDocument : { ...rawDocument, budget: migrateMonthlyBudget(rawDocument.budget) as MonthlyBudget }
       const example = encodeDocument(newDocument())
       const legacyExample = structuredClone(example)
       delete legacyExample.budget
