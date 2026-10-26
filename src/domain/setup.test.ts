@@ -126,6 +126,8 @@ describe('household setup', () => {
     const restored = decodePersistedDocument(JSON.stringify(encoded))
     expect(restored).toMatchObject({ sourceVersion: 2, document: { snapshot: { rate: '4.5', term: '25' }, incomeTimeline: [{ id: `income-${person.id}`, annualSalary: 60000 }, { id: 'future-role', annualSalary: 80000 }] } })
     expect(decodePersistedDocument(JSON.stringify(encoded))).toEqual(restored)
+    const oldV2 = structuredClone(encoded); delete oldV2.budget
+    expect(decodePersistedDocument(JSON.stringify(oldV2))).toMatchObject({ document: { budget: { pots: expect.any(Array), lines: [] } } })
   })
   it('requires missing v1 balance dates before migration is complete and preserves invalid draft text in v2', () => {
     const doc = completeDocument(); doc.snapshot.people[0]!.isaAsOfDate = ''

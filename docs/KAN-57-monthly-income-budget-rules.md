@@ -1,6 +1,6 @@
 # KAN-57: Monthly income and budget timing rules
 
-**Status:** Approved by Nick on 2026-10-25
+**Status:** Approved by Nick on 2026-10-25; extended for monthly budget v1
 **Purpose:** Define the income and timing contract for KAN-58's monthly budget template and overrides.
 **Scope:** Decision specification only. No application behavior or saved data changes are authorized by this document.
 
@@ -16,7 +16,9 @@
 | Calendar timing | Budget periods are calendar months. An income change effective on any day applies to the whole effective month. |
 | Past months and overrides | A later income change does not rewrite earlier months. Explicit month overrides remain in place when the base income changes. |
 | Joint funding | Proportional funding is shared among people with positive budget-available take-home. If everyone has zero take-home, the item must use an explicit equal, custom or single-person rule. |
-| Actual spending | Actual-spending capture and reconciliation are out of scope. This contract describes planned income and funding only. |
+| Budgeted lifestyle amount | Each adult can budget all monthly net income or set a monthly amount they want to live on. Income above that amount is automatically assigned to a chosen savings destination; income below it is shown as a shortfall and does not trigger an automatic savings withdrawal. |
+| Amex actual spending | Monthly budget v1 accepts a CSV statement with date, description and amount columns. Transactions remain unassigned until a person selects a pot. The statement balance can be entered and compared with imported transactions. Duplicate file names within a month are rejected. |
+| Actual spending scope | Amex statement import and manual pot assignment are in scope for v1. Bank connections, automatic categorization, and other actual-spending capture are out of scope. |
 
 ## Pension and take-home accounting
 
@@ -40,7 +42,7 @@ In every case, estimated employment take-home is gross pay less the applicable e
 
 ## Review and handoff
 
-Nick approved this contract on 2026-10-25. KAN-58 may implement the agreed monthly budget and override behavior; it must not broaden this task into actual-spending tracking or new tax/payroll calculations.
+Nick approved this contract on 2026-10-25. KAN-58 may implement the agreed monthly budget behavior. Monthly budget v1 also includes a focused Amex CSV upload and manual assignment flow, as requested after the original scope decision. It does not add bank integrations or new tax/payroll calculations.
 
 ## Existing model alignment
 
