@@ -155,7 +155,8 @@ it('collapses the configuration rail on compact screens and lets the user reopen
 
 it('uses a readable month and year to select the budget and statement period', () => {
   render(<Harness />)
-  expect(screen.getByText(/Choose the month for income and item overrides/)).toBeVisible()
+  expect(screen.getByLabelText('Month')).toBeVisible()
+  expect(screen.getByLabelText('Year')).toBeVisible()
   const nextDate = new Date(); nextDate.setMonth(nextDate.getMonth() + 1)
   fireEvent.change(screen.getByLabelText('Month'), { target: { value: String(nextDate.getMonth() + 1) } })
   if (nextDate.getFullYear() !== new Date().getFullYear()) fireEvent.change(screen.getByLabelText('Year'), { target: { value: String(nextDate.getFullYear()) } })
@@ -164,5 +165,5 @@ it('uses a readable month and year to select the budget and statement period', (
   fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
   expect(screen.getByText('Rent')).toBeVisible()
   selectAmexView()
-  expect(screen.getByText(`No Amex statement uploaded for ${nextPeriod}. Upload a CSV to assign transactions to pots.`)).toBeVisible()
+  expect(screen.getByText(`No statement uploaded for ${nextPeriod}.`)).toBeVisible()
 })
