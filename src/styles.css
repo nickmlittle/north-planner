@@ -986,3 +986,16 @@ small, .muted, footer { color: #59665a; }
 .budget-custom-split input{width:100%;min-width:0}
 @media(min-width:1100px){.budget-transfer-card{display:flex;flex-direction:column;max-height:calc(100dvh - 36px);overflow:hidden}.budget-transfer-table-wrap{min-height:0;max-height:calc(100dvh - 250px);overflow-y:auto;overscroll-behavior:contain}.budget-transfer-table thead{position:sticky;top:0;z-index:2;background:var(--card)}.budget-transfer-total-row{position:sticky;bottom:0;z-index:1;background:var(--card)}}
 @media(max-width:1099px){.budget-transfer-card{max-height:none;overflow:visible}.budget-transfer-table-wrap{max-height:none;overflow:visible}}
+
+@media (max-width: 700px) {
+  .dashboard-main > .route-heading, .settings-main > .route-heading {
+    height: auto;
+    min-height: 0;
+    flex-basis: auto;
+    margin-bottom: 12px;
+  }
+  .dashboard-main > .route-heading .page-description, .settings-main > .route-heading .page-description {
+    margin-bottom: 0;
+  }
+  .journey-main > .page-description, .planner-main > .page-description { margin-bottom: 20px; }
+}

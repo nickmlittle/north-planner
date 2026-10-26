@@ -21,11 +21,14 @@ type BudgetProps = {
   setDocument: Dispatch<SetStateAction<AppDocument>>
   warning?: string
   saveStatus?: string
+  accountBacked?: boolean
+  email?: string
+  onSignOut?: () => void
   onSelectSettings: (section: SettingsSection) => void
   onSelectView: (view: 'dashboard' | 'household' | 'budget') => void
 }
 
-export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, onSelectSettings, onSelectView }: BudgetProps) {
+export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, accountBacked = false, email, onSignOut, onSelectSettings, onSelectView }: BudgetProps) {
   const today = new Date()
   const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
   const [view, setView] = useState<BudgetView>(() => new URLSearchParams(window.location.search).get('budgetView') === 'amex' ? 'amex' : 'planning')
@@ -192,7 +195,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   })
 
   return <div className="north-shell dashboard-shell budget-shell">
-    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} saveStatus={saveStatus} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { setView(budgetView); navigateToBudget(budgetView) }} />
+    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { setView(budgetView); navigateToBudget(budgetView) }} />
     <PageFrame className="dashboard-main budget-page" headingClass="route-heading budget-heading" eyebrow="Monthly plan" title="Budget your month" description="Plan what each pot needs and review transfers before payday." summary={<SummaryTiles label="Monthly budget summary" className="budget-metrics">
         <SummaryTile label="Household income" value={pounds(totalIncome)} />
         <SummaryTile label="Planned allocations" value={pounds(transfers.plannedPence)} />
