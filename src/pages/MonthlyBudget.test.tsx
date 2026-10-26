@@ -8,14 +8,18 @@ import { MonthlyBudget } from './MonthlyBudget'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-function Harness() {
+function Harness({ grouped = false }: { grouped?: boolean } = {}) {
   const [document, setDocument] = useState<AppDocument>(() => {
     const doc = newDocument()
     doc.snapshot.people = [{ ...doc.snapshot.people[0]!, id: 'alex', name: 'Alex', role: 'you' }]
-    doc.budget.pots[0] = { ...doc.budget.pots[0]!, ownerName: 'Joint', provider: 'Nationwide' }
+    doc.budget.pots[0] = { ...doc.budget.pots[0]!, ownerName: 'Joint', provider: grouped ? 'Monzo' : 'Nationwide' }
     doc.budget.incomes = [{ personId: 'alex', monthlyNetPence: 400000, mode: 'all-income', liveOnPence: 0, surplusPotId: 'nick-isa' }]
     doc.budget.lines = [{ id: 'rent', category: 'Other Living Expenses', ownerName: 'Joint', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }]
     doc.budget.statements = [{ id: 'statement', fileName: 'amex.csv', period: new Date().toISOString().slice(0, 7), statementBalancePence: 2500, transactions: [{ id: 'tx', date: '2026-10-01', description: 'Cafe', amountPence: 2500, potId: 'bills' }] }]
+    if (grouped) {
+      doc.budget.pots.push({ id: 'monzo-piggy', name: 'Joint Monzo Piggy Bank', kind: 'savings', ownerName: 'Joint', provider: 'Monzo' })
+      doc.budget.lines.push({ id: 'piggy', category: 'Savings', ownerName: 'Joint', name: 'Emergency fund', entryAmountPence: 10000, frequency: 'monthly', amountPence: 10000, potId: 'monzo-piggy', funding: 'proportional' })
+    }
     return doc
   })
   return <MonthlyBudget document={document} setDocument={setDocument} onSelectSettings={() => {}} onSelectView={() => {}} />
@@ -122,12 +126,16 @@ it('keeps the income rail and shows statement settlement in the Amex tab', () =>
 })
 
 it('shows payday transfers as an owner and bank matrix with person and total columns', () => {
-  render(<Harness />)
+  render(<Harness grouped />)
   const matrix = screen.getByRole('table', { name: 'Payday transfers by account and pot' })
   expect(within(matrix).getByRole('columnheader', { name: 'Alex' })).toBeVisible()
   expect(within(matrix).getByRole('columnheader', { name: 'Total' })).toBeVisible()
-  expect(within(matrix).getByRole('row', { name: /Joint · Nationwide/ })).toHaveTextContent('Bills')
-  expect(within(matrix).getByRole('row', { name: /Joint · Nationwide/ })).toHaveTextContent('£1,000')
+  const bankRow = within(matrix).getByRole('row', { name: /Joint · Monzo £1,100 £1,100/ })
+  expect(bankRow).toBeVisible()
+  expect(within(matrix).queryByRole('row', { name: /Piggy Bank/ })).not.toBeInTheDocument()
+  fireEvent.click(within(bankRow).getByRole('button', { name: 'Expand Joint · Monzo pots' }))
+  expect(within(matrix).getByRole('row', { name: /Piggy Bank £100 £100/ })).toBeVisible()
+  expect(within(matrix).getByRole('row', { name: /Bills £1,000 £1,000/ })).toBeVisible()
   expect(screen.queryByRole('heading', { name: 'Pot funding' })).not.toBeInTheDocument()
 })
 

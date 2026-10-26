@@ -903,7 +903,7 @@ small, .muted, footer { color: #59665a; }
 .budget-table-wrap{width:100%;overflow:visible;border:1px solid var(--line);border-radius:7px}
 .budget-items-table{width:100%;table-layout:fixed;border-collapse:collapse;text-align:left;font-size:11px}
 .budget-items-table th,.budget-items-table td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.2;overflow-wrap:anywhere}
-.budget-items-table th:nth-child(1){width:26%}.budget-items-table th:nth-child(2){width:19%}.budget-items-table th:nth-child(3){width:23%}.budget-items-table th:nth-child(4){width:24%}.budget-items-table th:nth-child(5){width:8%}
+.budget-items-table th:nth-child(1){width:24%}.budget-items-table th:nth-child(2){width:19%}.budget-items-table th:nth-child(3){width:22%}.budget-items-table th:nth-child(4){width:21%}.budget-items-table th:nth-child(5){width:14%}
 .budget-items-table thead th{color:var(--muted);font-size:10px;font-weight:650;white-space:normal}
 .budget-items-table tbody tr:last-child td{border-bottom:0}
 .budget-items-table td:nth-child(2){font-variant-numeric:tabular-nums}
@@ -957,8 +957,13 @@ small, .muted, footer { color: #59665a; }
 .budget-transfer-table th:first-child{width:40%;text-align:left}
 .budget-transfer-table thead th{color:var(--muted);font-size:10px;font-weight:650}
 .budget-transfer-bank-row{font-weight:700}
+.budget-transfer-disclosure{display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;cursor:pointer}
+.budget-transfer-disclosure:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.budget-transfer-disclosure span{color:var(--muted);font-size:10px}
 .budget-transfer-bank-row th small{display:block;margin-top:2px;color:var(--muted);font-size:9px;font-weight:500}
 .budget-transfer-pot-row th{padding-left:13px;color:var(--muted);font-style:italic;font-weight:500;text-align:left}
 .budget-transfer-pot-row td:last-child{font-weight:650}
 .budget-transfer-total-row th,.budget-transfer-total-row td{border-top:2px solid var(--charcoal);border-bottom:0;font-weight:750}
 .budget-transfer-table td:last-child{font-weight:650}
+@media(min-width:1100px){.budget-transfer-card{display:flex;flex-direction:column;max-height:calc(100dvh - 36px);overflow:hidden}.budget-transfer-table-wrap{min-height:0;max-height:calc(100dvh - 250px);overflow-y:auto;overscroll-behavior:contain}.budget-transfer-table thead{position:sticky;top:0;z-index:2;background:var(--card)}.budget-transfer-total-row{position:sticky;bottom:0;z-index:1;background:var(--card)}}
+@media(max-width:1099px){.budget-transfer-card{max-height:none;overflow:visible}.budget-transfer-table-wrap{max-height:none;overflow:visible}}
