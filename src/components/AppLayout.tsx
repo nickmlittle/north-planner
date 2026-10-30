@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react'
+import { PlannerHeader, type PlannerHeaderProps } from './PlannerHeader'
 
-export function AppLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="app-shell">
-      <header><span className="wordmark">North Planner</span></header>
-      <main>{children}</main>
-      <footer>Household financial planning · V1</footer>
-    </div>
-  )
+export function AppLayout({ children, navigation, pageClass = '' }: { children: ReactNode; navigation: PlannerHeaderProps; pageClass?: string }) {
+  return <div className={`planner-app-shell ${pageClass}`}>
+    <PlannerHeader {...navigation} />
+    <main className="planner-app-content">{children}</main>
+  </div>
 }

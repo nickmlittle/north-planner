@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from '../App'
 import { storageKey } from '../state/useAppDocument'
 import { completeDocument } from '../test/setupFixture'
@@ -8,12 +8,14 @@ import { documentForecast } from '../state/forecast'
 import { formatGBPWhole } from '../formatting/money'
 import { newPropertyMove } from '../config/defaultMoves'
 import { decodePersistedDocument } from '../domain/setup'
+import { navigateToSettings, type SettingsSection } from '../state/navigation'
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const click = (name: string | RegExp) => { const button = screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }); button.focus(); fireEvent.click(button) }
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const saved = () => { const result = decodePersistedDocument(localStorage.getItem(storageKey)!); if ('error' in result) throw new Error(result.error); return result.document }
+const openSettings = (section: SettingsSection) => act(() => navigateToSettings(section))
 function open(doc = completeDocument()) {
   doc.completed = true; doc.step = 10
   window.history.replaceState(null, '', '/?view=settings&settings=events')
@@ -41,16 +43,14 @@ it('previews purchases without persistence, saves identical metrics, edits witho
   expect(saved().purchaseEvents[0]!.recurring).toMatchObject({ startYear: 2027, endYear: 2029 })
   expect(saved().spendingEvents).toEqual([])
   click('Dashboard')
-  const tile = screen.getByRole('heading', { name: 'Indicative annual withdrawal' }).parentElement!
+  const tile = screen.getByText('Indicative annual withdrawal')
   expect(within(tile).getByText(`${withdrawal}/yr`)).toBeVisible()
-  click('Plan settings')
-  click('Goals & life events')
+  openSettings('events')
   click('Edit Family car'); enter('One-off purchase cost (£)', '5000'); click(/Preview impact/); click('Save event')
   expect(saved().purchaseEvents).toHaveLength(1)
   expect(saved().purchaseEvents[0]!.upfrontCost).toBe(5000)
   view.unmount(); render(<App />)
-  click('Plan settings')
-  click('Goals & life events')
+  openSettings('events')
   expect(screen.getByRole('button', { name: 'Edit Family car' })).toBeVisible()
   fireEvent.click(screen.getByLabelText('Include Family car'))
   expect(saved().purchaseEvents[0]!.enabled).toBe(false)
@@ -131,7 +131,7 @@ it('previews a property move scenario without persistence until explicitly saved
   click('Dashboard')
   click('Explore a move')
   expect(screen.getByRole('button', { name: 'Save changes to Family home' })).toBeDisabled()
-  const fireTile = screen.getByRole('heading', { name: 'Net worth at retirement' }).parentElement!
+  const fireTile = screen.getByRole('heading', { name: /Projected net worth · work optional/ }).parentElement!
   const currentFireValue = within(fireTile).getByText(/£|Not available/).textContent
   fireEvent.change(screen.getByLabelText(/Move year/), { target: { value: '2030' } })
   expect(saved().moves[0]!.year).toBe(2028)

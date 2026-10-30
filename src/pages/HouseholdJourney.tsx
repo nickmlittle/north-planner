@@ -4,7 +4,6 @@ import { ageOn, annual, annualIncome, emptyPerson, householdErrors, isPersonLink
 import type { AppDocument, SetupPerson, SetupSnapshot } from '../domain/setup'
 import { formatGBP, formatGBPSummary } from '../formatting/money'
 import { FrequencyField, MoneyField, SetupCard, SetupField } from '../components/SetupFields'
-import { PlannerHeader } from '../components/PlannerHeader'
 import { BalanceDateReview } from '../components/BalanceDateReview'
 
 const headings = ['A clearer picture of your future starts here.', 'Your household', 'Current income', 'Your pensions', 'Savings and cash', 'Your home', 'Current household spending', 'Review your starting position', 'Your starting position']
@@ -13,7 +12,7 @@ function Owners({ people, value, onChange, label }: { people: SetupPerson[]; val
   return <fieldset className="owner-picker"><legend>{label}</legend>{people.map(p => <label key={p.id}><input type="checkbox" checked={value.includes(p.id)} onChange={e => onChange(e.target.checked ? [...value, p.id] : value.filter(id => id !== p.id))} />{p.name || 'Unnamed adult'}</label>)}{!value.length && <small>Choose at least one owner. Select multiple people for joint ownership.</small>}</fieldset>
 }
 function Money({ value }: { value: number | null }) { return <>{value === null ? 'Not added' : formatGBP(value)}</> }
-export function HouseholdJourney({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, standalone = false, householdSection = 8, onSelectHouseholdSection, onSelectView }: {
+export function HouseholdJourney({ document: doc, setDocument, accountBacked = false, standalone = false, householdSection = 8, onSelectHouseholdSection, onSelectView }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
   standalone?: boolean; householdSection?: number; onSelectHouseholdSection?: (section: number) => void; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void
 }) {
@@ -52,7 +51,6 @@ export function HouseholdJourney({ document: doc, setDocument, warning, replaceS
   const missing = missingDetails(s); const totals = snapshotTotals(s)
   const linkedPerson = s.people.find(p => p.id === removing)
   return <div className={`north-shell ${activeStep === 8 ? 'settings-shell' : ''}`}>
-    <PlannerHeader step={standalone ? 8 : activeStep === 8 ? 8 : doc.completed ? activeStep : -1} go={step => { if (step === 8) go(8); else go(step) }} currentView={standalone ? 'household' : undefined} onSelectView={onSelectView} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} />
     <div className={`journey-layout ${activeStep === 0 || (activeStep === 8 && !standalone) ? 'without-sidebar' : ''} ${activeStep === 8 && !standalone ? 'household-summary-layout' : ''}`}>
       {activeStep > 0 && (activeStep < 8 || standalone) && <nav className="journey-sidebar" aria-label={standalone ? 'Household records' : 'Household setup'}><p className="eyebrow">{standalone ? 'Household' : 'Getting started'}</p><ol>{(standalone ? [...setupSteps.slice(1, 8), 'Overview'] : setupSteps.slice(1, 8)).map((name, i) => <li key={name}><button type="button" aria-current={activeStep === i + 1 ? 'step' : undefined} onClick={() => go(i + 1)}><span className="step-number">{!standalone && activeStep > i + 1 && (i === 0 ? !householdErrors(s).length : !missing.some(m => m.step === i + 1)) ? '✓' : i + 1}</span>{standalone ? ['People', 'Income', 'Pensions', 'Savings', 'Home', 'Spending', 'Review', 'Overview'][i] : name}</button></li>)}</ol>{!standalone && <p className="sidebar-note">Build a picture of today.<br />Plan the future next.</p>}</nav>}
       <main className={`journey-main ${activeStep === 0 ? 'welcome-main' : ''} ${activeStep === 8 ? 'dashboard-main dashboard-container settings-main household-summary-main' : ''}`}>
