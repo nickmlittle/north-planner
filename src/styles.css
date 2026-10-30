@@ -1428,6 +1428,13 @@ small, .muted, footer { color: #59665a; }
   .planner-app-content>.north-shell,.planner-app-content>.north-shell.dashboard-shell{min-height:100dvh;height:auto;overflow:visible!important}
 }
 
+/* The desktop rail can expand over the page. */
+.desktop-sidebar-toggle{display:none}
+@media(min-width:768px){
+  .desktop-sidebar-toggle{display:grid;place-items:center;flex:0 0 auto;width:52px;min-height:46px;margin:0 0 24px;padding:7px;border:0;border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+  .desktop-sidebar-toggle:hover,.desktop-sidebar-toggle:focus-visible,.desktop-sidebar-toggle[aria-expanded=true]{background:rgba(255,255,255,.12)}
+}
+
 /* Keep the Spark-style icon rail narrow; show the secondary panel beside it. */
 .planner-sidebar,.planner-sidebar.is-compact,.planner-sidebar.is-expanded{width:68px;padding:0;overflow:visible;box-shadow:none;transition:none}
 .planner-sidebar:hover,.planner-sidebar:focus-within{width:68px;padding:0;overflow:visible;box-shadow:none}
@@ -1505,4 +1512,24 @@ small, .muted, footer { color: #59665a; }
   .planner-app-shell{display:block;min-height:100dvh}
   .planner-app-content,.planner-sidebar.is-expanded~.planner-app-content{height:auto;min-height:100dvh;margin:0;overflow:visible;scrollbar-gutter:auto}
   .planner-app-content>.north-shell,.planner-app-content>.north-shell.dashboard-shell{min-height:100dvh;height:auto;overflow:visible!important}
+}
+
+@media(min-width:768px){
+  .planner-sidebar,.planner-sidebar.is-compact{transition:width .4s ease,box-shadow .4s ease}
+  .planner-sidebar .sidebar-rail{align-items:stretch;transition:width .4s ease,padding .4s ease}
+  .planner-sidebar .sidebar-icon-nav,.planner-sidebar .sidebar-rail-utility{align-items:stretch}
+  .planner-sidebar .sidebar-rail .sidebar-icon-nav .sidebar-link,.planner-sidebar .sidebar-rail .sidebar-rail-utility .rail-settings-link{justify-content:flex-start!important;width:100%;padding-inline:10px!important;overflow:hidden}
+  .planner-sidebar .sidebar-rail .sidebar-label{display:block;flex:1;min-width:0;opacity:0;white-space:nowrap;transition:opacity .18s ease}
+  .planner-sidebar.is-compact .sidebar-rail-utility .sidebar-account{justify-content:flex-start;gap:0;box-sizing:border-box;padding-inline:10px}
+  .planner-sidebar .sidebar-account-label{position:absolute;left:56px;right:8px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0;transition:opacity .18s ease}
+  .planner-sidebar .sidebar-status{display:flex;align-items:center;gap:14px;box-sizing:border-box;width:100%;padding-inline:18px;white-space:nowrap;overflow:hidden}
+  .planner-sidebar .sidebar-status-label{display:block;opacity:0;transition:opacity .18s ease}
+  .planner-sidebar.desktop-expanded,.planner-sidebar.desktop-expanded:hover,.planner-sidebar.desktop-expanded:focus-within{width:320px;box-shadow:8px 0 28px rgba(0,0,0,.18)}
+  .planner-sidebar.desktop-expanded .sidebar-rail{width:320px;padding-inline:16px;background:var(--pine,#173f32)}
+  .planner-sidebar.desktop-expanded .sidebar-rail .sidebar-label{opacity:1;transition-delay:.14s}
+  .planner-sidebar.desktop-expanded .sidebar-icon-nav .sidebar-link::after,.planner-sidebar.desktop-expanded .sidebar-rail-utility .rail-settings-link::after{display:none}
+  .planner-sidebar.desktop-expanded .sidebar-account-label,.planner-sidebar.desktop-expanded .sidebar-status-label{opacity:1;transition-delay:.14s}
+}
+@media(prefers-reduced-motion:reduce){
+  .planner-sidebar,.planner-sidebar.is-compact,.planner-sidebar .sidebar-rail,.planner-sidebar .sidebar-label,.planner-sidebar .sidebar-account-label,.planner-sidebar .sidebar-status-label{transition:none}
 }
