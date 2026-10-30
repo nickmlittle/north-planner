@@ -35,4 +35,15 @@ describe('monthly budget', () => {
     expect(migrated.categories).toContain('Uncategorised')
     expect(validMonthlyBudget(migrated)).toBe(true)
   })
+  it('migrates legacy destination groups into reviewable master accounts', () => {
+    const legacy = defaultMonthlyBudget()
+    delete legacy.accounts
+    delete legacy.accountsReviewed
+    legacy.pots = legacy.pots.map(pot => { const copy = { ...pot }; delete copy.accountId; return copy })
+    const migrated = migrateMonthlyBudget(legacy) as ReturnType<typeof defaultMonthlyBudget>
+    expect(migrated.accountsReviewed).toBe(false)
+    expect(migrated.accounts?.length).toBeGreaterThan(0)
+    expect(migrated.pots.every(pot => !!pot.accountId && migrated.accounts?.some(account => account.id === pot.accountId))).toBe(true)
+    expect(validMonthlyBudget(migrated)).toBe(true)
+  })
 })

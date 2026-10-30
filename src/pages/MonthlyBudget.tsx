@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import type { AppDocument } from '../domain/setup'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { parseAmexCsv } from '../domain/amexCsv'
-import type { BudgetFrequency, BudgetPot, BudgetStatement, FundingRule } from '../domain/monthlyBudget'
+import type { BudgetAccount, BudgetFrequency, BudgetPot, BudgetStatement, FundingRule } from '../domain/monthlyBudget'
 import { monthlyContributionPence, resolveMonthBudget, updateMonthBudget } from '../domain/monthlyBudget'
 import { formatGBPSummary } from '../formatting/money'
 import { PlannerHeader } from '../components/PlannerHeader'
@@ -14,6 +14,7 @@ import { PageFrame } from '../components/PageFrame'
 import { GroupedMoneyInput } from '../components/GroupedMoneyInput'
 
 type BudgetView = 'planning' | 'amex'
+type PlanningMode = 'transfers' | 'plan'
 type BudgetDialog = 'item' | 'categories' | 'destinations' | null
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 type BudgetProps = {
@@ -28,10 +29,53 @@ type BudgetProps = {
   onSelectView: (view: 'dashboard' | 'household' | 'budget') => void
 }
 
+type TransferGroup = { key: string; label: string; owner: string; provider: string; pots: { row: { potId: string; amountPence: number }; pot?: BudgetPot }[]; amountFor: (personId: string) => number; total: number; potLabel: (name: string, pot?: BudgetPot) => string }
+
+function TransferWorkspace({ adults, groups, transfers, pounds, selectedPersonId, setSelectedPersonId, selectedDestinationId, setSelectedDestinationId, reviewed, onReviewAccounts }: {
+  adults: { id: string; name: string }[]; groups: TransferGroup[]; transfers: ReturnType<typeof budgetTransfers>; pounds: (pence: number) => string
+  selectedPersonId: string | null; setSelectedPersonId: (id: string | null) => void; selectedDestinationId: string | null; setSelectedDestinationId: (id: string | null) => void; reviewed: boolean; onReviewAccounts: () => void
+}) {
+  const [copyFeedback, setCopyFeedback] = useState('')
+  const selected = adults.find(person => person.id === selectedPersonId)
+  const personPots = selected ? transfers.people.find(person => person.personId === selected.id)?.pots ?? [] : []
+  const amountForPot = (potId: string) => personPots.find(row => row.potId === potId)?.amountPence ?? 0
+  const personGroups = groups.map(group => ({ ...group, amount: group.pots.reduce((sum, entry) => sum + amountForPot(entry.row.potId), 0) })).filter(group => group.amount !== 0)
+  const detail = personGroups.find(group => group.key === selectedDestinationId)
+  const copyAmount = async (pence: number) => {
+    try {
+      await navigator.clipboard.writeText((pence / 100).toFixed(2))
+      setCopyFeedback('Amount copied')
+      window.setTimeout(() => setCopyFeedback(''), 1800)
+    } catch {
+      setCopyFeedback('Could not copy amount')
+      window.setTimeout(() => setCopyFeedback(''), 2200)
+    }
+  }
+  if (!reviewed) return <section className="budget-transfer-focus" aria-labelledby="account-review-heading"><h2 id="account-review-heading">Review master accounts</h2><p>Confirm the account groups before using transfers. You can split pots into separate accounts when the same owner and provider have more than one account.</p><button type="button" className="primary-button" onClick={onReviewAccounts}>Review accounts</button></section>
+  return <section className="budget-transfer-focus" aria-label="Make transfers">
+    {!selected ? <div className="budget-transfer-chooser"><h2>Who’s transferring?</h2><p>Choose the person making this month’s transfers.</p><div className="budget-transfer-people">{adults.map(person => <button type="button" className="secondary-button" key={person.id} onClick={() => setSelectedPersonId(person.id)}>{person.name || 'Adult'}</button>)}</div>{!adults.length && <p className="budget-empty-state">Add an adult in Household to see transfers.</p>}</div> : <>
+      <div className="budget-transfer-person-control"><label>Who’s transferring?<select aria-label="Who’s transferring?" value={selected.id} onChange={event => setSelectedPersonId(event.target.value)}>{adults.map(person => <option key={person.id} value={person.id}>{person.name || 'Adult'}</option>)}</select></label><p>From your paid-into account to each destination.</p></div>
+      {detail ? <div className="budget-transfer-detail"><div className="budget-transfer-detail-sticky"><button type="button" className="budget-transfer-breadcrumb" onClick={() => setSelectedDestinationId(null)}>All transfers <span aria-hidden="true">›</span> <strong>{detail.label}</strong></button><div className="budget-transfer-detail-summary"><h2>{detail.label}</h2><div className="budget-transfer-total"><span>Total to distribute</span><strong>{pounds(detail.amount)}</strong></div></div></div><ul className="budget-transfer-list">{detail.pots.map(({ row, pot }) => {
+        const amount = amountForPot(row.potId)
+        if (!amount) return null
+        const name = detail.potLabel(pot?.name ?? 'Unassigned', pot) || pot?.name || 'Unassigned'
+        return <li key={row.potId}><span>{name}</span><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(amount)} for ${name}`} onClick={() => void copyAmount(amount)}>{pounds(amount)}</button></span></li>
+      })}</ul></div> : <div className="budget-transfer-destinations"><h2>Transfers to make</h2>{personGroups.length ? <ul className="budget-transfer-list">{personGroups.map(group => {
+        const detailLabel = [group.owner, group.provider].filter(Boolean).join(' · ')
+        return <li key={group.key}><button type="button" className="budget-transfer-destination-link" onClick={() => setSelectedDestinationId(group.key)}><span>{group.label}{detailLabel && detailLabel !== group.label && <small>{detailLabel}</small>}</span><span aria-hidden="true">›</span></button><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(group.amount)} for ${group.label}`} onClick={() => void copyAmount(group.amount)}>{pounds(group.amount)}</button></span></li>
+      })}</ul> : <p className="budget-empty-state">{selected.name || 'This person'} has no transfers to make this month.</p>}{personGroups.length > 0 && <div className="budget-transfer-total"><span>Total to transfer</span><strong>{pounds(personGroups.reduce((sum, group) => sum + group.amount, 0))}</strong></div>}</div>}
+    </>}
+    <div className={`budget-copy-toast${copyFeedback ? ' is-visible' : ''}`} role="status" aria-live="polite" aria-atomic="true">{copyFeedback}</div>
+  </section>
+}
+
 export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, accountBacked = false, email, onSignOut, onSelectSettings, onSelectView }: BudgetProps) {
   const today = new Date()
   const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
   const [view, setView] = useState<BudgetView>(() => new URLSearchParams(window.location.search).get('budgetView') === 'amex' ? 'amex' : 'planning')
+  const [planningMode, setPlanningMode] = useState<PlanningMode>('transfers')
+  const [selectedTransferPersonId, setSelectedTransferPersonId] = useState<string | null>(null)
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1099px)').matches)
   const [configOpen, setConfigOpen] = useState(false)
   const [dialog, setDialog] = useState<BudgetDialog>(null)
@@ -57,6 +101,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [expandedOwners, setExpandedOwners] = useState<Set<string>>(() => new Set())
   const [expandedTransferGroups, setExpandedTransferGroups] = useState<Set<string>>(() => new Set())
   const [createDestination, setCreateDestination] = useState(false)
+  const [newAccountName, setNewAccountName] = useState('')
   const [newPotName, setNewPotName] = useState('')
   const [newPotKind, setNewPotKind] = useState<BudgetPot['kind']>('spending')
   const [newPotOwner, setNewPotOwner] = useState('')
@@ -96,6 +141,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const setBudgetMonth = (year: number, monthNumber: number) => setMonth(`${year}-${String(monthNumber).padStart(2, '0')}`)
   const budget = resolveMonthBudget(document.budget, month)
   const transfers = budgetTransfers(budget, adults.map(person => person.id))
+  const accountsReviewed = budget.accountsReviewed !== false
   const pounds = (pence: number) => formatGBPSummary(pence / 100)
   const splitLabel = (line: typeof budget.lines[number]) => {
     if (line.funding === 'equal') return 'Equal split'
@@ -142,7 +188,13 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
     const newPot: BudgetPot | null = createDestination ? { id: crypto.randomUUID(), name: newPotName.trim(), kind: newPotKind, ...(newPotOwner.trim() ? { ownerName: newPotOwner.trim() } : {}), ...(newPotProvider.trim() ? { provider: newPotProvider.trim() } : {}) } : null
     const potId = newPot?.id ?? linePot
     setDocument(current => {
-      const base = newPot ? { ...current.budget, pots: [...current.budget.pots, newPot] } : current.budget
+      const base = newPot ? (() => {
+        const matchingAccounts = newPot.ownerName || newPot.provider ? (current.budget.accounts ?? []).filter(row => row.ownerName === newPot.ownerName && row.provider === newPot.provider) : []
+        const account = matchingAccounts.length === 1 ? matchingAccounts[0] : undefined
+        const accountId = account?.id ?? crypto.randomUUID()
+        const createdAccount: BudgetAccount | null = account ? null : { id: accountId, name: matchingAccounts.length ? newPot.name : [newPot.ownerName, newPot.provider].filter(Boolean).join(' · ') || newPot.name, ...(newPot.ownerName ? { ownerName: newPot.ownerName } : {}), ...(newPot.provider ? { provider: newPot.provider } : {}) }
+        return { ...current.budget, accounts: [...(current.budget.accounts ?? []), ...(createdAccount ? [createdAccount] : [])], pots: [...current.budget.pots, { ...newPot, accountId: accountId }] }
+      })() : current.budget
       return { ...current, budget: updateMonthBudget(base, month, resolved => {
         const updated = { category: lineCategory, ownerName: lineOwner, name: lineName.trim(), entryAmountPence, frequency: lineFrequency, amountPence, potId }
         return { incomes: resolved.incomes, lines: editingLineId
@@ -224,8 +276,23 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
     } }))
   }
   const updatePot = (potId: string, key: 'name' | 'ownerName' | 'provider' | 'kind', value: string) => {
-    setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(pot => pot.id === potId ? { ...pot, [key]: key === 'kind' ? value as BudgetPot['kind'] : value } : pot) } }))
+    setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(pot => pot.id === potId ? { ...pot, [key]: key === 'kind' ? value as BudgetPot['kind'] : value } : pot), accounts: (current.budget.accounts ?? []).map(account => {
+      const pot = current.budget.pots.find(row => row.id === potId)
+      if (!pot || pot.accountId !== account.id || !['ownerName', 'provider'].includes(key)) return account
+      const ownerName = key === 'ownerName' ? value : pot.ownerName ?? ''
+      const provider = key === 'provider' ? value : pot.provider ?? ''
+      return { ...account, ownerName: ownerName || undefined, provider: provider || undefined }
+    }) } }))
   }
+  const addMasterAccount = () => {
+    const name = newAccountName.trim()
+    if (!name) return
+    const account = { id: crypto.randomUUID(), name }
+    setDocument(current => ({ ...current, budget: { ...current.budget, accounts: [...(current.budget.accounts ?? []), account] } }))
+    setNewAccountName('')
+  }
+  const updateAccount = (accountId: string, key: 'name' | 'ownerName' | 'provider', value: string) => setDocument(current => ({ ...current, budget: { ...current.budget, accounts: (current.budget.accounts ?? []).map(account => account.id === accountId ? { ...account, [key]: value } : account) } }))
+  const assignPotAccount = (potId: string, accountId: string) => setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(pot => pot.id === potId ? { ...pot, accountId } : pot) } }))
   const removeEditingLine = () => {
     if (!editingLineId) return
     setDocument(current => ({ ...current, budget: updateMonthBudget(current.budget, month, resolved => ({ ...resolved, lines: resolved.lines.filter(line => line.id !== editingLineId) })) }))
@@ -272,11 +339,13 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const assignedTotals = budget.pots.map(pot => ({ pot, amount: statementTransactions.filter(transaction => transaction.potId === pot.id).reduce((sum, transaction) => sum + transaction.amountPence, 0) })).filter(row => row.amount !== 0)
   const transferGroups = [...new Set(transfers.pots.map(row => {
     const pot = budget.pots.find(item => item.id === row.potId)
-    return `${pot?.ownerName ?? 'Household'}::${pot?.provider ?? `Bank not set (${pot?.kind ?? 'spending'})`}`
+    return pot?.accountId ?? `unassigned-${row.potId}`
   }))].map(key => {
-    const [owner, provider] = key.split('::') as [string, string]
-    const pots = transfers.pots.map(row => ({ row, pot: budget.pots.find(item => item.id === row.potId) })).filter(entry => `${entry.pot?.ownerName ?? 'Household'}::${entry.pot?.provider ?? `Bank not set (${entry.pot?.kind ?? 'spending'})`}` === key)
-    const label = `${owner} · ${provider.startsWith('Bank not set') ? provider.includes('savings') ? 'Savings account' : provider.includes('credit-card') ? 'Credit card' : 'Bank not set' : provider}`
+    const pots = transfers.pots.map(row => ({ row, pot: budget.pots.find(item => item.id === row.potId) })).filter(entry => (entry.pot?.accountId ?? `unassigned-${entry.row.potId}`) === key)
+    const account = budget.accounts?.find(item => item.id === key)
+    const label = account?.name ?? ([pots[0]?.pot?.ownerName, pots[0]?.pot?.provider].filter(Boolean).join(' · ') || pots[0]?.pot?.name || 'Unassigned account')
+    const owner = account?.ownerName ?? pots[0]?.pot?.ownerName ?? ''
+    const provider = account?.provider ?? pots[0]?.pot?.provider ?? ''
     const amountFor = (personId: string) => pots.reduce((sum, entry) => sum + (transfers.people.find(person => person.personId === personId)?.pots.find(item => item.potId === entry.row.potId)?.amountPence ?? 0), 0)
     const total = pots.reduce((sum, entry) => sum + entry.row.amountPence, 0)
     const potLabel = (name: string, pot?: BudgetPot) => {
@@ -288,20 +357,20 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
       const accountName = tokens.join(' ').toLowerCase()
       return cleaned || (normalizedName === accountName ? '' : name)
     }
-    return { key, label, pots, amountFor, total, potLabel }
+    return { key, label, owner, provider, pots, amountFor, total, potLabel }
   })
 
   return <div className="north-shell dashboard-shell budget-shell">
-    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { setView(budgetView); navigateToBudget(budgetView) }} />
-    <PageFrame className="dashboard-main budget-page" headingClass="route-heading budget-heading" eyebrow="Monthly plan" title="Budget your month" description="Plan what each pot needs and review transfers before payday." summary={<SummaryTiles label="Monthly budget summary" className="budget-metrics">
+    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { if (budgetView === 'planning' && view === 'amex' && planningMode === 'transfers') { setSelectedTransferPersonId(null); setSelectedDestinationId(null) } setView(budgetView); navigateToBudget(budgetView) }} />
+    <PageFrame className="dashboard-main budget-page" headingClass="route-heading budget-heading" eyebrow="Monthly plan" title="Budget your month" description={view === 'planning' && planningMode === 'transfers' ? undefined : 'Plan what each pot needs and review transfers before payday.'} summary={planningMode === 'plan' ? <SummaryTiles label="Monthly budget summary" className="budget-metrics">
         <SummaryTile label="Household income" value={pounds(totalIncome)} />
         <SummaryTile label="Planned allocations" value={pounds(transfers.plannedPence)} />
         <SummaryTile label={transfers.remainingPence < 0 ? 'Monthly shortfall' : 'Monthly surplus'} value={pounds(Math.abs(transfers.remainingPence))} />
         <SummaryTile label="Savings allocation" value={`${savingsRate}%`} />
-      </SummaryTiles>}>
+      </SummaryTiles> : undefined}>
 
-      <div className="budget-layout">
-        <details className="budget-config" open={!compact || configOpen} onToggle={event => { if (compact) setConfigOpen(event.currentTarget.open) }}>
+      <div className={`budget-layout${view === 'planning' && planningMode === 'transfers' ? ' transfers-active' : ''}`}>
+        {(view !== 'planning' || planningMode === 'plan') && <details className="budget-config" open={!compact || configOpen} onToggle={event => { if (compact) setConfigOpen(event.currentTarget.open) }}>
           <summary>Income and month setup</summary>
           <div className="budget-config-content">
             <div className="budget-month-control"><p className="eyebrow">BUDGET PERIOD</p><div className="budget-period-selects"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div></div>
@@ -321,10 +390,10 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
               }) : <p>Add an adult in Household to set up the monthly budget.</p>}
             </div>
           </div>
-        </details>
+        </details>}
 
         <section className="budget-workspace" aria-label="Monthly budget workspace">
-          {view === 'planning' ? <div className="budget-work-grid" id="budget-planning-panel" role="region" aria-label="Planning budget">
+          {view === 'planning' ? <>{planningMode === 'transfers' && <div className="budget-transfer-context"><p className="budget-transfer-period">Monthly transfers <strong>{monthNames[selectedMonth! - 1]} {selectedYear}</strong></p><div className="budget-transfer-period-selects"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div></div>}<div className="budget-mode-switch" role="group" aria-label="Budget workspace"><button type="button" aria-pressed={planningMode === 'transfers'} onClick={() => { setPlanningMode('transfers'); setSelectedTransferPersonId(null); setSelectedDestinationId(null) }}>Make transfers</button><button type="button" aria-pressed={planningMode === 'plan'} onClick={() => { setPlanningMode('plan'); setSelectedDestinationId(null) }}>Plan budget</button></div>{planningMode === 'transfers' ? <TransferWorkspace adults={adults.map(person => ({ id: person.id, name: person.name }))} groups={transferGroups} transfers={transfers} pounds={pounds} selectedPersonId={selectedTransferPersonId} setSelectedPersonId={setSelectedTransferPersonId} selectedDestinationId={selectedDestinationId} setSelectedDestinationId={setSelectedDestinationId} reviewed={accountsReviewed} onReviewAccounts={() => setDialog('destinations')} /> : <div className="budget-work-grid" id="budget-planning-panel" role="region" aria-label="Planning budget">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Budget items</h2><p>Plan monthly expenses, savings and allocations by category.</p></div><button className="primary-button" onClick={() => openAddItem()}>Add budget item</button></div>
               <div className="budget-table-toolbar"><div className="budget-disclosure-actions" aria-label="Budget table sections"><span>Sections</span><button type="button" disabled={!budget.lines.length} onClick={expandBudgetSections}>Expand all</button><button type="button" disabled={!budget.lines.length} onClick={collapseBudgetSections}>Collapse all</button></div><div className="budget-table-settings"><button type="button" className="budget-destination-toggle budget-destination-toolbar-toggle" aria-label={showDestinations ? 'Hide destinations' : 'Show destinations'} aria-pressed={showDestinations} onClick={() => setShowDestinations(value => !value)}>{showDestinations ? 'Hide destinations' : 'Show destinations'}</button><button type="button" onClick={() => setDialog('categories')}>Manage categories</button><button type="button" onClick={() => setDialog('destinations')}>Manage destinations</button></div></div>
@@ -357,7 +426,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
                 return <Fragment key={group.key}><tr className="budget-transfer-bank-row"><th scope="row">{disclosure ? <button className="budget-transfer-disclosure" type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} pots`} onClick={() => setExpandedTransferGroups(current => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next })}><span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span className="budget-transfer-label">{group.label}</span></button> : <span className="budget-transfer-label">{group.label}</span>}{!disclosure && onlyPotLabel && <small>{onlyPotLabel}</small>}</th>{adults.map(person => <td key={person.id}>{pounds(group.amountFor(person.id))}</td>)}<td>{pounds(group.total)}</td></tr>{disclosure && expanded && group.pots.map(({ row, pot }) => <tr className="budget-transfer-pot-row" key={row.potId}><th scope="row"><span className="budget-transfer-label">{group.potLabel(pot?.name ?? 'Unassigned', pot)}</span></th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.find(item => item.potId === row.potId)?.amountPence ?? 0)}</td>)}<td>{pounds(row.amountPence)}</td></tr>)}</Fragment>
               })}<tr className="budget-transfer-total-row"><th scope="row">Total</th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.reduce((sum, row) => sum + row.amountPence, 0) ?? 0)}</td>)}<td>{pounds(transfers.pots.reduce((sum, row) => sum + row.amountPence, 0))}</td></tr></tbody></table></div> : <p className="budget-empty-state">Payday transfers will appear here as you add planned items.</p>}{transfers.remainingPence < 0 ? <p className="budget-shortfall" role="status">Planned items exceed the available monthly amount by {pounds(-transfers.remainingPence)}.</p> : <p className="budget-remaining">{pounds(transfers.remainingPence)} left to allocate</p>}</section>
             </aside>
-          </div> : <div className="budget-work-grid" id="budget-amex-panel" role="region" aria-label="Amex statement review">
+          </div>}</> : <div className="budget-work-grid" id="budget-amex-panel" role="region" aria-label="Amex statement review">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Amex statement</h2></div></div>
               <label className="secondary-button budget-upload-button">Upload CSV<input type="file" accept=".csv,text/csv" onChange={event => void upload(event.target.files?.[0])} /></label>
@@ -398,9 +467,11 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
       </section></div>}
       {dialog === 'destinations' && <div className="budget-dialog-backdrop"><section className="budget-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-destinations-dialog-title" onKeyDown={event => { if (event.key === 'Escape') setDialog(null) }}>
         <div className="budget-dialog-heading"><div><p className="eyebrow">BUDGET SETUP</p><h2 id="budget-destinations-dialog-title">Manage destinations</h2></div><button className="text-button" type="button" aria-label="Close dialog" onClick={() => setDialog(null)}>Close</button></div>
-        <p className="muted">Keep the destination name focused on its purpose; record account owner and bank separately.</p>
-        <div className="budget-destination-manager">{budget.pots.map(pot => <section className="budget-destination-fields" key={pot.id} aria-label={`Destination ${pot.name}`}><h3>{pot.name}</h3><label>Destination name<input aria-label={`Destination name for ${pot.name}`} value={pot.name} onChange={event => updatePot(pot.id, 'name', event.target.value)} /></label><div className="budget-frequency-fields"><label>Owner<input aria-label={`Owner for ${pot.name}`} value={pot.ownerName ?? ''} onChange={event => updatePot(pot.id, 'ownerName', event.target.value)} placeholder="Joint, Nick or Immy" /></label><label>Bank or provider<input aria-label={`Provider for ${pot.name}`} value={pot.provider ?? ''} onChange={event => updatePot(pot.id, 'provider', event.target.value)} placeholder="e.g. Monzo" /></label></div><label>Destination type<select aria-label={`Type for ${pot.name}`} value={pot.kind} onChange={event => updatePot(pot.id, 'kind', event.target.value)}><option value="spending">Spending</option><option value="savings">Savings</option><option value="credit-card">Credit card</option></select></label></section>)}</div>
-        <div className="budget-dialog-actions"><button className="primary-button" type="button" onClick={() => setDialog(null)}>Done</button></div>
+        <p className="muted">Master accounts are separate destinations. Link each pot to its account; use separate accounts when the same owner has multiple accounts at one provider.</p>
+        <div className="budget-account-manager">{(budget.accounts ?? []).map(account => <section className="budget-destination-fields" key={account.id} aria-label={`Master account ${account.name}`}><label>Account name<input aria-label={`Account name for ${account.name}`} value={account.name} onChange={event => updateAccount(account.id, 'name', event.target.value)} /></label><div className="budget-frequency-fields"><label>Owner<input aria-label={`Account owner for ${account.name}`} value={account.ownerName ?? ''} onChange={event => updateAccount(account.id, 'ownerName', event.target.value)} /></label><label>Bank or provider<input aria-label={`Account provider for ${account.name}`} value={account.provider ?? ''} onChange={event => updateAccount(account.id, 'provider', event.target.value)} /></label></div></section>)}</div>
+        <form className="budget-add-category" onSubmit={event => { event.preventDefault(); addMasterAccount() }}><label>New master account<input aria-label="New master account" value={newAccountName} onChange={event => setNewAccountName(event.target.value)} placeholder="e.g. Joint Monzo bills account" /></label><button className="secondary-button" type="submit" disabled={!newAccountName.trim()}>Add account</button></form>
+        <div className="budget-destination-manager">{budget.pots.map(pot => <section className="budget-destination-fields" key={pot.id} aria-label={`Destination ${pot.name}`}><h3>{pot.name}</h3><label>Pot name<input aria-label={`Destination name for ${pot.name}`} value={pot.name} onChange={event => updatePot(pot.id, 'name', event.target.value)} /></label><label>Master account<select aria-label={`Master account for ${pot.name}`} value={pot.accountId ?? ''} onChange={event => assignPotAccount(pot.id, event.target.value)}><option value="">Choose account</option>{(budget.accounts ?? []).map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><div className="budget-frequency-fields"><label>Owner<input aria-label={`Owner for ${pot.name}`} value={pot.ownerName ?? ''} onChange={event => updatePot(pot.id, 'ownerName', event.target.value)} placeholder="Joint, Nick or Immy" /></label><label>Bank or provider<input aria-label={`Provider for ${pot.name}`} value={pot.provider ?? ''} onChange={event => updatePot(pot.id, 'provider', event.target.value)} placeholder="e.g. Monzo" /></label></div><label>Destination type<select aria-label={`Type for ${pot.name}`} value={pot.kind} onChange={event => updatePot(pot.id, 'kind', event.target.value)}><option value="spending">Spending</option><option value="savings">Savings</option><option value="credit-card">Credit card</option></select></label></section>)}</div>
+        <div className="budget-dialog-actions"><button className="primary-button" type="button" onClick={() => { setDocument(current => ({ ...current, budget: { ...current.budget, accountsReviewed: true } })); setDialog(null) }}>Done</button></div>
       </section></div>}
     </PageFrame>
   </div>
