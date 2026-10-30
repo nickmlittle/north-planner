@@ -1,14 +1,15 @@
 export type FundingRule = 'proportional' | 'equal' | 'custom' | 'single'
 export type BudgetFrequency = 'monthly' | 'annually'
 export const starterBudgetCategories = ['Financing Activities', 'Other Living Expenses', 'Subscriptions', 'Entertainment', 'Savings', 'Living Expenses']
-export interface BudgetPot { id: string; name: string; kind: 'spending' | 'savings' | 'credit-card'; ownerName?: string; provider?: string }
+export interface BudgetAccount { id: string; name: string; ownerName?: string; provider?: string }
+export interface BudgetPot { id: string; name: string; kind: 'spending' | 'savings' | 'credit-card'; ownerName?: string; provider?: string; accountId?: string }
 export interface BudgetIncome { personId: string; monthlyNetPence: number; mode: 'all-income' | 'live-on'; liveOnPence: number; surplusPotId: string }
 export interface BudgetLine { id: string; category: string; ownerName: string; name: string; entryAmountPence: number; frequency: BudgetFrequency; amountPence: number; potId: string; funding: FundingRule; singleFunderId?: string; customShares?: Record<string, number> }
 export interface BudgetTransaction { id: string; date: string; description: string; amountPence: number; potId: string }
 export interface BudgetStatement { id: string; fileName: string; period: string; statementBalancePence: number | null; transactions: BudgetTransaction[] }
-export interface MonthlyBudget { pots: BudgetPot[]; categories: string[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
+export interface MonthlyBudget { pots: BudgetPot[]; accounts?: BudgetAccount[]; accountsReviewed?: boolean; categories: string[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
 export function defaultMonthlyBudget(): MonthlyBudget {
-  return { pots: [{ id: 'bills', name: 'Bills', kind: 'spending' }, { id: 'amex', name: 'Amex', kind: 'credit-card', provider: 'Amex' }, { id: 'nick-isa', name: 'Nick ISA', kind: 'savings', ownerName: 'Nick' }, { id: 'immy-isa', name: 'Immy ISA', kind: 'savings', ownerName: 'Immy' }], categories: [...starterBudgetCategories], incomes: [], lines: [], statements: [], monthOverrides: {} }
+  return { pots: [{ id: 'bills', name: 'Bills', kind: 'spending', accountId: 'account-bills' }, { id: 'amex', name: 'Amex', kind: 'credit-card', provider: 'Amex', accountId: 'account-amex' }, { id: 'nick-isa', name: 'Nick ISA', kind: 'savings', ownerName: 'Nick', accountId: 'account-nick-isa' }, { id: 'immy-isa', name: 'Immy ISA', kind: 'savings', ownerName: 'Immy', accountId: 'account-immy-isa' }], accounts: [{ id: 'account-bills', name: 'Bills' }, { id: 'account-amex', name: 'Amex', provider: 'Amex' }, { id: 'account-nick-isa', name: 'Nick ISA', ownerName: 'Nick' }, { id: 'account-immy-isa', name: 'Immy ISA', ownerName: 'Immy' }], accountsReviewed: true, categories: [...starterBudgetCategories], incomes: [], lines: [], statements: [], monthOverrides: {} }
 }
 export function monthlyContributionPence(amountPence: number, frequency: BudgetFrequency): number {
   return frequency === 'annually' ? Math.round(amountPence / 12) : amountPence
@@ -45,7 +46,29 @@ export function migrateMonthlyBudget(value: unknown): unknown {
     const provider = typeof row.provider === 'string' ? row.provider : ['Monzo', 'Nationwide', 'Amex'].find(providerName => new RegExp(`\\b${providerName}\\b`, 'i').test(name))
     return { ...row, ...(ownerName ? { ownerName } : {}), ...(provider ? { provider } : {}) }
   }) : raw.pots
-  return { ...raw, pots, categories, lines: migratedLines, monthOverrides: migratedOverrides }
+  const accounts = Array.isArray(raw.accounts) ? raw.accounts : []
+  let migratedPots = pots
+  let migratedAccounts = accounts
+  if (Array.isArray(pots) && !Array.isArray(raw.accounts)) {
+    const byKey = new Map<string, { id: string; name: string; ownerName?: string; provider?: string }>()
+    migratedPots = pots.map((pot, index) => {
+      if (!pot || typeof pot !== 'object' || Array.isArray(pot)) return pot
+      const row = pot as Record<string, unknown>
+      const ownerName = typeof row.ownerName === 'string' ? row.ownerName : undefined
+      const provider = typeof row.provider === 'string' ? row.provider : undefined
+      const key = `${ownerName ?? 'Household'}\u0000${provider ?? `Bank not set (${String(row.kind ?? 'spending')})`}`
+      let account = byKey.get(key)
+      if (!account) {
+        const id = `legacy-account-${index}`
+        const name = [ownerName, provider].filter(Boolean).join(' · ') || String(row.name ?? 'Master account')
+        account = { id, name, ...(ownerName ? { ownerName } : {}), ...(provider ? { provider } : {}) }
+        byKey.set(key, account)
+      }
+      return { ...row, accountId: typeof row.accountId === 'string' ? row.accountId : account.id }
+    })
+    migratedAccounts = [...byKey.values()]
+  }
+  return { ...raw, pots: migratedPots, accounts: migratedAccounts, accountsReviewed: raw.accountsReviewed === true, categories, lines: migratedLines, monthOverrides: migratedOverrides }
 }
 export function resolveMonthBudget(budget: MonthlyBudget, month: string): MonthlyBudget {
   const override = budget.monthOverrides?.[month]
@@ -61,7 +84,10 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   const b = value as MonthlyBudget
   const ids = (items: { id: string }[]) => items.every(i => typeof i.id === 'string' && !!i.id) && new Set(items.map(i => i.id)).size === items.length
   if (!Array.isArray(b.categories) || b.categories.some(category => typeof category !== 'string' || !category.trim()) || new Set(b.categories).size !== b.categories.length) return false
-  if (!Array.isArray(b.pots) || !ids(b.pots) || b.pots.some(p => typeof p.name !== 'string' || !['spending', 'savings', 'credit-card'].includes(p.kind) || p.ownerName !== undefined && typeof p.ownerName !== 'string' || p.provider !== undefined && typeof p.provider !== 'string')) return false
+  if (!Array.isArray(b.pots) || !ids(b.pots) || b.pots.some(p => typeof p.name !== 'string' || !['spending', 'savings', 'credit-card'].includes(p.kind) || p.ownerName !== undefined && typeof p.ownerName !== 'string' || p.provider !== undefined && typeof p.provider !== 'string' || p.accountId !== undefined && typeof p.accountId !== 'string')) return false
+  if (b.accounts !== undefined && (!Array.isArray(b.accounts) || !ids(b.accounts) || b.accounts.some(account => typeof account.name !== 'string' || !account.name.trim() || account.ownerName !== undefined && typeof account.ownerName !== 'string' || account.provider !== undefined && typeof account.provider !== 'string'))) return false
+  if (b.accountsReviewed !== undefined && typeof b.accountsReviewed !== 'boolean') return false
+  if (Array.isArray(b.accounts) && b.pots.some(pot => pot.accountId !== undefined && !b.accounts!.some(account => account.id === pot.accountId))) return false
   if (!Array.isArray(b.incomes) || b.incomes.some(i => !i || typeof i.personId !== 'string' || !Number.isSafeInteger(i.monthlyNetPence) || i.monthlyNetPence < 0 || !Number.isSafeInteger(i.liveOnPence) || i.liveOnPence < 0 || !['all-income', 'live-on'].includes(i.mode) || typeof i.surplusPotId !== 'string')) return false
   const validLines = (lines: unknown): lines is BudgetLine[] => Array.isArray(lines) && ids(lines) && lines.every(l => typeof l.category === 'string' && b.categories.includes(l.category) && typeof l.ownerName === 'string' && !!l.ownerName.trim() && typeof l.name === 'string' && Number.isSafeInteger(l.entryAmountPence) && l.entryAmountPence >= 0 && ['monthly', 'annually'].includes(l.frequency) && Number.isSafeInteger(l.amountPence) && l.amountPence === monthlyContributionPence(l.entryAmountPence, l.frequency) && typeof l.potId === 'string' && ['proportional', 'equal', 'custom', 'single'].includes(l.funding) && (l.customShares === undefined || (typeof l.customShares === 'object' && l.customShares !== null && Object.values(l.customShares as Record<string, unknown>).every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0))))
   if (!validLines(b.lines)) return false
