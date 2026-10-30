@@ -16,6 +16,7 @@ export function PlannerHeader({ step, warning, replaceSavedDraft, downloadOrigin
   const [accountOpen, setAccountOpen] = useState(false)
   const [warningOpen, setWarningOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [desktopExpanded, setDesktopExpanded] = useState(false)
   useEffect(() => {
     if (!mobileOpen) return
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false) }
@@ -34,26 +35,27 @@ export function PlannerHeader({ step, warning, replaceSavedDraft, downloadOrigin
   const selectMobileSettings = (section: SettingsSection) => { selectSettings(section); setMobileOpen(false) }
   return <>
     <div className="mobile-nav-bar"><button type="button" className="mobile-nav-trigger" aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileOpen} aria-controls="mobile-navigation-panel" onClick={() => setMobileOpen(value => !value)}>{mobileOpen ? <span className="mobile-menu-close" aria-hidden="true">×</span> : <Menu size={24} strokeWidth={2} aria-hidden="true" />}</button></div>
-    <aside className={`planner-sidebar is-compact${mobileOpen ? ' mobile-open' : ''}`} aria-label="Application navigation">
+    <aside className={`planner-sidebar is-compact${mobileOpen ? ' mobile-open' : ''}${desktopExpanded ? ' desktop-expanded' : ''}`} aria-label="Application navigation">
       <div className="sidebar-rail">
-        <nav className="sidebar-icon-nav" aria-label="Main navigation">
+        <button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={() => setDesktopExpanded(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button>
+        <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">
           {primaryDestinations.map(destination => {
             const Icon = destination.id === 'dashboard' ? House : destination.id === 'household' ? UserRoundGroup : Wallet
-            return <button key={destination.id} type="button" className="sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} aria-label={destination.label} title={destination.label} onClick={() => selectView(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span></button>
+            return <button key={destination.id} type="button" className="sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} aria-label={destination.label} title={destination.label} onClick={() => selectView(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span><span className="sidebar-label" aria-hidden={!desktopExpanded}>{destination.label}</span></button>
           })}
         </nav>
         <div className="sidebar-rail-utility">
-          <button type="button" className="sidebar-link rail-settings-link" aria-current={step === 10 ? 'page' : undefined} aria-label="Plan settings" title="Plan settings" onClick={() => selectSettings('planning')}><span className="sidebar-icon" aria-hidden="true"><Settings size={24} strokeWidth={2} /></span></button>
+          <button type="button" className="sidebar-link rail-settings-link" aria-current={step === 10 ? 'page' : undefined} aria-label="Plan settings" title="Plan settings" onClick={() => selectSettings('planning')}><span className="sidebar-icon" aria-hidden="true"><Settings size={24} strokeWidth={2} /></span><span className="sidebar-label" aria-hidden={!desktopExpanded}>Plan settings</span></button>
           {warning && (!accountBacked || warning.startsWith('Saved data')) && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status"><span>{warning}</span>{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</div>}</div>}
-          {onSignOut && <div className="sidebar-account"><button className="account-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button>{accountOpen && <div className="account-menu"><span className="account-menu-email">{email ?? 'Signed in'}</span><button onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
-          <span className="save-icon" title={status} aria-label={status}>{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>
+          {onSignOut && <div className="sidebar-account"><button className="account-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button><span className="sidebar-account-label" aria-hidden={!desktopExpanded}>{email ?? 'Account'}</span>{accountOpen && <div className="account-menu"><span className="account-menu-email">{email ?? 'Signed in'}</span><button onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
+          <span className="save-icon sidebar-status" title={status} aria-label={status}><span aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span><span className="sidebar-status-label" aria-hidden={!desktopExpanded}>{status}</span></span>
         </div>
       </div>
       {mobileOpen && <>
         <button type="button" className="mobile-sidebar-scrim" aria-label="Close navigation menu" onClick={() => setMobileOpen(false)} />
         <div id="mobile-navigation-panel" className="mobile-sidebar-panel">
           <div className="mobile-sidebar-brand" aria-hidden="true">north.</div>
-          <nav className="mobile-sidebar-navigation" aria-label="Mobile navigation">
+          <nav className="mobile-sidebar-navigation" aria-label="Navigation menu">
             {primaryDestinations.map(destination => {
               const Icon = destination.id === 'dashboard' ? House : destination.id === 'household' ? UserRoundGroup : Wallet
               return <button key={destination.id} type="button" className="mobile-sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} onClick={() => selectMobileView(destination.id)}><Icon size={22} strokeWidth={2} /><span>{destination.label}</span></button>
