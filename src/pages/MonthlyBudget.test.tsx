@@ -45,8 +45,7 @@ it('adds a monthly item to an existing destination and updates transfer summarie
   expect(screen.getAllByText('£12').length).toBeGreaterThan(0)
   expect(screen.getAllByText('Bills').length).toBeGreaterThan(0)
   expect(screen.getAllByText('Joint').length).toBeGreaterThan(0)
-  fireEvent.change(screen.getByLabelText('Funding split for Music'), { target: { value: 'equal' } })
-  expect(screen.getByLabelText('Funding split for Music')).toHaveValue('equal')
+  expect(screen.getByText('Income ratio')).toBeVisible()
 })
 
 it('collapses and expands category and owner levels in the budget table', () => {
@@ -95,7 +94,8 @@ it('edits an existing item and manages destination owner and provider separately
   fireEvent.change(within(dialog).getByLabelText('Bill destination'), { target: { value: 'nick-isa' } })
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
   expect(screen.getByText('Home rent')).toBeVisible()
-  expect(screen.getAllByText('Nick ISA').length).toBeGreaterThan(0)
+  fireEvent.click(screen.getByRole('button', { name: 'Show destinations' }))
+  expect(screen.getByText(/Nick ISA/)).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Manage destinations' }))
   const destinations = screen.getByRole('dialog', { name: 'Manage destinations' })
   fireEvent.change(within(destinations).getByLabelText('Owner for Bills'), { target: { value: 'Joint' } })
