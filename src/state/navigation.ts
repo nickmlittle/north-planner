@@ -10,6 +10,12 @@ export const settingsSections = [
   { id: 'forecast', label: 'Forecast details', description: 'Review the year-by-year results behind your dashboard.' },
 ] as const
 
+export const primaryDestinations = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'household', label: 'Household' },
+  { id: 'budget', label: 'Budget' },
+] as const
+
 export type SettingsSection = typeof settingsSections[number]['id']
 export function isSettingsSection(value: string | null): value is SettingsSection {
   return settingsSections.some(section => section.id === value)

@@ -9,6 +9,8 @@ import { useCloudDocument } from './state/useCloudDocument'
 import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
+import { AppLayout } from './components/AppLayout'
+import type { PlannerHeaderProps } from './components/PlannerHeader'
 import { isSettingsSection, navigateToBudget, navigateToDashboard, navigateToHousehold, navigateToSettings } from './state/navigation'
 
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
@@ -25,11 +27,13 @@ function PlannerApp() {
     navigateToSettings(section)
   }
   const chooseView = (target: 'dashboard' | 'household' | 'budget') => target === 'dashboard' ? navigateToDashboard() : target === 'budget' ? navigateToBudget() : navigateToHousehold()
-  if (view === 'budget') return <MonthlyBudget document={state.document} setDocument={state.setDocument} warning={state.warning} onSelectSettings={chooseSettings} onSelectView={chooseView} />
-  if (view === 'household') return <HouseholdJourney {...state} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />
-  if (view === 'settings' && isSettingsSection(route)) return <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
-  if (view === 'dashboard') return <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
-  return state.document.step === 9 ? <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : state.document.step === 10 ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...state} onSelectView={chooseView} />
+  const navigation: PlannerHeaderProps = { step: view === 'household' ? 8 : view === 'settings' ? 10 : state.document.step, go: step => step === 8 ? navigateToHousehold() : step === 9 ? chooseView('dashboard') : navigateToSettings('planning'), warning: state.warning, replaceSavedDraft: state.replaceSavedDraft, downloadOriginal: state.downloadOriginal, recoveryOriginal: state.recoveryOriginal, settingsSection, onSelectSettings: chooseSettings, currentView: view === 'budget' ? 'budget' : view === 'household' ? 'household' : view === 'dashboard' || (!view && state.document.step === 9) ? 'dashboard' : undefined, onSelectView: chooseView }
+  const page = view === 'budget' ? <MonthlyBudget document={state.document} setDocument={state.setDocument} warning={state.warning} onSelectSettings={chooseSettings} onSelectView={chooseView} />
+    : view === 'household' ? <HouseholdJourney {...state} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />
+      : view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+        : view === 'dashboard' || state.document.step === 9 ? <HouseholdDashboard {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+          : state.document.step === 10 ? <HouseholdPlanner {...state} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...state} onSelectView={chooseView} />
+  return <AppLayout pageClass={view === 'budget' ? 'budget-app' : view === 'household' ? 'household-app' : view === 'settings' ? 'settings-app' : 'dashboard-app'} navigation={navigation}>{page}</AppLayout>
 }
 
 function CloudPlanner({ session }: { session: Session }) {
@@ -48,12 +52,13 @@ function CloudPlanner({ session }: { session: Session }) {
     navigateToSettings(section)
   }
   const chooseView = (target: 'dashboard' | 'household' | 'budget') => target === 'dashboard' ? navigateToDashboard() : target === 'budget' ? navigateToBudget() : navigateToHousehold()
-  if (view === 'budget') return <><MonthlyBudget document={document} setDocument={state.setDocument} warning={state.error} saveStatus={state.status} accountBacked email={session.user.email ?? undefined} onSignOut={() => void signOut()} onSelectSettings={chooseSettings} onSelectView={chooseView} />{state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}</>
-  if (view === 'household') return <><HouseholdJourney {...props} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />{state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}</>
-  return <>
-    {view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : view === 'dashboard' ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : document.step === 9 ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : document.step === 10 ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...props} onSelectView={chooseView} />}
-    {state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}
-  </>
+  const navigation: PlannerHeaderProps = { step: view === 'household' ? 8 : view === 'settings' ? 10 : document.step, go: step => step === 8 ? navigateToHousehold() : step === 9 ? chooseView('dashboard') : navigateToSettings('planning'), warning: state.error, replaceSavedDraft: () => {}, accountBacked: true, saveStatus: state.status, email: session.user.email ?? undefined, onSignOut: () => void signOut(), settingsSection, onSelectSettings: chooseSettings, currentView: view === 'budget' ? 'budget' : view === 'household' ? 'household' : view === 'dashboard' || (!view && document.step === 9) ? 'dashboard' : undefined, onSelectView: chooseView }
+  const page = view === 'budget' ? <MonthlyBudget document={document} setDocument={state.setDocument} warning={state.error} saveStatus={state.status} accountBacked email={session.user.email ?? undefined} onSignOut={() => void signOut()} onSelectSettings={chooseSettings} onSelectView={chooseView} />
+    : view === 'household' ? <HouseholdJourney {...props} standalone householdSection={Number(params.get('section')) || 8} onSelectHouseholdSection={navigateToHousehold} onSelectView={chooseView} />
+      : view === 'settings' && isSettingsSection(route) ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+        : view === 'dashboard' || document.step === 9 ? <HouseholdDashboard {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" />
+          : document.step === 10 ? <HouseholdPlanner {...props} settingsSection={settingsSection} onSelectSettings={chooseSettings} onSelectView={chooseView} currentView="dashboard" /> : <HouseholdJourney {...props} onSelectView={chooseView} />
+  return <AppLayout pageClass={view === 'budget' ? 'budget-app' : view === 'household' ? 'household-app' : view === 'settings' ? 'settings-app' : 'dashboard-app'} navigation={navigation}>{page}{state.error && <aside className="storage-warning cloud-warning" role="alert">{state.error}</aside>}</AppLayout>
 }
 
 function AccountApp() {

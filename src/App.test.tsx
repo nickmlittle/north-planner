@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { storageKey } from './state/useAppDocument'
 import { completeDocument } from './test/setupFixture'
 import { decodePersistedDocument, emptyPerson } from './domain/setup'
+import { navigateToSettings, type SettingsSection } from './state/navigation'
 
 beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const click = (name: string | RegExp) => fireEvent.click(screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }))
 const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
 const savedDocument = () => decodePersistedDocument(localStorage.getItem(storageKey)!)
+const openSettings = (section: SettingsSection) => act(() => navigateToSettings(section))
 
 it('creates a single-adult renter household from a genuinely empty first load', () => {
   render(<App />)
@@ -79,26 +81,44 @@ it('blocks child forecasts until later age bands are explicitly configured', () 
   const p = emptyPerson('child'); Object.assign(p, { name: 'Jamie', dob: '2020-02-22', childCost: '400' }); d.snapshot.people.push(p)
   localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
   expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('future annual costs')
-  click('Plan settings')
-  click('Child costs')
+  openSettings('children')
   enter('Jamie Ages 12–18 annual cost (£)', '0')
   expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
   expect(savedDocument()).toMatchObject({ document: { snapshot: { people: [{}, { futureCosts: { ages12to18: '0' } }] } } })
 })
 
-it('opens plan settings as a menu, then supports URL-backed pages and browser history', async () => {
+it('opens settings from shared navigation and supports URL-backed pages and browser history', async () => {
   const d = completeDocument(); d.step = 9
   localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  click('Plan settings')
   expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible()
   expect(window.location.search).toBe('')
-  click('Tax estimates')
+  click('Plan settings')
+  expect(screen.getByRole('heading', { level: 1, name: 'Planning assumptions' })).toBeVisible()
+  window.history.back()
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible())
+  openSettings('tax')
   expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible()
   expect(window.location.search).toContain('settings=tax')
   window.history.back()
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible())
   window.history.forward()
   await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible())
+})
+
+it('renders one shared navigation and closes the mobile drawer after a destination is chosen', () => {
+  const d = completeDocument(); d.step = 9
+  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
+  expect(screen.getAllByRole('navigation', { name: 'Main navigation' })).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+  expect(screen.getAllByRole('button', { name: 'Close navigation menu' })[0]).toHaveAttribute('aria-expanded', 'true')
+  const mobileNavigation = screen.getByRole('navigation', { name: 'Mobile navigation' })
+  expect(within(mobileNavigation).getAllByRole('button').map(button => button.textContent)).toEqual(['Dashboard', 'Household', 'Budget'])
+  expect(screen.getAllByRole('button', { name: 'Plan settings' })).toHaveLength(2)
+  expect(screen.queryByRole('button', { name: 'Child costs' })).not.toBeInTheDocument()
+  fireEvent.click(within(mobileNavigation).getByRole('button', { name: 'Household' }))
+  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('button', { name: 'Household' })).toHaveAttribute('aria-current', 'page')
 })
 
 it('opens Household as an independent editor without changing completed setup or future income', async () => {
@@ -147,23 +167,23 @@ it('requires explicit confirmation for removal and removes shared ownership refe
 it('persists planner edits and reflects current income changes in the overview', () => {
   const d = completeDocument(); d.step = 10
   localStorage.setItem(storageKey, JSON.stringify(d)); const view = render(<App />)
-  click('Plan settings'); click('Income timeline')
+  openSettings('income')
   enter('Alex Annual salary (GBP)', '72000')
-  click('Plan settings'); click('Planning assumptions')
+  openSettings('planning')
   enter('FIRE age', '55')
   click('Household')
   expect(screen.getByText('£72,000.00')).toBeVisible()
   view.unmount(); render(<App />)
-  click('Plan settings')
-  click('Planning assumptions')
+  openSettings('planning')
   expect(screen.getByLabelText('FIRE age')).toHaveValue('55')
-  click('Plan settings'); click('Income timeline')
+  openSettings('income')
   expect(screen.getByLabelText('Alex Annual salary (GBP)')).toHaveValue('72000')
 })
 
 it('preserves corrupted storage and uses session state when storage fails', () => {
   localStorage.setItem(storageKey, '{broken')
   const view = render(<App />)
+  click('Storage warning')
   expect(screen.getByRole('status')).toHaveTextContent('saved document is not valid JSON')
   click(/Create your household/)
   expect(localStorage.getItem(storageKey)).toBe('{broken')
@@ -172,6 +192,7 @@ it('preserves corrupted storage and uses session state when storage fails', () =
   view.unmount(); localStorage.clear()
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
   render(<App />); click(/Create your household/)
+  click('Storage warning')
   expect(screen.getByRole('status')).toHaveTextContent('only last for this session')
   enter('Household name', 'Still usable')
   expect(screen.getByLabelText('Household name')).toHaveValue('Still usable')

@@ -1,14 +1,12 @@
 import type { Dispatch, FormEvent, KeyboardEvent, SetStateAction } from 'react'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { AppDocument } from '../domain/setup'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { parseAmexCsv } from '../domain/amexCsv'
 import type { BudgetAccount, BudgetFrequency, BudgetPot, BudgetStatement, FundingRule } from '../domain/monthlyBudget'
 import { monthlyContributionPence, resolveMonthBudget, updateMonthBudget } from '../domain/monthlyBudget'
 import { formatGBPSummary } from '../formatting/money'
-import { PlannerHeader } from '../components/PlannerHeader'
 import type { SettingsSection } from '../state/navigation'
-import { navigateToBudget } from '../state/navigation'
 import { SummaryTile, SummaryTiles } from '../components/SummaryTiles'
 import { PageFrame } from '../components/PageFrame'
 import { GroupedMoneyInput } from '../components/GroupedMoneyInput'
@@ -36,11 +34,12 @@ function TransferWorkspace({ adults, groups, transfers, pounds, selectedPersonId
   selectedPersonId: string | null; setSelectedPersonId: (id: string | null) => void; selectedDestinationId: string | null; setSelectedDestinationId: (id: string | null) => void; reviewed: boolean; onReviewAccounts: () => void
 }) {
   const [copyFeedback, setCopyFeedback] = useState('')
+  const [showAllDestinations, setShowAllDestinations] = useState(false)
   const selected = adults.find(person => person.id === selectedPersonId)
   const personPots = selected ? transfers.people.find(person => person.personId === selected.id)?.pots ?? [] : []
   const amountForPot = (potId: string) => personPots.find(row => row.potId === potId)?.amountPence ?? 0
   const personGroups = groups.map(group => ({ ...group, amount: group.pots.reduce((sum, entry) => sum + amountForPot(entry.row.potId), 0) })).filter(group => group.amount !== 0)
-  const detail = personGroups.find(group => group.key === selectedDestinationId)
+  const visiblePersonGroups = showAllDestinations ? personGroups : personGroups.slice(0, 4)
   const copyAmount = async (pence: number) => {
     try {
       await navigator.clipboard.writeText((pence / 100).toFixed(2))
@@ -55,28 +54,29 @@ function TransferWorkspace({ adults, groups, transfers, pounds, selectedPersonId
   return <section className="budget-transfer-focus" aria-label="Make transfers">
     {!selected ? <div className="budget-transfer-chooser"><h2>Who’s transferring?</h2><p>Choose the person making this month’s transfers.</p><div className="budget-transfer-people">{adults.map(person => <button type="button" className="secondary-button" key={person.id} onClick={() => setSelectedPersonId(person.id)}>{person.name || 'Adult'}</button>)}</div>{!adults.length && <p className="budget-empty-state">Add an adult in Household to see transfers.</p>}</div> : <>
       <div className="budget-transfer-person-control"><label>Who’s transferring?<select aria-label="Who’s transferring?" value={selected.id} onChange={event => setSelectedPersonId(event.target.value)}>{adults.map(person => <option key={person.id} value={person.id}>{person.name || 'Adult'}</option>)}</select></label><p>From your paid-into account to each destination.</p></div>
-      {detail ? <div className="budget-transfer-detail"><div className="budget-transfer-detail-sticky"><button type="button" className="budget-transfer-breadcrumb" onClick={() => setSelectedDestinationId(null)}>All transfers <span aria-hidden="true">›</span> <strong>{detail.label}</strong></button><div className="budget-transfer-detail-summary"><h2>{detail.label}</h2><div className="budget-transfer-total"><span>Total to distribute</span><strong>{pounds(detail.amount)}</strong></div></div></div><ul className="budget-transfer-list">{detail.pots.map(({ row, pot }) => {
-        const amount = amountForPot(row.potId)
-        if (!amount) return null
-        const name = detail.potLabel(pot?.name ?? 'Unassigned', pot) || pot?.name || 'Unassigned'
-        return <li key={row.potId}><span>{name}</span><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(amount)} for ${name}`} onClick={() => void copyAmount(amount)}>{pounds(amount)}</button></span></li>
-      })}</ul></div> : <div className="budget-transfer-destinations"><h2>Transfers to make</h2>{personGroups.length ? <ul className="budget-transfer-list">{personGroups.map(group => {
+      <div className="budget-transfer-destinations"><h2>Transfers to make</h2>{personGroups.length ? <><ul className="budget-transfer-list">{visiblePersonGroups.map(group => {
         const detailLabel = [group.owner, group.provider].filter(Boolean).join(' · ')
-        return <li key={group.key}><button type="button" className="budget-transfer-destination-link" onClick={() => setSelectedDestinationId(group.key)}><span>{group.label}{detailLabel && detailLabel !== group.label && <small>{detailLabel}</small>}</span><span aria-hidden="true">›</span></button><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(group.amount)} for ${group.label}`} onClick={() => void copyAmount(group.amount)}>{pounds(group.amount)}</button></span></li>
-      })}</ul> : <p className="budget-empty-state">{selected.name || 'This person'} has no transfers to make this month.</p>}{personGroups.length > 0 && <div className="budget-transfer-total"><span>Total to transfer</span><strong>{pounds(personGroups.reduce((sum, group) => sum + group.amount, 0))}</strong></div>}</div>}
+        const expanded = selectedDestinationId === group.key
+        return <li key={group.key} className={expanded ? 'is-expanded' : undefined}><div className="budget-transfer-account-row"><button type="button" className="budget-transfer-destination-link" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} account details`} aria-expanded={expanded} onClick={() => setSelectedDestinationId(expanded ? null : group.key)}><span className="budget-transfer-account-copy"><span className="budget-transfer-chevron" aria-hidden="true">{expanded ? '▾' : '▸'}</span><span className="budget-transfer-account-label">{group.label}{detailLabel && detailLabel !== group.label && <small>{detailLabel}</small>}</span></span></button><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(group.amount)} for ${group.label}`} onClick={() => void copyAmount(group.amount)}>{pounds(group.amount)}</button></span></div>{expanded && <ul className="budget-transfer-pot-breakdown" aria-label={`${group.label} pot breakdown`}>{group.pots.map(({ row, pot }) => {
+          const amount = amountForPot(row.potId)
+          if (!amount) return null
+          const name = group.potLabel(pot?.name ?? 'Unassigned', pot) || pot?.name || 'Unassigned'
+          return <li key={row.potId}><span>{name}</span><span className="budget-transfer-amount"><button type="button" className="budget-copy-amount" aria-label={`Copy ${pounds(amount)} for ${name}`} onClick={() => void copyAmount(amount)}>{pounds(amount)}</button></span></li>
+        })}</ul>}</li>
+      })}</ul>{personGroups.length > 4 && <button type="button" className="text-button budget-transfer-show-more" aria-expanded={showAllDestinations} onClick={() => setShowAllDestinations(value => !value)}>{showAllDestinations ? 'Show fewer destinations' : `Show all ${personGroups.length} destinations`}</button>}</> : <p className="budget-empty-state">{selected.name || 'This person'} has no transfers to make this month.</p>}{personGroups.length > 0 && <div className="budget-transfer-total"><span>Total to transfer</span><strong>{pounds(personGroups.reduce((sum, group) => sum + group.amount, 0))}</strong></div>}</div>
     </>}
     <div className={`budget-copy-toast${copyFeedback ? ' is-visible' : ''}`} role="status" aria-live="polite" aria-atomic="true">{copyFeedback}</div>
   </section>
 }
 
-export function MonthlyBudget({ document, setDocument, warning = '', saveStatus, accountBacked = false, email, onSignOut, onSelectSettings, onSelectView }: BudgetProps) {
+export function MonthlyBudget({ document, setDocument, saveStatus, accountBacked = false }: BudgetProps) {
   const today = new Date()
   const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`)
-  const [view, setView] = useState<BudgetView>(() => new URLSearchParams(window.location.search).get('budgetView') === 'amex' ? 'amex' : 'planning')
+  const search = useSyncExternalStore(callback => { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }, () => window.location.search, () => '')
+  const view: BudgetView = new URLSearchParams(search).get('budgetView') === 'amex' ? 'amex' : 'planning'
   const [planningMode, setPlanningMode] = useState<PlanningMode>('transfers')
   const [selectedTransferPersonId, setSelectedTransferPersonId] = useState<string | null>(null)
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | null>(null)
-  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1099px)').matches)
   const [configOpen, setConfigOpen] = useState(false)
   const [dialog, setDialog] = useState<BudgetDialog>(null)
   const [showDestinations, setShowDestinations] = useState(false)
@@ -100,6 +100,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => new Set())
   const [expandedOwners, setExpandedOwners] = useState<Set<string>>(() => new Set())
   const [expandedTransferGroups, setExpandedTransferGroups] = useState<Set<string>>(() => new Set())
+  const [selectedCategory, setSelectedCategory] = useState(() => document.budget.lines[0]?.category ?? document.budget.categories[0] ?? '')
   const [createDestination, setCreateDestination] = useState(false)
   const [newAccountName, setNewAccountName] = useState('')
   const [newPotName, setNewPotName] = useState('')
@@ -107,14 +108,6 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   const [newPotOwner, setNewPotOwner] = useState('')
   const [newPotProvider, setNewPotProvider] = useState('')
   const [newCategory, setNewCategory] = useState('')
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return
-    const media = window.matchMedia('(max-width: 1099px)')
-    const update = () => setCompact(media.matches)
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
 
   useEffect(() => {
     const id = inlineAmountPendingId.current
@@ -153,16 +146,16 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
     return 'Income ratio'
   }
   const totalIncome = budget.incomes.reduce((sum, income) => sum + income.monthlyNetPence, 0)
-  const allocatedSavings = budget.lines.filter(line => budget.pots.find(pot => pot.id === line.potId)?.kind === 'savings').reduce((sum, line) => sum + line.amountPence, 0) + transfers.surplusPence
-  const savingsRate = totalIncome > 0 ? Math.round(allocatedSavings / totalIncome * 100) : 0
   const tableCategories = [...budget.categories, ...[...new Set(budget.lines.map(line => line.category))].filter(category => !budget.categories.includes(category))]
+  const activeCategory = tableCategories.includes(selectedCategory) ? selectedCategory : tableCategories[0] ?? ''
+  const categoryTotals = tableCategories.map(category => ({ category, total: budget.lines.filter(line => line.category === category).reduce((sum, line) => sum + line.amountPence, 0) }))
   const ownerNames = ['Joint', ...adults.map(person => person.name).filter((name): name is string => !!name && name !== 'Joint')]
   const expandBudgetSections = () => {
-    setCollapsedCategories(new Set())
-    setExpandedOwners(new Set(budget.lines.map(line => `${line.category}::${line.ownerName}`)))
+    setCollapsedCategories(current => { const next = new Set(current); next.delete(activeCategory); return next })
+    setExpandedOwners(new Set(budget.lines.filter(line => line.category === activeCategory).map(line => `${line.category}::${line.ownerName}`)))
   }
   const collapseBudgetSections = () => {
-    setCollapsedCategories(new Set(budget.lines.map(line => line.category)))
+    setCollapsedCategories(new Set([activeCategory]))
     setExpandedOwners(new Set())
   }
 
@@ -208,6 +201,7 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
       setCollapsedCategories(current => { const next = new Set(current); next.delete(returnCategory); return next })
       setExpandedOwners(current => new Set(current).add(`${returnCategory}::${returnOwner}`))
     }
+    if (!editingLineId) setSelectedCategory(lineCategory)
     setDialog(null)
   }
   const openInlineAmount = (line: typeof budget.lines[number]) => {
@@ -263,11 +257,13 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
     const category = newCategory.trim()
     if (!category || budget.categories.includes(category)) return
     setDocument(current => ({ ...current, budget: { ...current.budget, categories: [...current.budget.categories, category] } }))
+    setSelectedCategory(category)
     setNewCategory('')
   }
   const renameCategory = (oldName: string, newName: string) => {
     const category = newName.trim()
     if (!category || (category !== oldName && budget.categories.includes(category))) return
+    setSelectedCategory(current => current === oldName ? category : current)
     setDocument(current => ({ ...current, budget: {
       ...current.budget,
       categories: current.budget.categories.map(item => item === oldName ? category : item),
@@ -361,19 +357,17 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
   })
 
   return <div className="north-shell dashboard-shell budget-shell">
-    <PlannerHeader step={9} go={() => onSelectView('dashboard')} warning={warning} replaceSavedDraft={() => {}} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection="planning" onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView="budget" onSelectBudgetView={budgetView => { if (budgetView === 'planning' && view === 'amex' && planningMode === 'transfers') { setSelectedTransferPersonId(null); setSelectedDestinationId(null) } setView(budgetView); navigateToBudget(budgetView) }} />
-    <PageFrame className="dashboard-main budget-page" headingClass="route-heading budget-heading" eyebrow="Monthly plan" title="Budget your month" description={view === 'planning' && planningMode === 'transfers' ? undefined : 'Plan what each pot needs and review transfers before payday.'} summary={planningMode === 'plan' ? <SummaryTiles label="Monthly budget summary" className="budget-metrics">
+    <PageFrame className="dashboard-main budget-page" headingClass="route-heading budget-heading" eyebrow="Monthly plan" title="Budget your month" description={view === 'planning' && planningMode === 'transfers' ? undefined : 'Plan what each pot needs and review transfers before payday.'} titleAside={view === 'planning' ? <div className="budget-period-selects budget-title-period"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div> : undefined} summary={view === 'planning' ? <SummaryTiles label="Monthly budget summary" className="budget-metrics">
         <SummaryTile label="Household income" value={pounds(totalIncome)} />
         <SummaryTile label="Planned allocations" value={pounds(transfers.plannedPence)} />
         <SummaryTile label={transfers.remainingPence < 0 ? 'Monthly shortfall' : 'Monthly surplus'} value={pounds(Math.abs(transfers.remainingPence))} />
-        <SummaryTile label="Savings allocation" value={`${savingsRate}%`} />
       </SummaryTiles> : undefined}>
 
+      {view === 'planning' && <div className="budget-mode-switch" role="group" aria-label="Budget workspace"><button type="button" aria-pressed={planningMode === 'transfers'} onClick={() => { setPlanningMode('transfers'); setSelectedTransferPersonId(null); setSelectedDestinationId(null) }}>Make transfers</button><button type="button" aria-pressed={planningMode === 'plan'} onClick={() => { setPlanningMode('plan'); setSelectedDestinationId(null) }}>Plan budget</button></div>}
       <div className={`budget-layout${view === 'planning' && planningMode === 'transfers' ? ' transfers-active' : ''}`}>
-        {(view !== 'planning' || planningMode === 'plan') && <details className="budget-config" open={!compact || configOpen} onToggle={event => { if (compact) setConfigOpen(event.currentTarget.open) }}>
+        {(view !== 'planning' || planningMode === 'plan') && <details className="budget-config" open={configOpen} onToggle={event => setConfigOpen(event.currentTarget.open)}>
           <summary>Income and month setup</summary>
           <div className="budget-config-content">
-            <div className="budget-month-control"><p className="eyebrow">BUDGET PERIOD</p><div className="budget-period-selects"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div></div>
             <div className="budget-income-settings"><h2>Household income</h2>
               {adults.length ? adults.map(person => {
                 const income = budget.incomes.find(row => row.personId === person.id)
@@ -393,11 +387,12 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
         </details>}
 
         <section className="budget-workspace" aria-label="Monthly budget workspace">
-          {view === 'planning' ? <>{planningMode === 'transfers' && <div className="budget-transfer-context"><p className="budget-transfer-period">Monthly transfers <strong>{monthNames[selectedMonth! - 1]} {selectedYear}</strong></p><div className="budget-transfer-period-selects"><label>Month<select aria-label="Budget month" value={selectedMonth} onChange={event => setBudgetMonth(selectedYear!, Number(event.target.value))}>{monthNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><label>Year<select aria-label="Budget year" value={selectedYear} onChange={event => setBudgetMonth(Number(event.target.value), selectedMonth!)}>{years.map(year => <option key={year} value={year}>{year}</option>)}</select></label></div></div>}<div className="budget-mode-switch" role="group" aria-label="Budget workspace"><button type="button" aria-pressed={planningMode === 'transfers'} onClick={() => { setPlanningMode('transfers'); setSelectedTransferPersonId(null); setSelectedDestinationId(null) }}>Make transfers</button><button type="button" aria-pressed={planningMode === 'plan'} onClick={() => { setPlanningMode('plan'); setSelectedDestinationId(null) }}>Plan budget</button></div>{planningMode === 'transfers' ? <TransferWorkspace adults={adults.map(person => ({ id: person.id, name: person.name }))} groups={transferGroups} transfers={transfers} pounds={pounds} selectedPersonId={selectedTransferPersonId} setSelectedPersonId={setSelectedTransferPersonId} selectedDestinationId={selectedDestinationId} setSelectedDestinationId={setSelectedDestinationId} reviewed={accountsReviewed} onReviewAccounts={() => setDialog('destinations')} /> : <div className="budget-work-grid" id="budget-planning-panel" role="region" aria-label="Planning budget">
+          {view === 'planning' ? <>{planningMode === 'transfers' ? <TransferWorkspace adults={adults.map(person => ({ id: person.id, name: person.name }))} groups={transferGroups} transfers={transfers} pounds={pounds} selectedPersonId={selectedTransferPersonId} setSelectedPersonId={setSelectedTransferPersonId} selectedDestinationId={selectedDestinationId} setSelectedDestinationId={setSelectedDestinationId} reviewed={accountsReviewed} onReviewAccounts={() => setDialog('destinations')} /> : <div className="budget-work-grid" id="budget-planning-panel" role="region" aria-label="Planning budget">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Budget items</h2><p>Plan monthly expenses, savings and allocations by category.</p></div><button className="primary-button" onClick={() => openAddItem()}>Add budget item</button></div>
+              <div className="budget-category-overview" aria-label="Budget categories">{categoryTotals.map(({ category, total }) => <button type="button" className="budget-category-card" key={category} aria-pressed={category === activeCategory} onClick={() => setSelectedCategory(category)}><span>{category}</span><strong>{pounds(total)}<small> / month</small></strong></button>)}</div>
               <div className="budget-table-toolbar"><div className="budget-disclosure-actions" aria-label="Budget table sections"><span>Sections</span><button type="button" disabled={!budget.lines.length} onClick={expandBudgetSections}>Expand all</button><button type="button" disabled={!budget.lines.length} onClick={collapseBudgetSections}>Collapse all</button></div><div className="budget-table-settings"><button type="button" className="budget-destination-toggle budget-destination-toolbar-toggle" aria-label={showDestinations ? 'Hide destinations' : 'Show destinations'} aria-pressed={showDestinations} onClick={() => setShowDestinations(value => !value)}>{showDestinations ? 'Hide destinations' : 'Show destinations'}</button><button type="button" onClick={() => setDialog('categories')}>Manage categories</button><button type="button" onClick={() => setDialog('destinations')}>Manage destinations</button></div></div>
-              {budget.lines.length > 0 ? <div className="budget-table-wrap"><table className={`budget-items-table${showDestinations ? ' show-destinations' : ''}`}><colgroup><col className="budget-col-bill" /><col className="budget-col-amount" /><col className="budget-col-split" /><col className="budget-col-actions" /></colgroup><thead><tr><th scope="col" className="budget-bill-heading"><div className="budget-bill-heading-content"><span>Bill</span></div></th><th scope="col" className="budget-amount-heading">Monthly amount</th><th scope="col" className="budget-split-heading">Split</th><th scope="col" className="budget-actions-heading">Actions</th></tr></thead><tbody>{tableCategories.map(category => {
+              {budget.lines.some(line => line.category === activeCategory) ? <div className="budget-table-wrap"><table className={`budget-items-table${showDestinations ? ' show-destinations' : ''}`}><colgroup><col className="budget-col-bill" /><col className="budget-col-amount" /><col className="budget-col-split" /><col className="budget-col-actions" /></colgroup><thead><tr><th scope="col" className="budget-bill-heading"><div className="budget-bill-heading-content"><span>Bill</span></div></th><th scope="col" className="budget-amount-heading">Monthly amount</th><th scope="col" className="budget-split-heading">Split</th><th scope="col" className="budget-actions-heading">Actions</th></tr></thead><tbody>{[activeCategory].filter(Boolean).map(category => {
                 const categoryLines = budget.lines.filter(line => line.category === category)
                 if (!categoryLines.length) return null
                 const categoryTotal = categoryLines.reduce((sum, line) => sum + line.amountPence, 0)
@@ -416,16 +411,16 @@ export function MonthlyBudget({ document, setDocument, warning = '', saveStatus,
                   <td><button className="budget-edit-action" aria-label={`Edit ${line.name}`} onClick={() => openEditItem(line)}>Edit</button></td>
                 </tr>)}<tr className="budget-context-add-row"><td><button type="button" className="budget-context-add-action" onClick={() => openAddItem({ category, owner })}>+ Add to {owner} in {category}</button></td><td /><td /><td /></tr></>}</Fragment>
                 })}{!categoryCollapsed && !hasExpandedOwner && <tr className="budget-context-add-row budget-category-context-add"><td><button type="button" className="budget-context-add-action" onClick={() => openAddItem({ category })}>+ Add to {category}</button></td><td /><td /><td /></tr>}</Fragment>
-              })}</tbody></table></div> : <p className="budget-empty-state">No budget items yet. Add an item to start assigning this month’s income.</p>}
+              })}</tbody></table></div> : <p className="budget-empty-state">No budget items in {activeCategory || 'this category'} yet. Add an item to start assigning this month’s income.</p>}
             </section>
-            <aside className="budget-summary-rail" aria-label="Payday transfer summary">
+            <details className="budget-payday-disclosure"><summary>Payday transfer breakdown</summary><aside className="budget-summary-rail" aria-label="Payday transfer summary">
               <section className="budget-summary-card budget-transfer-card"><div className="budget-section-heading"><div><h2>Payday transfers</h2><p>Monthly transfers by account and pot.</p></div></div>{transfers.pots.length ? <div className="budget-transfer-table-wrap"><table className="budget-transfer-table" aria-label="Payday transfers by account and pot"><colgroup><col style={{ width: '40%' }} />{adults.map(person => <col key={person.id} style={{ width: `${60 / (adults.length + 1)}%` }} />)}<col style={{ width: `${60 / (adults.length + 1)}%` }} /></colgroup><thead><tr><th scope="col">Transfer to</th>{adults.map(person => <th scope="col" key={person.id}>{person.name}</th>)}<th scope="col">Total</th></tr></thead><tbody>{transferGroups.map(group => {
                 const expanded = expandedTransferGroups.has(group.key)
                 const disclosure = group.pots.length > 1
                 const onlyPotLabel = group.pots.length === 1 ? group.potLabel(group.pots[0]!.pot?.name ?? 'Unassigned', group.pots[0]!.pot) : ''
                 return <Fragment key={group.key}><tr className="budget-transfer-bank-row"><th scope="row">{disclosure ? <button className="budget-transfer-disclosure" type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} pots`} onClick={() => setExpandedTransferGroups(current => { const next = new Set(current); if (next.has(group.key)) next.delete(group.key); else next.add(group.key); return next })}><span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span className="budget-transfer-label">{group.label}</span></button> : <span className="budget-transfer-label">{group.label}</span>}{!disclosure && onlyPotLabel && <small>{onlyPotLabel}</small>}</th>{adults.map(person => <td key={person.id}>{pounds(group.amountFor(person.id))}</td>)}<td>{pounds(group.total)}</td></tr>{disclosure && expanded && group.pots.map(({ row, pot }) => <tr className="budget-transfer-pot-row" key={row.potId}><th scope="row"><span className="budget-transfer-label">{group.potLabel(pot?.name ?? 'Unassigned', pot)}</span></th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.find(item => item.potId === row.potId)?.amountPence ?? 0)}</td>)}<td>{pounds(row.amountPence)}</td></tr>)}</Fragment>
               })}<tr className="budget-transfer-total-row"><th scope="row">Total</th>{adults.map(person => <td key={person.id}>{pounds(transfers.people.find(entry => entry.personId === person.id)?.pots.reduce((sum, row) => sum + row.amountPence, 0) ?? 0)}</td>)}<td>{pounds(transfers.pots.reduce((sum, row) => sum + row.amountPence, 0))}</td></tr></tbody></table></div> : <p className="budget-empty-state">Payday transfers will appear here as you add planned items.</p>}{transfers.remainingPence < 0 ? <p className="budget-shortfall" role="status">Planned items exceed the available monthly amount by {pounds(-transfers.remainingPence)}.</p> : <p className="budget-remaining">{pounds(transfers.remainingPence)} left to allocate</p>}</section>
-            </aside>
+            </aside></details>
           </div>}</> : <div className="budget-work-grid" id="budget-amex-panel" role="region" aria-label="Amex statement review">
             <section className="budget-editor-card">
               <div className="budget-section-heading"><div><h2>Amex statement</h2></div></div>

@@ -1,68 +1,72 @@
-import { useEffect, useRef, useState } from 'react'
-import { navigateToBudget, navigateToSettings, settingsSections } from '../state/navigation'
+import { useEffect, useState } from 'react'
+import { House, Menu, Settings, UserRoundGroup, Wallet } from 'lucide-react'
+import { navigateToBudget, navigateToDashboard, navigateToHousehold, navigateToSettings, primaryDestinations } from '../state/navigation'
 import type { SettingsSection } from '../state/navigation'
 
-const links = [['dashboard', 'Dashboard'], ['household', 'Household'], ['budget', 'Budget']] as const
+export type PlannerView = 'dashboard' | 'household' | 'budget'
+export interface PlannerHeaderProps {
+  step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void
+  downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string
+  email?: string; onSignOut?: () => void; settingsSection?: SettingsSection
+  onSelectSettings?: (section: SettingsSection) => void; currentView?: PlannerView
+  onSelectView?: (view: PlannerView) => void; onSelectBudgetView?: (view: 'planning' | 'amex') => void
+}
 
-export function PlannerHeader({ step, go, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, currentView, onSelectView, onSelectBudgetView }: {
-  step: number; go: (step: number) => void; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
-  settingsSection?: SettingsSection; onSelectSettings?: (section: SettingsSection) => void; currentView?: 'dashboard' | 'household' | 'budget'; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void; onSelectBudgetView?: (view: 'planning' | 'amex') => void
-}) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+export function PlannerHeader({ step, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal = '', accountBacked = false, saveStatus, email, onSignOut, onSelectSettings, currentView, onSelectView }: PlannerHeaderProps) {
   const [accountOpen, setAccountOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [budgetOpen, setBudgetOpen] = useState(false)
-  const accountButton = useRef<HTMLButtonElement>(null)
-  const accountMenu = useRef<HTMLDivElement>(null)
-  const settingsButton = useRef<HTMLButtonElement>(null)
-  const settingsMenu = useRef<HTMLDivElement>(null)
-  const budgetButton = useRef<HTMLButtonElement>(null)
-  const budgetMenu = useRef<HTMLDivElement>(null)
+  const [warningOpen, setWarningOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   useEffect(() => {
-    if (!accountOpen) return
-    accountMenu.current?.querySelector('button')?.focus()
-    const onPointer = (event: PointerEvent) => { if (!accountMenu.current?.contains(event.target as Node) && !accountButton.current?.contains(event.target as Node)) setAccountOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setAccountOpen(false); accountButton.current?.focus() } }
-    document.addEventListener('pointerdown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [accountOpen])
-  useEffect(() => {
-    if (!settingsOpen) return
-    const onPointer = (event: PointerEvent) => { if (!settingsMenu.current?.contains(event.target as Node) && !settingsButton.current?.contains(event.target as Node)) setSettingsOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setSettingsOpen(false); settingsButton.current?.focus() } }
-    document.addEventListener('pointerdown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [settingsOpen])
-  useEffect(() => {
-    if (!budgetOpen) return
-    const onPointer = (event: PointerEvent) => { if (!budgetMenu.current?.contains(event.target as Node) && !budgetButton.current?.contains(event.target as Node)) setBudgetOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setBudgetOpen(false); budgetButton.current?.focus() } }
-    document.addEventListener('pointerdown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey) }
-  }, [budgetOpen])
+    if (!mobileOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false) }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [mobileOpen])
   const status = warning ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus && /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
-  const nav = <nav className="app-nav" aria-label="Main navigation">
-    {links.map(([view, label]) => view === 'budget' ? <div key={view} className="settings-nav-item" onMouseEnter={() => setBudgetOpen(true)} onMouseLeave={() => setBudgetOpen(false)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setBudgetOpen(false) }}>
-      <button ref={budgetButton} type="button" aria-current={currentView === 'budget' ? 'page' : undefined} aria-haspopup="menu" aria-expanded={budgetOpen} onFocus={() => setBudgetOpen(true)} onClick={() => { if (onSelectView) onSelectView('budget'); else navigateToBudget('planning'); setMobileOpen(false); setSettingsOpen(false) }}>{label} <span aria-hidden="true">⌄</span></button>
-      {budgetOpen && <div ref={budgetMenu} className="settings-dropdown" role="menu" aria-label="Budget pages">{([['planning', 'Planning'], ['amex', 'Amex']] as const).map(([budgetView, budgetLabel]) => <button key={budgetView} type="button" role="menuitem" aria-current={currentView === 'budget' && (new URLSearchParams(window.location.search).get('budgetView') ?? 'planning') === budgetView ? 'page' : undefined} onClick={() => { if (onSelectBudgetView) onSelectBudgetView(budgetView); else navigateToBudget(budgetView); setBudgetOpen(false); setMobileOpen(false) }}>{budgetLabel}</button>)}</div>}
-    </div> : <button key={view} aria-current={currentView === view ? 'page' : undefined} onClick={() => { if (onSelectView) onSelectView(view); else go(view === 'dashboard' ? 9 : 8); setMobileOpen(false); setSettingsOpen(false); setBudgetOpen(false) }}>{label}</button>)}
-    <div className="settings-nav-item" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSettingsOpen(false) }}>
-      <button ref={settingsButton} type="button" aria-current={step === 10 ? 'page' : undefined} aria-haspopup="menu" aria-expanded={settingsOpen} onFocus={() => setSettingsOpen(true)} onClick={() => setSettingsOpen(true)}>Plan settings <span aria-hidden="true">⌄</span></button>
-      {settingsOpen && <div ref={settingsMenu} className="settings-dropdown" role="menu" aria-label="Plan settings pages">{settingsSections.map(section => <button key={section.id} type="button" role="menuitem" aria-current={step === 10 && settingsSection === section.id ? 'page' : undefined} onClick={() => { if (onSelectSettings) onSelectSettings(section.id); else navigateToSettings(section.id); setSettingsOpen(false); setMobileOpen(false) }}>{section.label}</button>)}</div>}
-    </div>
-  </nav>
-  return <><header className="north-header"><div className="header-inner dashboard-container">
-    <button className="brand brand-button" onClick={() => onSelectView ? onSelectView('dashboard') : go(9)} aria-label="North dashboard"><span>north.</span></button>
-    {nav}
-    <span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>
-    {onSignOut && <div className="account-control"><button ref={accountButton} className="account-button" aria-label="Account menu" aria-haspopup="true" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button>
-      {accountOpen && <div ref={accountMenu} className="account-menu" aria-label="Account options"><span className="account-menu-label">Signed in as</span><span className="account-menu-email">{email ?? 'Signed in'}</span><button onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
-    <button className="mobile-menu-button" aria-expanded={mobileOpen} aria-controls="mobile-header-menu" onClick={() => setMobileOpen(value => !value)}><span className="menu-glyph" aria-hidden="true">{mobileOpen ? '×' : '☰'}</span>{mobileOpen ? 'Close menu' : 'Menu'}</button>
-  </div>{mobileOpen && <div id="mobile-header-menu" className="mobile-header-menu">{nav}<div className="mobile-header-actions"><span className={`save-status ${status === 'Save failed' ? 'save-error' : ''}`} aria-live="polite"><span className="save-icon" aria-hidden="true">{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>{status}</span>{onSignOut && <><span className="mobile-account-email">{email ?? 'Signed in'}</span><button className="mobile-signout" onClick={() => { setMobileOpen(false); onSignOut() }}>Sign out</button></>}</div></div>}</header>
-    {warning && !accountBacked && <aside className="storage-warning" role="status">{warning}{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</aside>}
-    {warning && accountBacked && warning.startsWith('Saved data') && <aside className="storage-warning" role="status">{warning}{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</aside>}
+  const selectView = (view: PlannerView) => {
+    if (onSelectView) onSelectView(view)
+    else if (view === 'dashboard') navigateToDashboard()
+    else if (view === 'household') navigateToHousehold()
+    else navigateToBudget('planning')
+  }
+  const selectSettings = (section: SettingsSection) => { if (onSelectSettings) onSelectSettings(section); else navigateToSettings(section) }
+  const selectMobileView = (view: PlannerView) => { selectView(view); setMobileOpen(false) }
+  const selectMobileSettings = (section: SettingsSection) => { selectSettings(section); setMobileOpen(false) }
+  return <>
+    <div className="mobile-nav-bar"><button type="button" className="mobile-nav-trigger" aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileOpen} aria-controls="mobile-navigation-panel" onClick={() => setMobileOpen(value => !value)}>{mobileOpen ? <span className="mobile-menu-close" aria-hidden="true">×</span> : <Menu size={24} strokeWidth={2} aria-hidden="true" />}</button></div>
+    <aside className={`planner-sidebar is-compact${mobileOpen ? ' mobile-open' : ''}`} aria-label="Application navigation">
+      <div className="sidebar-rail">
+        <nav className="sidebar-icon-nav" aria-label="Main navigation">
+          {primaryDestinations.map(destination => {
+            const Icon = destination.id === 'dashboard' ? House : destination.id === 'household' ? UserRoundGroup : Wallet
+            return <button key={destination.id} type="button" className="sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} aria-label={destination.label} title={destination.label} onClick={() => selectView(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span></button>
+          })}
+        </nav>
+        <div className="sidebar-rail-utility">
+          <button type="button" className="sidebar-link rail-settings-link" aria-current={step === 10 ? 'page' : undefined} aria-label="Plan settings" title="Plan settings" onClick={() => selectSettings('planning')}><span className="sidebar-icon" aria-hidden="true"><Settings size={24} strokeWidth={2} /></span></button>
+          {warning && (!accountBacked || warning.startsWith('Saved data')) && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status"><span>{warning}</span>{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</div>}</div>}
+          {onSignOut && <div className="sidebar-account"><button className="account-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button>{accountOpen && <div className="account-menu"><span className="account-menu-email">{email ?? 'Signed in'}</span><button onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
+          <span className="save-icon" title={status} aria-label={status}>{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'}</span>
+        </div>
+      </div>
+      {mobileOpen && <>
+        <button type="button" className="mobile-sidebar-scrim" aria-label="Close navigation menu" onClick={() => setMobileOpen(false)} />
+        <div id="mobile-navigation-panel" className="mobile-sidebar-panel">
+          <div className="mobile-sidebar-brand" aria-hidden="true">north.</div>
+          <nav className="mobile-sidebar-navigation" aria-label="Mobile navigation">
+            {primaryDestinations.map(destination => {
+              const Icon = destination.id === 'dashboard' ? House : destination.id === 'household' ? UserRoundGroup : Wallet
+              return <button key={destination.id} type="button" className="mobile-sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} onClick={() => selectMobileView(destination.id)}><Icon size={22} strokeWidth={2} /><span>{destination.label}</span></button>
+            })}
+          </nav>
+          <div className="mobile-sidebar-utility">
+            <button type="button" className="mobile-sidebar-link" aria-current={step === 10 ? 'page' : undefined} onClick={() => selectMobileSettings('planning')}><Settings size={22} strokeWidth={2} /><span>Plan settings</span></button>
+            {warning && (!accountBacked || warning.startsWith('Saved data')) && <div className="mobile-sidebar-warning" role="status"><p>{warning}</p>{recoveryOriginal && <><button type="button" onClick={downloadOriginal}>Download original JSON</button><button type="button" onClick={replaceSavedDraft}>Replace saved data with this draft</button></>}</div>}
+            {onSignOut && <div className="mobile-sidebar-account"><span>{email ?? 'Account'}</span><button type="button" onClick={onSignOut}>Sign out</button></div>}
+            <span className="mobile-sidebar-status" aria-label={status}>{status === 'Saved' ? '✓' : status === 'Saving…' ? '◌' : '!'} {status}</span>
+          </div>
+        </div>
+      </>}
+    </aside>
   </>
 }

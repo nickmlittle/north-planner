@@ -9,10 +9,11 @@ import { MonthlyBudget } from './MonthlyBudget'
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals() })
 
 function selectAmexView() {
-  fireEvent.focus(screen.getByRole('button', { name: /Budget/ }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Amex' }))
+  window.history.pushState(null, '', '/?view=budget&budgetView=amex')
+  fireEvent(window, new PopStateEvent('popstate'))
 }
 function selectPlanMode() { fireEvent.click(screen.getByRole('button', { name: 'Plan budget' })) }
+function openBudgetSetup() { fireEvent.click(screen.getByText('Income and month setup')) }
 
 function Harness({ grouped = false, multiple = false, splitAccounts = false, noSamTransfers = false, needsReview = false }: { grouped?: boolean; multiple?: boolean; splitAccounts?: boolean; noSamTransfers?: boolean; needsReview?: boolean } = {}) {
   const [document, setDocument] = useState<AppDocument>(() => {
@@ -76,6 +77,23 @@ it('collapses and expands category and owner levels in the budget table', () => 
   expect(screen.getByText('Rent')).toBeVisible()
 })
 
+it('uses the category overview to focus the table on one category at a time', () => {
+  render(<Harness grouped />)
+  selectPlanMode()
+  const savings = screen.getByRole('button', { name: /^Savings/ })
+  fireEvent.click(savings)
+  expect(savings).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Collapse Savings' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Collapse Other Living Expenses' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
+  expect(screen.getByText('Emergency fund')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: /^Other Living Expenses/ }))
+  expect(screen.getByRole('button', { name: 'Collapse Other Living Expenses' })).toBeVisible()
+  expect(screen.queryByText('Emergency fund')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint' }))
+  expect(screen.getByText('Rent')).toBeVisible()
+})
+
 it('saves an annual item at one twelfth per month and creates its destination in the same dialog', () => {
   render(<Harness />)
   selectPlanMode()
@@ -95,7 +113,7 @@ it('saves an annual item at one twelfth per month and creates its destination in
   expect(screen.getByText('£720/yr')).toBeVisible()
   expect(screen.getAllByText('£60').length).toBeGreaterThan(0)
   expect(screen.getAllByText('Car Fund').length).toBeGreaterThan(0)
-  expect(screen.getByText('2%')).toBeVisible()
+  expect(screen.getByRole('button', { name: /^Savings/ })).toHaveAttribute('aria-pressed', 'true')
 })
 
 it('edits an existing item and manages destination owner and provider separately', () => {
@@ -128,7 +146,7 @@ it('renames a category across its rows and closes the item form with Escape', ()
   const categories = screen.getByRole('dialog', { name: 'Manage categories' })
   fireEvent.change(within(categories).getByLabelText('Category 2'), { target: { value: 'Household bills' } })
   fireEvent.click(within(categories).getByRole('button', { name: 'Done' }))
-  expect(screen.getByText('Household bills')).toBeVisible()
+  expect(screen.getAllByText('Household bills').length).toBeGreaterThan(0)
   fireEvent.click(screen.getByRole('button', { name: 'Add budget item' }))
   const itemDialog = screen.getByRole('dialog', { name: 'Add budget item' })
   fireEvent.keyDown(itemDialog, { key: 'Escape' })
@@ -138,6 +156,7 @@ it('renames a category across its rows and closes the item form with Escape', ()
 it('keeps the income rail and shows statement settlement in the Amex tab', () => {
   render(<Harness />)
   selectAmexView()
+  openBudgetSetup()
   expect(screen.getByLabelText('Alex net income per month')).toBeVisible()
   expect(screen.getByRole('heading', { name: 'Card settlement by pot' })).toBeVisible()
   expect(screen.getByText('amex.csv')).toBeVisible()
@@ -148,6 +167,7 @@ it('keeps the income rail and shows statement settlement in the Amex tab', () =>
 it('shows payday transfers as an owner and bank matrix with person and total columns', () => {
   render(<Harness grouped />)
   selectPlanMode()
+  fireEvent.click(screen.getByText('Payday transfer breakdown'))
   const matrix = screen.getByRole('table', { name: 'Payday transfers by account and pot' })
   expect(within(matrix).getByRole('columnheader', { name: 'Alex' })).toBeVisible()
   expect(within(matrix).getByRole('columnheader', { name: 'Total' })).toBeVisible()
@@ -171,15 +191,16 @@ it('starts with a chooser for all adults and reveals one person’s transfers on
   expect(screen.getByRole('button', { name: 'Sam' })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Child' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /Copy/ })).not.toBeInTheDocument()
-  expect(screen.queryByText('Planned allocations')).not.toBeInTheDocument()
-  expect(screen.getByText(/Monthly transfers/)).toBeVisible()
+  expect(screen.getByText('Planned allocations')).toBeVisible()
+  expect(screen.getByText('Monthly surplus')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Alex' }))
   expect(screen.getByLabelText('Who’s transferring?')).toHaveValue('alex')
   expect(screen.getByText('Joint Monzo')).toBeVisible()
   expect(screen.getByText('Total to transfer')).toBeVisible()
-  expect(screen.queryByText('Planned allocations')).not.toBeInTheDocument()
+  expect(screen.getByText('Planned allocations')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Plan budget' }))
   expect(screen.getByText('Planned allocations')).toBeVisible()
+  openBudgetSetup()
   expect(screen.getByLabelText('Alex net income per month')).toBeVisible()
   expect(screen.getByLabelText('Alex budgeting method')).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Make transfers' }))
@@ -215,30 +236,30 @@ it('opens one destination at a time and copies its amount without opening detail
   fireEvent.click(copyDestination)
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Could not copy'))
   expect(screen.getByRole('heading', { name: 'Transfers to make' })).toBeVisible()
-  fireEvent.click(screen.getByText('Joint Monzo'))
-  expect(screen.getByRole('button', { name: /All transfers/ })).toBeVisible()
-  const stickyDetail = document.querySelector('.budget-transfer-detail-sticky') as HTMLElement
-  expect(stickyDetail).toBeInTheDocument()
-  expect(within(stickyDetail).getByText('Total to distribute')).toBeVisible()
-  expect(within(stickyDetail).getByText('£1,100')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint Monzo account details' }))
+  expect(screen.getByRole('button', { name: 'Collapse Joint Monzo account details' })).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('list', { name: 'Joint Monzo pot breakdown' })).toBeVisible()
+  expect(screen.getByText('Total to transfer')).toBeVisible()
+  expect(screen.getAllByText('£1,100').length).toBeGreaterThan(0)
   const copyPot = screen.getByRole('button', { name: 'Copy £1,000 for Bills' })
   expect(copyPot).toBeVisible()
   fireEvent.click(copyPot)
   expect(writeText).toHaveBeenLastCalledWith('1000.00')
   expect(await screen.findByRole('status')).toHaveTextContent('Amount copied')
-  fireEvent.click(screen.getByRole('button', { name: /All transfers/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse Joint Monzo account details' }))
+  expect(screen.queryByRole('list', { name: 'Joint Monzo pot breakdown' })).not.toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Transfers to make' })).toBeVisible()
 })
 
 it('keeps the open destination context when switching the selected person', () => {
   render(<Harness grouped multiple />)
   fireEvent.click(screen.getByRole('button', { name: 'Alex' }))
-  fireEvent.click(screen.getByText('Joint Monzo'))
-  expect(screen.getByText('Total to distribute')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Expand Joint Monzo account details' }))
+  expect(screen.getByText('Total to transfer')).toBeVisible()
   fireEvent.change(screen.getByLabelText('Who’s transferring?'), { target: { value: 'sam' } })
   expect(screen.getByLabelText('Who’s transferring?')).toHaveValue('sam')
-  expect(screen.getByRole('button', { name: /All transfers/ })).toBeVisible()
-  expect(screen.getByText('Total to distribute')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Collapse Joint Monzo account details' })).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByText('Total to transfer')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Copy £333 for Bills' })).toBeVisible()
 })
 

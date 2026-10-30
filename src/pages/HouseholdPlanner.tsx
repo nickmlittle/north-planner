@@ -6,7 +6,6 @@ import type { IncomePeriod } from '../domain/income'
 import { documentForecast } from '../state/forecast'
 import { navigateToDashboard, navigateToHousehold, navigateToSettings, settingsSections } from '../state/navigation'
 import type { SettingsSection } from '../state/navigation'
-import { PlannerHeader } from '../components/PlannerHeader'
 import { PlanEvents } from '../components/PlanEvents'
 import { householdEmployment } from '../engine/employment'
 import { childEffects } from '../engine/children'
@@ -21,7 +20,7 @@ import { ForecastResults } from '../components/ForecastResults'
 import { SetupCard, MoneyField, SetupField } from '../components/SetupFields'
 import { BalanceDateReview } from '../components/BalanceDateReview'
 
-export function HouseholdPlanner({ document: doc, setDocument, warning, replaceSavedDraft, downloadOriginal, recoveryOriginal, accountBacked = false, saveStatus, email, onSignOut, settingsSection = 'planning', onSelectSettings, onSelectView, currentView = 'dashboard' }: {
+export function HouseholdPlanner({ document: doc, setDocument, accountBacked = false, settingsSection = 'planning', onSelectView }: {
   document: AppDocument; setDocument: Dispatch<SetStateAction<AppDocument>>; warning: string; replaceSavedDraft: () => void; downloadOriginal?: () => void; recoveryOriginal?: string; accountBacked?: boolean; saveStatus?: string; email?: string; onSignOut?: () => void
   settingsSection?: SettingsSection; onSelectSettings: (section: SettingsSection) => void; onSelectView?: (view: 'dashboard' | 'household' | 'budget') => void; currentView?: 'dashboard' | 'household' | 'budget'
 }) {
@@ -65,7 +64,7 @@ export function HouseholdPlanner({ document: doc, setDocument, warning, replaceS
   }
   const page = settingsSections.find(section => section.id === settingsSection) ?? settingsSections[0]!
   const futureCosts = doc.snapshot.people.filter(p => p.role === 'child' && currentBand(p, doc.snapshot.planningStartDate))
-  return <div className="north-shell settings-shell"><PlannerHeader step={10} go={go} warning={warning} replaceSavedDraft={replaceSavedDraft} downloadOriginal={downloadOriginal} recoveryOriginal={recoveryOriginal} accountBacked={accountBacked} saveStatus={saveStatus} email={email} onSignOut={onSignOut} settingsSection={settingsSection} onSelectSettings={onSelectSettings} onSelectView={onSelectView} currentView={currentView} />
+  return <div className="north-shell settings-shell">
     <main className="dashboard-main dashboard-container settings-main">
       <div className="route-heading settings-heading"><div><h1 ref={heading} tabIndex={-1}>{page.label}</h1><p className="page-description">{page.description}</p></div></div>
       <div className="settings-content">
