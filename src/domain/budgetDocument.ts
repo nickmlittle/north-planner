@@ -27,6 +27,7 @@ export function decodeBudgetDocument(raw: unknown): BudgetDocument | null {
     lines.every(line => pots.has(line.potId) && (!line.singleFunderId || people.has(line.singleFunderId)) && Object.keys(line.customShares ?? {}).every(id => people.has(id)))
   if (!validMonth(budget.incomes, budget.lines)) return null
   if (Object.values(budget.monthOverrides ?? {}).some(override => !validMonth(override.incomes ?? budget.incomes, override.lines ?? budget.lines))) return null
+  if (Object.values(budget.incomeChanges ?? {}).some(incomes => !validMonth(incomes, budget.lines))) return null
   return value as BudgetDocument
 }
 
@@ -71,6 +72,7 @@ export function removeAdult(document: BudgetDocument, id: string): BudgetDocumen
         ...(override.incomes ? { incomes: cleanIncomes(override.incomes) } : {}),
         ...(override.lines ? { lines: cleanLines(override.lines) } : {}),
       }])),
+      incomeChanges: document.budget.incomeChanges ? Object.fromEntries(Object.entries(document.budget.incomeChanges).map(([month, incomes]) => [month, cleanIncomes(incomes)])) : undefined,
     },
   }
 }

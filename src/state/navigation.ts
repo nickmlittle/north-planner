@@ -1,8 +1,7 @@
+import type { LucideIcon } from 'lucide-react'
+
 export type PlannerView = 'household' | 'budget'
-export const primaryDestinations = [
-  { id: 'household', label: 'Household' },
-  { id: 'budget', label: 'Budget' },
-] as const
+export type PlannerDestination = { id: PlannerView; label: string; Icon: LucideIcon }
 
 export function navigateTo(view: PlannerView) {
   const url = new URL(window.location.href)

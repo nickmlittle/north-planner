@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Check, Menu, UserRoundGroup, Wallet } from 'lucide-react'
-import { navigateTo, primaryDestinations, type PlannerView } from '../state/navigation'
+import { Check, Menu, X } from 'lucide-react'
+import { navigateTo, type PlannerDestination, type PlannerView } from '../state/navigation'
 
 export interface PlannerHeaderProps {
   currentView: PlannerView
+  destinations: PlannerDestination[]
   warning?: string
   saveStatus?: string
   email?: string
@@ -11,7 +12,7 @@ export interface PlannerHeaderProps {
   onSelectView?: (view: PlannerView) => void
 }
 
-export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView }: PlannerHeaderProps) {
+export function PlannerHeader({ currentView, destinations, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView }: PlannerHeaderProps) {
   const [accountOpen, setAccountOpen] = useState(false)
   const [warningOpen, setWarningOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -26,12 +27,12 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
   const select = (view: PlannerView) => { (onSelectView ?? navigateTo)(view); setMobileOpen(false) }
   const statusIcon = status === 'Saved' ? <Check size={24} strokeWidth={2} aria-hidden="true" /> : <span aria-hidden="true">{status === 'Saving…' ? '◌' : '!'}</span>
   return <>
-    <div className="mobile-nav-bar"><button type="button" className="mobile-nav-trigger" aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileOpen} aria-controls="mobile-navigation-panel" onClick={() => setMobileOpen(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button></div>
+    <div className={`mobile-nav-bar${mobileOpen ? ' is-open' : ''}`}><button type="button" className="mobile-nav-trigger" aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileOpen} aria-controls="mobile-navigation-panel" onClick={() => setMobileOpen(value => !value)}>{mobileOpen ? <X size={24} strokeWidth={2} aria-hidden="true" /> : <Menu size={24} strokeWidth={2} aria-hidden="true" />}</button></div>
     <aside className={`planner-sidebar is-compact${mobileOpen ? ' mobile-open' : ''}${desktopExpanded ? ' desktop-expanded' : ''}`} aria-label="Application navigation">
       <div className="sidebar-rail">
         <div className="desktop-sidebar-header"><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={() => setDesktopExpanded(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button>{desktopExpanded && <span className="desktop-sidebar-brand" aria-hidden="true">north.</span>}</div>
-        <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">{primaryDestinations.map(destination => {
-          const Icon = destination.id === 'household' ? UserRoundGroup : Wallet
+        <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">{destinations.map(destination => {
+          const Icon = destination.Icon
           return <button key={destination.id} type="button" className="sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} aria-label={destination.label} title={destination.label} onClick={() => select(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span><span className="sidebar-label" aria-hidden={!desktopExpanded}>{destination.label}</span></button>
         })}</nav>
         <div className="sidebar-rail-utility">
@@ -43,8 +44,8 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
       <button type="button" className="mobile-sidebar-scrim" aria-label="Close navigation menu" onClick={() => setMobileOpen(false)} />
       <div id="mobile-navigation-panel" className="mobile-sidebar-panel" aria-hidden={!mobileOpen}>
         <div className="mobile-sidebar-brand" aria-hidden="true">north.</div>
-        <nav className="mobile-sidebar-navigation" aria-label="Navigation menu">{primaryDestinations.map(destination => {
-          const Icon = destination.id === 'household' ? UserRoundGroup : Wallet
+        <nav className="mobile-sidebar-navigation" aria-label="Navigation menu">{destinations.map(destination => {
+          const Icon = destination.Icon
           return <button key={destination.id} type="button" className="mobile-sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} onClick={() => select(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span><span>{destination.label}</span></button>
         })}</nav>
         <div className="mobile-sidebar-utility">
