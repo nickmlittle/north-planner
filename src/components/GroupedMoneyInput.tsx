@@ -6,16 +6,18 @@ const displayGBP = new Intl.NumberFormat('en-GB', {
   maximumFractionDigits: 2,
 })
 
-export function GroupedMoneyInput({ value, onChange, label }: {
+export function GroupedMoneyInput({ value, onChange, label, autoFocus = false }: {
   value: number
   onChange: (value: number) => void
   label: string
+  autoFocus?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
   return <input
     aria-label={label}
+    autoFocus={autoFocus}
     type="text"
     inputMode="decimal"
     value={editing ? draft : displayGBP.format(value)}

@@ -14,7 +14,7 @@ export function HouseholdSetup({ document, setDocument, onContinue }: {
   const nameOnFocus = useRef<Record<string, string>>({})
   const { household } = document
   const ready = !!household.name.trim() && household.adults.length > 0 && household.adults.every(person => !!person.name.trim())
-  return <PageFrame element="div" className="household-setup-page" eyebrow="Getting started" title="Your household" description="Add the people who will plan and make transfers together.">
+  return <PageFrame className="household-setup-page" eyebrow="Getting started" title="Your household" description="Add the people who will plan and make transfers together.">
     <section className="setup-card">
       <label className="setup-field">Household name<input aria-label="Household name" value={household.name} onChange={event => setDocument(current => ({ ...current, household: { ...current.household, name: event.target.value } }))} aria-invalid={attempted && !household.name.trim()} placeholder="e.g. Alex + Sam" /></label>
     </section>
