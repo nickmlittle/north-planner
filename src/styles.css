@@ -1480,7 +1480,7 @@ small, .muted, footer { color: #59665a; }
 .planner-sidebar:hover .sidebar-rail-utility .sidebar-account,.planner-sidebar:focus-within .sidebar-rail-utility .sidebar-account{justify-content:center;padding:0}
 .sidebar-rail-utility .sidebar-account .account-button{flex:0 0 34px;width:34px;height:34px;padding:0;margin:0}
 .mobile-sidebar-toggle{display:none}
-@media(max-width:767px){
+@media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .mobile-sidebar-toggle{display:flex}
   .mobile-menu-close{font-size:30px;font-weight:300;line-height:1}
   .mobile-sidebar-scrim{position:fixed;inset:0 0 0 60px;z-index:95;border:0;background:transparent}
@@ -1500,8 +1500,9 @@ small, .muted, footer { color: #59665a; }
 
 /* Mobile uses an on-demand drawer; desktop keeps the persistent icon rail. */
 .mobile-nav-bar{display:none}
-@media(max-width:767px){
+@media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .mobile-nav-bar{position:fixed;z-index:120;top:16px;left:16px;display:flex;align-items:center;width:52px;height:46px}
+  .desktop-sidebar-toggle{display:none}
   .mobile-nav-trigger{display:inline-flex;align-items:center;justify-content:center;width:52px;height:46px;padding:7px;border:0;border-radius:8px;background:rgba(248,247,241,.38);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--pine,#173f32);cursor:pointer}
   .mobile-nav-trigger:hover,.mobile-nav-trigger:focus-visible{background:rgba(248,247,241,.58)}
   .mobile-nav-trigger[aria-expanded=true]{background:rgba(255,255,255,.12);color:var(--cream,#f8f7f1)}
@@ -1533,11 +1534,12 @@ small, .muted, footer { color: #59665a; }
   .dashboard-app .planner-app-content>.north-shell.dashboard-shell>.page-frame.dashboard-main{padding-top:16px}
   .dashboard-app .dashboard-main>.page-frame-heading{box-sizing:border-box;height:46px;min-height:46px;flex:0 0 46px;padding-left:64px;flex-direction:row;align-items:center;justify-content:flex-start}
 }
-@media(max-width:767px) and (prefers-reduced-motion:reduce){
+@media(max-width:767px) and (prefers-reduced-motion:reduce), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse) and (prefers-reduced-motion:reduce){
   .planner-sidebar,.planner-sidebar.is-compact,.planner-sidebar.is-expanded,.planner-sidebar.mobile-open,.planner-sidebar .mobile-sidebar-scrim,.planner-sidebar .mobile-sidebar-panel,.planner-app-content{transition:none}
 }
 
-@media(min-width:768px){
+/* Keep the full drawer on a landscape phone; pointer-based desktop widths retain the rail. */
+@media (min-width:768px) and (min-height:481px), (min-width:981px), (min-width:768px) and (hover:hover), (min-width:768px) and (pointer:fine){
   .mobile-sidebar-scrim,.mobile-sidebar-panel{display:none}
   .planner-sidebar,.planner-sidebar.is-compact{transition:width .4s ease,box-shadow .4s ease}
   .planner-sidebar .sidebar-rail{align-items:stretch;transition:width .4s ease,padding .4s ease}
@@ -1557,4 +1559,10 @@ small, .muted, footer { color: #59665a; }
 }
 @media(prefers-reduced-motion:reduce){
   .planner-sidebar,.planner-sidebar.is-compact,.planner-sidebar .sidebar-rail,.planner-sidebar .sidebar-label,.planner-sidebar .sidebar-account-label,.planner-sidebar .sidebar-status-label{transition:none}
+}
+
+@media (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .mobile-nav-bar{left:calc(16px + env(safe-area-inset-left,0px))}
+  .planner-sidebar .mobile-sidebar-panel{padding-left:calc(16px + env(safe-area-inset-left,0px))}
+  .mobile-sidebar-brand{left:calc(80px + env(safe-area-inset-left,0px))}
 }
