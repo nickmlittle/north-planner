@@ -1,210 +1,107 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
-import { storageKey } from './state/useAppDocument'
-import { completeDocument } from './test/setupFixture'
-import { decodePersistedDocument, emptyPerson } from './domain/setup'
-import { navigateToSettings, type SettingsSection } from './state/navigation'
+import { budgetStorageKey } from './state/useBudgetDocument'
 
-beforeEach(() => { localStorage.clear(); window.history.replaceState(null, '', '/'); vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
-const click = (name: string | RegExp) => fireEvent.click(screen.queryByRole('button', { name }) ?? screen.getByRole('menuitem', { name }))
-const enter = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
-const savedDocument = () => decodePersistedDocument(localStorage.getItem(storageKey)!)
-const openSettings = (section: SettingsSection) => act(() => navigateToSettings(section))
+afterEach(() => { cleanup(); localStorage.clear(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals() })
 
-it('creates a single-adult renter household from a genuinely empty first load', () => {
+async function completeSetup() {
+  fireEvent.change(screen.getByLabelText('Household name'), { target: { value: 'Alex household' } })
+  fireEvent.click(screen.getByRole('button', { name: '+ Add an adult' }))
+  fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Alex' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
+  await screen.findByRole('heading', { name: 'Budget your month' })
+}
+
+it('starts with household setup and saves only the new budget key', async () => {
+  localStorage.setItem('north.household.v2', '{"old":"data"}')
   render(<App />)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('A clearer picture')
-  expect(screen.queryByText('Nick')).not.toBeInTheDocument()
-  click(/Create your household/)
-  click(/Continue/)
-  expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Add at least one adult')
-  enter('Household name', 'Alex household')
-  click('+ Add an adult')
-  enter('Person name', 'Alex')
-  enter('Alex date of birth', '1990-06-14')
-  click(/Continue/)
-  enter('Alex income type', 'none')
-  click(/Continue/)
-  enter('Alex pension status', 'none')
-  click(/Continue/)
-  enter('Alex ISA type', 'none')
-  fireEvent.click(screen.getByLabelText('No cash savings or current-account balance (£0)'))
-  click(/Continue/)
-  enter('Current housing', 'rent')
-  expect(screen.queryByLabelText('Estimated home value (£)')).not.toBeInTheDocument()
-  click(/Continue/)
-  enter('Living costs (£)', '0')
-  click(/Continue/)
-  expect(screen.queryByText('Still to add')).not.toBeInTheDocument()
-  click(/Open your dashboard/)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your route ahead')
-  expect(screen.getAllByText('£0').length).toBeGreaterThan(2)
-  expect(screen.getByRole('heading', { name: 'Net worth over time' })).toBeVisible()
-  expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('at least one adult')
+  await completeSetup()
+  expect(screen.getByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(JSON.parse(localStorage.getItem(budgetStorageKey)!)).toMatchObject({ household: { name: 'Alex household', adults: [{ name: 'Alex' }] } })
+  expect(localStorage.getItem('north.household.v2')).toBe('{"old":"data"}')
 })
 
-it('preserves input and step on Back and reload, including invalid financial text', () => {
-  const d = completeDocument(); d.step = 2
-  localStorage.setItem(storageKey, JSON.stringify(d))
-  const view = render(<App />)
-  enter('Alex gross pay (£)', '-1')
-  click(/Continue/)
-  expect(screen.getByLabelText('Alex gross pay (£)')).toHaveAttribute('aria-invalid', 'true')
-  click('Back')
-  click(/Continue/)
-  expect(screen.getByLabelText('Alex gross pay (£)')).toHaveValue('-1')
-  view.unmount(); render(<App />)
-  expect(screen.getByLabelText('Alex gross pay (£)')).toHaveValue('-1')
-  enter('Alex gross pay (£)', '6000')
-  click(/Continue/)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your pensions')
-})
-
-it('shows incomplete totals and actionable missing details after skipping finances', () => {
-  const d = completeDocument(); d.step = 3; d.snapshot.people[0]!.pension = ''
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  click('Skip for now')
-  click(/Review/)
-  expect(screen.getByText('Incomplete')).toBeVisible()
-  click(/Open your dashboard/)
-  const card = screen.getByRole('heading', { name: 'Net worth today' }).parentElement!
-  expect(within(card).getByText('Incomplete')).toBeVisible()
-  expect(within(card).queryByText(/Known assets:/)).not.toBeInTheDocument()
-  expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('pension balance')
-})
-
-it('blocks child forecasts until later age bands are explicitly configured', () => {
-  const d = completeDocument(); d.step = 9
-  const p = emptyPerson('child'); Object.assign(p, { name: 'Jamie', dob: '2020-02-22', childCost: '400' }); d.snapshot.people.push(p)
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  expect(screen.getAllByText(/Forecast unavailable/)[0]).toHaveTextContent('future annual costs')
-  openSettings('children')
-  enter('Jamie Ages 12–18 annual cost (£)', '0')
-  expect(screen.queryByText(/Forecast unavailable/)).not.toBeInTheDocument()
-  expect(savedDocument()).toMatchObject({ document: { snapshot: { people: [{}, { futureCosts: { ages12to18: '0' } }] } } })
-})
-
-it('opens settings from shared navigation and supports URL-backed pages and browser history', async () => {
-  const d = completeDocument(); d.step = 9
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible()
-  expect(window.location.search).toBe('')
-  click('Plan settings')
-  expect(screen.getByRole('heading', { level: 1, name: 'Planning assumptions' })).toBeVisible()
-  window.history.back()
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible())
-  openSettings('tax')
-  expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible()
-  expect(window.location.search).toContain('settings=tax')
-  window.history.back()
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Your route ahead' })).toBeVisible())
-  window.history.forward()
-  await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Tax estimates' })).toBeVisible())
-})
-
-it('renders one shared navigation and closes the mobile drawer after a destination is chosen', () => {
-  const d = completeDocument(); d.step = 9
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  expect(screen.getAllByRole('navigation', { name: 'Main navigation' })).toHaveLength(1)
-  expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
-  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-  expect(screen.getAllByRole('button', { name: 'Close navigation menu' })[0]).toHaveAttribute('aria-expanded', 'true')
-  const mobileNavigation = screen.getByRole('navigation', { name: 'Navigation menu' })
-  expect(within(mobileNavigation).getAllByRole('button').map(button => button.textContent)).toEqual(['Dashboard', 'Household', 'Budget'])
-  expect(screen.getAllByRole('button', { name: 'Plan settings' })).toHaveLength(2)
-  expect(screen.queryByRole('button', { name: 'Child costs' })).not.toBeInTheDocument()
-  fireEvent.click(within(mobileNavigation).getByRole('button', { name: 'Household' }))
-  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.getByRole('button', { name: 'Household' })).toHaveAttribute('aria-current', 'page')
+it('keeps the sidebar controls and routes between Household and Budget', async () => {
+  render(<App />)
+  await completeSetup()
   fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
   expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('complementary', { name: 'Application navigation' })).toHaveClass('desktop-expanded')
-  expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByText('Household')).toBeInTheDocument()
-  expect(screen.queryByRole('navigation', { name: 'Navigation menu' })).not.toBeInTheDocument()
+  expect(screen.getAllByText('north.')).toHaveLength(2)
+  const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+  fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  expect(window.location.search).toContain('view=household')
+  fireEvent.click(within(nav).getByRole('button', { name: 'Budget' }))
+  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
-  fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Budget' }))
-  expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('button', { name: 'Budget' })).toHaveAttribute('aria-current', 'page')
 })
 
-it('opens Household as an independent editor without changing completed setup or future income', async () => {
-  const d = completeDocument(); d.step = 9; d.completed = true
-  d.incomeTimeline = [{ id: 'future-role', personId: d.snapshot.people[0]!.id, kind: 'paye', startYear: 2031, endYear: 2038, annualSalary: 80000, dayRate: 0, billableDays: 0, workingFraction: 1, annualGrossOverride: null }]
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  click('Household')
-  expect(window.location.search).toContain('view=household')
-  expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true, snapshot: { people: [expect.objectContaining({ pay: '5000' })] }, incomeTimeline: expect.arrayContaining([expect.objectContaining({ id: 'future-role', annualSalary: 80000 })]) } })
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Household records' })).getByRole('button', { name: /Income/ }))
-  expect(screen.getByRole('heading', { level: 1, name: 'Current income' })).toBeVisible()
-  fireEvent.change(screen.getByLabelText('Household section'), { target: { value: '5' } })
-  expect(screen.getByRole('heading', { level: 1, name: 'Your home' })).toBeVisible()
-  fireEvent.change(screen.getByLabelText('Household section'), { target: { value: '2' } })
-  enter('Alex gross pay (£)', '6000')
-  await waitFor(() => expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true, snapshot: { people: [expect.objectContaining({ pay: '6000' })] }, incomeTimeline: [expect.objectContaining({ id: 'income-' + d.snapshot.people[0]!.id }), expect.objectContaining({ id: 'future-role', annualSalary: 80000 })] } }))
-  click('Dashboard')
-  expect(screen.getByRole('heading', { level: 1, name: 'Your route ahead' })).toBeVisible()
-  expect(savedDocument()).toMatchObject({ document: { step: 9, completed: true } })
+it('closes the mobile drawer with Escape and a navigation choice', async () => {
+  render(<App />)
+  await completeSetup()
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+  expect(screen.getByRole('button', { name: 'Close navigation menu', expanded: true })).toBeVisible()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Navigation menu' })).getByRole('button', { name: 'Household' }))
+  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
 })
 
-it('keeps incomplete onboarding progress when routes change', () => {
-  const d = completeDocument(); d.step = 3; d.completed = false
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  click('Household')
-  expect(savedDocument()).toMatchObject({ document: { step: 3, completed: false, snapshot: { name: 'Alex household' } } })
-  click('Dashboard')
-  expect(savedDocument()).toMatchObject({ document: { step: 3, completed: false, snapshot: { name: 'Alex household' } } })
+it('maps removed page URLs to the retained screens', async () => {
+  const saved = { version: 1, household: { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }, workflow: { setupComplete: true }, budget: { pots: [], accounts: [], accountsReviewed: true, categories: ['Living Expenses'], incomes: [], lines: [], monthOverrides: {} } }
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  window.history.replaceState(null, '', '/?view=dashboard&settings=tax&budgetView=amex')
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(screen.queryByText('Amex statement')).not.toBeInTheDocument()
 })
 
-it('requires explicit confirmation for removal and removes shared ownership references', () => {
-  const d = completeDocument(); d.step = 1
-  const other = emptyPerson('partner'); Object.assign(other, { name: 'Sam', dob: '1992-11-03' }); d.snapshot.people.push(other)
-  d.snapshot.homeOwners.push(other.id); d.snapshot.borrowers.push(other.id)
-  localStorage.setItem(storageKey, JSON.stringify(d)); render(<App />)
-  click('Remove Alex')
-  expect(screen.getByText(/Shared balances stay in place/)).toBeVisible()
-  click('Keep person')
-  expect(screen.getByLabelText('Alex name')).toBeVisible()
-  click('Remove Alex'); click('Confirm removal')
-  const saved = savedDocument()
-  expect(saved).toMatchObject({ document: { snapshot: { people: [expect.objectContaining({ id: other.id })], homeOwners: [other.id] } } })
-  expect(screen.queryByLabelText('Alex name')).not.toBeInTheDocument()
+it('closes the mobile drawer with the page strip and preserves the agreed saved icon', async () => {
+  render(<App />)
+  await completeSetup()
+  const saved = document.querySelector('.sidebar-status')!
+  expect(saved.querySelector('path')?.getAttribute('d')).toBe('M20 6 9 17l-5-5')
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+  const scrim = document.querySelector('.mobile-sidebar-scrim') as HTMLButtonElement
+  fireEvent.click(scrim)
+  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
 })
 
-it('persists planner edits and reflects current income changes in the overview', () => {
-  const d = completeDocument(); d.step = 10
-  localStorage.setItem(storageKey, JSON.stringify(d)); const view = render(<App />)
-  openSettings('income')
-  enter('Alex Annual salary (GBP)', '72000')
-  openSettings('planning')
-  enter('FIRE age', '55')
-  click('Household')
-  expect(screen.getByText('£72,000.00')).toBeVisible()
-  view.unmount(); render(<App />)
-  openSettings('planning')
-  expect(screen.getByLabelText('FIRE age')).toHaveValue('55')
-  openSettings('income')
-  expect(screen.getByLabelText('Alex Annual salary (GBP)')).toHaveValue('72000')
+it('returns from an old settings URL to Budget through browser navigation', async () => {
+  render(<App />)
+  await completeSetup()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Household' }))
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  window.history.replaceState(null, '', '/?view=settings&settings=tax')
+  fireEvent(window, new PopStateEvent('popstate'))
+  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
 })
 
-it('preserves corrupted storage and uses session state when storage fails', () => {
-  localStorage.setItem(storageKey, '{broken')
-  const view = render(<App />)
-  click('Storage warning')
-  expect(screen.getByRole('status')).toHaveTextContent('saved document is not valid JSON')
-  click(/Create your household/)
-  expect(localStorage.getItem(storageKey)).toBe('{broken')
-  click('Replace saved data with this draft')
-  expect(JSON.parse(localStorage.getItem(storageKey)!).version).toBe(2)
-  view.unmount(); localStorage.clear()
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
-  render(<App />); click(/Create your household/)
-  click('Storage warning')
-  expect(screen.getByRole('status')).toHaveTextContent('only last for this session')
-  enter('Household name', 'Still usable')
-  expect(screen.getByLabelText('Household name')).toHaveValue('Still usable')
+it('keeps budget ownership aligned after an adult name is edited', () => {
+  const saved = { version: 1, household: { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }, workflow: { setupComplete: true }, budget: {
+    pots: [{ id: 'bills', name: 'Bills', kind: 'spending', ownerName: 'Alex' }], accounts: [], accountsReviewed: true, categories: ['Bills'], incomes: [],
+    lines: [{ id: 'rent', category: 'Bills', ownerName: 'Alex', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }], monthOverrides: {},
+  } }
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  window.history.replaceState(null, '', '/?view=household')
+  render(<App />)
+  const input = screen.getByLabelText('Adult 1 name')
+  fireEvent.focus(input)
+  fireEvent.change(input, { target: { value: '' } })
+  fireEvent.blur(input)
+  fireEvent.focus(input)
+  fireEvent.change(input, { target: { value: 'Alexandra' } })
+  fireEvent.blur(input)
+  const next = JSON.parse(localStorage.getItem(budgetStorageKey)!)
+  expect(next.household.adults[0].name).toBe('Alexandra')
+  expect(next.budget.lines[0].ownerName).toBe('Alexandra')
+  expect(next.budget.pots[0].ownerName).toBe('Alexandra')
 })

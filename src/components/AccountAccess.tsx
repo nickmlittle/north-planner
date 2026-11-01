@@ -55,8 +55,8 @@ export function AccountAccess() {
   }
 
   return <main className="account-screen">
-    <p className="eyebrow">North Planner</p><h1>Save your household</h1>
-    <p className="page-description">Sign in with a passkey to access your household on any device.</p>
+    <p className="eyebrow">North Planner</p><h1>Save your budget</h1>
+    <p className="page-description">Sign in with a passkey to access your budget on any device.</p>
     <div className="account-options">
       <button className="primary-button" type="button" onClick={() => void signInWithPasskey()} disabled={busy || !supportsPasskeys()}>
         {busy ? 'Please wait…' : 'Sign in with a passkey'}
