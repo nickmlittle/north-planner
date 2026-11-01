@@ -1,74 +1,16 @@
 export type FundingRule = 'proportional' | 'equal' | 'custom' | 'single'
 export type BudgetFrequency = 'monthly' | 'annually'
-export const starterBudgetCategories = ['Financing Activities', 'Other Living Expenses', 'Subscriptions', 'Entertainment', 'Savings', 'Living Expenses']
+export const starterBudgetCategories = ['Bills', 'Living Expenses', 'Subscriptions', 'Entertainment', 'Savings', 'Other']
 export interface BudgetAccount { id: string; name: string; ownerName?: string; provider?: string }
 export interface BudgetPot { id: string; name: string; kind: 'spending' | 'savings' | 'credit-card'; ownerName?: string; provider?: string; accountId?: string }
 export interface BudgetIncome { personId: string; monthlyNetPence: number; mode: 'all-income' | 'live-on'; liveOnPence: number; surplusPotId: string }
 export interface BudgetLine { id: string; category: string; ownerName: string; name: string; entryAmountPence: number; frequency: BudgetFrequency; amountPence: number; potId: string; funding: FundingRule; singleFunderId?: string; customShares?: Record<string, number> }
-export interface BudgetTransaction { id: string; date: string; description: string; amountPence: number; potId: string }
-export interface BudgetStatement { id: string; fileName: string; period: string; statementBalancePence: number | null; transactions: BudgetTransaction[] }
-export interface MonthlyBudget { pots: BudgetPot[]; accounts?: BudgetAccount[]; accountsReviewed?: boolean; categories: string[]; incomes: BudgetIncome[]; lines: BudgetLine[]; statements: BudgetStatement[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
+export interface MonthlyBudget { pots: BudgetPot[]; accounts?: BudgetAccount[]; accountsReviewed?: boolean; categories: string[]; incomes: BudgetIncome[]; lines: BudgetLine[]; monthOverrides?: Record<string, { incomes?: BudgetIncome[]; lines?: BudgetLine[] }> }
 export function defaultMonthlyBudget(): MonthlyBudget {
-  return { pots: [{ id: 'bills', name: 'Bills', kind: 'spending', accountId: 'account-bills' }, { id: 'amex', name: 'Amex', kind: 'credit-card', provider: 'Amex', accountId: 'account-amex' }, { id: 'nick-isa', name: 'Nick ISA', kind: 'savings', ownerName: 'Nick', accountId: 'account-nick-isa' }, { id: 'immy-isa', name: 'Immy ISA', kind: 'savings', ownerName: 'Immy', accountId: 'account-immy-isa' }], accounts: [{ id: 'account-bills', name: 'Bills' }, { id: 'account-amex', name: 'Amex', provider: 'Amex' }, { id: 'account-nick-isa', name: 'Nick ISA', ownerName: 'Nick' }, { id: 'account-immy-isa', name: 'Immy ISA', ownerName: 'Immy' }], accountsReviewed: true, categories: [...starterBudgetCategories], incomes: [], lines: [], statements: [], monthOverrides: {} }
+  return { pots: [], accounts: [], accountsReviewed: true, categories: [...starterBudgetCategories], incomes: [], lines: [], monthOverrides: {} }
 }
 export function monthlyContributionPence(amountPence: number, frequency: BudgetFrequency): number {
   return frequency === 'annually' ? Math.round(amountPence / 12) : amountPence
-}
-export function migrateMonthlyBudget(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
-  const raw = value as Record<string, unknown>
-  const ownerForPot = (potId: unknown) => {
-    const pot = Array.isArray(raw.pots) ? raw.pots.find(candidate => candidate && typeof candidate === 'object' && (candidate as Record<string, unknown>).id === potId) as Record<string, unknown> | undefined : undefined
-    const potName = typeof pot?.name === 'string' ? pot.name : ''
-    return typeof pot?.ownerName === 'string' ? pot.ownerName : /\bjoint\b/i.test(potName) ? 'Joint' : /\bnick\b/i.test(potName) ? 'Nick' : /\bimmy\b/i.test(potName) ? 'Immy' : 'Joint'
-  }
-  const migrateLines = (lines: unknown) => Array.isArray(lines) ? lines.map(line => {
-    if (!line || typeof line !== 'object' || Array.isArray(line)) return line
-    const row = line as Record<string, unknown>
-    return { ...row, category: row.category ?? 'Uncategorised', ownerName: row.ownerName ?? ownerForPot(row.potId), entryAmountPence: row.entryAmountPence ?? row.amountPence, frequency: row.frequency ?? 'monthly' }
-  }) : lines
-  const migratedLines = migrateLines(raw.lines)
-  const migratedOverrides = raw.monthOverrides && typeof raw.monthOverrides === 'object' && !Array.isArray(raw.monthOverrides)
-    ? Object.fromEntries(Object.entries(raw.monthOverrides as Record<string, unknown>).map(([month, override]) => [month,
-      override && typeof override === 'object' && !Array.isArray(override) ? { ...override, lines: migrateLines((override as Record<string, unknown>).lines) } : override]))
-    : raw.monthOverrides
-  const categories: unknown = raw.categories === undefined ? [...starterBudgetCategories, 'Uncategorised'] : Array.isArray(raw.categories) ? [...raw.categories] : raw.categories
-  if (Array.isArray(categories)) {
-    for (const line of [...(Array.isArray(migratedLines) ? migratedLines : []), ...Object.values(migratedOverrides && typeof migratedOverrides === 'object' ? migratedOverrides : {}).flatMap(override => override && typeof override === 'object' && Array.isArray((override as Record<string, unknown>).lines) ? (override as { lines: unknown[] }).lines : [])]) {
-      if (line && typeof line === 'object' && typeof (line as Record<string, unknown>).category === 'string' && !categories.includes((line as Record<string, unknown>).category)) categories.push((line as Record<string, unknown>).category as string)
-    }
-  }
-  const pots = Array.isArray(raw.pots) ? raw.pots.map(pot => {
-    if (!pot || typeof pot !== 'object' || Array.isArray(pot)) return pot
-    const row = pot as Record<string, unknown>
-    const name = typeof row.name === 'string' ? row.name : ''
-    const ownerName = typeof row.ownerName === 'string' ? row.ownerName : /\bjoint\b/i.test(name) ? 'Joint' : /\bnick\b/i.test(name) ? 'Nick' : /\bimmy\b/i.test(name) ? 'Immy' : undefined
-    const provider = typeof row.provider === 'string' ? row.provider : ['Monzo', 'Nationwide', 'Amex'].find(providerName => new RegExp(`\\b${providerName}\\b`, 'i').test(name))
-    return { ...row, ...(ownerName ? { ownerName } : {}), ...(provider ? { provider } : {}) }
-  }) : raw.pots
-  const accounts = Array.isArray(raw.accounts) ? raw.accounts : []
-  let migratedPots = pots
-  let migratedAccounts = accounts
-  if (Array.isArray(pots) && !Array.isArray(raw.accounts)) {
-    const byKey = new Map<string, { id: string; name: string; ownerName?: string; provider?: string }>()
-    migratedPots = pots.map((pot, index) => {
-      if (!pot || typeof pot !== 'object' || Array.isArray(pot)) return pot
-      const row = pot as Record<string, unknown>
-      const ownerName = typeof row.ownerName === 'string' ? row.ownerName : undefined
-      const provider = typeof row.provider === 'string' ? row.provider : undefined
-      const key = `${ownerName ?? 'Household'}\u0000${provider ?? `Bank not set (${String(row.kind ?? 'spending')})`}`
-      let account = byKey.get(key)
-      if (!account) {
-        const id = `legacy-account-${index}`
-        const name = [ownerName, provider].filter(Boolean).join(' · ') || String(row.name ?? 'Master account')
-        account = { id, name, ...(ownerName ? { ownerName } : {}), ...(provider ? { provider } : {}) }
-        byKey.set(key, account)
-      }
-      return { ...row, accountId: typeof row.accountId === 'string' ? row.accountId : account.id }
-    })
-    migratedAccounts = [...byKey.values()]
-  }
-  return { ...raw, pots: migratedPots, accounts: migratedAccounts, accountsReviewed: raw.accountsReviewed === true, categories, lines: migratedLines, monthOverrides: migratedOverrides }
 }
 export function resolveMonthBudget(budget: MonthlyBudget, month: string): MonthlyBudget {
   const override = budget.monthOverrides?.[month]
@@ -88,10 +30,10 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (b.accounts !== undefined && (!Array.isArray(b.accounts) || !ids(b.accounts) || b.accounts.some(account => typeof account.name !== 'string' || !account.name.trim() || account.ownerName !== undefined && typeof account.ownerName !== 'string' || account.provider !== undefined && typeof account.provider !== 'string'))) return false
   if (b.accountsReviewed !== undefined && typeof b.accountsReviewed !== 'boolean') return false
   if (Array.isArray(b.accounts) && b.pots.some(pot => pot.accountId !== undefined && !b.accounts!.some(account => account.id === pot.accountId))) return false
-  if (!Array.isArray(b.incomes) || b.incomes.some(i => !i || typeof i.personId !== 'string' || !Number.isSafeInteger(i.monthlyNetPence) || i.monthlyNetPence < 0 || !Number.isSafeInteger(i.liveOnPence) || i.liveOnPence < 0 || !['all-income', 'live-on'].includes(i.mode) || typeof i.surplusPotId !== 'string')) return false
+  const validIncomes = (incomes: unknown): incomes is BudgetIncome[] => Array.isArray(incomes) && incomes.every(i => i && typeof i.personId === 'string' && Number.isSafeInteger(i.monthlyNetPence) && i.monthlyNetPence >= 0 && Number.isSafeInteger(i.liveOnPence) && i.liveOnPence >= 0 && ['all-income', 'live-on'].includes(i.mode) && typeof i.surplusPotId === 'string')
+  if (!validIncomes(b.incomes)) return false
   const validLines = (lines: unknown): lines is BudgetLine[] => Array.isArray(lines) && ids(lines) && lines.every(l => typeof l.category === 'string' && b.categories.includes(l.category) && typeof l.ownerName === 'string' && !!l.ownerName.trim() && typeof l.name === 'string' && Number.isSafeInteger(l.entryAmountPence) && l.entryAmountPence >= 0 && ['monthly', 'annually'].includes(l.frequency) && Number.isSafeInteger(l.amountPence) && l.amountPence === monthlyContributionPence(l.entryAmountPence, l.frequency) && typeof l.potId === 'string' && ['proportional', 'equal', 'custom', 'single'].includes(l.funding) && (l.customShares === undefined || (typeof l.customShares === 'object' && l.customShares !== null && Object.values(l.customShares as Record<string, unknown>).every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0))))
   if (!validLines(b.lines)) return false
-  if (!Array.isArray(b.statements) || !ids(b.statements) || b.statements.some(s => typeof s.fileName !== 'string' || !/^\d{4}-\d{2}$/.test(s.period) || s.statementBalancePence !== null && !Number.isSafeInteger(s.statementBalancePence) || !Array.isArray(s.transactions) || !ids(s.transactions) || s.transactions.some(t => typeof t.date !== 'string' || typeof t.description !== 'string' || !Number.isSafeInteger(t.amountPence) || typeof t.potId !== 'string'))) return false
-  if (b.monthOverrides !== undefined && (!b.monthOverrides || typeof b.monthOverrides !== 'object' || Object.entries(b.monthOverrides).some(([month, override]) => !/^\d{4}-\d{2}$/.test(month) || !override || typeof override !== 'object' || override.incomes !== undefined && !Array.isArray(override.incomes) || override.lines !== undefined && !validLines(override.lines)))) return false
+  if (b.monthOverrides !== undefined && (!b.monthOverrides || typeof b.monthOverrides !== 'object' || Object.entries(b.monthOverrides).some(([month, override]) => !/^\d{4}-\d{2}$/.test(month) || !override || typeof override !== 'object' || override.incomes !== undefined && !validIncomes(override.incomes) || override.lines !== undefined && !validLines(override.lines)))) return false
   return true
 }

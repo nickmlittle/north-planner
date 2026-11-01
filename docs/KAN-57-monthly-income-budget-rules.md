@@ -1,3 +1,5 @@
+> Historical design note: This predates the budget-only app. Current behavior and storage are described in [README.md](../README.md).
+
 # KAN-57: Monthly income and budget timing rules
 
 **Status:** Approved by Nick on 2026-10-25; extended for monthly budget v1

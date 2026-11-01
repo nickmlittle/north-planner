@@ -1,3 +1,5 @@
+> Historical design note: This predates the budget-only app. Current behavior and storage are described in [README.md](../README.md).
+
 # Planning data model proposal (KAN-53)
 
 **Status:** proposal for review; no application or saved-data changes are included.  
