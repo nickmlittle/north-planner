@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState, type SetStateAction } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
+import { decodeBudgetDocument, migrateV2BudgetDocument, newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { supabase } from './supabase'
 
-const pendingKey = (userId: string) => `north.budget.pending.${userId}.v1`
+const pendingKey = (userId: string) => `north.budget.pending.${userId}.v3`
+const legacyPendingKey = (userId: string) => `north.budget.pending.${userId}.v2`
 type State = { document: BudgetDocument | null; revision: number; status: string; error: string; dirty: boolean; conflict: BudgetDocument | null }
-function readPending(userId: string): BudgetDocument | null {
-  try { return decodeBudgetDocument(JSON.parse(localStorage.getItem(pendingKey(userId)) ?? 'null')) } catch { return null }
+function readPending(userId: string): { document: BudgetDocument | null; error: string } {
+  try {
+    const v3 = localStorage.getItem(pendingKey(userId))
+    if (v3) {
+      const document = decodeBudgetDocument(JSON.parse(v3))
+      return document ? { document, error: '' } : { document: null, error: 'The pending budget draft could not be read. Its original data remains in this browser.' }
+    }
+    const v2 = localStorage.getItem(legacyPendingKey(userId))
+    if (!v2) return { document: null, error: '' }
+    const document = migrateV2BudgetDocument(JSON.parse(v2))
+    return document ? { document, error: '' } : { document: null, error: 'The pending v2 budget draft could not be migrated. Its original data remains in this browser.' }
+  } catch { return { document: null, error: 'The pending budget draft could not be read. Its original data remains in this browser.' } }
 }
 function keepPending(userId: string, document: BudgetDocument) {
   try { localStorage.setItem(pendingKey(userId), JSON.stringify(document)) } catch { /* The save error is visible in the app. */ }
 }
 function clearPending(userId: string) {
-  try { localStorage.removeItem(pendingKey(userId)) } catch { /* The cloud copy is authoritative. */ }
+  try { localStorage.removeItem(pendingKey(userId)); localStorage.removeItem(legacyPendingKey(userId)) } catch { /* The cloud copy is authoritative. */ }
 }
 
 export function useCloudBudget(user: User) {
@@ -24,20 +35,24 @@ export function useCloudBudget(user: User) {
     let active = true
     async function load() {
       if (!supabase) return
+      try { localStorage.removeItem(`north.budget.pending.${user.id}.v1`) } catch { /* The old draft is ignored. */ }
       const { data, error } = await supabase.from('budgets').select('document, revision').eq('user_id', user.id).maybeSingle()
       if (!active) return
       if (error) { setState(s => ({ ...s, status: 'Not saved', error: `Could not load your budget: ${error.message}` })); return }
-      const pending = readPending(user.id)
-      const remote = data ? decodeBudgetDocument(data.document) : null
-      if (data && !remote) { setState(s => ({ ...s, status: 'Not saved', error: 'The account budget could not be read. Its original data remains in your account.' })); return }
+      const pendingResult = readPending(user.id)
+      if (pendingResult.error) { setState(s => ({ ...s, status: 'Not saved', error: pendingResult.error })); return }
+      const pending = pendingResult.document
+      const remote = data ? decodeBudgetDocument(data.document) ?? migrateV2BudgetDocument(data.document) : null
+      if (data && !remote && (data.document as { version?: unknown })?.version !== 1) { setState(s => ({ ...s, status: 'Not saved', error: 'The account budget could not be read. Its original data remains in your account.' })); return }
       if (pending && remote && JSON.stringify(pending) !== JSON.stringify(remote)) {
         setState({ document: pending, revision: data!.revision, status: 'Choose a version', error: '', dirty: false, conflict: remote }); return
       }
       if (pending && !remote) {
-        setState({ document: pending, revision: 0, status: 'Unsaved changes', error: '', dirty: true, conflict: null }); return
+        setState({ document: pending, revision: data?.revision ?? 0, status: 'Unsaved changes', error: '', dirty: true, conflict: null }); return
       }
-      clearPending(user.id)
-      setState({ document: remote ?? newBudgetDocument(), revision: data?.revision ?? 0, status: 'Saved', error: '', dirty: false, conflict: null })
+      const needsMigrationSave = !!data && (data.document as { version?: number }).version === 2
+      if (!needsMigrationSave) clearPending(user.id)
+      setState({ document: remote ?? newBudgetDocument(), revision: data?.revision ?? 0, status: needsMigrationSave ? 'Unsaved changes' : 'Saved', error: '', dirty: needsMigrationSave, conflict: null })
     }
     void load()
     return () => { active = false }
@@ -60,7 +75,7 @@ export function useCloudBudget(user: User) {
         keepPending(user.id, latest.current ?? document)
         if (!error || error.code === '23505') {
           const { data: current, error: readError } = await supabase.from('budgets').select('document, revision').eq('user_id', user.id).single()
-          const remote = current ? decodeBudgetDocument(current.document) : null
+          const remote = current ? decodeBudgetDocument(current.document) ?? migrateV2BudgetDocument(current.document) : null
           if (!readError && remote) { setState(s => ({ ...s, revision: current.revision, conflict: remote, dirty: false, status: 'Choose a version', error: '' })); return }
         }
         setState(s => ({ ...s, status: 'Not saved', error: `Could not save your budget: ${error?.message ?? 'a newer save exists'}` }))
@@ -86,7 +101,7 @@ export function useCloudBudget(user: User) {
   function chooseConflict(choice: 'cloud' | 'device') {
     setState(previous => {
       if (!previous.conflict) return previous
-      if (choice === 'cloud') { clearPending(user.id); return { ...previous, document: previous.conflict, conflict: null, dirty: false, status: 'Saved', error: '' } }
+      if (choice === 'cloud') { clearPending(user.id); return { ...previous, document: previous.conflict, conflict: null, dirty: true, status: 'Unsaved changes', error: '' } }
       if (previous.document) keepPending(user.id, previous.document)
       return { ...previous, conflict: null, dirty: true, status: 'Unsaved changes', error: '' }
     })

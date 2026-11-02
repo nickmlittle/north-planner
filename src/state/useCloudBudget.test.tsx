@@ -51,13 +51,13 @@ it('offers cloud and device choices when a pending copy differs', async () => {
   const pending = newBudgetDocument()
   pending.household.name = 'Device'
   backend.row = { document: remote, revision: 2 }
-  localStorage.setItem('north.budget.pending.user-1.v1', JSON.stringify(pending))
+  localStorage.setItem('north.budget.pending.user-1.v3', JSON.stringify(pending))
   const { result } = renderHook(() => useCloudBudget(user))
   await waitFor(() => expect(result.current.conflict).not.toBeNull())
   expect(result.current.document?.household.name).toBe('Device')
   act(() => result.current.chooseConflict('cloud'))
   expect(result.current.document?.household.name).toBe('Cloud')
-  expect(localStorage.getItem('north.budget.pending.user-1.v1')).toBeNull()
+  expect(localStorage.getItem('north.budget.pending.user-1.v3')).toBeNull()
 })
 
 it('retries the device version against the latest cloud revision after a conflict', async () => {
@@ -66,11 +66,40 @@ it('retries the device version against the latest cloud revision after a conflic
   const pending = newBudgetDocument()
   pending.household.name = 'Device'
   backend.row = { document: remote, revision: 2 }
-  localStorage.setItem('north.budget.pending.user-1.v1', JSON.stringify(pending))
+  localStorage.setItem('north.budget.pending.user-1.v3', JSON.stringify(pending))
   const { result } = renderHook(() => useCloudBudget(user))
   await waitFor(() => expect(result.current.conflict).not.toBeNull())
   act(() => result.current.chooseConflict('device'))
   await waitFor(() => expect(result.current.status).toBe('Saved'), { timeout: 2000 })
   expect(backend.row?.revision).toBe(3)
   expect(backend.row?.document).toMatchObject({ household: { name: 'Device' } })
+})
+
+it('ignores old pending drafts and treats a v1 cloud row as an empty v3 budget', async () => {
+  backend.row = { document: { version: 1, budget: { categories: ['Bills'] } }, revision: 2 }
+  localStorage.setItem('north.budget.pending.user-1.v1', JSON.stringify({ old: true }))
+  const { result } = renderHook(() => useCloudBudget(user))
+  await waitFor(() => expect(result.current.document?.version).toBe(3))
+  expect(result.current.document?.budget.categories).toEqual([])
+  expect(localStorage.getItem('north.budget.pending.user-1.v1')).toBeNull()
+  act(() => result.current.setDocument(current => ({ ...current, household: { ...current.household, name: 'Fresh' } })))
+  await waitFor(() => expect(backend.row?.revision).toBe(3), { timeout: 2000 })
+  expect(backend.row?.document).toMatchObject({ version: 3, household: { name: 'Fresh' } })
+})
+it('migrates a cloud v2 document through the existing revision update', async () => {
+  backend.row = { document: { version: 2, household: { name: 'Cloud v2', adults: [{ id: 'nick', name: 'Nick' }] }, workflow: { setupComplete: true }, budget: { accounts: [], pots: [], categories: [], incomes: [], lines: [], monthOverrides: {} } }, revision: 7 }
+  const { result } = renderHook(() => useCloudBudget(user))
+  await waitFor(() => expect(result.current.status).toBe('Saved'), { timeout: 2000 })
+  expect(result.current.document?.version).toBe(3)
+  expect(backend.row?.revision).toBe(8)
+  expect(backend.row?.document).toMatchObject({ version: 3, household: { name: 'Cloud v2' } })
+})
+it('keeps an unreadable pending draft recoverable instead of clearing it', async () => {
+  const raw = '{broken pending v2'
+  backend.row = { document: newBudgetDocument(), revision: 4 }
+  localStorage.setItem('north.budget.pending.user-1.v2', raw)
+  const { result } = renderHook(() => useCloudBudget(user))
+  await waitFor(() => expect(result.current.status).toBe('Not saved'))
+  expect(result.current.error).toMatch(/original data remains/)
+  expect(localStorage.getItem('north.budget.pending.user-1.v2')).toBe(raw)
 })

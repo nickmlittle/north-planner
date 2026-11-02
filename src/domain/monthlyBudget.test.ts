@@ -1,16 +1,6 @@
 import { expect, it } from 'vitest'
-import { defaultMonthlyBudget, resolveMonthBudget } from './monthlyBudget'
-
-it('applies effective-dated income from the selected month onward and preserves earlier months', () => {
-  const budget = defaultMonthlyBudget()
-  budget.incomes = [{ personId: 'alex', monthlyNetPence: 300000, mode: 'all-income', liveOnPence: 300000, surplusPotId: '' }]
-  budget.incomeChanges = {
-    '2026-04': [{ personId: 'alex', monthlyNetPence: 350000, mode: 'all-income', liveOnPence: 350000, surplusPotId: '' }],
-    '2026-09': [{ personId: 'alex', monthlyNetPence: 400000, mode: 'all-income', liveOnPence: 400000, surplusPotId: '' }],
-  }
-
-  expect(resolveMonthBudget(budget, '2026-03').incomes[0]?.monthlyNetPence).toBe(300000)
-  expect(resolveMonthBudget(budget, '2026-04').incomes[0]?.monthlyNetPence).toBe(350000)
-  expect(resolveMonthBudget(budget, '2026-08').incomes[0]?.monthlyNetPence).toBe(350000)
-  expect(resolveMonthBudget(budget, '2026-09').incomes[0]?.monthlyNetPence).toBe(400000)
-})
+import { defaultMonthlyBudget, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, updateIncomeAtMonth, type BudgetItem } from './monthlyBudget'
+const item=(id:string,amount=10000):BudgetItem=>({id,name:id,categoryId:'c',entryAmountPence:amount,frequency:'monthly',amountPence:amount,destination:{kind:'account',accountId:'a'},funding:'proportional'})
+it('resolves snapshot inheritance and keeps later boundaries independent',()=>{let b=defaultMonthlyBudget();b.categories=[{id:'c',name:'Bills'}];b.accounts=[{id:'a',name:'Bank',ownerPersonIds:['nick']}];b=updateBudgetAtMonth(b,'2026-11',()=>[item('nov',10000)]);b=updateBudgetAtMonth(b,'2027-05',()=>[item('may',30000)]);expect(resolveBudget(b,'2027-01').items[0]?.id).toBe('nov');expect(resolveBudget(b,'2027-01').sourceMonth).toBe('2026-11');b=updateBudgetAtMonth(b,'2027-01',xs=>[...xs,item('jan',5000)]);expect(resolveBudget(b,'2027-02').items.map(x=>x.id)).toEqual(['nov','jan']);expect(resolveBudget(b,'2027-05').items.map(x=>x.id)).toEqual(['may'])})
+it('stores intentional empty snapshots and removes a boundary cleanly',()=>{let b=defaultMonthlyBudget();b.categories=[{id:'c',name:'Bills'}];b.accounts=[{id:'a',name:'Bank',ownerPersonIds:[]}];b=updateBudgetAtMonth(b,'2026-11',()=>[item('x')]);b=updateBudgetAtMonth(b,'2027-01',()=>[]);expect(resolveBudget(b,'2027-01').items).toEqual([]);delete b.snapshots['2027-01'];expect(resolveBudget(b,'2027-01').items[0]?.id).toBe('x')})
+it('resolves independent income changes without changing budgets',()=>{let b=defaultMonthlyBudget();b.incomeSources=[{id:'job',personId:'nick',name:'Job',type:'employment',baseAmountPence:400000,changes:{}},{id:'parents',personId:'nick',name:'Parents',type:'additional',baseAmountPence:0,changes:{}}];b=updateIncomeAtMonth(b,'2027-01','parents',40000);expect(resolveIncomeSources(b,'2026-12').map(x=>x.amountPence)).toEqual([400000,0]);expect(resolveIncomeSources(b,'2027-01').map(x=>x.amountPence)).toEqual([400000,40000]);expect(Object.keys(b.snapshots)).toEqual([])})
