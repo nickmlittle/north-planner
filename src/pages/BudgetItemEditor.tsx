@@ -19,6 +19,17 @@ const fundingOptions: Array<{ value: FundingRule; label: string }> = [
   { value: 'single', label: 'One person' }, { value: 'fixed', label: 'Fixed contributions' }, { value: 'custom', label: 'Custom split' },
 ]
 
+function destinationFunding(document: BudgetDocument, selection: DestinationSelection): Pick<BudgetItemDraft, 'funding' | 'singleFunderId'> {
+  const destination = selection.destination
+  const potId = destination?.kind === 'pot' ? destination.potId : undefined
+  const pot = selection.stagedPot?.id === potId ? selection.stagedPot : document.budget.pots.find(row => row.id === potId)
+  const accountId = destination?.kind === 'account' ? destination.accountId : pot?.accountId
+  const account = selection.stagedAccount?.id === accountId ? selection.stagedAccount : document.budget.accounts.find(row => row.id === accountId)
+  const ownerId = account?.ownerPersonIds.length === 1 ? account.ownerPersonIds[0] : undefined
+  const personalOwner = document.household.adults.find(person => person.id === ownerId)
+  return personalOwner ? { funding: 'single', singleFunderId: personalOwner.id } : { funding: 'proportional', singleFunderId: document.household.adults[0]?.id ?? '' }
+}
+
 export function BudgetItemEditor({ document, month, item, onSave, onClose }: Props) {
   const adults = document.household.adults
   const [rows, setRows] = useState<BudgetItemDraft[]>(() => [item ? itemDraft(item) : newItemDraft(crypto.randomUUID(), adults[0]?.id ?? '')])
@@ -31,6 +42,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const [initial] = useState(() => JSON.stringify({ rows, categoryId, destination }))
   const formRef = useRef<HTMLFormElement>(null)
   const pendingFocus = useRef<string | null>(null)
+  const fundingOverrides = useRef(new Set<string>())
   const triggerRef = useRef<HTMLElement | null>(null)
   const dirty = destinationTouched || !!newCategoryName || initial !== JSON.stringify({ rows, categoryId, destination })
   const includedRows = rows.filter(row => row.touched || row.name.trim() || row.amount.trim())
@@ -53,16 +65,28 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   }, [rows])
 
   const update = (id: string, patch: Partial<BudgetItemDraft>) => {
+    if ('funding' in patch || 'singleFunderId' in patch || 'contributions' in patch || 'customShares' in patch) fundingOverrides.current.add(id)
     setRows(current => current.map(row => row.id === id ? { ...row, ...patch, touched: true } : row))
     setError(undefined)
   }
+  const changeDestination = (value: DestinationSelection) => {
+    setDestination(value)
+    setDestinationTouched(true)
+    setError(undefined)
+    if (!item && value.destination) {
+      const defaults = destinationFunding(document, value)
+      const overrides = new Set(fundingOverrides.current)
+      setRows(current => current.map(row => overrides.has(row.id) ? row : { ...row, ...defaults }))
+    }
+  }
   const addRow = () => {
-    const row = newItemDraft(crypto.randomUUID(), adults[0]?.id ?? '')
+    const row = { ...newItemDraft(crypto.randomUUID(), adults[0]?.id ?? ''), ...destinationFunding(document, destination) }
     pendingFocus.current = `${row.id}:name`
     setRows(current => [...current, row])
     setError(undefined)
   }
   const removeRow = (id: string) => {
+    fundingOverrides.current.delete(id)
     const index = rows.findIndex(row => row.id === id)
     const remaining = rows.filter(row => row.id !== id)
     const next = remaining[Math.min(index, remaining.length - 1)]
@@ -110,12 +134,12 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
             <div className="budget-batch-category"><label>Category<select data-error-key="category" value={categoryId} aria-invalid={error?.field === 'category'} aria-describedby={error?.field === 'category' ? 'budget-category-error' : undefined} onChange={event => { setCategoryId(event.target.value); setError(undefined) }}><option value="">Choose a category</option>{document.budget.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}<option value="__new__">Create a category…</option></select></label>
               {categoryId === '__new__' && <label>New category<input value={newCategoryName} onChange={event => { setNewCategoryName(event.target.value); setError(undefined) }}/></label>}
               {error?.field === 'category' && <p id="budget-category-error" className="budget-batch-error" role="alert">{error.message}</p>}
-              <p>All rows use this category and destination.</p>
             </div>
-            <div className="budget-batch-destination" data-error-key="destination" tabIndex={-1}><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={value => { setDestination(value); setDestinationTouched(true); setError(undefined) }} onDraftChange={() => setDestinationTouched(true)}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
+            <div className="budget-batch-destination" data-error-key="destination" tabIndex={-1}><span className="budget-batch-shared-label">Destination</span><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
           </div>
+          <p className="budget-batch-shared-note">All items share this category and destination. Funding contributions are monthly.</p>
           <table className="budget-batch-table" aria-label="Budget items to save">
-            <thead><tr><th>Item name</th><th>Amount</th><th>Frequency</th><th>Funding type</th><th>Funding amounts <small>Monthly, by person</small></th>{!item && <th><span className="budget-batch-sr-only">Actions</span></th>}</tr></thead>
+            <thead><tr><th>Item name</th><th>Amount</th><th>Frequency</th><th>Funding type</th><th>Funding amounts</th>{!item && <th>Actions</th>}</tr></thead>
             <tbody>{rows.map((row, index) => {
               const read = readItemDraft({ ...row, name: row.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id))
               const preview = 'item' in read ? budgetTransfers(previewBudget, adults.map(person => person.id), month, [read.item]) : undefined
@@ -127,13 +151,14 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
                 <td><label><span className="budget-batch-field-label">{row.frequency === 'annually' ? 'Annual amount' : 'Amount'}</span><input inputMode="decimal" data-error-key={`${row.id}:amount`} value={row.amount} aria-invalid={fieldError(row, 'amount')} aria-describedby={descriptionId(row, 'amount')} onChange={event => update(row.id, { amount: event.target.value })}/></label><small>{row.frequency === 'annually' ? monthly !== undefined ? `Monthly equivalent: ${pounds(monthly)}` : 'Enter the annual amount' : 'Per month'}</small>{errorText(row, 'amount')}</td>
                 <td><label><span className="budget-batch-field-label">Frequency</span><select data-error-key={`${row.id}:frequency`} value={row.frequency} onChange={event => update(row.id, { frequency: event.target.value as BudgetItemDraft['frequency'] })}><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label>{errorText(row, 'frequency')}</td>
                 <td><label><span className="budget-batch-field-label">Funding type</span><select data-error-key={`${row.id}:funding`} value={row.funding} onChange={event => update(row.id, { funding: event.target.value as FundingRule })}>{fundingOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{errorText(row, 'funding')}</td>
-                <td className="budget-batch-funding"><span className="budget-batch-mobile-heading">Funding amounts <small>Monthly, by person</small></span>
-                  {row.funding === 'single' && <label>Person<select data-error-key={`${row.id}:singleFunderId`} value={row.singleFunderId} aria-invalid={fieldError(row, 'singleFunderId')} aria-describedby={descriptionId(row, 'singleFunderId')} onChange={event => update(row.id, { singleFunderId: event.target.value })}><option value="">Choose a person</option>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
-                  {row.funding === 'fixed' ? <><div className="budget-batch-person-inputs">{adults.map(person => <label key={person.id}>{person.name} monthly contribution<input inputMode="decimal" data-error-key={`${row.id}:contributions`} value={row.contributions[person.id] ?? ''} aria-invalid={fieldError(row, 'contributions')} aria-describedby={descriptionId(row, 'contributions')} onChange={event => update(row.id, { contributions: { ...row.contributions, [person.id]: event.target.value } })}/></label>)}</div>{monthly !== undefined && <p className="budget-batch-allocation">{fixedTotal > monthly ? `${pounds(fixedTotal - monthly)} over allocated` : `${pounds(monthly - fixedTotal)} left to allocate`}</p>}</> : <>
-                    {row.funding === 'custom' && <div className="budget-batch-person-inputs">{adults.map(person => <label key={person.id}>{person.name} relative weight<input inputMode="decimal" data-error-key={`${row.id}:customShares`} value={row.customShares[person.id] ?? ''} aria-invalid={fieldError(row, 'customShares')} aria-describedby={descriptionId(row, 'customShares')} onChange={event => update(row.id, { customShares: { ...row.customShares, [person.id]: event.target.value } })}/></label>)}</div>}
+                <td className="budget-batch-funding"><div className="budget-batch-funding-content"><span className="budget-batch-mobile-heading">Funding amounts</span>
+                  {row.funding === 'single' && <label className="budget-batch-person-select"><span className="budget-batch-field-label">Person</span><select aria-label="Person" data-error-key={`${row.id}:singleFunderId`} value={row.singleFunderId} aria-invalid={fieldError(row, 'singleFunderId')} aria-describedby={descriptionId(row, 'singleFunderId')} onChange={event => update(row.id, { singleFunderId: event.target.value })}><option value="">Choose a person</option>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
+                  {row.funding === 'fixed' ? <><div className="budget-batch-person-inputs">{adults.map(person => <label key={person.id}><span className="budget-batch-inline-person">{person.name}</span><input aria-label={`${person.name} monthly contribution`} inputMode="decimal" data-error-key={`${row.id}:contributions`} value={row.contributions[person.id] ?? ''} aria-invalid={fieldError(row, 'contributions')} aria-describedby={descriptionId(row, 'contributions')} onChange={event => update(row.id, { contributions: { ...row.contributions, [person.id]: event.target.value } })}/></label>)}</div>{monthly !== undefined && <p className="budget-batch-allocation">{fixedTotal > monthly ? `${pounds(fixedTotal - monthly)} over allocated` : `${pounds(monthly - fixedTotal)} left to allocate`}</p>}</> : <>
+                    {row.funding === 'custom' && <div className="budget-batch-person-inputs">{adults.map(person => <label key={person.id}><span className="budget-batch-inline-person">{person.name}</span><input aria-label={`${person.name} relative weight`} inputMode="decimal" data-error-key={`${row.id}:customShares`} value={row.customShares[person.id] ?? ''} aria-invalid={fieldError(row, 'customShares')} aria-describedby={descriptionId(row, 'customShares')} onChange={event => update(row.id, { customShares: { ...row.customShares, [person.id]: event.target.value } })}/></label>)}</div>}
                     {preview?.unresolvedItemIds.length ? <p className="budget-batch-allocation">Add employment income to calculate</p> : <dl className="budget-batch-preview">{adults.map(person => <div key={person.id}><dt>{person.name}</dt><dd>{preview ? pounds(preview.people.find(row => row.personId === person.id)?.plannedPence ?? 0) : '—'}</dd></div>)}</dl>}
                   </>}
                   {errorText(row, 'singleFunderId')}{errorText(row, 'contributions')}{errorText(row, 'customShares')}
+                </div>
                 </td>
                 {!item && <td className="budget-batch-remove"><button type="button" className="text-button" aria-label={`Remove item ${index + 1}`} onClick={() => removeRow(row.id)}>Remove</button></td>}
               </tr>
