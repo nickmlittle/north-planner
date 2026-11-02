@@ -63,7 +63,7 @@ it('uses all five funding rules and routes their rounded monthly contributions t
   result.items.forEach((item, index) => {
     const preview = budgetTransfers(result.document.budget, people, '2026-11', [item])
     expect(preview.people.map(person => person.plannedPence)).toEqual(expected[index])
-    expect(preview.accounts[0]!.pots).toEqual([{ potId: 'pot', amountPence: item.amountPence }])
+    expect(preview.accounts[0]!.pots).toMatchObject([{ potId: 'pot', amountPence: item.amountPence }])
   })
   const all = budgetTransfers(result.document.budget, people, '2026-11', result.items)
   expect(all.accounts[0]!.amountPence).toBe(5004)

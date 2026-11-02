@@ -43,6 +43,23 @@ it('keeps the sidebar controls and routes between Household and Budget', async (
   expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
 })
 
+it('keeps the Budget view switch in the app header and resets it to Plan on re-entry', async () => {
+  render(<App />)
+  await completeSetup()
+  const group = screen.getByRole('group', { name: 'Budget view' })
+  const transfers = within(group).getByRole('button', { name: 'Transfers' })
+  const plan = within(group).getByRole('button', { name: 'Plan' })
+  expect(plan).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(transfers)
+  expect(transfers).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Household' }))
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  expect(screen.queryByRole('group', { name: 'Budget view' })).not.toBeInTheDocument()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Budget' }))
+  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(within(screen.getByRole('group', { name: 'Budget view' })).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
+})
+
 it('closes the mobile drawer with Escape and a navigation choice', async () => {
   render(<App />)
   await completeSetup()

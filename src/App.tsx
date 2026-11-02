@@ -25,9 +25,16 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   onSignOut?: () => void
 }) {
   const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
+  const [mobileBudgetView, setMobileBudgetView] = useState<'transfers' | 'plan'>('plan')
+  useEffect(() => {
+    const resetBudgetView = () => setMobileBudgetView('plan')
+    window.addEventListener('popstate', resetBudgetView)
+    return () => window.removeEventListener('popstate', resetBudgetView)
+  }, [])
   const requested = new URLSearchParams(search).get('view')
   const setupComplete = !!document.household.name.trim() && document.household.adults.length > 0 && document.household.adults.every(person => !!person.name.trim())
   const view: PlannerView = !setupComplete || !document.workflow.setupComplete || requested === 'household' ? 'household' : 'budget'
+  const selectView = (nextView: PlannerView) => { if (nextView === 'budget') setMobileBudgetView('plan'); navigateTo(nextView) }
   const routes: Array<PlannerDestination & { render: () => ReactNode }> = [
     {
       id: 'household', label: 'Household', Icon: UserRoundGroup,
@@ -35,10 +42,10 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     },
     {
       id: 'budget', label: 'Budget', Icon: Wallet,
-      render: () => <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} /></Suspense>,
+      render: () => <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={mobileBudgetView} /></Suspense>,
     },
   ]
-  return <AppLayout navigation={{ currentView: view, destinations: routes, warning: error, saveStatus: status, email, onSignOut, onSelectView: navigateTo }}>
+  return <AppLayout navigation={{ currentView: view, destinations: routes, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, mobileBudgetView, onMobileBudgetViewChange: setMobileBudgetView }}>
     {routes.find(route => route.id === view)!.render()}
   </AppLayout>
 }
