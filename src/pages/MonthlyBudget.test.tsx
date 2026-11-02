@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { MonthlyBudget } from './MonthlyBudget'
@@ -29,6 +29,9 @@ it('starts with no budget records and adds a categorized item with a staged acco
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add budget item'})[0]!);const dialog=screen.getByRole('form',{name:'Add budget item'});fireEvent.change(within(dialog).getByLabelText('Amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60')})
 it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Classification'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));expect(screen.getAllByText('Additional income').some(node=>node.closest('p')?.textContent?.includes('£400'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details while retaining owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Matching total')})
+it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}});expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
+it('shows the balance in plain language and opens the people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(screen.getByText('£10 over budget')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'People & transfers'}));expect(screen.getByRole('dialog',{name:'People and transfers'})).toBeVisible();expect(screen.getByText('Money by person')).toBeVisible()})
+it('confirms removal from the selected budget month',()=>{vi.spyOn(window,'confirm').mockReturnValue(false);render(<Harness/>);addItem();fireEvent.click(screen.getByText('More',{selector:'summary'}));fireEvent.click(screen.getByRole('button',{name:'Remove'}));expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Apple TV'));expect(screen.getByText('Apple TV')).toBeVisible()})
 it('shows explicit budget and income change markers in the month picker',()=>{render(<Harness/>);addItem('Bill');fireEvent.click(screen.getByRole('button',{name:'November 2026'}));expect(screen.getByRole('dialog',{name:'Choose budget month'})).toBeVisible()})
 it('saves monthly proportional amounts inline with Enter and blur',()=>{render(<Harness/>);addItem('Phone', '10', '', 'proportional');fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));const input=screen.getByRole('textbox',{name:'Monthly amount for Phone'});fireEvent.change(input,{target:{value:'15'}});fireEvent.keyDown(input,{key:'Enter'});expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£15')})
 it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add budget item'})[0]!);const form=screen.getByRole('form',{name:'Add budget item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save 1 item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Nick · Monzo · Current')})
@@ -382,4 +385,38 @@ it('updates automatic defaults between personal and Joint destinations while pre
   expect(within(second).getByLabelText('Funding type')).toHaveValue('equal')
   expect(within(third).getByLabelText('Person')).toHaveValue('immy')
   expect(within(fourth).getByLabelText('Person')).toHaveValue('nick')
+})
+
+
+it('keeps a single operable sticky group context as boundaries cross and results change', async () => {
+  const initial=seededDocument()
+  const month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.snapshots[month]={items:[{id:'sticky-item',name:'Groceries',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:12000,amountPence:12000,frequency:'monthly',funding:'equal'}]}
+  render(<SeededHarness initial={initial}/>)
+  const wrap=document.querySelector<HTMLDivElement>('.budget-v3-table-wrap')!
+  wrap.style.overflowY='auto'
+  const rect=(top:number,bottom:number,height=bottom-top)=>({top,bottom,height,left:0,right:800,width:800,x:0,y:top,toJSON:()=>({})})
+  vi.spyOn(wrap,'getBoundingClientRect').mockImplementation(()=>rect(100,500))
+  vi.spyOn(wrap.querySelector('thead')!,'getBoundingClientRect').mockImplementation(()=>rect(100,130))
+  const owner=wrap.querySelector<HTMLElement>('[data-budget-group="owner"]')!
+  const category=wrap.querySelector<HTMLElement>('[data-budget-group="category"]')!
+  let ownerTop=140,categoryTop=180
+  vi.spyOn(owner,'getBoundingClientRect').mockImplementation(()=>rect(ownerTop,ownerTop+32))
+  vi.spyOn(category,'getBoundingClientRect').mockImplementation(()=>rect(categoryTop,categoryTop+32))
+  ownerTop=120;categoryTop=150
+  fireEvent.scroll(wrap)
+  await waitFor(()=>expect(wrap.querySelector('.budget-v3-sticky-category')).toHaveTextContent('Bills'))
+  expect(screen.getAllByRole('button',{name:/Bills, 1 items/})).toHaveLength(1)
+  const sticky=within(wrap.querySelector<HTMLElement>('.budget-v3-sticky-category')!).getByRole('button')
+  sticky.focus()
+  categoryTop=200;ownerTop=140
+  fireEvent.scroll(wrap)
+  await waitFor(()=>expect(sticky).not.toBeInTheDocument())
+  expect(within(category).getByRole('button')).toHaveFocus()
+  ownerTop=120
+  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Groceries'}})
+  await waitFor(()=>expect(wrap.querySelector('.budget-v3-sticky-owner')).toHaveTextContent('Matching total £120'))
+  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'no match'}})
+  expect(screen.getByText(/No items match/)).toBeVisible()
+  expect(document.querySelector('.budget-v3-sticky-context')).not.toBeInTheDocument()
 })

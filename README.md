@@ -13,3 +13,7 @@ Without Supabase environment variables, budgets save in this browser under `nort
 Version 2 local documents, pending drafts, and cloud documents migrate to version 3 when loaded. The source data is preserved until the migrated document is safely saved. No database reset is part of this rollout; do not run the earlier one-time reset script.
 
 The earlier household forecast data is not read or modified by this budget app. It remains in its original browser storage keys and `public.households` table.
+
+## Page layout contract
+
+Product pages use the shared `AppLayout` and `PageFrame` shell. Keep the page title and essential page context in the frame's heading, summary, and page-controls regions; put the page's main work in its body. At desktop sizes the shell fills the dynamic viewport and the body owns vertical scrolling. Workspace pages may bound a primary table or list as an internal scroll region with sticky headings. On phones and constrained heights, layouts should compact persistent context and fall back to page scrolling whenever a fixed shell would clip content. Keep dialogs and drawers independently scrollable and keyboard reachable.
