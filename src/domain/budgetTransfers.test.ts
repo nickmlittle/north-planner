@@ -1,22 +1,6 @@
 import { expect, it } from 'vitest'
-import { defaultMonthlyBudget } from './monthlyBudget'
+import { defaultMonthlyBudget, type BudgetItem } from './monthlyBudget'
 import { budgetTransfers } from './budgetTransfers'
-
-it('splits monthly items in proportion to net income and keeps pence exact', () => {
-  const budget = defaultMonthlyBudget()
-  budget.incomes = [
-    { personId: 'alex', monthlyNetPence: 400000, mode: 'all-income', liveOnPence: 0, surplusPotId: '' },
-    { personId: 'sam', monthlyNetPence: 200000, mode: 'all-income', liveOnPence: 0, surplusPotId: '' },
-  ]
-  budget.lines = [{ id: 'rent', category: 'Living Expenses', ownerName: 'Joint', name: 'Rent', entryAmountPence: 100001, frequency: 'monthly', amountPence: 100001, potId: 'bills', funding: 'proportional' }]
-  const result = budgetTransfers(budget, ['alex', 'sam'])
-  expect(result.plannedPence).toBe(100001)
-  expect(result.remainingPence).toBe(499999)
-  expect(result.people.map(person => person.pots[0]?.amountPence)).toEqual([66667, 33334])
-})
-
-it('routes lifestyle surplus to a savings destination', () => {
-  const budget = defaultMonthlyBudget()
-  budget.incomes = [{ personId: 'alex', monthlyNetPence: 400000, mode: 'live-on', liveOnPence: 300000, surplusPotId: 'savings' }]
-  expect(budgetTransfers(budget, ['alex'])).toMatchObject({ spendablePence: 300000, surplusPence: 100000, pots: [{ potId: 'savings', amountPence: 100000 }] })
-})
+const base=()=>{const b=defaultMonthlyBudget();b.accounts=[{id:'hl',name:'HL',ownerPersonIds:['nick','immy']}];b.categories=[{id:'c',name:'Savings'}];b.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:400000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:200000,changes:{}},{id:'g',personId:'nick',name:'Parents',type:'additional',baseAmountPence:40000,changes:{}}];return b}
+it('uses employment income for proportional shares and includes gifts in availability only',()=>{const b=base();const item:BudgetItem={id:'isa',name:'ISA',categoryId:'c',entryAmountPence:50000,frequency:'monthly',amountPence:50000,destination:{kind:'account',accountId:'hl'},funding:'proportional'};const r=budgetTransfers(b,['nick','immy'],'2026-11',[item]);expect(r.availablePence).toBe(640000);expect(r.people.map(p=>p.plannedPence)).toEqual([33333,16667]);expect(r.people[0]?.remainingPence).toBe(406667)})
+it('keeps fixed contributions exact and identifies proportional items without income',()=>{const b=base();b.incomeSources=[];const items:BudgetItem[]=[{id:'isa',name:'ISA',categoryId:'c',entryAmountPence:50000,frequency:'monthly',amountPence:50000,destination:{kind:'account',accountId:'hl'},funding:'fixed',contributions:[{personId:'nick',amountPence:40000},{personId:'immy',amountPence:10000}]},{id:'x',name:'Unfunded',categoryId:'c',entryAmountPence:4000,frequency:'monthly',amountPence:4000,destination:{kind:'account',accountId:'hl'},funding:'proportional'}];const r=budgetTransfers(b,['nick','immy'],'2026-11',items);expect(r.plannedPence).toBe(54000);expect(r.unresolvedItemIds).toEqual(['x']);expect(r.accounts[0]?.amountPence).toBe(50000)})

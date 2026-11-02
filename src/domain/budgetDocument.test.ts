@@ -1,45 +1,7 @@
 import { expect, it } from 'vitest'
-import { decodeBudgetDocument, newBudgetDocument, removeAdult, renameAdult } from './budgetDocument'
-
-it('starts with a fresh, generic budget record', () => {
-  const document = newBudgetDocument()
-  expect(document).toMatchObject({ version: 1, household: { name: '', adults: [] } })
-  expect(document.budget.pots).toEqual([])
-  expect(document.budget.accounts).toEqual([])
-  expect(document.budget.lines).toEqual([])
-  expect(decodeBudgetDocument(JSON.parse(JSON.stringify(document)))).toEqual(document)
-})
-
-it('removes adult income and funding references from base and monthly overrides', () => {
-  const document = newBudgetDocument()
-  document.household.adults = [{ id: 'alex', name: 'Alex' }, { id: 'sam', name: 'Sam' }]
-  document.budget.incomes = [{ personId: 'sam', monthlyNetPence: 200000, mode: 'all-income', liveOnPence: 0, surplusPotId: '' }]
-  const line = { id: 'rent', category: 'Living Expenses', ownerName: 'Joint', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly' as const, amountPence: 100000, potId: 'bills', funding: 'single' as const, singleFunderId: 'sam', customShares: { alex: 40, sam: 60 } }
-  document.budget.lines = [line]
-  document.budget.monthOverrides = { '2026-11': { incomes: [...document.budget.incomes], lines: [line] } }
-  const next = removeAdult(document, 'sam')
-  expect(next.household.adults).toEqual([{ id: 'alex', name: 'Alex' }])
-  expect(next.budget.incomes).toEqual([])
-  expect(next.budget.lines[0]).toMatchObject({ funding: 'proportional', customShares: { alex: 40 } })
-  expect(next.budget.lines[0]?.singleFunderId).toBeUndefined()
-  expect(next.budget.monthOverrides?.['2026-11']?.incomes).toEqual([])
-  expect(next.budget.monthOverrides?.['2026-11']?.lines?.[0]?.customShares).toEqual({ alex: 40 })
-})
-
-it('rejects invalid budget records', () => {
-  expect(decodeBudgetDocument({ version: 1, household: { name: '', adults: [{ id: 'same', name: 'A' }, { id: 'same', name: 'B' }] }, budget: newBudgetDocument().budget })).toBeNull()
-  expect(decodeBudgetDocument({ ...newBudgetDocument(), budget: { pots: [] } })).toBeNull()
-})
-
-it('keeps budget owner labels in sync when an adult is renamed', () => {
-  const document = newBudgetDocument()
-  document.household.adults = [{ id: 'alex', name: 'Alex' }]
-  document.budget.pots = [{ id: 'pot', name: 'Savings', kind: 'savings', ownerName: 'Alex' }]
-  document.budget.accounts = [{ id: 'account', name: 'Bank', ownerName: 'Alex' }]
-  document.budget.lines = [{ id: 'line', category: 'Savings', ownerName: 'Alex', name: 'Save', entryAmountPence: 1000, frequency: 'monthly', amountPence: 1000, potId: 'pot', funding: 'proportional' }]
-  const next = renameAdult(document, 'alex', 'Alexandra')
-  expect(next.household.adults[0]?.name).toBe('Alexandra')
-  expect(next.budget.pots[0]?.ownerName).toBe('Alexandra')
-  expect(next.budget.accounts?.[0]?.ownerName).toBe('Alexandra')
-  expect(next.budget.lines[0]?.ownerName).toBe('Alexandra')
-})
+import { decodeBudgetDocument, migrateV2BudgetDocument, newBudgetDocument, removeAdult, renameAdult } from './budgetDocument'
+it('starts empty at document version 3',()=>{const d=newBudgetDocument();expect(d.version).toBe(3);expect(d.budget).toMatchObject({accounts:[],pots:[],categories:[],snapshots:{},incomeSources:[]});expect(decodeBudgetDocument(JSON.parse(JSON.stringify(d)))).toEqual(d)})
+it('migrates legacy item and income values deterministically',()=>{const old={version:2,household:{name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]},workflow:{setupComplete:true},budget:{accounts:[{id:'hl',name:'HL',ownerName:'Immy'}],pots:[{id:'pot',name:'ISA',accountId:'hl'}],categories:['Savings'],incomes:[{personId:'nick',monthlyNetPence:400000,mode:'all-income',liveOnPence:0,surplusPotId:''}],lines:[{id:'item',category:'Savings',ownerName:'Immy',name:'ISA',entryAmountPence:50000,frequency:'monthly',amountPence:50000,potId:'pot',funding:'proportional'}],monthOverrides:{'2026-11':{lines:[]}}}};const migrated=migrateV2BudgetDocument(old)!;expect(migrated.version).toBe(3);expect(migrated.budget.snapshots['2026-11']?.items).toEqual([]);expect(migrated.budget.snapshots['2026-12']?.items[0]).toMatchObject({id:'item',categoryId:'legacy-category:0',destination:{kind:'pot',potId:'pot'}});expect(migrated.budget.accounts[0]?.ownerPersonIds).toEqual(['immy']);expect(migrateV2BudgetDocument(old)).toEqual(migrated)})
+it('rejects broken references and protects referenced adults from removal',()=>{const d=newBudgetDocument();d.household.adults=[{id:'nick',name:'Nick'}];d.budget.accounts=[{id:'a',name:'Bank',ownerPersonIds:['nick']}];expect(removeAdult(d,'nick')).toEqual(d);expect(decodeBudgetDocument({...d,budget:{...d.budget,accounts:[{id:'a',name:'Bank',ownerPersonIds:['missing']}]}})).toBeNull()})
+it('renames stable person records without changing ownership references',()=>{const d=newBudgetDocument();d.household.adults=[{id:'nick',name:'Nick'}];d.budget.accounts=[{id:'a',name:'Bank',ownerPersonIds:['nick']}];const next=renameAdult(d,'nick','Nicholas');expect(next.household.adults[0]?.name).toBe('Nicholas');expect(next.budget.accounts[0]?.ownerPersonIds).toEqual(['nick'])})
+it('migrates the production v2 object-category and pot-categoryId shape',()=>{const old={version:2,household:{name:'Home',adults:[{id:'nick',name:'Nick'}]},workflow:{setupComplete:true},budget:{accounts:[{id:'account',name:'Joint Nationwide'}],pots:[{id:'pot',name:'Joint Monzo Bills',accountId:'account',categoryId:'cat',kind:'spending'}],categories:[{id:'cat',name:'Financing'}],incomes:[],lines:[],incomeChanges:{'2026-11':[{personId:'nick',monthlyNetPence:425000,mode:'all-income',liveOnPence:0,surplusPotId:''}]}}};const migrated=migrateV2BudgetDocument(old);expect(migrated).not.toBeNull();expect(migrated?.budget.categories).toEqual([{id:'cat',name:'Financing'}]);expect(migrated?.budget.pots[0]).toMatchObject({id:'pot',accountId:'account'});expect(migrated?.budget.accounts[0]).toMatchObject({legacyOwner:'Unassigned',ownerPersonIds:[]});expect(migrated?.budget.incomeSources[0]?.changes['2026-11']).toBe(425000)})

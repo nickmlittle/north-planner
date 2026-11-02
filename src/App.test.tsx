@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { budgetStorageKey } from './state/useBudgetDocument'
+import { newBudgetDocument } from './domain/budgetDocument'
 
 afterEach(() => { cleanup(); localStorage.clear(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals() })
 
@@ -56,7 +57,9 @@ it('closes the mobile drawer with Escape and a navigation choice', async () => {
 })
 
 it('maps removed page URLs to the retained screens', async () => {
-  const saved = { version: 1, household: { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }, workflow: { setupComplete: true }, budget: { pots: [], accounts: [], accountsReviewed: true, categories: ['Living Expenses'], incomes: [], lines: [], monthOverrides: {} } }
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }
+  saved.workflow.setupComplete = true
   localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
   window.history.replaceState(null, '', '/?view=dashboard&settings=tax&budgetView=amex')
   render(<App />)
@@ -86,10 +89,10 @@ it('returns from an old settings URL to Budget through browser navigation', asyn
 })
 
 it('keeps budget ownership aligned after an adult name is edited', () => {
-  const saved = { version: 1, household: { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }, workflow: { setupComplete: true }, budget: {
-    pots: [{ id: 'bills', name: 'Bills', kind: 'spending', ownerName: 'Alex' }], accounts: [], accountsReviewed: true, categories: ['Bills'], incomes: [],
-    lines: [{ id: 'rent', category: 'Bills', ownerName: 'Alex', name: 'Rent', entryAmountPence: 100000, frequency: 'monthly', amountPence: 100000, potId: 'bills', funding: 'proportional' }], monthOverrides: {},
-  } }
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }
+  saved.workflow.setupComplete = true
+  saved.budget.accounts = [{ id: 'account', name: 'Joint Monzo', ownerPersonIds: ['alex'] }]
   localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
   window.history.replaceState(null, '', '/?view=household')
   render(<App />)
@@ -102,6 +105,5 @@ it('keeps budget ownership aligned after an adult name is edited', () => {
   fireEvent.blur(input)
   const next = JSON.parse(localStorage.getItem(budgetStorageKey)!)
   expect(next.household.adults[0].name).toBe('Alexandra')
-  expect(next.budget.lines[0].ownerName).toBe('Alexandra')
-  expect(next.budget.pots[0].ownerName).toBe('Alexandra')
+  expect(next.budget.accounts[0].ownerPersonIds).toEqual(['alex'])
 })
