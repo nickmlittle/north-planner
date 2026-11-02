@@ -1,9 +1,11 @@
+import { isAccountTypeId, type AccountTypeId } from './accountTypes'
+
 export type FundingRule = 'proportional' | 'equal' | 'custom' | 'single' | 'fixed'
 export type BudgetFrequency = 'monthly' | 'annually'
 export type IncomeSourceType = 'employment' | 'additional'
 
 export interface BudgetCategory { id: string; name: string }
-export interface BudgetAccount { id: string; name: string; ownerPersonIds: string[]; provider?: string; legacyOwner?: string }
+export interface BudgetAccount { id: string; name: string; ownerPersonIds: string[]; provider?: string; accountTypeId?: AccountTypeId; legacyOwner?: string }
 export interface BudgetPot { id: string; name: string; accountId: string; kind?: 'spending' | 'savings' | 'credit-card'; provider?: string }
 export type BudgetDestination = { kind: 'account'; accountId: string } | { kind: 'pot'; potId: string }
 export interface FixedContribution { personId: string; amountPence: number }
@@ -104,7 +106,7 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   const ids = (items: Array<{ id: string }>) => items.every(item => item && typeof item.id === 'string' && !!item.id) && new Set(items.map(item => item.id)).size === items.length
   const validMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month)
   if (!Array.isArray(b.categories) || !ids(b.categories) || b.categories.some(category => typeof category.name !== 'string' || !category.name.trim()) || new Set(b.categories.map(category => category.name.trim().toLocaleLowerCase())).size !== b.categories.length) return false
-  if (!Array.isArray(b.accounts) || !ids(b.accounts) || b.accounts.some(account => typeof account.name !== 'string' || !account.name.trim() || !Array.isArray(account.ownerPersonIds) || account.ownerPersonIds.some(id => typeof id !== 'string') || account.provider !== undefined && typeof account.provider !== 'string' || account.legacyOwner !== undefined && typeof account.legacyOwner !== 'string')) return false
+  if (!Array.isArray(b.accounts) || !ids(b.accounts) || b.accounts.some(account => typeof account.name !== 'string' || !account.name.trim() || !Array.isArray(account.ownerPersonIds) || account.ownerPersonIds.some(id => typeof id !== 'string') || account.provider !== undefined && typeof account.provider !== 'string' || account.accountTypeId !== undefined && !isAccountTypeId(account.accountTypeId) || account.legacyOwner !== undefined && typeof account.legacyOwner !== 'string')) return false
   if (!Array.isArray(b.pots) || !ids(b.pots) || b.pots.some(pot => typeof pot.name !== 'string' || !pot.name.trim() || !b.accounts.some(account => account.id === pot.accountId) || pot.kind !== undefined && !['spending', 'savings', 'credit-card'].includes(pot.kind))) return false
   if (!b.snapshots || typeof b.snapshots !== 'object' || Array.isArray(b.snapshots)) return false
   if (b.importedBaseline !== undefined && !validItems(b.importedBaseline)) return false
