@@ -503,18 +503,17 @@ small, .muted, footer { color: #59665a; }
   .planner-sidebar{z-index:110;width:var(--mobile-sidebar-width);height:100dvh;background:transparent;visibility:hidden;pointer-events:none;transition:visibility 0s linear .4s}
   .planner-sidebar.mobile-open{visibility:visible;pointer-events:auto;transition:visibility 0s}
   .planner-sidebar .sidebar-rail{display:none}
-  .mobile-nav-bar{position:fixed;z-index:120;inset:0 0 auto;box-sizing:border-box;display:flex;align-items:center;width:100%;height:calc(52px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 0 0 calc(var(--page-gutter-left) - 14px)}
-  .mobile-nav-bar::before{position:absolute;z-index:1;inset:0 auto 1px 0;width:var(--mobile-sidebar-width);content:"";background:var(--pine);transform:scaleX(0);transform-origin:left center;transition:transform .4s ease;pointer-events:none}
+  .mobile-nav-bar{position:fixed;z-index:120;inset:0 0 auto;box-sizing:border-box;display:flex;align-items:center;width:100%;height:calc(52px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 0 0 calc(var(--page-gutter-left) - 14px);pointer-events:none}
   .mobile-nav-bar::after{position:absolute;z-index:0;inset:0;box-sizing:border-box;content:"";border-bottom:1px solid var(--line);background:var(--cream);transition:transform .4s ease;pointer-events:none}
-  .mobile-nav-bar.is-open::before{transform:scaleX(1)}
   .mobile-nav-bar.is-open::after{transform:translateX(var(--mobile-sidebar-width))}
-  .mobile-nav-trigger{position:relative;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin:0;padding:0;border:0;border-radius:8px;background:transparent;color:var(--pine);touch-action:manipulation}
-  .mobile-nav-trigger svg{display:block;flex:none}
-  .mobile-nav-trigger:hover{background:transparent}
+  .mobile-nav-trigger,.mobile-sidebar-close{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin:0;padding:0;border:0;border-radius:8px;background:transparent;touch-action:manipulation}
+  .mobile-nav-trigger{position:relative;z-index:2;color:var(--pine);pointer-events:auto}
+  .mobile-nav-trigger[hidden]{display:none}
+  .mobile-nav-trigger svg,.mobile-sidebar-close svg{display:block;flex:none}
+  .mobile-nav-trigger:hover,.mobile-sidebar-close:hover{background:transparent}
   .mobile-nav-trigger:focus-visible{outline:2px solid var(--pine);outline-offset:1px;background:transparent}
-  .mobile-nav-bar.is-open .mobile-nav-trigger{color:var(--cream)}
-  .mobile-nav-bar.is-open .mobile-nav-trigger:hover{background:transparent}
-  .mobile-nav-bar.is-open .mobile-nav-trigger:focus-visible{outline-color:var(--cream);background:transparent}
+  .mobile-sidebar-close{position:absolute;top:calc(4px + env(safe-area-inset-top,0px));left:calc(var(--page-gutter-left) - 14px);color:var(--cream)}
+  .mobile-sidebar-close:focus-visible{outline:2px solid var(--cream);outline-offset:1px}
   .mobile-sidebar-scrim{position:fixed;inset:0;z-index:0;display:block;margin:0;padding:0;border:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .4s ease}
   .planner-sidebar.mobile-open .mobile-sidebar-scrim{opacity:1;pointer-events:auto}
   .mobile-sidebar-panel{position:absolute;inset:0 auto 0 0;z-index:1;box-sizing:border-box;display:flex;flex-direction:column;width:100%;height:100%;padding:calc(68px + env(safe-area-inset-top,0px)) var(--page-gutter-right) calc(14px + env(safe-area-inset-bottom,0px)) var(--page-gutter-left);background:var(--pine);color:var(--cream);box-shadow:8px 0 28px rgba(0,0,0,.22);overflow-y:auto;clip-path:inset(0 100% 0 0);transition:clip-path .4s ease}
@@ -539,7 +538,7 @@ small, .muted, footer { color: #59665a; }
   .budget-page.page-frame{padding-top:calc(68px + env(safe-area-inset-top,0px))}
 }
 @media(prefers-reduced-motion:reduce){
-  .planner-sidebar, .sidebar-rail, .sidebar-animated-char, .mobile-nav-bar, .mobile-nav-bar::before, .mobile-nav-bar::after, .mobile-sidebar-scrim, .mobile-sidebar-panel, .planner-app-content{transition:none!important}
+  .planner-sidebar, .sidebar-rail, .sidebar-animated-char, .mobile-nav-bar, .mobile-nav-bar::after, .mobile-sidebar-scrim, .mobile-sidebar-panel, .planner-app-content{transition:none!important}
 }
 .household-setup-page .setup-card{margin:18px 0;padding:24px}
 .household-setup-page .setup-card h2{margin:0 0 18px}
