@@ -768,3 +768,72 @@ small, .muted, footer { color: #59665a; }
   .budget-batch-panel input,.budget-batch-panel select{font-size:16px}
   .budget-batch-footer>div:first-child{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}.budget-batch-footer>div:last-child{justify-content:flex-end;width:100%}
 }
+
+/* Shared page frame contract: persistent context above one bounded content region. */
+.page-frame-controls{width:100%;min-width:0;flex:0 0 auto;margin:0 0 12px}
+@media(min-width:768px){
+  .planner-app-shell{height:100dvh;min-height:0;overflow:hidden}
+  .planner-app-content,.planner-app-content>.north-shell{height:100dvh;min-height:0;overflow:hidden}
+  .page-frame{height:100%;min-height:0;overflow:hidden;padding-bottom:20px}
+  .page-frame-heading,.page-frame-summary,.page-frame-controls{flex:0 0 auto}
+  .page-frame-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .monthly-budget-page>.page-frame-body{display:flex;flex-direction:column;overflow:hidden}
+  .monthly-budget-page .budget-v3-workspace{display:flex;flex:1 1 auto;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+  .monthly-budget-page .budget-v3-scroll-tools{flex:0 0 auto}
+  .monthly-budget-page .budget-v3-table-wrap{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+  .monthly-budget-page .budget-v3-table thead{position:sticky;top:0;z-index:2;background:var(--cream)}
+}
+.monthly-budget-page .route-heading{margin-bottom:10px}
+.monthly-budget-page .page-description{display:none}
+.budget-v3-controls{display:flex;align-items:end;gap:12px;margin:8px 0}
+.budget-v3-search{flex:1;max-width:560px}
+.budget-v3-owner-filter{display:grid;gap:6px;min-width:150px;color:var(--muted);font-size:12px;font-weight:600}
+.budget-v3-owner-filter select{min-height:42px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--charcoal)}
+.budget-v3-table th:nth-child(2),.budget-v3-table td:nth-child(2){text-align:right;font-variant-numeric:tabular-nums}
+.budget-v3-owner th button,.budget-v3-category th button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left}
+.budget-v3-owner th button{font-weight:700}.budget-v3-category th button{font-weight:650}
+.budget-v3-amount{border:1px solid transparent;border-radius:4px}
+.budget-v3-amount:hover,.budget-v3-amount:focus-visible{border-color:var(--line);background:var(--card)}
+.budget-v3-row-menu{position:relative;display:inline-block;margin:0 0 0 7px}
+.budget-v3-row-menu summary{list-style:none;color:var(--pine);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.budget-v3-row-menu summary::-webkit-details-marker{display:none}
+.budget-v3-row-menu button{position:absolute;right:0;z-index:5;min-width:100px;padding:8px 12px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:#873d2b;text-align:left}
+.budget-v3-summary-panel header{position:sticky;top:-26px;z-index:1;display:flex;justify-content:space-between;align-items:center;margin:-8px -8px 8px;padding:8px;background:var(--card)}
+.budget-v3-summary-panel .budget-v3-transfers{padding:0;border:0;background:transparent}
+.budget-v3-overlay[hidden]{display:none}
+@media(max-width:767px){
+  .budget-v3-controls{align-items:stretch;flex-direction:column}
+  .budget-v3-search{max-width:none}.budget-v3-owner-filter{grid-template-columns:auto 1fr;align-items:center}
+  .budget-v3-summary-trigger{grid-column:1/-1}
+  .budget-v3-row-menu{margin-left:14px}
+}
+@media(max-height:620px) and (min-width:768px){
+  .page-frame{padding-top:12px!important;padding-bottom:10px!important}
+  .page-frame-heading{margin-bottom:6px!important}
+  .page-frame-heading h1{font-size:28px}
+  .page-frame-summary{margin-bottom:4px}
+  .page-frame-controls{margin-bottom:6px}
+  .budget-v3-summary{gap:14px;padding:4px 0}
+}
+.budget-v3-info{display:inline;padding:0 2px;border:0;background:transparent;color:var(--pine);font:inherit;cursor:help}
+.budget-v3-summary .is-deficit strong{color:#a54232}
+
+/* Group context stays within the Budget table's own scrolling surface. */
+.budget-v3-sticky-anchor{position:sticky;top:calc(var(--budget-header-height,0px) + var(--budget-viewport-top,0px));height:0;z-index:3}
+.budget-v3-sticky-context{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;gap:0;background:var(--cream)}
+.budget-v3-table-wrap[data-page-scroll=true] .budget-v3-sticky-anchor{position:fixed;top:var(--budget-viewport-top,0px);left:var(--budget-wrap-left,0px);width:var(--budget-wrap-width,100%)}
+.budget-v3-sticky-owner,.budget-v3-sticky-category{box-sizing:border-box;flex:0 0 auto;padding:0 10px;border-bottom:1px solid var(--line)}
+.budget-v3-sticky-owner{height:var(--budget-owner-row-height,32px);background:#e7eee6;color:var(--pine);font-size:13px;font-weight:700}
+.budget-v3-sticky-category{height:var(--budget-category-row-height,32px);padding-left:22px;background:#f5f6f2;color:var(--charcoal);font-size:12px;font-weight:650}
+.budget-v3-sticky-context button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.budget-v3-sticky-context button span{flex:none;white-space:nowrap;font-weight:600}
+.budget-v3-sticky-context button:focus-visible,.budget-v3-owner button:focus-visible,.budget-v3-category button:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+@media(max-width:767px){.monthly-budget-page .budget-v3-table-wrap{overflow:visible}}
+@media(max-width:640px){.budget-v3-sticky-category{padding-left:18px}}
+@media(min-width:768px) and (max-height:480px){
+ html:has(.monthly-budget-page),body:has(.monthly-budget-page),#root:has(.monthly-budget-page){height:auto;min-height:100%;overflow:visible}
+ .planner-app-shell:has(.monthly-budget-page),.planner-app-content:has(.monthly-budget-page),.planner-app-content>.north-shell:has(.monthly-budget-page),.monthly-budget-page.page-frame{height:auto;min-height:100dvh;overflow:visible}
+ .monthly-budget-page>.page-frame-body,.monthly-budget-page .budget-v3-workspace,.monthly-budget-page .budget-v3-table-wrap{display:block;overflow:visible}
+ .monthly-budget-page .budget-v3-table thead{position:static}
+}
+.budget-v3-owner button[aria-hidden=true],.budget-v3-category button[aria-hidden=true]{visibility:hidden}
