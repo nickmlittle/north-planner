@@ -6,10 +6,10 @@ import { budgetDateMarkers, incomeDateMarkers, resolveBudget, resolveIncomeSourc
 import { PageFrame } from '../components/PageFrame'
 import { BudgetManagement } from './BudgetManagement'
 import { BudgetItemEditor } from './BudgetItemEditor'
-import { BudgetInfoDialog, MobileBudgetSummary, MobileTransferCards } from './MobileBudgetViews'
+import { BudgetInfoDialog, MobileBudgetSummary, MobileTransferOverview, MobileTransferPreview } from './MobileBudgetViews'
 import { commitItemBatch, type BudgetItemBatch } from '../domain/budgetItemDrafts'
 import { accountTypeLabel } from '../domain/accountTypes'
-import { accountOptionLabels } from './budgetLabels'
+import { accountOptionLabels, accountOwnerLabel } from './budgetLabels'
 import { formatGBPSummary } from '../formatting/money'
 
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void }
@@ -34,7 +34,7 @@ export function MonthlyBudget({document,setDocument,mobileBudgetView:sharedMobil
  const [ownerFilter,setOwnerFilter]=useState('All')
  const mobileBudgetView=sharedMobileBudgetView??'plan'
  const [transferCollapsed,setTransferCollapsed]=useState<Record<string,boolean>>({})
- const [mobileTransferCollapsed,setMobileTransferCollapsed]=useState<Record<string,boolean>>({})
+ const [selectedTransferAccount,setSelectedTransferAccount]=useState<string|null>(null)
  const [infoDialog,setInfoDialog]=useState<'month'|'plan'|'transfers'|null>(null)
  const monthOptionsRef=useRef<HTMLButtonElement>(null), optionsHandoff=useRef(false)
  useLayoutEffect(()=>{
@@ -52,6 +52,7 @@ export function MonthlyBudget({document,setDocument,mobileBudgetView:sharedMobil
  const incomes=resolveIncomeSources(document.budget,month), transfers=budgetTransfers(document.budget,adults.map(p=>p.id),month,items)
  const categories=document.budget.categories
  const accountLabels=accountOptionLabels(document.budget.accounts,adults)
+ const mobileAccountLabels=accountOptionLabels(document.budget.accounts,adults,false)
  const accountFor=(item:BudgetItem)=>{const destination=item.destination;if(destination.kind==='account')return document.budget.accounts.find(a=>a.id===destination.accountId);const potId=destination.potId;return document.budget.accounts.find(a=>a.id===document.budget.pots.find(p=>p.id===potId)?.accountId)}
  const ownerGroup=(item:BudgetItem)=>{const a=accountFor(item);if(!a)return 'Needs owner';if(a.ownerPersonIds.length>1)return 'Joint';if(!a.ownerPersonIds.length)return 'Needs owner';return adults.find(p=>p.id===a.ownerPersonIds[0])?.name??'Needs owner'}
  const searchMatch=(item:BudgetItem)=>{if(!query.trim())return true;const c=categories.find(x=>x.id===item.categoryId)?.name??'',a=accountFor(item),destination=item.destination,p=destination.kind==='pot'?document.budget.pots.find(x=>x.id===destination.potId)?.name??'':'';const owner=ownerGroup(item);return [item.name,c,a?.name,a?.provider,accountTypeLabel(a?.accountTypeId),p,owner].some(v=>v?.toLocaleLowerCase().includes(query.toLocaleLowerCase()))}
@@ -72,6 +73,8 @@ export function MonthlyBudget({document,setDocument,mobileBudgetView:sharedMobil
   ...(transferAccounts.some(account=>!document.budget.accounts.find(row=>row.id===account.accountId)?.ownerPersonIds.length)?[{key:'unassigned',label:'Needs owner',accounts:transferAccounts.filter(account=>!document.budget.accounts.find(row=>row.id===account.accountId)?.ownerPersonIds.length)}]:[]),
  ]
  const accountPeople=(account:typeof transfers.accounts[number])=>transfers.people.map(person=>({personId:person.personId,amountPence:(account.directByPerson.find(row=>row.personId===person.personId)?.amountPence??0)+account.pots.reduce((sum,pot)=>sum+(pot.byPerson.find(row=>row.personId===person.personId)?.amountPence??0),0)}))
+ const selectedAccount=transferAccounts.find(account=>account.accountId===selectedTransferAccount)
+ const selectedBudgetAccount=document.budget.accounts.find(account=>account.id===selectedTransferAccount)
  const start=(item?:BudgetItem)=>{setFormError('');setEditingItem(item);setEditor(true)}
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)
@@ -161,7 +164,7 @@ export function MonthlyBudget({document,setDocument,mobileBudgetView:sharedMobil
     </Fragment>})}</tbody>
     <tfoot><tr className={transfers.unresolvedItemIds.length?'is-incomplete':undefined}><th scope="row">Allocated total</th>{transfers.people.map(person=><td key={person.personId}>{pounds(person.plannedPence)}</td>)}<td>{pounds(transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0))}{transfers.unresolvedItemIds.length?' *':''}</td></tr></tfoot>
    </table></div>
-   <MobileTransferCards groups={mobileTransferGroups} labels={accountLabels} document={document} items={items} collapsed={mobileTransferCollapsed} onToggle={accountId=>setMobileTransferCollapsed(current=>({...current,[accountId]:!(current[accountId]??true)}))}/>
+   <MobileTransferOverview groups={mobileTransferGroups} labels={mobileAccountLabels} adults={adults} accountPeople={accountPeople} onOpen={setSelectedTransferAccount}/>
 
   </>}
  </section>
@@ -190,6 +193,7 @@ export function MonthlyBudget({document,setDocument,mobileBudgetView:sharedMobil
    {transfers.unresolvedItemIds.length>0&&<p>Incomplete totals include only calculated contributions. Review the items needing funding below the summary.</p>}
   </>}
  </BudgetInfoDialog>}
+ {selectedAccount&&<BudgetInfoDialog title={`${selectedBudgetAccount?accountOwnerLabel(selectedBudgetAccount,adults):'Needs owner'} · ${mobileAccountLabels.get(selectedAccount.accountId)??'Account'}`} onClose={()=>setSelectedTransferAccount(null)}><MobileTransferPreview account={selectedAccount} document={document} accountPeople={accountPeople(selectedAccount)}/></BudgetInfoDialog>}
  {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)}/>}
  {incomeOpen&&<div className="budget-v3-overlay"><form className="budget-v3-panel" onSubmit={saveIncome}><h2>Income for {monthLabel(month)}</h2><p>Income changes are independent of budget dates. Employment income sets proportional shares; additional income affects available money only. £0 stops a source from this month.</p>{incomes.map(source=><label key={source.id}>{adults.find(a=>a.id===source.personId)?.name} · {source.name} ({source.type})<input inputMode="decimal" value={incomeDraft[source.id]??(source.amountPence/100).toFixed(2)} onChange={e=>setIncomeDraft(x=>({...x,[source.id]:e.target.value}))}/></label>)}<fieldset><legend>Add recurring income source</legend><label>Person<select value={newIncomePerson} onChange={e=>setNewIncomePerson(e.target.value)}>{adults.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>Source name<input value={newIncomeName} onChange={e=>setNewIncomeName(e.target.value)} placeholder="Parents"/></label><label>Classification<select value={newIncomeType} onChange={e=>setNewIncomeType(e.target.value as 'employment'|'additional')}><option value="employment">Employment income</option><option value="additional">Additional income</option></select></label><label>Monthly amount<input inputMode="decimal" value={newIncomeAmount} onChange={e=>setNewIncomeAmount(e.target.value)}/></label></fieldset><div className="budget-v3-actions"><button type="button" className="secondary-button" onClick={()=>setIncomeOpen(false)}>Cancel</button><button className="primary-button">Save income</button></div></form></div>}
  {management&&<BudgetManagement document={document} setDocument={setDocument} onClose={()=>setManagement(false)}/>}

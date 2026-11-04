@@ -1,9 +1,8 @@
 import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronRight, Info, X } from 'lucide-react'
+import { ChevronRight, Info, X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { budgetTransfers } from '../domain/budgetTransfers'
-import type { BudgetItem } from '../domain/monthlyBudget'
 import { formatGBPSummary } from '../formatting/money'
 
 const pounds = (pence: number) => formatGBPSummary(pence / 100)
@@ -60,7 +59,7 @@ export function MobileBudgetSummary({ view, available, planned, allocated, hasIt
     <div className="budget-mobile-summary-heading"><h2>{plan ? 'Budget balance' : 'Allocated total'}</h2><button type="button" aria-label={`${plan ? 'Plan' : 'Transfers'} summary details`} onClick={onDetails}><Info aria-hidden="true"/></button></div>
     <p className="budget-mobile-summary-value">{plan ? balanceText : pounds(allocated)}</p>
     {plan ? <dl className="budget-mobile-summary-support"><div><dt>Available income</dt><dd>{pounds(available)}</dd></div><div><dt>Planned budget</dt><dd>{pounds(planned)}</dd></div></dl>
-      : <div className="budget-mobile-summary-support"><div><span className={incomplete ? 'budget-allocation-incomplete' : undefined}>{incomplete ? 'Allocation needs attention' : hasItems ? 'All items allocated' : 'No allocations yet'}</span><span className="budget-mobile-summary-note">Planned contributions{incomplete ? ' · Incomplete total' : ''}</span></div></div>}
+      : <p className={`budget-mobile-allocation-status${incomplete ? ' budget-allocation-incomplete' : ''}`}>{incomplete ? 'Allocation needs attention' : hasItems ? 'All items allocated' : 'No allocations yet'}</p>}
   </section>
 }
 
@@ -68,32 +67,49 @@ function Contributions({ people, adults }: { people: PersonAmount[]; adults: Bud
   return <dl className="budget-contributions">{people.map(person => <div key={person.personId}><dt>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</dt><dd>{pounds(person.amountPence)}</dd></div>)}</dl>
 }
 
-export function MobileTransferCards({ groups, labels, document, items, collapsed, onToggle }: {
-  groups: { key: string; label: string; accounts: Transfers['accounts'] }[]
-  labels: Map<string, string>; document: BudgetDocument; items: BudgetItem[]; collapsed: Record<string, boolean>; onToggle: (id: string) => void
+export type MobileTransferGroup = { key: string; label: string; accounts: Transfers['accounts'] }
+
+export function MobileTransferOverview({ groups, labels, adults, accountPeople, onOpen }: {
+  groups: MobileTransferGroup[]
+  labels: Map<string, string>
+  adults: BudgetDocument['household']['adults']
+  accountPeople: (account: Transfers['accounts'][number]) => PersonAmount[]
+  onOpen: (accountId: string) => void
 }) {
-  const prefix = useId()
   return <div className="budget-mobile-destinations" role="region" aria-label="Transfers by account owner">
     {groups.filter(group => group.accounts.length > 0).map(group => <section className="budget-destination-group" key={group.key} aria-label={`${group.label} destinations`}>
       <h3>{group.label}</h3>
-      {group.accounts.map(account => {
-        const label = labels.get(account.accountId) ?? 'Account', open = collapsed[account.accountId] === false
-        const detailsId = `${prefix}-${account.accountId}`
-        const people = account.directByPerson.map(person => ({ personId: person.personId, amountPence: person.amountPence + account.pots.reduce((sum, pot) => sum + (pot.byPerson.find(row => row.personId === person.personId)?.amountPence ?? 0), 0) }))
-        return <article className="budget-destination-card" aria-label={label} key={account.accountId}>
-          <header><h4>{label}</h4><div className="budget-destination-amount"><span>Allocated total</span><strong>{pounds(account.amountPence)}</strong>{account.incomplete && <small className="budget-allocation-incomplete">Incomplete allocation</small>}</div></header>
-          <Contributions people={people} adults={document.household.adults}/>
-          <button type="button" className="budget-destination-disclosure" aria-label={`${open ? 'Hide' : 'View'} budget items for ${label}`} aria-expanded={open} aria-controls={detailsId} onClick={() => onToggle(account.accountId)}>{open ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}{open ? 'Hide budget items' : 'View budget items'}<span>{account.items.length}</span></button>
-          {open && <div id={detailsId} className="budget-destination-items">{account.items.map(item => {
-            const destination = items.find(row => row.id === item.id)?.destination
-            const potName = destination?.kind === 'pot' ? document.budget.pots.find(pot => pot.id === destination.potId)?.name ?? 'Pot' : 'Direct to account'
-            return <section className="budget-destination-item" aria-label={item.name} key={item.id}>
-              <header><div><h5>{item.name}</h5><p>{potName}</p></div><div className="budget-destination-amount"><span>Item total</span><strong>{pounds(item.amountPence)}</strong>{item.incomplete && <small className="budget-allocation-incomplete">Incomplete allocation</small>}</div></header>
-              <Contributions people={item.byPerson} adults={document.household.adults}/>
-            </section>
-          })}</div>}
-        </article>
-      })}
+      <ul>{group.accounts.map(account => {
+        const label = labels.get(account.accountId) ?? 'Account'
+        const nonzeroPeople = accountPeople(account).filter(person => person.amountPence !== 0)
+        return <li key={account.accountId}><button type="button" className="budget-destination-row" aria-label={`${group.label} · ${label}, ${pounds(account.amountPence)} allocated, ${account.items.length} ${account.items.length === 1 ? 'item' : 'items'}${account.incomplete ? ', incomplete allocation' : ''}`} onClick={() => onOpen(account.accountId)}>
+          <span className="budget-destination-main"><span className="budget-destination-name">{label}</span><strong className="budget-destination-total">{pounds(account.amountPence)}</strong></span>
+          <span className="budget-destination-contribution-line">{nonzeroPeople.length ? nonzeroPeople.map((person, index) => <span key={person.personId}>{index > 0 && <span aria-hidden="true"> · </span>}{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'} {pounds(person.amountPence)}</span>) : 'No contribution allocated'}</span>
+          <span className="budget-destination-meta"><span>{account.items.length} {account.items.length === 1 ? 'item' : 'items'}{account.incomplete && <span className="budget-allocation-incomplete"> · Incomplete allocation</span>}</span><ChevronRight size={18} aria-hidden="true" /></span>
+        </button></li>
+      })}</ul>
     </section>)}
+  </div>
+}
+
+/** Keeps the existing breakdown available until the full-screen detail flow is added. */
+export function MobileTransferPreview({ account, document, accountPeople }: {
+  account: Transfers['accounts'][number]; document: BudgetDocument; accountPeople: PersonAmount[]
+}) {
+  return <div className="budget-destination-preview">
+    <p><strong>Allocated total {pounds(account.amountPence)}</strong>{account.incomplete && <span className="budget-allocation-incomplete"> · Incomplete allocation</span>}</p>
+    <Contributions people={accountPeople} adults={document.household.adults}/>
+    <h3>Allocation breakdown</h3>
+    <div className="budget-destination-allocations">
+      {account.hasDirect && <section className="budget-destination-allocation" aria-label="Direct to account">
+        <header><h4>Direct to account</h4><strong>{pounds(account.directAmountPence)}</strong></header>
+        <Contributions people={account.directByPerson} adults={document.household.adults}/>
+      </section>}
+      {account.pots.map(pot => <section className="budget-destination-allocation" aria-label={document.budget.pots.find(row => row.id === pot.potId)?.name ?? 'Pot'} key={pot.potId}>
+        <header><h4>{document.budget.pots.find(row => row.id === pot.potId)?.name ?? 'Pot'}</h4><strong>{pounds(pot.amountPence)}</strong></header>
+        <Contributions people={pot.byPerson} adults={document.household.adults}/>
+      </section>)}
+    </div>
+    <p className="budget-destination-rounding">Amounts are rounded to whole pounds and may not add up exactly.</p>
   </div>
 }

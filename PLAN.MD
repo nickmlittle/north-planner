@@ -88,10 +88,10 @@ Implement the presentation changes primarily in `src/pages/MobileBudgetViews.tsx
 
 - Opening a destination shows a full-viewport detail layer with a sticky header containing **Back to Transfers** and the account name.
 - Include owner, selected month, allocated total and every household member’s contribution near the top.
-- Follow with an unboxed, divided list of budget items in their existing order.
-- Each item initially shows its name, total and pot name or **Direct to account**. Show incomplete status immediately where applicable.
-- Make each item row a disclosure button revealing its complete per-person split, including zero amounts. Multiple item splits may be open simultaneously.
-- Keep item counts, currency formatting and the existing rounding explanation. Do not introduce payment execution, paid/unpaid tracking or editing controls into this view.
+- Follow with an unboxed, divided breakdown of **Direct to account** when present and each pot in its existing order.
+- Show the allocated total and complete per-person split for each direct or pot summary, including zero amounts. Keep incomplete allocation status visible near the account total.
+- Pot summaries are the lowest level of detail. Do not show budget-item rows or item disclosures in Transfers.
+- Keep currency formatting and the existing rounding explanation. Do not introduce payment execution, paid/unpaid tracking or editing controls into this view.
 
 ### Interaction and accessibility
 
@@ -109,7 +109,7 @@ Implement the presentation changes primarily in `src/pages/MobileBudgetViews.tsx
 1. Introduce typed navigation parsing and URL updates, then adapt the app’s selected Budget mode and month to this state.
 2. Build the mobile bottom bar and utility sheet; remove obsolete drawer behaviour and associated mobile styles.
 3. Replace transfer cards and summary styling with the grouped overview.
-4. Add the full-screen destination view and item disclosures, including history, focus and scroll restoration.
+4. Add the full-screen destination view with direct and pot summaries, including history, focus and scroll restoration.
 5. Update tests and perform responsive browser/device verification.
 
 Internal interfaces will change to pass the selected month, Budget mode, destination ID and navigation callbacks into the relevant components. Transfer rendering should continue consuming `budgetTransfers()` output; monetary calculations must not move into presentation components.
@@ -128,7 +128,7 @@ Update the existing Vitest/Testing Library tests to cover:
 - Grouping, duplicate account labels, direct-plus-pot totals and households with more than two adults.
 - Zero contributions omitted only from the overview and retained in detail.
 - Empty budgets and incomplete allocations, including the existing Edit income action.
-- Detail entry/exit, item disclosure, Escape, focus restoration and direct-link fallback.
+- Detail entry/exit, direct and pot summaries, Escape, focus restoration and direct-link fallback.
 - Account deletion while detail is selected and cleanup when leaving the mobile breakpoint.
 - Account/sign-out availability, save warnings and modal isolation of bottom navigation.
 - Desktop sidebar and transfer-table regression behaviour.
@@ -145,11 +145,11 @@ Acceptance criteria:
 - At 390 × 844 with ordinary two-person data and no warning, at least three destination rows are fully visible before scrolling.
 - All interactive targets meet the specified minimum sizes and have visible keyboard focus.
 - The last content row remains accessible above the bottom bar and device safe area.
-- Expanding a 23-item destination no longer lengthens the overview.
+- A destination with 23 budget items shows only its direct and pot summaries without lengthening the overview.
 - Returning from detail restores the same destination and scroll position.
 - Plan forms, menus and modal actions remain usable with the on-screen keyboard.
 - Desktop retains its existing layout and behaviour.
 
 Physical-phone checks should confirm thumb reach, safe areas and keyboard interaction; responsive browser screenshots alone are insufficient.
 
-**Chosen defaults:** three direct bottom destinations; full-screen destination detail; Plan remains the default landing view; zero contributions are hidden only in overview summaries; transfer calculations and desktop presentation remain unchanged.
+**Chosen defaults:** three direct bottom destinations; full-screen destination detail ending at pot summaries; Plan remains the default landing view; zero contributions are hidden only in overview summaries; transfer calculations and desktop presentation remain unchanged.
