@@ -1,5 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { UserRoundGroup, Wallet } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { BudgetDocument } from './domain/budgetDocument'
 import { HouseholdSetup } from './pages/HouseholdSetup'
@@ -9,7 +8,7 @@ import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
-import { navigateTo, type PlannerDestination, type PlannerView } from './state/navigation'
+import { navigateTo, parseNavigation, type BudgetView, type PlannerView } from './state/navigation'
 
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
 
@@ -25,28 +24,18 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   onSignOut?: () => void
 }) {
   const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
-  const [mobileBudgetView, setMobileBudgetView] = useState<'transfers' | 'plan'>('plan')
-  useEffect(() => {
-    const resetBudgetView = () => setMobileBudgetView('plan')
-    window.addEventListener('popstate', resetBudgetView)
-    return () => window.removeEventListener('popstate', resetBudgetView)
-  }, [])
-  const requested = new URLSearchParams(search).get('view')
-  const setupComplete = !!document.household.name.trim() && document.household.adults.length > 0 && document.household.adults.every(person => !!person.name.trim())
-  const view: PlannerView = !setupComplete || !document.workflow.setupComplete || requested === 'household' ? 'household' : 'budget'
-  const selectView = (nextView: PlannerView) => { if (nextView === 'budget') setMobileBudgetView('plan'); navigateTo(nextView) }
-  const routes: Array<PlannerDestination & { render: () => ReactNode }> = [
-    {
-      id: 'household', label: 'Household', Icon: UserRoundGroup,
-      render: () => <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo('budget') }} />,
-    },
-    {
-      id: 'budget', label: 'Budget', Icon: Wallet,
-      render: () => <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={mobileBudgetView} /></Suspense>,
-    },
-  ]
-  return <AppLayout navigation={{ currentView: view, destinations: routes, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, mobileBudgetView, onMobileBudgetViewChange: setMobileBudgetView }}>
-    {routes.find(route => route.id === view)!.render()}
+  const navigation = parseNavigation(search)
+  const setupComplete = !!document.household.name.trim() && document.household.adults.length > 0 && document.household.adults.every(person => !!person.name.trim()) && document.workflow.setupComplete
+  const view: PlannerView = !setupComplete || navigation.view === 'household' ? 'household' : 'budget'
+  const selectView = (nextView: PlannerView) => { if (nextView !== view) navigateTo({ view: nextView, transferAccount: null }) }
+  const selectBudgetView = (nextView: BudgetView) => {
+    if (!setupComplete || (view === 'budget' && navigation.budgetView === nextView)) return
+    navigateTo({ view: 'budget', budgetView: nextView, transferAccount: null })
+  }
+  return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
+    {view === 'household'
+      ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
+      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} /></Suspense>}
   </AppLayout>
 }
 

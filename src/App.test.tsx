@@ -32,7 +32,7 @@ it('keeps the sidebar controls and routes between Household and Budget', async (
   await completeSetup()
   fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
   expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getAllByText('north.')).toHaveLength(2)
+  expect(screen.getAllByText('north.')).toHaveLength(1)
   const nav = screen.getByRole('navigation', { name: 'Main navigation' })
   fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
@@ -43,34 +43,44 @@ it('keeps the sidebar controls and routes between Household and Budget', async (
   expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
 })
 
-it('keeps the Budget view switch in the app header and resets it to Plan on re-entry', async () => {
+it('keeps the selected mobile destination and month in the URL and browser history', async () => {
   render(<App />)
   await completeSetup()
-  const group = screen.getByRole('group', { name: 'Budget view' })
-  const transfers = within(group).getByRole('button', { name: 'Transfers' })
-  const plan = within(group).getByRole('button', { name: 'Plan' })
-  expect(plan).toHaveAttribute('aria-pressed', 'true')
+  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
+  const transfers = within(nav).getByRole('button', { name: 'Transfers' })
+  const plan = within(nav).getByRole('button', { name: 'Plan' })
+  expect(plan).toHaveAttribute('aria-current', 'page')
+  const firstLength = window.history.length
+  fireEvent.click(plan)
+  expect(window.history.length).toBe(firstLength)
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }))
+  const selectedMonth = new URLSearchParams(window.location.search).get('month')
+  expect(selectedMonth).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/)
   fireEvent.click(transfers)
-  expect(transfers).toHaveAttribute('aria-pressed', 'true')
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Household' }))
+  expect(window.location.search).toContain('budgetView=transfers')
+  expect(new URLSearchParams(window.location.search).get('month')).toBe(selectedMonth)
+  expect(transfers).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
-  expect(screen.queryByRole('group', { name: 'Budget view' })).not.toBeInTheDocument()
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Budget' }))
+  fireEvent.click(transfers)
   expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
-  expect(within(screen.getByRole('group', { name: 'Budget view' })).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-pressed', 'true')
+  expect(transfers).toHaveAttribute('aria-current', 'page')
+  expect(new URLSearchParams(window.location.search).get('month')).toBe(selectedMonth)
 })
 
-it('closes the mobile drawer with Escape and a navigation choice', async () => {
+it('opens the mobile account and save status sheet and closes it with Escape', async () => {
   render(<App />)
   await completeSetup()
-  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-  expect(screen.getByRole('button', { name: 'Close navigation menu', expanded: true })).toBeVisible()
-  fireEvent.keyDown(document, { key: 'Escape' })
-  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
-  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Navigation menu' })).getByRole('button', { name: 'Household' }))
-  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  const trigger = screen.getByRole('button', { name: 'Account and save status' })
+  trigger.focus()
+  fireEvent.click(trigger)
+  const sheet = screen.getByRole('dialog', { name: 'Account and save status' })
+  expect(within(sheet).getByText('Saved')).toBeVisible()
+  expect(within(sheet).queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
+  expect(document.querySelector('.planner-app-shell')?.closest('[inert]')).not.toBeNull()
+  fireEvent.keyDown(sheet, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Account and save status' })).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
 })
 
 it('maps removed page URLs to the retained screens', async () => {
@@ -84,15 +94,42 @@ it('maps removed page URLs to the retained screens', async () => {
   expect(screen.queryByText('Amex statement')).not.toBeInTheDocument()
 })
 
-it('closes the mobile drawer with the page strip and preserves the agreed saved icon', async () => {
+it('opens direct Transfers URLs and keeps budget search mounted across tab changes', async () => {
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }] }
+  saved.workflow.setupComplete = true
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
+  render(<App />)
+  await screen.findByRole('heading', { name: 'Budget your month' })
+  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
+  expect(within(nav).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('button', { name: 'February 2026' })).toBeInTheDocument()
+  fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
+  const search = screen.getByPlaceholderText('Search budget')
+  fireEvent.change(search, { target: { value: 'Groceries' } })
+  fireEvent.click(within(nav).getByRole('button', { name: 'Transfers' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
+  expect(search).toHaveValue('Groceries')
+  expect(screen.getByRole('button', { name: 'February 2026' })).toBeInTheDocument()
+})
+
+it('gates direct Budget URLs until household setup is complete', () => {
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers')
+  render(<App />)
+  expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
+  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
+  expect(within(nav).getByRole('button', { name: 'Transfers' })).toBeDisabled()
+  expect(within(nav).getByRole('button', { name: 'Household' })).toHaveAttribute('aria-current', 'page')
+})
+
+it('preserves the saved check icon and removes the mobile drawer', async () => {
   render(<App />)
   await completeSetup()
   const saved = document.querySelector('.sidebar-status')!
   expect(saved.querySelector('path')?.getAttribute('d')).toBe('M20 6 9 17l-5-5')
-  fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-  const scrim = document.querySelector('.mobile-sidebar-scrim') as HTMLButtonElement
-  fireEvent.click(scrim)
-  expect(screen.getByRole('button', { name: 'Open navigation menu' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument()
+  expect(document.querySelector('.mobile-sidebar-scrim')).toBeNull()
 })
 
 it('returns from an old settings URL to Budget through browser navigation', async () => {
