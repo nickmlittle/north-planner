@@ -32,10 +32,16 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     if (!setupComplete || (view === 'budget' && navigation.budgetView === nextView)) return
     navigateTo({ view: 'budget', budgetView: nextView, transferAccount: null })
   }
+  const openTransferAccount = (accountId: string) => navigateTo({ view: 'budget', budgetView: 'transfers', transferAccount: accountId }, { historyState: { northTransferDetail: true } })
+  const closeTransferAccount = () => {
+    if (window.history.state?.northTransferDetail === true) window.history.back()
+    else navigateTo({ transferAccount: null }, { replace: true })
+  }
+  const dismissTransferAccount = () => navigateTo({ transferAccount: null }, { replace: true })
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
     {view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
-      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} /></Suspense>}
+      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} transferAccount={navigation.transferAccount} onOpenTransferAccount={openTransferAccount} onCloseTransferAccount={closeTransferAccount} onDismissTransferAccount={dismissTransferAccount} /></Suspense>}
   </AppLayout>
 }
 

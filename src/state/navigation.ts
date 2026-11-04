@@ -21,7 +21,7 @@ export function parseNavigation(search: string): NavigationState {
   }
 }
 
-export function navigateTo(next: Partial<NavigationState>, { replace = false }: { replace?: boolean } = {}) {
+export function navigateTo(next: Partial<NavigationState>, { replace = false, historyState = null }: { replace?: boolean; historyState?: unknown } = {}) {
   const current = parseNavigation(window.location.search)
   const state = { ...current, ...next }
   const url = new URL(window.location.href)
@@ -36,6 +36,6 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false }: 
   url.searchParams.delete('settings')
   const target = `${url.pathname}${url.search}${url.hash}`
   if (target === `${window.location.pathname}${window.location.search}${window.location.hash}`) return
-  window.history[replace ? 'replaceState' : 'pushState'](null, '', target)
+  window.history[replace ? 'replaceState' : 'pushState'](historyState, '', target)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
