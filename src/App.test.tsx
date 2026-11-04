@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { budgetStorageKey } from './state/useBudgetDocument'
 import { newBudgetDocument } from './domain/budgetDocument'
@@ -13,6 +13,16 @@ async function completeSetup() {
   fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Alex' } })
   fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
   await screen.findByRole('heading', { name: 'Budget your month' })
+}
+
+function savedTransferDocument() {
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Alex household', adults: [{ id: 'alex', name: 'Alex' }, { id: 'sam', name: 'Sam' }] }
+  saved.workflow.setupComplete = true
+  saved.budget.accounts = [{ id: 'account-1', name: 'Current account', provider: 'Monzo', accountTypeId: 'current-account', ownerPersonIds: ['alex'] }]
+  saved.budget.categories = [{ id: 'bills', name: 'Bills' }]
+  saved.budget.snapshots['2026-02'] = { items: [{ id: 'bill', name: 'Rent', categoryId: 'bills', destination: { kind: 'account', accountId: 'account-1' }, entryAmountPence: 10000, amountPence: 10000, frequency: 'monthly', funding: 'equal' }] }
+  return saved
 }
 
 it('starts with household setup and saves only the new budget key', async () => {
@@ -160,4 +170,68 @@ it('keeps budget ownership aligned after an adult name is edited', () => {
   const next = JSON.parse(localStorage.getItem(budgetStorageKey)!)
   expect(next.household.adults[0].name).toBe('Alexandra')
   expect(next.budget.accounts[0].ownerPersonIds).toEqual(['alex'])
+})
+
+it('opens a destination URL and restores the overview with Back and browser Forward', async () => {
+  localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
+  render(<App />)
+  const row = await screen.findByRole('button', { name: /Alex · Monzo · Current account, £100 allocated/ })
+  row.focus()
+  const originalLength = window.history.length
+  fireEvent.click(row)
+  expect(window.location.search).toContain('transferAccount=account-1')
+  expect(window.history.length).toBe(originalLength + 1)
+  const detail = await screen.findByRole('dialog', { name: 'Monzo · Current account' })
+  const heading = within(detail).getByRole('heading', { name: 'Monzo · Current account' })
+  const back = within(detail).getByRole('button', { name: 'Back to Transfers' })
+  expect(heading).toHaveFocus()
+  fireEvent.keyDown(detail, { key: 'Tab' })
+  expect(back).toHaveFocus()
+  within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Plan' }).focus()
+  expect(heading).toHaveFocus()
+  expect(detail).toHaveTextContent('Alex · February 2026')
+  expect(detail).toHaveTextContent('Alex£50Sam£50')
+  expect(document.body.style.position).toBe('fixed')
+  expect(document.querySelector('.planner-app-shell')?.closest('[inert]')).not.toBeNull()
+  fireEvent.click(back)
+  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
+  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
+  expect(row).toHaveFocus()
+  expect(document.body.style.position).toBe('')
+  window.history.forward()
+  expect(await screen.findByRole('dialog', { name: 'Monzo · Current account' })).toBeInTheDocument()
+})
+
+it('replaces a direct detail URL when closing and clears an invalid destination', async () => {
+  localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')
+  render(<App />)
+  const detail = await screen.findByRole('dialog', { name: 'Monzo · Current account' })
+  const length = window.history.length
+  fireEvent.keyDown(detail, { key: 'Escape' })
+  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
+  expect(window.history.length).toBe(length)
+  cleanup()
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=missing')
+  render(<App />)
+  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
+  expect(screen.getByRole('status')).toHaveTextContent('Destination is no longer available')
+})
+
+it('dismisses mobile detail when the viewport becomes desktop', async () => {
+  localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
+  const listeners = new Set<() => void>()
+  let matches = true
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ get matches() { return matches }, addEventListener: (_: string, listener: () => void) => listeners.add(listener), removeEventListener: (_: string, listener: () => void) => listeners.delete(listener) })))
+  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')
+  render(<App />)
+  expect(await screen.findByRole('dialog', { name: 'Monzo · Current account' })).toBeInTheDocument()
+  matches = false
+  listeners.forEach(listener => listener())
+  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
+  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
+  matches = true
+  listeners.forEach(listener => listener())
+  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
 })
