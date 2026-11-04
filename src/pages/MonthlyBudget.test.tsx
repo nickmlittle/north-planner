@@ -69,7 +69,7 @@ it('expands search matches temporarily and restores the saved group state when c
   fireEvent.change(search,{target:{value:''}})
   expect(screen.queryByText('Apple TV')).not.toBeInTheDocument()
 })
-it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(screen.getByText('£10 over budget')).toBeVisible();expect(screen.getByRole('region',{name:'People and transfers'})).toBeVisible();expect(screen.getByText('Monthly plan by person')).toBeVisible();expect(screen.getByText('Transfers by destination')).toBeVisible()})
+it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(within(screen.getByRole('region',{name:'Plan summary'})).getByText('£10 over budget')).toBeVisible();expect(screen.getByRole('region',{name:'People and transfers'})).toBeVisible();expect(screen.getByText('Monthly plan by person')).toBeVisible();expect(screen.getByText('Transfers by destination')).toBeVisible()})
 it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{name:'Budget your month'}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
 it('confirms removal from the selected budget month',()=>{vi.spyOn(window,'confirm').mockReturnValue(false);render(<Harness/>);addItem();fireEvent.click(screen.getByLabelText('More actions for Apple TV'));fireEvent.click(screen.getByRole('button',{name:'Remove'}));expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Apple TV'));expect(screen.getByText('Apple TV')).toBeVisible()})
 it('shows explicit budget and income change markers in the month picker',()=>{render(<Harness/>);addItem('Bill');fireEvent.click(screen.getByRole('button',{name:'November 2026'}));expect(screen.getByRole('dialog',{name:'Choose budget month'})).toBeVisible()})
@@ -126,25 +126,27 @@ it('shows person allocations for an account, its direct funding and its pot deta
   render(<SeededHarness initial={initial} view="transfers"/>)
   expect(screen.getByRole('heading',{name:'Budget your month'})).toBeVisible()
   const transfers=screen.getByRole('region',{name:'Transfers by account owner'})
-  const nickGroup=within(transfers).getByRole('button',{name:/^Transfers for Nick/})
-  expect(nickGroup).toHaveAttribute('aria-expanded','false')
-  expect(within(transfers).queryByRole('table',{name:/Transfers for Nick/})).not.toBeInTheDocument()
-  fireEvent.click(nickGroup)
-  expect(document.querySelector('.budget-v3-transfer-mobile-total')).toHaveTextContent('£35')
-  expect(nickGroup).toHaveAttribute('aria-expanded','true')
-  expect(nickGroup).toHaveTextContent(/Planned £20/)
-  const mobileTable=within(transfers).getByRole('table',{name:/Transfers for Nick/})
-  expect(within(mobileTable).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Account / budget item','Nick','Immy','Total'])
-  const accountDisclosure=within(mobileTable).getByRole('button',{name:/budget items for Nick · Monzo · Current account/})
+  const card=within(transfers).getByRole('article',{name:'Nick · Monzo · Current account'})
+  expect(within(transfers).queryByRole('region',{name:'Joint destinations'})).not.toBeInTheDocument()
+  expect(within(card).getByText('Nick').parentElement).toHaveTextContent('Nick£15')
+  expect(within(card).getByText('Immy').parentElement).toHaveTextContent('Immy£15')
+  expect(card).not.toHaveTextContent(/remaining|planned £/i)
+  const summary=screen.getByRole('region',{name:'Transfers summary'})
+  expect(summary).toHaveTextContent('Allocated total£35')
+  expect(summary).toHaveTextContent('All items allocated')
+  const accountDisclosure=within(card).getByRole('button',{name:/View budget items/})
   expect(accountDisclosure).toHaveAttribute('aria-expanded','false')
+  expect(within(card).queryByText('Direct item')).not.toBeInTheDocument()
   fireEvent.click(accountDisclosure)
-  expect(within(mobileTable).getByText('Direct item')).toBeVisible()
-  expect(within(mobileTable).getByText('Pot item')).toBeVisible()
-  expect(within(mobileTable).getByText('Pot item').closest('tr')).toHaveTextContent('£10£10£20')
+  expect(within(card).getByText('Direct to account')).toBeVisible()
+  const potItem=within(card).getByRole('region',{name:'Pot item'})
+  expect(potItem).toHaveTextContent('Spending')
+  expect(within(potItem).getByText('Nick').parentElement).toHaveTextContent('Nick£10')
+  expect(within(potItem).getByText('Immy').parentElement).toHaveTextContent('Immy£10')
   fireEvent.click(screen.getByRole('button',{name:'Next month'}))
   fireEvent.click(screen.getByRole('button',{name:'Previous month'}))
-  expect(within(transfers).getByRole('button',{name:/budget items for Nick · Monzo · Current account/})).toHaveAttribute('aria-expanded','true')
-  expect(within(transfers).getByRole('button',{name:/^Transfers for Nick/})).toHaveAttribute('aria-expanded','true')
+  expect(within(card).getByRole('button',{name:/Hide budget items/})).toHaveAttribute('aria-expanded','true')
+
 })
 
 it('keeps the budget title and month selector shared between Transfers and Plan',()=>{
@@ -160,19 +162,19 @@ it('keeps the budget title and month selector shared between Transfers and Plan'
   expect(selector.querySelector('.budget-v3-date-context')).toBeVisible()
 })
 
-it('builds mobile transfer columns from household members',()=>{
+it('shows every household contribution including zero amounts in destination cards',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.household.adults.push({id:'sam',name:'Sam'})
   initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   render(<SeededHarness initial={initial} view="transfers"/>)
   const transfers=screen.getByRole('region',{name:'Transfers by account owner'})
-  const nickGroup=within(transfers).getByRole('button',{name:/^Transfers for Nick/})
-  fireEvent.click(nickGroup)
-  const table=within(transfers).getByRole('table',{name:/Transfers for Nick/})
-  expect(within(table).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Account / budget item','Nick','Immy','Sam','Total'])
-  fireEvent.click(within(table).getByRole('button',{name:/budget items for Nick · Monzo · Current account/}))
-  const row=within(table).getByRole('row',{name:/Solo transfer/})
-  expect(within(row).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['£5','£0','£0','£5'])
+  const card=within(transfers).getByRole('article',{name:'Nick · Monzo · Current account'})
+  for(const name of ['Immy','Sam'])expect(within(card).getByText(name).parentElement).toHaveTextContent(`${name}£0`)
+  expect(within(card).getByText('Nick').parentElement).toHaveTextContent('Nick£5')
+  fireEvent.click(within(card).getByRole('button',{name:/View budget items/}))
+  const item=within(card).getByRole('region',{name:'Solo transfer'})
+  expect(within(item).getAllByRole('definition').map(cell=>cell.textContent)).toEqual(['£5','£0','£0'])
+
 })
 
 it('keeps the incomplete allocation warning actionable and shows an empty transfer state',()=>{
@@ -181,11 +183,18 @@ it('keeps the incomplete allocation warning actionable and shows an empty transf
   render(<SeededHarness initial={initial} view="transfers"/>)
   const warning=document.querySelector<HTMLElement>('.budget-v3-transfer-warning')!
   expect(warning).toHaveTextContent('Unfunded')
+  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Allocation needs attention')
+  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Incomplete total')
+  const card=screen.getByRole('article',{name:'Nick · Monzo · Current account'})
+  expect(card).toHaveTextContent('Incomplete allocation')
+  fireEvent.click(within(card).getByRole('button',{name:/View budget items/}))
+  expect(within(card).getByRole('region',{name:'Unfunded'})).toHaveTextContent('Incomplete allocation')
   fireEvent.click(within(warning).getByRole('button',{name:'Edit income'}))
   expect(screen.getByRole('heading',{name:/Income for/})).toBeVisible()
   cleanup()
   render(<SeededHarness initial={seededDocument()} view="transfers"/>)
   expect(screen.getByText('No transfers planned')).toBeVisible()
+  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('No allocations yet')
 })
 
 it('navigates an existing account and pot and saves the selected stable pot ID', () => {
@@ -562,4 +571,98 @@ it('keeps a single operable sticky group context as boundaries cross and results
   fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'no match'}})
   expect(screen.getByText(/No items match/)).toBeVisible()
   expect(document.querySelector('.budget-v3-sticky-context')).not.toBeInTheDocument()
+})
+
+it.each([
+  {income:2000,text:'£10 remaining'},
+  {income:1000,text:'Budget balanced'},
+  {income:0,text:'£10 over budget'},
+])('leads the mobile Plan summary with $text',({income,text})=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.incomeSources=[{id:'job',personId:'nick',name:'Job',type:'employment',baseAmountPence:income,changes:{}}]
+  initial.budget.snapshots[month]={items:[{id:'bill',name:'Bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
+  render(<SeededHarness initial={initial}/>)
+  const summary=screen.getByRole('region',{name:'Plan summary'})
+  expect(summary).toHaveTextContent(text)
+  expect(summary).toHaveTextContent('Available income')
+  expect(summary).not.toHaveTextContent('Employment split basis')
+  const trigger=within(summary).getByRole('button',{name:'Plan summary details'})
+  trigger.focus();fireEvent.click(trigger)
+  const dialog=screen.getByRole('dialog',{name:'Plan summary details'})
+  expect(dialog).toHaveTextContent('Employment split basis')
+  expect(dialog).toHaveTextContent('Additional income increases available money')
+  expect(within(dialog).getByRole('button',{name:'Close dialog'})).toHaveFocus()
+  fireEvent.keyDown(dialog,{key:'Escape'})
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+})
+
+it('keeps month options keyboard focus contained and preserves a budget when removal is cancelled',()=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.snapshots[month]={items:[]}
+  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)
+  render(<SeededHarness initial={initial}/>)
+  const trigger=screen.getByRole('button',{name:'Month options'})
+  trigger.focus();fireEvent.click(trigger)
+  const dialog=screen.getByRole('dialog',{name:'Month options'})
+  const close=within(dialog).getByRole('button',{name:'Close dialog'}),remove=within(dialog).getByRole('button',{name:'Remove budget date'})
+  expect(close).toHaveFocus()
+  fireEvent.keyDown(close,{key:'Tab',shiftKey:true})
+  expect(remove).toHaveFocus()
+  fireEvent.keyDown(remove,{key:'Tab'})
+  expect(close).toHaveFocus()
+  fireEvent.click(remove)
+  expect(confirm).toHaveBeenCalled()
+  expect(savedBudget().snapshots[month]).toBeDefined()
+  expect(screen.queryByRole('dialog',{name:'Month options'})).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+})
+
+it('hands off from month options to income and management and restores focus',()=>{
+  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
+  const trigger=screen.getByRole('button',{name:'Month options'})
+  trigger.focus();fireEvent.click(trigger)
+  let dialog=screen.getByRole('dialog',{name:'Month options'})
+  expect(within(dialog).queryByRole('button',{name:'Remove budget date'})).not.toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button',{name:'Edit income'}))
+  expect(screen.queryByRole('dialog',{name:'Month options'})).not.toBeInTheDocument()
+  const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
+  expect(form).toContainElement(document.activeElement as HTMLElement)
+  expect(form.closest('.page-frame-body')).toBeNull()
+  fireEvent.click(within(form).getByRole('button',{name:'Cancel'}))
+  expect(trigger).toHaveFocus()
+  fireEvent.click(trigger)
+  dialog=screen.getByRole('dialog',{name:'Month options'})
+  fireEvent.click(within(dialog).getByRole('button',{name:'Manage accounts, pots & categories'}))
+  expect(screen.queryByRole('dialog',{name:'Month options'})).not.toBeInTheDocument()
+  const management=screen.getByRole('dialog',{name:'Manage accounts, pots and categories'})
+  expect(management).toContainElement(document.activeElement as HTMLElement)
+  fireEvent.click(within(management).getByRole('button',{name:'Done'}))
+  expect(trigger).toHaveFocus()
+})
+
+it('preserves month, search, owner and destination expansion when switching views',()=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.snapshots[month]={items:[{id:'bill',name:'Bill',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'equal'}]}
+  const {rerender}=render(<SeededHarness initial={initial} view="plan"/>)
+  fireEvent.click(screen.getByRole('button',{name:'Next month'}))
+  const selectedMonth=document.querySelector('.budget-v3-month>button:nth-child(2)')!.textContent
+  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Bill'}})
+  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Nick'}})
+  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  const card=screen.getByRole('article',{name:'Nick · Monzo · Current account'})
+  fireEvent.click(within(card).getByRole('button',{name:/View budget items/}))
+  const trigger=screen.getByRole('button',{name:'Transfers summary details'})
+  trigger.focus();fireEvent.click(trigger)
+  const dialog=screen.getByRole('dialog',{name:'Transfers summary details'})
+  expect(dialog).toHaveTextContent('Destination accounts1')
+  expect(dialog).toHaveTextContent('rounded to whole pounds')
+  fireEvent.click(within(dialog).getByRole('button',{name:'Close dialog'}))
+  expect(trigger).toHaveFocus()
+  rerender(<SeededHarness initial={initial} view="plan"/>)
+  expect(screen.getByPlaceholderText('Search budget')).toHaveValue('Bill')
+  expect(screen.getByLabelText('Owner')).toHaveValue('Nick')
+  expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
+  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  expect(within(card).getByRole('button',{name:/Hide budget items/})).toHaveAttribute('aria-expanded','true')
 })
