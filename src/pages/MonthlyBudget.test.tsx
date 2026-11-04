@@ -109,9 +109,9 @@ function seededDocument() {
   d.budget.pots = [{ id: 'p1', name: 'Spending', accountId: 'a1' }]
   return d
 }
-function SeededHarness({ initial }: { initial: BudgetDocument }) {
+function SeededHarness({ initial, view = 'plan' }: { initial: BudgetDocument; view?: 'transfers' | 'plan' }) {
   const [document, setDocument] = useState(initial)
-  return <><MonthlyBudget document={document} setDocument={setDocument}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
+  return <><MonthlyBudget document={document} setDocument={setDocument} mobileBudgetView={view}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
 }
 function savedBudget() { return JSON.parse(screen.getByTestId('saved-budget').textContent!) as BudgetDocument['budget'] }
 
@@ -121,14 +121,71 @@ it('shows person allocations for an account, its direct funding and its pot deta
   initial.budget.snapshots[month]={items:[
     {id:'direct',name:'Direct item',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'equal'},
     {id:'pot-item',name:'Pot item',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:2000,amountPence:2000,frequency:'monthly',funding:'equal'},
+    {id:'single-item',name:'Single funder',categoryId:'bills',destination:{kind:'account',accountId:'a2'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'},
   ]}
-  render(<SeededHarness initial={initial}/>)
-  const transfers=screen.getByRole('region',{name:'Monthly transfers by destination'})
-  expect(within(transfers).getByText('Direct to account')).toBeVisible()
-  expect(within(transfers).getByText('Spending')).toBeVisible()
-  expect(within(transfers).getByText('Allocated total').parentElement).toHaveTextContent('£15')
-  fireEvent.click(within(transfers).getByRole('button',{name:/Current account/}))
-  expect(within(transfers).queryByText('Spending')).not.toBeInTheDocument()
+  render(<SeededHarness initial={initial} view="transfers"/>)
+  expect(screen.getByRole('heading',{name:'Budget your month'})).toBeVisible()
+  const transfers=screen.getByRole('region',{name:'Transfers by account owner'})
+  const nickGroup=within(transfers).getByRole('button',{name:/^Transfers for Nick/})
+  expect(nickGroup).toHaveAttribute('aria-expanded','false')
+  expect(within(transfers).queryByRole('table',{name:/Transfers for Nick/})).not.toBeInTheDocument()
+  fireEvent.click(nickGroup)
+  expect(document.querySelector('.budget-v3-transfer-mobile-total')).toHaveTextContent('£35')
+  expect(nickGroup).toHaveAttribute('aria-expanded','true')
+  expect(nickGroup).toHaveTextContent(/Planned £20/)
+  const mobileTable=within(transfers).getByRole('table',{name:/Transfers for Nick/})
+  expect(within(mobileTable).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Account / budget item','Nick','Immy','Total'])
+  const accountDisclosure=within(mobileTable).getByRole('button',{name:/budget items for Nick · Monzo · Current account/})
+  expect(accountDisclosure).toHaveAttribute('aria-expanded','false')
+  fireEvent.click(accountDisclosure)
+  expect(within(mobileTable).getByText('Direct item')).toBeVisible()
+  expect(within(mobileTable).getByText('Pot item')).toBeVisible()
+  expect(within(mobileTable).getByText('Pot item').closest('tr')).toHaveTextContent('£10£10£20')
+  fireEvent.click(screen.getByRole('button',{name:'Next month'}))
+  fireEvent.click(screen.getByRole('button',{name:'Previous month'}))
+  expect(within(transfers).getByRole('button',{name:/budget items for Nick · Monzo · Current account/})).toHaveAttribute('aria-expanded','true')
+  expect(within(transfers).getByRole('button',{name:/^Transfers for Nick/})).toHaveAttribute('aria-expanded','true')
+})
+
+it('keeps the budget title and month selector shared between Transfers and Plan',()=>{
+  const initial=seededDocument()
+  const {rerender}=render(<SeededHarness initial={initial} view="transfers"/>)
+  const title=screen.getByRole('heading',{name:'Budget your month'})
+  const selector=document.querySelector('.budget-v3-date-selector')!
+  expect(selector).toBeVisible()
+  expect(selector.querySelector('.budget-v3-date-context')).toBeVisible()
+  rerender(<SeededHarness initial={initial} view="plan"/>)
+  expect(screen.getByRole('heading',{name:'Budget your month'})).toBe(title)
+  expect(document.querySelector('.budget-v3-date-selector')).toBe(selector)
+  expect(selector.querySelector('.budget-v3-date-context')).toBeVisible()
+})
+
+it('builds mobile transfer columns from household members',()=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.household.adults.push({id:'sam',name:'Sam'})
+  initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
+  render(<SeededHarness initial={initial} view="transfers"/>)
+  const transfers=screen.getByRole('region',{name:'Transfers by account owner'})
+  const nickGroup=within(transfers).getByRole('button',{name:/^Transfers for Nick/})
+  fireEvent.click(nickGroup)
+  const table=within(transfers).getByRole('table',{name:/Transfers for Nick/})
+  expect(within(table).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Account / budget item','Nick','Immy','Sam','Total'])
+  fireEvent.click(within(table).getByRole('button',{name:/budget items for Nick · Monzo · Current account/}))
+  const row=within(table).getByRole('row',{name:/Solo transfer/})
+  expect(within(row).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['£5','£0','£0','£5'])
+})
+
+it('keeps the incomplete allocation warning actionable and shows an empty transfer state',()=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.snapshots[month]={items:[{id:'unresolved',name:'Unfunded',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'proportional'}]}
+  render(<SeededHarness initial={initial} view="transfers"/>)
+  const warning=document.querySelector<HTMLElement>('.budget-v3-transfer-warning')!
+  expect(warning).toHaveTextContent('Unfunded')
+  fireEvent.click(within(warning).getByRole('button',{name:'Edit income'}))
+  expect(screen.getByRole('heading',{name:/Income for/})).toBeVisible()
+  cleanup()
+  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
+  expect(screen.getByText('No transfers planned')).toBeVisible()
 })
 
 it('navigates an existing account and pot and saves the selected stable pot ID', () => {
