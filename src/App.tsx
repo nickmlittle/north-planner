@@ -38,10 +38,11 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     else navigateTo({ transferAccount: null }, { replace: true })
   }
   const dismissTransferAccount = () => navigateTo({ transferAccount: null }, { replace: true })
+  const openPlanItem = (itemId: string) => navigateTo({ view: 'budget', budgetView: 'plan', transferAccount: null }, { historyState: { northPlanItem: itemId } })
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
     {view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
-      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} transferAccount={navigation.transferAccount} onOpenTransferAccount={openTransferAccount} onCloseTransferAccount={closeTransferAccount} onDismissTransferAccount={dismissTransferAccount} /></Suspense>}
+      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} transferAccount={navigation.transferAccount} onOpenTransferAccount={openTransferAccount} onCloseTransferAccount={closeTransferAccount} onDismissTransferAccount={dismissTransferAccount} onOpenPlanItem={openPlanItem} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
   </AppLayout>
 }
 
