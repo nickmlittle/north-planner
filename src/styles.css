@@ -1127,3 +1127,37 @@ small, .muted, footer { color: #59665a; }
   .budget-destination-row:focus-visible,.budget-mobile-summary button:focus-visible,.budget-mobile-month-options:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
 }
 @media(max-width:360px){.budget-destination-main{grid-template-columns:minmax(0,1fr)}.budget-destination-total{max-width:none;text-align:left}}
+
+/* Opt-in mobile Transfers matrix. The account view and desktop table retain their own styles. */
+@media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .transfer-matrix-preview-control{display:grid;justify-items:start;gap:4px;margin:4px 0}
+  .transfer-matrix-preview-control button{min-height:44px;padding:8px 12px;border:1px solid #bdcbbd;border-radius:7px;background:var(--card);color:var(--pine);font:650 13px var(--font-family);cursor:pointer}
+  .transfer-matrix-preview-control button:focus-visible,.transfer-matrix-scroll:focus-visible,.transfer-matrix-disclosure:focus-visible,.transfer-matrix-edit:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+  .transfer-matrix-preview-control p{margin:0;color:#a54232;font-size:13px;line-height:1.4}
+  .transfer-matrix{min-width:0;margin-top:8px}
+  .monthly-budget-page .transfer-matrix-intro h3{margin:0 0 5px;color:var(--pine);font-size:16px}
+  .transfer-matrix-intro p,.transfer-matrix-scroll-hint,.transfer-matrix-empty{margin:0 0 4px;color:var(--muted);font-size:12px;line-height:1.35}
+  .transfer-matrix-intro .transfer-matrix-warning{margin-top:10px;padding:9px 10px;border-left:3px solid #a54232;background:#fbf0ed;color:var(--charcoal);font-size:13px}
+  .transfer-matrix-scroll-hint{margin:6px 0}
+  .transfer-matrix-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+  .transfer-matrix-table{width:100%;min-width:max-content;border-collapse:separate;border-spacing:0;font-size:13px;line-height:1.35;font-variant-numeric:tabular-nums}
+  .transfer-matrix-table th,.transfer-matrix-table td{box-sizing:border-box;min-width:64px;padding:7px 5px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+  .transfer-matrix-table tr[hidden]{display:none}
+  .transfer-matrix-table td{white-space:nowrap}
+  .transfer-matrix-table th:first-child{position:sticky;left:0;z-index:1;width:125px;min-width:125px;max-width:150px;text-align:left;white-space:normal;overflow-wrap:anywhere;box-shadow:2px 0 4px #183b2c0a}
+  .transfer-matrix-table thead th{background:#f2f5ef;color:var(--muted);font-size:11px;font-weight:650;white-space:normal}
+  .transfer-matrix-table thead th:first-child{z-index:2}
+  .transfer-matrix-table .transfer-matrix-account th,.transfer-matrix-table .transfer-matrix-account td{background:#e7eee6;color:var(--pine);font-weight:700}
+  .transfer-matrix-table .transfer-matrix-allocation th,.transfer-matrix-table .transfer-matrix-allocation td{background:var(--card);font-weight:500}
+  .transfer-matrix-table .transfer-matrix-allocation th{padding-left:12px}
+  .transfer-matrix-table .transfer-matrix-item th,.transfer-matrix-table .transfer-matrix-item td{background:#fafbf8;font-weight:400}
+  .transfer-matrix-table .transfer-matrix-item th{padding-left:25px}
+  .transfer-matrix-disclosure{display:flex;align-items:flex-start;gap:3px;width:100%;min-height:28px;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+  .transfer-matrix-chevron{flex:none;display:inline-block;width:12px;transition:transform .15s ease}
+  .transfer-matrix-disclosure[aria-expanded="false"] .transfer-matrix-chevron{transform:rotate(-90deg)}
+  .transfer-matrix-edit{display:block;margin:5px 0 0;padding:2px 0;border:0;background:transparent;color:var(--pine);font:650 11px var(--font-family);text-align:left;text-decoration:underline;cursor:pointer}
+  .transfer-matrix-allocation-name,.transfer-matrix-purpose,.transfer-matrix-incomplete{display:block}
+  .transfer-matrix-purpose{margin-top:3px;color:var(--muted);font-size:11px;font-weight:400}
+  .transfer-matrix-incomplete{margin-top:3px;color:#a54232;font-size:11px;font-weight:650}
+  .transfer-matrix-table tfoot th,.transfer-matrix-table tfoot td{border-top:2px solid var(--pine);border-bottom:0;background:#f2f5ef;color:var(--pine);font-weight:750}
+}
