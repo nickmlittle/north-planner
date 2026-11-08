@@ -165,7 +165,7 @@ describe('transfer matrix mapping', () => {
     document.budget.snapshots['2027-03'] = { items: [] }
     const original = buildTransferMatrixModel(document, month)
     const inherited = buildTransferMatrixModel(document, '2027-02')
-    expect(inherited).toMatchObject({ month: '2027-02', sourceMonth: month, nextBudgetMonth: '2027-03', hasExplicitBudget: true, importedBaseline: false })
+    expect(inherited).toMatchObject({ month: '2027-02', sourceMonth: month, nextBudgetMonth: '2027-03', hasExplicitBudget: false, importedBaseline: false })
     expect(allItems(inherited)[0]!.byPerson.map(person => person.amountPence)).toEqual([5001, 5000])
     expect(inherited.accounts.map(row => row.id)).toEqual(original.accounts.map(row => row.id))
     expect(allItems(inherited).map(row => row.id)).toEqual(allItems(original).map(row => row.id))

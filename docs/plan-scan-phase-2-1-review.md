@@ -1,0 +1,9 @@
+# Mobile Plan scan review (item 2.1)
+
+**Decisions:** Plan defaults to the calendar month when the URL has no month. The signed balance is one state with three messages: left to allocate, over budget, or balanced. Available income, planned budget and employment split basis remain in Plan summary details. Mobile uses one combined owner/category heading per group, with visible item rows and owner/category filters. Desktop retains its existing grouped table.
+
+The mobile Plan summary is one compact line with an explicit Details control. Search sits above two filters; selecting a category applies only to mobile Plan and preserves the current query and owner selection. Combined headings show group counts and totals, with “Matching total” when search or a destination scope is active. Items retain their existing order, full editor, amount edit and action menu. The Transfers-to-Plan destination banner and return navigation remain available.
+
+On 8 November 2026, the 40-item synthetic baseline fixture was inspected in Device Hub on iPhone 17 / iOS 27.2 Safari. Without scrolling, the November 2026 month, inherited-budget status, £1,141.87 over-budget state, search, both filters, **Joint · Home**, and the Groceries and Rent rows were visible. The former baseline showed only collapsed owner headings in the same initial view. No fixture edits were saved during this visual check. This simulator inspection does not establish physical-device or screen-reader behavior; the later responsive pass should check 375/390/430 CSS px and larger text.
+
+Automated coverage checks the new compact group rows, owner/category filtering, the three balance messages, and the existing navigation, editor and calculation regressions. `npm run check` runs lint, tests, type checking and build. No saved-document version, storage key or calculation rules changed.

@@ -67,8 +67,27 @@ export function resolveBudget(budget: MonthlyBudget, month: string): ResolvedBud
   const months = Object.keys(budget.snapshots).filter(key => key <= month).sort()
   const sourceMonth = months.at(-1) ?? null
   const nextBudgetMonth = Object.keys(budget.snapshots).filter(key => key > month).sort()[0] ?? null
-  if (sourceMonth) return { items: budget.snapshots[sourceMonth]!.items, sourceMonth, nextBudgetMonth, hasExplicitBudget: true, importedBaseline: !!budget.snapshots[sourceMonth]!.imported }
+  if (sourceMonth) return { items: budget.snapshots[sourceMonth]!.items, sourceMonth, nextBudgetMonth, hasExplicitBudget: sourceMonth === month, importedBaseline: !!budget.snapshots[sourceMonth]!.imported }
   return { items: budget.importedBaseline ?? [], sourceMonth: null, nextBudgetMonth, hasExplicitBudget: false, importedBaseline: budget.importedBaseline !== undefined }
+}
+
+/** Inclusive calendar-month range affected by an edit; null means no later boundary. */
+export interface MonthEditScope { fromMonth: string; throughMonth: string | null }
+
+function editScope(month: string, boundaries: string[]): MonthEditScope {
+  const next = boundaries.filter(key => key > month).sort()[0]
+  if (!next) return { fromMonth: month, throughMonth: null }
+  const year = Number(next.slice(0, 4)), nextMonth = Number(next.slice(5))
+  const throughMonth = nextMonth === 1 ? `${String(year - 1).padStart(4, '0')}-12` : `${next.slice(0, 4)}-${String(nextMonth - 1).padStart(2, '0')}`
+  return { fromMonth: month, throughMonth }
+}
+
+export function budgetEditScope(budget: MonthlyBudget, month: string): MonthEditScope {
+  return editScope(month, Object.keys(budget.snapshots))
+}
+
+export function incomeEditScope(source: IncomeSource, month: string): MonthEditScope {
+  return editScope(month, Object.keys(source.changes))
 }
 
 export function resolveIncomeSources(budget: MonthlyBudget, month: string): ResolvedIncomeSource[] {
