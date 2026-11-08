@@ -1,0 +1,6 @@
+<!doctype html><meta charset="utf-8"><title>Isolated baseline seed</title><script type="module">
+const response = await fetch('/docs/fixtures/plan-transfers-baseline.json')
+const data = await response.json()
+localStorage.setItem('north.budget.v3', JSON.stringify(data))
+location.replace('/?view=budget&budgetView=plan&month=2026-11')
+</script>

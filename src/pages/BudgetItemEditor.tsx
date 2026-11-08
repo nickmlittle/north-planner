@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
-import { itemDraft, moneyPence, newItemDraft, readItemDraft, type BatchError, type BudgetItemBatch, type BudgetItemDraft, type DestinationSelection } from '../domain/budgetItemDrafts'
-import { monthlyContributionPence, type BudgetItem, type FundingRule } from '../domain/monthlyBudget'
+import { commitItemBatch, itemDraft, moneyPence, newItemDraft, readItemDraft, type BatchError, type BudgetItemBatch, type BudgetItemDraft, type DestinationSelection } from '../domain/budgetItemDrafts'
+import { budgetEditScope, monthlyContributionPence, type BudgetItem, type FundingRule } from '../domain/monthlyBudget'
+import { formatEditScope } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
 import { DestinationPicker } from './DestinationPicker'
+import { budgetImpact } from '../domain/budgetImpact'
+import { BudgetImpactSummary } from './BudgetImpactSummary'
 
 type Props = {
   document: BudgetDocument
@@ -41,6 +44,8 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const [error, setError] = useState<BatchError>()
   const [initial] = useState(() => JSON.stringify({ rows, categoryId, destination }))
   const formRef = useRef<HTMLFormElement>(null)
+  const detailsRef = useRef<HTMLDetailsElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
   const pendingFocus = useRef<string | null>(null)
   const fundingOverrides = useRef(new Set<string>())
   const triggerRef = useRef<HTMLElement | null>(null)
@@ -53,8 +58,29 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
     triggerRef.current = globalThis.document.activeElement as HTMLElement | null
     const previousOverflow = globalThis.document.body.style.overflow
     globalThis.document.body.style.overflow = 'hidden'
-    formRef.current?.querySelector<HTMLElement>('[data-error-key="category"]')?.focus()
+    formRef.current?.querySelector<HTMLElement>('[data-editor-heading]')?.focus()
     return () => { globalThis.document.body.style.overflow = previousOverflow; triggerRef.current?.focus() }
+  }, [])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const overlay = overlayRef.current
+    if (!viewport || !overlay) return
+    const resize = () => {
+      if (!window.matchMedia('(max-width: 640px)').matches) { overlay.style.removeProperty('height'); overlay.style.removeProperty('top'); return }
+      overlay.style.height = `${viewport.height}px`
+      overlay.style.top = `${viewport.offsetTop}px`
+    }
+    const focus = (event: FocusEvent) => {
+      if (!(event.target instanceof HTMLElement) || !event.target.matches('input, select, button')) return
+      window.setTimeout(() => event.target instanceof HTMLElement && event.target.isConnected && event.target.scrollIntoView({ block: 'nearest' }), 100)
+    }
+    resize()
+    viewport.addEventListener('resize', resize)
+    viewport.addEventListener('scroll', resize)
+    const form = formRef.current
+    form?.addEventListener('focusin', focus)
+    return () => { viewport.removeEventListener('resize', resize); viewport.removeEventListener('scroll', resize); form?.removeEventListener('focusin', focus) }
   }, [])
 
   useLayoutEffect(() => {
@@ -101,9 +127,13 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
       ...(categoryId === '__new__' ? { newCategory: { id: newCategoryId, name: newCategoryName } } : {}),
       destination, ...(item ? { editingId: item.id } : {}),
     }
+    if (draftImpact && 'error' in draftImpact) return
     const failure = onSave(batch)
     setError(failure)
-    if (failure) formRef.current?.querySelector<HTMLElement>(`[data-error-key="${failure.rowId ? `${failure.rowId}:` : ''}${failure.field}"]`)?.focus()
+    if (failure) {
+      if (item && (failure.field === 'category' || failure.field === 'frequency')) detailsRef.current!.open = true
+      formRef.current?.querySelector<HTMLElement>(`[data-error-key="${failure.rowId ? `${failure.rowId}:` : ''}${failure.field}"]`)?.focus()
+    }
   }
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close() }
@@ -124,12 +154,35 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const descriptionId = (row: BudgetItemDraft, field: string) => fieldError(row, field) ? `${row.id}-${field}-error` : undefined
   const title = item ? 'Edit budget item' : 'Add budget items'
   const monthText = new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const editRow = item ? rows[0] : undefined
+  const editRead = editRow ? readItemDraft({ ...editRow, name: editRow.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id)) : undefined
+  const editPreview = editRead && 'item' in editRead ? budgetTransfers(previewBudget, adults.map(person => person.id), month, [editRead.item]) : undefined
+  const originalPreview = item ? budgetTransfers(document.budget, adults.map(person => person.id), month, [item]) : undefined
+  const splitChanged = !!editPreview && !!originalPreview && adults.some(person => editPreview.people.find(row => row.personId === person.id)?.plannedPence !== originalPreview.people.find(row => row.personId === person.id)?.plannedPence)
+  const financialChange = !item || !!editRow && (moneyPence(editRow.amount) !== item.entryAmountPence || editRow.frequency !== item.frequency || editRow.funding !== item.funding || editRow.singleFunderId !== (item.singleFunderId ?? '') || JSON.stringify(editRow.contributions) !== JSON.stringify(itemDraft(item).contributions) || JSON.stringify(editRow.customShares) !== JSON.stringify(itemDraft(item).customShares) || JSON.stringify(destination.destination) !== JSON.stringify(item.destination))
+  const draftBatch: BudgetItemBatch = { rows, categoryId: categoryId === '__new__' ? '' : categoryId, ...(categoryId === '__new__' ? { newCategory: { id: newCategoryId, name: newCategoryName } } : {}), destination, ...(item ? { editingId: item.id } : {}) }
+  const draftResult = financialChange ? commitItemBatch(document, month, draftBatch) : undefined
+  const draftImpact = draftResult && 'document' in draftResult ? budgetImpact(document, draftResult.document, month, draftResult.items.map(row => row.id)) : undefined
 
-  return <div className="budget-v3-overlay budget-batch-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
+  return <div ref={overlayRef} className="budget-v3-overlay budget-batch-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
     <section className="budget-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-batch-title">
-      <form ref={formRef} className="budget-v3-panel budget-batch-panel" aria-label={item ? 'Edit budget item' : 'Add budget item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
-        <header className="budget-batch-header"><h2 id="budget-batch-title">{title}</h2><p>{monthText} · {item ? 'Update this item’s category, destination and funding.' : 'Choose a category and destination, then add one or more items.'}</p></header>
+      <form ref={formRef} className={`budget-v3-panel budget-batch-panel${item ? ' budget-single-panel' : ''}`} aria-label={item ? 'Edit budget item' : 'Add budget item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
+        <header className="budget-batch-header"><h2 id="budget-batch-title" data-editor-heading tabIndex={-1}>{title}</h2><p>{monthText} · {item ? 'Update this item’s details.' : 'Choose a category and destination, then add one or more items.'}</p></header>
         <div className="budget-batch-body">
+          <p className="budget-edit-scope">Changes apply: {formatEditScope(budgetEditScope(document.budget, month))}. Later saved budgets stay unchanged.</p>
+          {item && editRow ? <div className="budget-single-fields">
+            <label>Item name<input data-error-key={`${editRow.id}:name`} value={editRow.name} aria-invalid={fieldError(editRow, 'name')} aria-describedby={descriptionId(editRow, 'name')} onChange={event => update(editRow.id, { name: event.target.value })}/></label>{errorText(editRow, 'name')}
+            <label>{editRow.frequency === 'annually' ? 'Annual amount' : 'Amount'}<input inputMode="decimal" data-error-key={`${editRow.id}:amount`} value={editRow.amount} aria-invalid={fieldError(editRow, 'amount')} aria-describedby={descriptionId(editRow, 'amount')} onChange={event => update(editRow.id, { amount: event.target.value })}/></label>{editRow.frequency === 'annually' && <small>Monthly equivalent: {pounds(monthlyContributionPence(moneyPence(editRow.amount) ?? 0, 'annually'))}</small>}{errorText(editRow, 'amount')}
+            <div className="budget-single-destination" data-error-key="destination" tabIndex={-1}><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
+            <label>Funding type<select data-error-key={`${editRow.id}:funding`} value={editRow.funding} onChange={event => update(editRow.id, { funding: event.target.value as FundingRule })}>{fundingOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{errorText(editRow, 'funding')}
+            {editRow.funding === 'single' && <label>Person<select data-error-key={`${editRow.id}:singleFunderId`} value={editRow.singleFunderId} onChange={event => update(editRow.id, { singleFunderId: event.target.value })}>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
+            {editRow.funding === 'fixed' && <div className="budget-single-allocation"><strong>Monthly contributions</strong>{adults.map(person => <label key={person.id}>{person.name}<input inputMode="decimal" aria-label={`${person.name} monthly contribution`} data-error-key={`${editRow.id}:contributions`} value={editRow.contributions[person.id] ?? ''} onChange={event => update(editRow.id, { contributions: { ...editRow.contributions, [person.id]: event.target.value } })}/></label>)}{(()=>{const monthly=monthlyContributionPence(moneyPence(editRow.amount)??0,editRow.frequency),allocated=adults.reduce((sum,person)=>sum+(moneyPence(editRow.contributions[person.id]??'')??0),0);return <small>{allocated>monthly?`${pounds(allocated-monthly)} over allocated`:`${pounds(monthly-allocated)} left to allocate`}</small>})()}</div>}
+            {editRow.funding === 'custom' && <div className="budget-single-allocation"><strong>Relative weights</strong>{adults.map(person => <label key={person.id}>{person.name}<input inputMode="decimal" aria-label={`${person.name} relative weight`} data-error-key={`${editRow.id}:customShares`} value={editRow.customShares[person.id] ?? ''} onChange={event => update(editRow.id, { customShares: { ...editRow.customShares, [person.id]: event.target.value } })}/></label>)}</div>}
+            {errorText(editRow, 'singleFunderId')}{errorText(editRow, 'contributions')}{errorText(editRow, 'customShares')}
+            <div className="budget-single-contributions"><strong>Estimated monthly contributions</strong>{editPreview?.unresolvedItemIds.length ? <p>Add employment income to calculate contributions.</p> : <dl>{adults.map(person => <div key={person.id}><dt>{person.name}</dt><dd>{editPreview ? pounds(editPreview.people.find(row => row.personId === person.id)?.plannedPence ?? 0) : '—'}</dd></div>)}</dl>}{splitChanged && <p>Saving this change will update what household members contribute.</p>}</div>
+            {draftImpact && ('impact' in draftImpact ? <BudgetImpactSummary impact={draftImpact.impact} document={draftResult && 'document' in draftResult ? draftResult.document : document}/> : <p role="alert" className="budget-batch-error">{draftImpact.error} <button type="button" onClick={() => setRows(current => [...current])}>Retry</button></p>)}
+            <details ref={detailsRef} className="budget-single-details"><summary>More details · {document.budget.categories.find(category => category.id === categoryId)?.name ?? 'New category'} · {editRow.frequency === 'annually' ? 'Annually' : 'Monthly'}</summary><div className="budget-batch-category"><label>Category<select data-error-key="category" value={categoryId} aria-invalid={error?.field === 'category'} onChange={event => { setCategoryId(event.target.value); setError(undefined) }}><option value="">Choose a category</option>{document.budget.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}<option value="__new__">Create a category…</option></select></label>{categoryId === '__new__' && <label>New category<input value={newCategoryName} onChange={event => { setNewCategoryName(event.target.value); setError(undefined) }}/></label>}{error?.field === 'category' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div><label>Frequency<select data-error-key={`${editRow.id}:frequency`} value={editRow.frequency} onChange={event => update(editRow.id, { frequency: event.target.value as BudgetItemDraft['frequency'] })}><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label>{errorText(editRow, 'frequency')}</details>
+          </div> : <>
           <div className="budget-batch-shared">
             <div className="budget-batch-category"><label>Category<select data-error-key="category" value={categoryId} aria-invalid={error?.field === 'category'} aria-describedby={error?.field === 'category' ? 'budget-category-error' : undefined} onChange={event => { setCategoryId(event.target.value); setError(undefined) }}><option value="">Choose a category</option>{document.budget.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}<option value="__new__">Create a category…</option></select></label>
               {categoryId === '__new__' && <label>New category<input value={newCategoryName} onChange={event => { setNewCategoryName(event.target.value); setError(undefined) }}/></label>}
@@ -167,8 +220,10 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
           {!rows.length && <p className="budget-batch-empty">No items yet. Add a row to get started.</p>}
           {!item && <button className="secondary-button budget-batch-add" type="button" data-error-key="rows" onClick={addRow}>Add another item</button>}
           {error?.field === 'rows' && <p className="budget-batch-error" role="alert">{error.message}</p>}
+          {draftImpact && ('impact' in draftImpact ? <BudgetImpactSummary impact={draftImpact.impact} document={draftResult && 'document' in draftResult ? draftResult.document : document}/> : <p role="alert" className="budget-batch-error">{draftImpact.error} <button type="button" onClick={() => setRows(current => [...current])}>Retry</button></p>)}
+          </>}
         </div>
-        <footer className="budget-batch-footer"><div aria-live="polite"><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></div><div><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button">{item ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
+        <footer className="budget-batch-footer"><div aria-live="polite"><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></div><div><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>
     </section>
   </div>
