@@ -226,6 +226,9 @@ it('resumes setup at the first unfinished step and saves no income when pay is s
   fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
   await screen.findByRole('heading', { name: 'Monthly budget' })
   expect(JSON.parse(localStorage.getItem(budgetStorageKey)!).budget.incomeSources).toEqual([])
+  expect(screen.getByRole('heading', { name: 'Start your plan' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Add your first budget item' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Add income' })).toBeVisible()
 })
 
 it('reopens on the Plan or Transfers view used last on this device', async () => {

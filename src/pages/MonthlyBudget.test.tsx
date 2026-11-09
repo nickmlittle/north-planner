@@ -31,7 +31,20 @@ function addItem(name='Apple TV',amount='8.99',nickname='',funding?:string) {
   const category=document.querySelector<HTMLButtonElement>('.budget-v3-category button')!
   if(category.getAttribute('aria-expanded')==='false')fireEvent.click(category)
 }
-it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByText('There is no budget for this month yet.')).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Current account')})
+it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByRole('heading',{name:'Start your plan'})).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Current account')})
+it('prompts for the first item, and for income only while there is none',()=>{
+  render(<Harness/>)
+  const prompt=document.querySelector<HTMLElement>('.budget-first-run')!
+  expect(within(prompt).getByText('No income yet, so there’s nothing to split.')).toBeVisible()
+  fireEvent.click(within(prompt).getByRole('button',{name:'Add income'}))
+  const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
+  fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Pay'}})
+  fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'2000'}})
+  fireEvent.click(within(form).getByRole('button',{name:'Save income'}))
+  expect(within(prompt).queryByRole('button',{name:'Add income'})).not.toBeInTheDocument()
+  fireEvent.click(within(prompt).getByRole('button',{name:'Add your first budget item'}))
+  expect(screen.getByRole('form',{name:'Add item'})).toBeVisible()
+})
 it('keeps mobile Plan headings and funding context in a semantic three-column table',()=>{
   render(<Harness/>)
   addItem()
