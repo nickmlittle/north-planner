@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { BudgetAccount } from '../domain/monthlyBudget'
-import { destinationLabel, shortAccountLabels } from './budgetLabels'
+import { destinationLabel, shortAccountLabels, stepSummary } from './budgetLabels'
 
 const adults = [{ id: 'ada', name: 'Ada' }, { id: 'ben', name: 'Ben' }]
 const account = (id: string, patch: Partial<BudgetAccount>): BudgetAccount => ({ id, name: 'Current account', provider: 'Monzo', accountTypeId: 'current-account', ownerPersonIds: ['ada', 'ben'], ...patch })
@@ -44,4 +44,11 @@ it('numbers accounts that still clash, in a stable order', () => {
 it('puts the pot first, then the account', () => {
   expect(destinationLabel('Monzo Joint', 'Bills')).toBe('Bills · Monzo Joint')
   expect(destinationLabel('Monzo Joint')).toBe('Monzo Joint')
+})
+
+it('counts funding and pot moves apart, leaving out zeros', () => {
+  expect(stepSummary({ fundCount: 4, moveCount: 4 })).toBe('4 to fund · 4 moves')
+  expect(stepSummary({ fundCount: 1, moveCount: 1 })).toBe('1 to fund · 1 move')
+  expect(stepSummary({ fundCount: 2, moveCount: 0 })).toBe('2 to fund')
+  expect(stepSummary({ fundCount: 0, moveCount: 0 })).toBe('No steps')
 })

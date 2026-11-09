@@ -1,7 +1,9 @@
-import { ChevronRight } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, Copy } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
+import { stepSummary } from './budgetLabels'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
@@ -29,7 +31,7 @@ type Props = {
 
 /**
  * Payday, in order: fund an account, then move money out of it into its pots, indented beneath it.
- * Numbered so the count matches the hero's "N steps". Planned amounts only; nothing is ticked off.
+ * Numbered in order; the hero counts them as "N to fund · N moves". Planned amounts only; nothing is ticked off.
  */
 export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts }: Props) {
   const name = (personId: string) => adults.find(adult => adult.id === personId)?.name ?? 'Person'
@@ -42,6 +44,18 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     const count = itemCounts.get(accountId) ?? 0
     return <button type="button" className="text-button payday-see-items" data-see-items={accountId} aria-label={`See ${plural(count, 'item')} for ${label(accountId)}`} onClick={() => onSeeItems(accountId)}>See {plural(count, 'item')}<ChevronRight size={16} aria-hidden="true"/></button>
   }
+  // Tap an amount to copy it for the banking app: the plain number ("2215.45"), with a short confirmation.
+  const [copied, setCopied] = useState('')
+  const clearCopied = useRef<ReturnType<typeof setTimeout>>(undefined)
+  useEffect(() => () => clearTimeout(clearCopied.current), [])
+  const copy = async (pence: number) => {
+    let message = `Copied ${pounds(pence)}`
+    try { await navigator.clipboard.writeText((pence / 100).toFixed(2)) } catch { message = 'Couldn’t copy' }
+    setCopied(message)
+    clearTimeout(clearCopied.current)
+    clearCopied.current = setTimeout(() => setCopied(''), 2500)
+  }
+  const amount = (pence: number) => <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void copy(pence)}>{pounds(pence)}<Copy aria-hidden="true"/></button>
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
 
   const steps = (plan: PersonTransferPlan) => {
@@ -51,7 +65,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
       const fund = row.fundingPence > 0 ? [<li key={`${row.accountId}:fund`} className="payday-step is-fund" data-payday-account={row.accountId}>
         <span className="payday-step-number" aria-hidden="true">{++number}</span>
         <div className="payday-step-body">
-          <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span><strong className="payday-step-amount">{pounds(row.fundingPence)}</strong></p>
+          <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span>{amount(row.fundingPence)}</p>
           {row.movedOnBy.map(other => <p key={other.personId} className="payday-step-caption">{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</p>)}
           {affected(row.accountId)}
           {seeItems(row.accountId)}
@@ -62,7 +76,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
         return <li key={`${row.accountId}:${move.potId}`} className="payday-step is-pot-move" data-payday-account={row.accountId}>
           <span className="payday-step-number" aria-hidden="true">{++number}</span>
           <div className="payday-step-body">
-            <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span><strong className="payday-step-amount">{pounds(move.amountPence)}</strong></p>
+            <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span>{amount(move.amountPence)}</p>
             {move.fromOthers.length > 0 && <p className="payday-step-caption">Includes {others(move.fromOthers)}</p>}
             {first && affected(row.accountId)}
             {first && seeItems(row.accountId)}
@@ -74,10 +88,11 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   }
 
   return <div className="payday" role="region" aria-label="Steps by person">
+    <p className="payday-copied" role="status">{copied}</p>
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
-      {!chosen && <h3 className="payday-person-heading"><span>{name(plan.personId)}</span><span>{pounds(plan.fundingPence)} · {plural(plan.stepCount, 'step')}</span></h3>}
+      {!chosen && <h3 className="payday-person-heading"><span>{name(plan.personId)}</span><span>{pounds(plan.fundingPence)} · {stepSummary(plan)}</span></h3>}
       <ol className="payday-steps">{steps(plan)}</ol>
     </section>)}
     {plans.needsReview.length > 0 && <section className="payday-review" aria-label="Needs review">

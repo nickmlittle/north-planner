@@ -8,7 +8,8 @@ export type PersonPotMove = { potId: string; amountPence: number; fromOthers: Pe
 /** Someone else who moves part of this person's funding into pots afterwards. */
 export type MovedOnBy = { personId: string; potIds: string[]; amountPence: number }
 export type PersonTransferRow = { accountId: string; fundingPence: number; potMoves: PersonPotMove[]; movedOnBy: MovedOnBy[] }
-export type PersonTransferPlan = { personId: string; fundingPence: number; stepCount: number; rows: PersonTransferRow[] }
+/** `stepCount` is `fundCount` (accounts to fund) plus `moveCount` (pot moves). */
+export type PersonTransferPlan = { personId: string; fundingPence: number; fundCount: number; moveCount: number; stepCount: number; rows: PersonTransferRow[] }
 export type NeedsReviewReason = 'unavailable' | 'unallocated' | 'missing-pot-owner'
 export type NeedsReviewAccount = { accountId: string; byPerson: PersonAmount[]; notCalculated: boolean; reason: NeedsReviewReason }
 export type PersonTransferPlans = { people: PersonTransferPlan[]; needsReview: NeedsReviewAccount[] }
@@ -62,10 +63,12 @@ export function personTransferPlans(accounts: readonly TransferAccount[], instru
       }
       return fundingPence > 0 || potMoves.length ? [{ accountId: account.accountId, fundingPence, potMoves, movedOnBy }] : []
     })
+    const fundCount = rows.filter(row => row.fundingPence > 0).length
+    const moveCount = rows.reduce((sum, row) => sum + row.potMoves.length, 0)
     return {
       personId, rows,
       fundingPence: rows.reduce((sum, row) => sum + row.fundingPence, 0),
-      stepCount: rows.reduce((sum, row) => sum + (row.fundingPence > 0 ? 1 : 0) + row.potMoves.length, 0),
+      fundCount, moveCount, stepCount: fundCount + moveCount,
     }
   })
   const needsReview = accounts.filter(account => !ready.includes(account)).map(account => {
