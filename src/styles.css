@@ -364,6 +364,9 @@ small, footer { color: var(--muted) }
 }
 .budget-v3-destination-filter:focus-visible,.budget-v3-destination-filter button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 .budget-v3-table-wrap{--budget-category-indent:22px;width:100%;overflow-x:auto}
+/* Desktop Plan has one group level, so categories sit flush and item names line up under the category name. */
+.budget-v3-table-wrap.is-flat{--budget-category-indent:var(--space-2)}
+.budget-v3-table-wrap.is-flat .budget-v3-sticky-category{height:var(--grouped-level-0-height,44px)}
 .budget-v3-table{width:100%;border-collapse:collapse;font-size:var(--text-md)}
 .budget-v3-table th,.budget-v3-table td{padding:var(--space-3) var(--space-2);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
 .budget-v3-static-amount{display:inline-block;padding:var(--space-1);color:var(--charcoal);font-weight:600;white-space:nowrap}
