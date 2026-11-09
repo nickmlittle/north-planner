@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { BudgetManagement } from './BudgetManagement'
-import { accountOptionLabels, accountOwnerGroups } from './budgetLabels'
+import { accountOptionLabels, accountOwnerGroups, sortPotsForManage } from './budgetLabels'
 import { useBudgetDocument, budgetStorageKey } from '../state/useBudgetDocument'
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks() })
@@ -32,30 +32,66 @@ function setup(initial = seed(), onClose = vi.fn()) {
   const view = render(<Harness initial={initial} onChange={onChange} onClose={onClose}/>)
   return { view, current: () => current, onChange, onClose }
 }
-const open = (label: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${label} \\d+$`) }))
+const tab = (label: string) => screen.getByRole('tab', { name: new RegExp(`^${label} \\d+$`) })
+const open = (label: string) => fireEvent.click(tab(label))
+const rowFor = (name: RegExp) => screen.getByRole('button', { name })
 const change = (form: HTMLElement, label: string, value: string) => fireEvent.change(within(form).getByLabelText(label), { target: { value } })
 
-it('starts and reopens with every section and owner group collapsed', () => {
+it('opens on a flat Accounts tab with owner chips, and reopens there', () => {
   const { view } = setup()
-  for (const label of ['Accounts 3', 'Pots 1', 'Categories 1']) expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-expanded', 'false')
-  open('Accounts')
-  expect(screen.getByRole('button', { name: 'Joint 1' })).toHaveAttribute('aria-expanded', 'false')
-  expect(screen.queryByText('Nationwide · Mortgage')).not.toBeInTheDocument()
-  open('Joint')
-  expect(screen.getByRole('button', { name: /Nationwide · Mortgage/ })).toHaveTextContent('0 pots')
+  expect(tab('Accounts')).toHaveAttribute('aria-selected', 'true')
+  for (const label of ['Pots', 'Categories']) expect(tab(label)).toHaveAttribute('aria-selected', 'false')
+  const panel = screen.getByRole('tabpanel', { name: 'Accounts 3' })
+  expect(within(panel).getAllByRole('button', { expanded: false }).map(button => button.textContent)).toEqual([
+    'Nationwide · Mortgage Joint 0 pots', 'Monzo · Current account Nick 1 pot', 'HL · S&S ISA Immy 0 pots',
+  ])
+  open('Pots')
+  expect(rowFor(/^Bills · Nick · Monzo/)).toHaveTextContent('Bills Nick Monzo · Current account')
   view.unmount()
   render(<Harness/>)
-  expect(screen.getByRole('button', { name: 'Accounts 3' })).toHaveAttribute('aria-expanded', 'false')
+  expect(tab('Accounts')).toHaveAttribute('aria-selected', 'true')
+})
+
+it('moves between tabs with arrow keys, Home and End', () => {
+  setup()
+  const list = screen.getByRole('tablist', { name: 'Manage' })
+  tab('Accounts').focus()
+  fireEvent.keyDown(list, { key: 'ArrowRight' })
+  expect(tab('Pots')).toHaveFocus()
+  expect(tab('Pots')).toHaveAttribute('aria-selected', 'true')
+  expect(tab('Pots')).toHaveAttribute('tabindex', '0')
+  expect(tab('Accounts')).toHaveAttribute('tabindex', '-1')
+  expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', tab('Pots').id)
+  fireEvent.keyDown(list, { key: 'End' })
+  expect(tab('Categories')).toHaveFocus()
+  fireEvent.keyDown(list, { key: 'ArrowRight' })
+  expect(tab('Accounts')).toHaveFocus()
+  fireEvent.keyDown(list, { key: 'ArrowLeft' })
+  expect(tab('Categories')).toHaveFocus()
+  fireEvent.keyDown(list, { key: 'Home' })
+  expect(tab('Accounts')).toHaveAttribute('aria-selected', 'true')
+})
+
+it('keeps the tab while an edit is unsaved', () => {
+  setup()
+  fireEvent.click(rowFor(/Nationwide · Mortgage/))
+  change(screen.getByRole('form', { name: 'Edit account' }), 'Nickname (optional)', 'Home loan')
+  open('Pots')
+  fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' })
+  expect(tab('Accounts')).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByRole('alert')).toHaveTextContent('Save or Cancel')
+  fireEvent.click(within(screen.getByRole('form', { name: 'Edit account' })).getByRole('button', { name: 'Cancel' }))
+  open('Pots')
+  expect(tab('Pots')).toHaveAttribute('aria-selected', 'true')
 })
 
 it('keeps edits local, protects dirty groups and sections, and reveals the saved owner group', () => {
   const result = setup()
-  open('Accounts'); open('Joint')
-  fireEvent.click(screen.getByRole('button', { name: /Nationwide · Mortgage/ }))
+  fireEvent.click(rowFor(/Nationwide · Mortgage/))
   const form = screen.getByRole('form', { name: 'Edit account' })
   expect(within(form).getByLabelText('Nickname (optional)')).toHaveValue('')
   change(form, 'Nickname (optional)', 'Home loan')
-  open('Joint'); open('Pots')
+  open('Pots')
   fireEvent.click(screen.getByRole('button', { name: 'Done' }))
   expect(result.onClose).not.toHaveBeenCalled()
   expect(result.current().budget.accounts[0]?.name).toBe('Mortgage')
@@ -67,16 +103,16 @@ it('keeps edits local, protects dirty groups and sections, and reveals the saved
   fireEvent.click(within(edit).getByLabelText('Immy'))
   fireEvent.click(within(edit).getByRole('button', { name: 'Save account' }))
   expect(result.current().budget.accounts[0]).toMatchObject({ name: 'Home loan', ownerPersonIds: ['nick'] })
-  expect(screen.getByRole('button', { name: 'Nick 2' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getByRole('button', { name: /Nationwide · Mortgage · Home loan/ })).toBeVisible()
+  expect(rowFor(/Nationwide · Mortgage · Home loan/)).toHaveTextContent('Nationwide · Mortgage · Home loan Nick 0 pots')
 })
 
 it('requires account details and supports a type with no nickname', () => {
   const initial = seed()
   initial.budget.accounts.push({ id: 'legacy', name: 'Old bank', ownerPersonIds: [] })
   const result = setup(initial)
-  open('Accounts'); open('Needs owner')
-  expect(screen.getByRole('button', { name: /Old bank/ })).toHaveTextContent('Needs account type')
+  expect(rowFor(/Old bank/)).toHaveTextContent('Needs owner')
+  expect(rowFor(/Old bank/)).toHaveTextContent('Needs account type')
+  expect(within(rowFor(/Old bank/)).getByText('Needs owner')).toHaveClass('budget-manage-chip', 'is-review')
   fireEvent.click(screen.getByRole('button', { name: 'Add account' }))
   const form = screen.getByRole('form', { name: 'Add account' })
   fireEvent.click(within(form).getByRole('button', { name: 'Save account' }))
@@ -94,10 +130,11 @@ it('uses person IDs for owner groups even when people have the same name', () =>
   initial.budget.accounts.push({ id: 'old', name: 'Old', ownerPersonIds: [] })
   const groups = accountOwnerGroups(initial.budget.accounts, initial.household.adults)
   expect(groups.map(group => group.key)).toEqual(['joint', 'person:nick', 'person:immy', 'unassigned'])
-  setup(initial); open('Accounts')
-  const people = screen.getAllByRole('button', { name: 'Nick 1' })
-  expect(people).toHaveLength(2)
-  expect(people[0]?.getAttribute('aria-controls')).not.toBe(people[1]?.getAttribute('aria-controls'))
+  setup(initial)
+  expect(within(screen.getByRole('tabpanel')).getAllByText('Nick', { selector: '.budget-manage-chip' })).toHaveLength(2)
+  open('Pots'); fireEvent.click(screen.getByRole('button', { name: 'Add pot' }))
+  const form = screen.getByRole('form', { name: 'Add pot' })
+  expect(within(form).getAllByRole('button', { name: 'Select all Nick accounts' })).toHaveLength(2)
 })
 
 it('sorts pots across accounts within an owner without changing stored order', () => {
@@ -107,14 +144,16 @@ it('sorts pots across accounts within an owner without changing stored order', (
     { id: 'z', name: 'Zoo', accountId: 'current' }, { id: 'b', name: 'spending', accountId: 'current' },
     { id: 'a', name: 'Spending', accountId: 'isa' }, { id: 'c', name: 'apple', accountId: 'isa' }, { id: 'a-current', name: 'spending', accountId: 'current' },
   ]
+  initial.budget.pots.push({ id: 'joint-spending', name: 'Spending', accountId: 'mortgage' })
   const result = setup(initial)
-  open('Pots'); open('Nick')
-  const list = document.getElementById(screen.getByRole('button', { name: 'Nick 5' }).getAttribute('aria-controls')!)!
-  expect(within(list).getAllByRole('button').map(button => button.textContent?.replace('▸ ', ''))).toEqual([
-    'apple Nick · HL · S&S ISA', 'Spending Nick · HL · S&S ISA', 'spending Nick · Monzo · Current account', 'spending Nick · Monzo · Current account', 'Zoo Nick · Monzo · Current account',
+  open('Pots')
+  const panel = screen.getByRole('tabpanel')
+  expect(within(panel).getAllByRole('button', { expanded: false }).map(button => button.textContent)).toEqual([
+    'apple Nick HL · S&S ISA', 'Spending Joint Nationwide · Mortgage', 'Spending Nick HL · S&S ISA', 'spending Nick Monzo · Current account', 'spending Nick Monzo · Current account', 'Zoo Nick Monzo · Current account',
   ])
-  expect(within(list).getAllByRole('button').slice(2,4).map(button => button.getAttribute('aria-controls')?.split('-pot-')[1])).toEqual(['a-current', 'b'])
-  expect(result.current().budget.pots.map(pot => pot.id)).toEqual(['z', 'b', 'a', 'c', 'a-current'])
+  expect(within(panel).getAllByRole('button', { expanded: false }).slice(3, 5).map(button => button.getAttribute('aria-controls')?.split('-pot-')[1])).toEqual(['a-current', 'b'])
+  expect(sortPotsForManage(initial.budget.pots, initial.budget.accounts, initial.household.adults).map(pot => pot.id)).toEqual(['c', 'joint-spending', 'a', 'a-current', 'b', 'z'])
+  expect(result.current().budget.pots.map(pot => pot.id)).toEqual(['z', 'b', 'a', 'c', 'a-current', 'joint-spending'])
 })
 
 it('creates independent pots in one update and skips existing case-insensitive names', () => {
@@ -136,8 +175,7 @@ it('creates independent pots in one update and skips existing case-insensitive n
   expect(new Set(pots.map(pot => pot.id)).size).toBe(4)
   expect(pots.find(pot => pot.id === 'existing')?.name).toBe(' spending ')
   expect(screen.getByRole('status')).toHaveTextContent('Created 2 pots. Skipped 1 existing pot.')
-  open('Nick')
-  fireEvent.click(screen.getByRole('button', { name: /^Spending · Nick · Monzo/ }))
+  fireEvent.click(rowFor(/^Spending · Nick · Monzo/))
   const edit = screen.getByRole('form', { name: 'Edit pot' })
   change(edit, 'Pot name', 'Fun')
   fireEvent.click(within(edit).getByRole('button', { name: 'Save pot' }))
@@ -172,12 +210,12 @@ it('reassigns a pot without changing its ID or budget-item destinations across m
   const item = { id: 'bill', name: 'Bill', categoryId: 'financing', entryAmountPence: 10000, amountPence: 10000, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId: 'bills' }, funding: 'fixed' as const, contributions: [{ personId: 'nick', amountPence: 10000 }] }
   initial.budget.snapshots = { '2026-11': { items: [item] }, '2026-12': { items: [item] } }
   const result = setup(initial)
-  open('Pots'); open('Nick'); fireEvent.click(screen.getByRole('button', { name: /Bills · Nick/ }))
+  open('Pots'); fireEvent.click(rowFor(/Bills · Nick/))
   const form = screen.getByRole('form', { name: 'Edit pot' })
   change(form, 'Parent account', 'mortgage')
   expect(within(form).getByText(/every month/)).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save pot' }))
-  expect(screen.getByRole('button', { name: 'Joint 1' })).toHaveAttribute('aria-expanded', 'true')
+  expect(rowFor(/^Bills · Joint · Nationwide/)).toHaveTextContent('Bills Joint Nationwide · Mortgage')
   for (const month of ['2026-11', '2026-12']) {
     const budget = result.current().budget
     expect(budget.snapshots[month]?.items[0]?.destination).toEqual({ kind: 'pot', potId: 'bills' })
@@ -205,19 +243,17 @@ it('persists typed accounts and nicknames after reopening', () => {
     return <BudgetManagement document={document} setDocument={setDocument} onClose={() => {}}/>
   }
   const view = render(<PersistentHarness/>)
-  open('Accounts'); open('Joint'); fireEvent.click(screen.getByRole('button', { name: /Nationwide · Mortgage/ }))
+  fireEvent.click(rowFor(/Nationwide · Mortgage/))
   change(screen.getByRole('form', { name: 'Edit account' }), 'Nickname (optional)', 'Home loan')
   fireEvent.click(screen.getByRole('button', { name: 'Save account' }))
   view.unmount(); render(<PersistentHarness/>)
-  open('Accounts'); open('Joint')
-  expect(screen.getByRole('button', { name: /Nationwide · Mortgage · Home loan/ })).toBeVisible()
+  expect(rowFor(/Nationwide · Mortgage · Home loan/)).toBeVisible()
 })
 
 it('closes from the × with the same unsaved-edit guard as Done', () => {
   const result = setup()
-  expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toHaveTextContent('3 accounts')
-  open('Accounts'); open('Joint')
-  fireEvent.click(screen.getByRole('button', { name: /Nationwide · Mortgage/ }))
+  expect(tab('Accounts')).toHaveAccessibleName('Accounts 3')
+  fireEvent.click(rowFor(/Nationwide · Mortgage/))
   change(screen.getByRole('form', { name: 'Edit account' }), 'Nickname (optional)', 'Home loan')
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
   expect(result.onClose).not.toHaveBeenCalled()
