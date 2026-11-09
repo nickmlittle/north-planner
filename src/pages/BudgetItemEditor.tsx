@@ -8,6 +8,7 @@ import { formatGBP } from '../formatting/money'
 import { DestinationPicker } from './DestinationPicker'
 import { budgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
+import { PHONE_QUERY } from '../breakpoints'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
 type Props = {
@@ -70,7 +71,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
     const overlay = overlayRef.current
     if (!viewport || !overlay) return
     const resize = () => {
-      if (!window.matchMedia('(max-width: 640px)').matches) { overlay.style.removeProperty('height'); overlay.style.removeProperty('top'); return }
+      if (!window.matchMedia(PHONE_QUERY).matches) { overlay.style.removeProperty('height'); overlay.style.removeProperty('top'); return }
       overlay.style.height = `${viewport.height}px`
       overlay.style.top = `${viewport.offsetTop}px`
     }
