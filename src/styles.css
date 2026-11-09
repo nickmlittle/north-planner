@@ -924,7 +924,10 @@ small, .muted, footer { color: #59665a; }
   .page-frame-controls{margin-bottom:6px}
   .budget-v3-summary{gap:14px;padding:4px 0}
 }
-.budget-v3-info{display:inline;padding:0 2px;margin:0;border:0;background:transparent;color:var(--pine);font:inherit;cursor:help}
+.budget-v3-info{position:relative;display:inline;padding:0 2px;margin:0;border:0;background:transparent;color:var(--pine);font:inherit;cursor:help}
+.budget-v3-info::after{content:'';position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
+.budget-v3-summary-note{color:var(--muted);font-size:12px}
+.budget-mobile-summary-context{display:block;color:var(--muted);font-size:12px;font-weight:500}
 .budget-v3-summary .is-deficit strong{color:#a54232}
 
 @media(max-width:1023px){
@@ -946,7 +949,8 @@ small, .muted, footer { color: #59665a; }
   .monthly-budget-page>.page-frame-body{grid-row:5}
   .monthly-budget-page>.budget-v3-people-summary{grid-column:1;grid-row:2 / span 4;align-self:stretch;min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
   .monthly-budget-page>.page-frame-body{min-height:0}
-  .monthly-budget-page .budget-v3-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:auto auto;column-gap:12px;row-gap:4px;padding:4px 0}
+  .monthly-budget-page .budget-v3-summary-note{grid-column:1;grid-row:3}
+  .monthly-budget-page .budget-v3-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto auto;column-gap:12px;row-gap:4px;padding:4px 0}
   .monthly-budget-page .budget-v3-summary>span{display:contents}
   .monthly-budget-page .budget-v3-summary>span:nth-child(1)>small{grid-column:1;grid-row:1}
   .monthly-budget-page .budget-v3-summary>span:nth-child(2)>small{grid-column:2;grid-row:1}

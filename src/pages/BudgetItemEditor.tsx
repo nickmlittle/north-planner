@@ -153,7 +153,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const fieldError = (row: BudgetItemDraft, field: string) => error?.rowId === row.id && error.field === field
   const errorText = (row: BudgetItemDraft, field: string) => fieldError(row, field) ? <p id={`${row.id}-${field}-error`} className="budget-batch-error" role="alert">{error!.message}</p> : null
   const descriptionId = (row: BudgetItemDraft, field: string) => fieldError(row, field) ? `${row.id}-${field}-error` : undefined
-  const title = item ? 'Edit budget item' : 'Add budget items'
+  const title = item ? 'Edit budget item' : 'Add items'
   const monthText = new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const editRow = item ? rows[0] : undefined
   const editRead = editRow ? readItemDraft({ ...editRow, name: editRow.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id)) : undefined
@@ -167,7 +167,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
 
   return <div ref={overlayRef} className="budget-v3-overlay budget-batch-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
     <section className="budget-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-batch-title">
-      <form ref={formRef} className={`budget-v3-panel budget-batch-panel${item ? ' budget-single-panel' : ''}`} aria-label={item ? 'Edit budget item' : 'Add budget item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
+      <form ref={formRef} className={`budget-v3-panel budget-batch-panel${item ? ' budget-single-panel' : ''}`} aria-label={item ? 'Edit budget item' : 'Add item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
         <header className="budget-batch-header"><h2 id="budget-batch-title" data-editor-heading tabIndex={-1}>{title}</h2><p>{monthText} · {item ? 'Update this item’s details.' : 'Choose a category and destination, then add one or more items.'}</p></header>
         <div className="budget-batch-body">
           <p className="budget-edit-scope">Changes apply: {formatEditScope(budgetEditScope(document.budget, month))}. Later saved budgets stay unchanged.</p>

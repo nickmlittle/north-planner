@@ -3,7 +3,6 @@ import type { ReactNode, RefObject } from 'react'
 /** Shared page shell. Its named regions stay direct children so existing page layouts remain intact. */
 export function PageFrame({ title, eyebrow, headerActions, summary, pageControls, headingRef, headingClass = 'route-heading', className = '', contentWidth = 'wide', beforeHeading, afterHeading, afterSummary, children }: {
   title: ReactNode
-  description?: ReactNode
   eyebrow?: ReactNode
   headerActions?: ReactNode
   summary?: ReactNode
