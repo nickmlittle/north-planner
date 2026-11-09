@@ -45,7 +45,7 @@ export function planItemLabels(document: BudgetDocument, accountLabels: Readonly
       return accountFor(item)?.name ?? 'Account'
     },
     fundingLabel(item: BudgetItem) {
-      if (item.funding === 'fixed') return 'Fixed contributions'
+      if (item.funding === 'fixed') return 'Fixed amounts'
       if (item.funding === 'proportional') return 'Income ratio'
       if (item.funding === 'equal') return 'Equal split'
       if (item.funding === 'single') return `One person · ${adults.find(person => person.id === item.singleFunderId)?.name ?? 'Person'}`

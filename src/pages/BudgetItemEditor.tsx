@@ -226,7 +226,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
           </>}
         </div>
         <footer className="budget-batch-footer">
-          <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}. Later saved budgets stay unchanged.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRows(current => [...current])}/>
+          <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRows(current => [...current])}/>
           {!item && <div className="budget-batch-summary" aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div>}
           <div className="budget-batch-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>

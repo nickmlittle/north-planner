@@ -106,7 +106,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, owners
     cancelInline()
   }
 
-  const groupLabel = (group: { items: BudgetItem[] }) => `${group.items.length} items · ${query || planDestination ? 'Matching total ' : ''}${pounds(group.items.reduce((sum, item) => sum + item.amountPence, 0))}`
+  const groupLabel = (group: { items: BudgetItem[] }) => `${group.items.length} ${group.items.length === 1 ? 'item' : 'items'} · ${query || planDestination ? 'Matching total ' : ''}${pounds(group.items.reduce((sum, item) => sum + item.amountPence, 0))}`
   const groupButton = (group: ShownGroup, sticky = false) => {
     const Icon = group.collapsed ? ChevronRight : ChevronDown
     return <GroupedTableDisclosure groupKey={group.key} sticky={sticky} expanded={!group.collapsed} label={`${group.name}, ${groupLabel(group)}`} onClick={() => {

@@ -19,3 +19,9 @@ export function formatGBPAxis(value: number): string {
   if (abs >= 1_000) return `£${new Intl.NumberFormat('en-GB', { maximumFractionDigits: abs >= 100_000 ? 0 : 1 }).format(value / 1_000)}k`
   return formatGBPWhole(value)
 }
+
+/** Available minus planned, in the app's one wording: "£X over", "£X left" or "Balanced". */
+export function balanceLabel(balancePence: number): string {
+  if (balancePence === 0) return 'Balanced'
+  return `${formatGBP(Math.abs(balancePence) / 100)} ${balancePence < 0 ? 'over' : 'left'}`
+}
