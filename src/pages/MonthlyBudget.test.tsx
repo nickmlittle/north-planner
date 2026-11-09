@@ -31,13 +31,13 @@ function addItem(name='Apple TV',amount='8.99',nickname='',funding?:string) {
   const category=document.querySelector<HTMLButtonElement>('.budget-v3-category button')!
   if(category.getAttribute('aria-expanded')==='false')fireEvent.click(category)
 }
-it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByText('There is no budget for this month yet.')).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick · Monzo · Current')})
+it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByText('There is no budget for this month yet.')).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Current account')})
 it('keeps mobile Plan headings and funding context in a semantic three-column table',()=>{
   render(<Harness/>)
   addItem()
   const table=screen.getByRole('table',{name:'Budget items by owner and category'})
   expect(within(table).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Item','Amount','Actions'])
-  expect(within(table).getByRole('rowheader',{name:/Apple TV/})).toHaveTextContent('Destination: Nick · Monzo · Current account')
+  expect(within(table).getByRole('rowheader',{name:/Apple TV/})).toHaveTextContent('Destination: Current account')
   expect(table.querySelector('.budget-v3-owner th')).toHaveAttribute('colspan','3')
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
@@ -113,18 +113,27 @@ it('opens item editing from the name and dismisses the actions menu with Escape'
   fireEvent.click(screen.getByRole('button',{name:'Apple TV'}))
   expect(screen.getByRole('form',{name:'Edit budget item'})).toBeVisible()
 })
+it('opens the editor from anywhere on the row except its controls',()=>{
+  render(<Harness/>);addItem()
+  const row=screen.getByRole('button',{name:'Apple TV'}).closest('tr')!
+  fireEvent.click(within(row).getByRole('button',{name:'Edit amount for Apple TV'}))
+  expect(screen.queryByRole('form',{name:'Edit budget item'})).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
+  fireEvent.click(row.querySelector<HTMLElement>('.budget-v3-mobile-item-meta')!)
+  expect(screen.getByRole('form',{name:'Edit budget item'})).toBeVisible()
+})
 it('keeps compact destination details and opens editing from the row menu',()=>{
   render(<Harness/>);addItem()
   const row=screen.getByRole('button',{name:'Apple TV'}).closest('tr')!
-  expect(row.querySelector('.budget-v3-compact-destination')).toHaveTextContent('Nick · Monzo')
+  expect(row.querySelector('.budget-v3-compact-destination')).toHaveTextContent(/^Current account$/)
   const summary=within(row).getByLabelText('More actions for Apple TV')
   fireEvent.click(summary)
   fireEvent.click(within(summary.closest('details')!).getByRole('button',{name:'Edit'}))
   expect(screen.getByRole('form',{name:'Edit budget item'})).toBeVisible()
 })
-it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Nick · Monzo · Current')})
+it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills pot')})
 
-it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick · Monzo · Current account · Everyday')})
+it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Everyday')})
 
 function seededDocument() {
   const d = newBudgetDocument()
