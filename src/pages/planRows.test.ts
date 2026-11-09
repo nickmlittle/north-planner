@@ -3,42 +3,37 @@ import { expect, it } from 'vitest'
 import { decodeBudgetDocument } from '../domain/budgetDocument'
 import { resolveBudget, type BudgetItem } from '../domain/monthlyBudget'
 import { shortAccountLabels } from './budgetLabels'
-import { groupPlanItems, matchesPlanDestination, planDestinationLabel, planItemLabels, planOwnerOrder } from './planRows'
+import { groupPlanItems, matchesPlanDestination, planDestinationLabel, planItemLabels } from './planRows'
 
 const document = decodeBudgetDocument(JSON.parse(readFileSync(new URL('../../docs/fixtures/plan-transfers-baseline.json', import.meta.url), 'utf8')))!
 const adults = document.household.adults
 const items = resolveBudget(document.budget, '2026-11').items
 const short = shortAccountLabels(document.budget.accounts, adults)
 const labels = planItemLabels(document, short)
-const ownerOrder = planOwnerOrder(adults)
 const all = { query: '', owner: 'All', category: 'All' }
 const itemTo = (accountId: string, potId?: string) => items.find(item => potId ? item.destination.kind === 'pot' && item.destination.potId === potId : item.destination.kind === 'account' && item.destination.accountId === accountId)!
 
-it('bands phone rows by owner in household order, then by category', () => {
-  const { owners, matching } = groupPlanItems(items, all, false, ownerOrder, labels)
-  expect(owners.map(owner => owner.name)).toEqual(['Joint', 'Ada', 'Ben'])
-  expect(owners[0]!.key).toBe('owner:Joint')
-  expect(owners[0]!.categories[0]!.key).toBe(`Joint:${owners[0]!.categories[0]!.name}`)
+it('bands rows by category only, in first-appearance order, at every screen size', () => {
+  const { groups, matching } = groupPlanItems(items, all, labels)
+  expect(groups.map(group => group.key)).toEqual(groups.map(group => `category:${group.items[0]!.categoryId}`))
+  expect(new Set(groups.map(group => group.name)).size).toBe(groups.length)
+  expect(groups.flatMap(group => group.items)).toHaveLength(items.length)
   expect(matching).toHaveLength(items.length)
-  expect(owners.flatMap(owner => owner.categories.flatMap(category => category.items))).toHaveLength(items.length)
 })
 
-it('bands desktop rows by category only, under one "All" group', () => {
-  const { owners } = groupPlanItems(items, all, true, ownerOrder, labels)
-  expect(owners.map(owner => owner.key)).toEqual(['owner:All'])
-  const categories = owners[0]!.categories
-  expect(categories.map(category => category.key)).toEqual(categories.map(category => `category:${category.name}`))
-  expect(new Set(categories.map(category => category.name)).size).toBe(categories.length)
-  expect(categories.flatMap(category => category.items)).toHaveLength(items.length)
+it('puts items whose category has gone in one Uncategorised group', () => {
+  const orphans = [{ ...items[0]!, id: 'x', categoryId: 'gone-1' }, { ...items[1]!, id: 'y', categoryId: 'gone-2' }]
+  const { groups } = groupPlanItems(orphans, all, labels)
+  expect(groups.map(group => [group.name, group.items.length])).toEqual([['Uncategorised', 2]])
 })
 
 it('applies search, Owner and Category together, and returns nothing when none match', () => {
-  const ada = groupPlanItems(items, { ...all, owner: 'Ada' }, false, ownerOrder, labels)
-  expect(ada.owners.map(owner => owner.name)).toEqual(['Ada'])
+  const ada = groupPlanItems(items, { ...all, owner: 'Ada' }, labels)
+  expect(ada.matching.length).toBeGreaterThan(0)
   expect(ada.matching.every(item => labels.ownerGroup(item) === 'Ada')).toBe(true)
-  const home = groupPlanItems(items, { ...all, category: 'c0' }, true, ownerOrder, labels)
-  expect(home.owners[0]!.categories.map(category => category.name)).toEqual(['Home'])
-  expect(groupPlanItems(items, { ...all, query: 'zzzz' }, true, ownerOrder, labels)).toEqual({ owners: [], matching: [] })
+  const home = groupPlanItems(items, { ...all, category: 'c0' }, labels)
+  expect(home.groups.map(group => group.name)).toEqual(['Home'])
+  expect(groupPlanItems(items, { ...all, query: 'zzzz' }, labels)).toEqual({ groups: [], matching: [] })
 })
 
 it('searches account bank and pot names, ignoring case and surrounding space', () => {

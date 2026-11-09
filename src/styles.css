@@ -16,6 +16,8 @@
   --surface-subtle: #f5f7f2;
   --surface-header: #f2f5ef;
   --surface-band: #e7eee6;
+  --surface-band-hover: #dde8dc;
+  --share-track: #cdd8cb;
   --on-pine-faint: #ffffff1f;
   --on-pine-hover: #ffffff2b;
   --on-pine-line: #ffffff33;
@@ -420,7 +422,6 @@ small, footer { color: var(--muted) }
 .budget-v3-table-wrap{--budget-category-indent:22px;width:100%;overflow-x:auto}
 /* Desktop Plan has one group level, so categories sit flush and item names line up under the category name. */
 .budget-v3-table-wrap.is-flat{--budget-category-indent:var(--space-2)}
-.budget-v3-table-wrap.is-flat .budget-v3-sticky-category{height:var(--grouped-level-0-height,44px)}
 .budget-v3-table{width:100%;border-collapse:collapse;font-size:var(--text-md)}
 .budget-v3-table th,.budget-v3-table td{padding:var(--space-3) var(--space-2);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
 .budget-v3-inline-row td{padding:var(--space-3) var(--space-4);background:var(--surface-subtle)}
@@ -436,7 +437,6 @@ small, footer { color: var(--muted) }
 .budget-v3-inline-cell .budget-v3-inline-amount{width:100%;min-height:44px;padding:var(--space-2) var(--space-2);text-align:right}
 .budget-v3-inline-controls .primary-button,.budget-v3-inline-controls .secondary-button{min-height:44px;padding:var(--space-2) var(--space-4)}
 .budget-v3-table thead th{color:var(--muted);font-size:var(--text-sm);font-weight:650}
-.budget-v3-owner th{background:var(--surface-band);color:var(--pine);font-size:var(--text-sm)}.budget-v3-category th{padding-left:var(--budget-category-indent);background:var(--surface-subtle);color:var(--charcoal);font-size:var(--text-sm)}
 .budget-v3-item th:first-child{padding-left:calc(var(--budget-category-indent) + var(--space-4))}.budget-v3-amount{color:var(--pine);font:600 var(--text-md) var(--font-family);cursor:pointer}
 .budget-v3-item .text-button{margin-right:var(--space-2)}.budget-v3-empty{display:grid;justify-items:start;gap:var(--space-3);padding:var(--space-5);border:1px dashed var(--line);border-radius:var(--radius-md);color:var(--muted)}
 .budget-first-run{padding:var(--space-6) var(--space-5)}.budget-first-run h2{margin:0;color:var(--pine);font-size:var(--text-xl)}.budget-first-run>p{max-width:560px;margin:0;line-height:1.5}.budget-first-run-income{display:grid;justify-items:start;gap:var(--space-2);margin-top:var(--space-2);padding-top:var(--space-4);border-top:1px solid var(--line);width:100%}.budget-first-run-income p{margin:0}
@@ -623,18 +623,15 @@ small, footer { color: var(--muted) }
   .monthly-budget-page .budget-v3-workspace{display:flex;flex:1 1 auto;flex-direction:column;gap:var(--space-2);min-height:0;overflow:hidden}
   .monthly-budget-page .budget-v3-scroll-tools{flex:0 0 auto}
   .monthly-budget-page .budget-v3-table-wrap{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
-  .monthly-budget-page .budget-v3-table thead{position:sticky;top:0;z-index:2;background:var(--cream)}
+  .monthly-budget-page .budget-v3-table thead{position:sticky;top:0;z-index:2;background:var(--card)}
+  .monthly-budget-page .plan-card{display:flex;flex:0 1 auto;flex-direction:column;min-height:0}
+  .monthly-budget-page .plan-card-header{flex:0 0 auto}
 }
 .budget-v3-controls{display:flex;align-items:end;gap:var(--space-3);margin:var(--space-2) 0}
 .budget-v3-search{flex:1;max-width:560px}
 .budget-v3-filter{display:grid;gap:var(--space-2);min-width:150px;color:var(--muted);font-size:var(--text-sm);font-weight:600}
 .budget-v3-table th:nth-child(2),.budget-v3-table td:nth-child(2){text-align:right;font-variant-numeric:tabular-nums}
-.budget-v3-owner th button,.budget-v3-category th button,.budget-v3-sticky-context button{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);width:100%;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
-.budget-v3-owner th button{font-weight:700}.budget-v3-category th button{font-weight:650}
-.budget-v3-group-title{display:flex;align-items:center;gap:var(--space-2);flex:1;min-width:0;float:none!important}
-.budget-v3-group-title>svg{width:15px;height:15px;flex:0 0 15px;stroke-width:2.5}
-.budget-v3-group-title>span{float:none!important;min-width:0;overflow-wrap:anywhere;white-space:normal;font-weight:600}
-.budget-v3-group-total{flex:none;white-space:nowrap;font-weight:600}
+.budget-v3-sticky-context button{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);width:100%;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 
 .budget-v3-amount:hover,.budget-v3-amount:focus-visible{background:var(--card)}
 .budget-v3-row-menu{position:relative;display:inline-block;margin:0 0 0 var(--space-2)}
@@ -644,7 +641,6 @@ small, footer { color: var(--muted) }
 .budget-v3-row-menu[data-open-up=true] .budget-v3-menu-actions{top:auto;bottom:100%}
 .budget-v3-menu-actions button{display:block;width:100%;min-height:44px;padding:var(--space-2) var(--space-3);border:0;background:transparent;color:var(--pine);font:inherit;text-align:left;cursor:pointer}
 .budget-v3-menu-actions button:last-child{color:var(--status-error)}
-.budget-v3-compact-edit,.budget-v3-menu-icon,.budget-v3-compact-destination{display:none}
 .budget-v3-item-name{display:block;width:100%;max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px;cursor:pointer}
 .budget-v3-item-name span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .budget-v3-item-name:focus-visible,.budget-v3-row-menu summary:focus-visible,.budget-v3-menu-actions button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
@@ -823,13 +819,10 @@ small, footer { color: var(--muted) }
 .grouped-table-sticky-context{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;background:var(--cream)}
 .grouped-table-wrap[data-page-scroll=true] .grouped-table-sticky-anchor{position:fixed;top:var(--grouped-header-height,0px);left:var(--grouped-wrap-left,0px);width:var(--grouped-wrap-width,100%)}
 .grouped-table-sticky-band{box-sizing:border-box;flex:0 0 auto;border-bottom:1px solid var(--line)}
-.budget-v3-sticky-owner,.budget-v3-sticky-category{padding:0 var(--space-2)}
-.budget-v3-sticky-owner{height:var(--grouped-level-0-height,44px);background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:700}
-.budget-v3-sticky-category{height:var(--grouped-level-1-height,44px);padding-left:var(--budget-category-indent);background:var(--surface-subtle);color:var(--charcoal);font-size:var(--text-sm);font-weight:650}
 .grouped-table-sticky-context button{height:100%}
-.grouped-table-sticky-context button:focus-visible,.budget-v3-owner button:focus-visible,.budget-v3-category button:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+.grouped-table-sticky-context button:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
 
-.budget-v3-mobile-item-meta,.grouped-table-compact-label{display:none}
+.grouped-table-compact-label{display:none}
 
 /* The three-column mobile Plan remains a semantic table. */
 @media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
@@ -840,24 +833,17 @@ small, footer { color: var(--muted) }
   .budget-v3-table thead th:first-child{width:calc(100% - 160px)}
   .budget-v3-table thead th:nth-child(2){width:108px;text-align:right}
   .budget-v3-table thead th:nth-child(3){width:52px;text-align:right}
-  .budget-v3-table .budget-v3-owner th,.budget-v3-table .budget-v3-category th{padding:0 var(--space-2)}
-  .budget-v3-table .budget-v3-category th{padding-left:var(--budget-category-indent)}
-  .budget-v3-table .budget-v3-owner th button,.budget-v3-table .budget-v3-category th button{min-height:44px}
   .budget-v3-table .budget-v3-item th,.budget-v3-table .budget-v3-item td{padding:var(--space-1) var(--space-2);vertical-align:top}
   .budget-v3-table .budget-v3-item th:first-child{padding-left:var(--space-2);min-width:0;font-weight:600;overflow-wrap:anywhere}
   .budget-v3-table .budget-v3-item td:nth-child(2){text-align:right}
   .budget-v3-table .budget-v3-item td:nth-child(3){text-align:right}
   .budget-v3-item-name{display:flex;align-items:center;width:100%;min-height:36px;max-width:100%;color:var(--pine);text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px;overflow-wrap:anywhere}
   .budget-v3-item-name span{white-space:normal;overflow:visible;text-overflow:clip}
-  .budget-v3-mobile-item-meta{display:block;margin-top:0;color:var(--muted);font-size:var(--text-sm);font-weight:400;line-height:1.3;overflow-wrap:anywhere}
   .budget-v3-row-menu{display:inline-block;margin:0}
   .budget-v3-row-menu summary{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:36px;border-radius:var(--radius-sm);text-decoration:none}
   .budget-v3-amount{min-width:44px;min-height:36px;max-width:100%}
   .budget-v3-table .budget-v3-amount{padding:2px var(--space-1)}
   .budget-v3-inline-row td{padding:var(--space-3)}
-  .budget-v3-compact-edit,.budget-v3-compact-destination,.budget-v3-menu-icon{display:inline}
-  .budget-v3-menu-icon{font-size:var(--text-icon);line-height:1}
-  .budget-v3-menu-label,.budget-v3-wide-edit{display:none}
   .budget-v3-row-menu[open]{position:relative;z-index:7}
 }
 @media(max-width:767px){.monthly-budget-page .budget-v3-table-wrap{overflow:visible}}
@@ -873,7 +859,6 @@ small, footer { color: var(--muted) }
  .monthly-budget-page>.page-frame-body,.monthly-budget-page .budget-v3-workspace,.monthly-budget-page .budget-v3-table-wrap{display:block;overflow:visible}
  .monthly-budget-page .budget-v3-table thead{position:sticky;top:0}
 }
-.budget-v3-owner button[aria-hidden=true],.budget-v3-category button[aria-hidden=true]{visibility:hidden}
 
 /* Mobile monthly budget: one shared summary rhythm and vertical destinations. */
 .budget-mobile-summary,.payday,.budget-mobile-plan-heading{display:none}
@@ -930,12 +915,6 @@ small, footer { color: var(--muted) }
   .budget-filter-button.is-active{border-color:var(--pine);background:var(--pine);color:var(--white)}
   .budget-add-button{flex:none;width:44px;min-height:44px;margin:0;padding:0}
   .budget-add-button svg{width:22px;height:22px}
-  .budget-v3-compact-group{min-height:36px;background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:700}
-  .grouped-table-sticky-band.budget-v3-compact-group{display:flex;align-items:center;padding:var(--space-1) var(--space-2)}
-  .budget-v3-compact-group span:last-child{font-size:var(--text-sm);font-weight:500;text-align:right}
-  .budget-v3-compact-group th{padding:0!important}
-  .budget-v3-compact-group th>span{display:inline-block;padding:var(--space-1) var(--space-2)}
-  .budget-v3-compact-group th>span:last-child{float:right}
   .monthly-budget-page.budget-view-transfers .budget-v3-transfer-heading{display:none}
   .payday{display:block;min-width:0}
   .payday-person,.payday-review{min-width:0}
@@ -1005,7 +984,6 @@ small, footer { color: var(--muted) }
 /* Fixed and annual amounts sit in the same chip shape, without the pencil, so every amount lines up. */
 .budget-v3-amount.is-static{border-color:transparent;background:transparent;color:var(--charcoal);cursor:default}
 .budget-v3-amount.is-static:hover{background:transparent}
-.budget-v3-compact-group>span:last-child{margin-left:auto;font-weight:500}
 .confirm-dialog-body p{margin:var(--space-3) 0 0}
 .confirm-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)}
 .dialog-close{display:flex;flex:none;align-items:center;justify-content:center;width:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
@@ -1024,3 +1002,68 @@ small, footer { color: var(--muted) }
 .budget-income-intro{margin:var(--space-1) 0 0;color:var(--charcoal);font-size:var(--text-md);line-height:1.5}
 .budget-nowrap{white-space:nowrap}
 /* Routine over-budget state: normal weight, status colour on the overage only (spec: no alarming language for routine work). */
+
+/* Plan items: one card like Transfers' "Funding by account", with collapsible groups, each group's share of the plan and a Total row. */
+.plan-card{box-sizing:border-box;min-width:0;padding:var(--space-4) var(--space-3) var(--space-3);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card)}
+.plan-card-header{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3) var(--space-4);padding:0 var(--space-3) var(--space-3)}
+.plan-card-heading{min-width:0;margin-right:auto}
+.plan-card-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:700}
+.plan-card-count{display:none;color:var(--muted);font-size:var(--text-sm);font-weight:600}
+.plan-card-summary{margin:2px 0 0;color:var(--muted);font-size:var(--text-sm)}
+.plan-expand-all{min-height:36px;margin:0;padding:0 var(--space-4);border:1px solid var(--line-strong);border-radius:var(--radius-pill);background:transparent;color:var(--pine);font:650 var(--text-sm) var(--font-family);cursor:pointer}
+.plan-expand-all:hover{background:var(--soft-fern)}
+.plan-expand-all:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.plan-card .budget-v3-table{table-layout:fixed}
+.plan-card .budget-v3-table thead th{background:var(--card)}
+.plan-card .budget-v3-table-wrap.is-flat thead th:nth-child(2){width:220px;text-align:left}
+.plan-card .budget-v3-table-wrap.is-flat thead th:nth-child(3){width:150px;text-align:right}
+.plan-card .budget-v3-table-wrap.is-flat thead th:nth-child(4){width:56px}
+.plan-card .budget-v3-table td.plan-share-cell{text-align:left}
+.plan-card .budget-v3-table .plan-amount-cell{text-align:right;font-variant-numeric:tabular-nums}
+.plan-card .budget-v3-table .plan-actions-cell{text-align:right}
+.plan-group{cursor:pointer}
+.plan-group>th,.plan-group>td{padding-top:var(--space-2);padding-bottom:var(--space-2);background:var(--surface-band);color:var(--pine)}
+.plan-group:hover>th,.plan-group:hover>td{background:var(--surface-band-hover)}
+.plan-group th button,.plan-sticky-band button{display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:var(--space-1);width:100%;min-height:36px;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.plan-group th button[aria-hidden=true]{visibility:hidden}
+.plan-group th button:focus-visible,.plan-sticky-band button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.plan-group-line{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+.plan-group-line svg{flex:none;width:16px;height:16px;stroke-width:2.5}
+.plan-group-name{min-width:0;overflow:hidden;font-size:var(--text-md);font-weight:750;text-overflow:ellipsis;white-space:nowrap}
+.plan-group-count{flex:none;color:var(--muted);font-size:var(--text-sm);font-weight:600}
+.plan-group-total{font-weight:800;font-variant-numeric:tabular-nums}
+.plan-group-meta{display:none}
+.plan-share{display:flex;align-items:center;gap:var(--space-2);color:var(--muted);font-size:var(--text-sm);font-weight:650;font-variant-numeric:tabular-nums}
+.plan-share-bar{display:block;flex:0 1 140px;height:6px;border-radius:var(--radius-pill);background:var(--share-track);overflow:hidden}
+.plan-share-bar>span{display:block;height:100%;border-radius:var(--radius-pill);background:var(--pine)}
+.plan-sticky-band{box-sizing:border-box;min-height:var(--grouped-level-0-height,44px);background:var(--surface-band);color:var(--pine);font-size:var(--text-md);cursor:pointer}
+.plan-sticky-band.is-desktop{display:grid;grid-template-columns:var(--grouped-column-widths);align-items:center}
+.plan-sticky-band.is-desktop>div{min-width:0;padding:0 var(--space-2)}
+.plan-sticky-band.is-desktop>.plan-amount-cell{text-align:right}
+.budget-v3-table .budget-v3-item>th:first-child{padding-left:var(--space-6)}
+.plan-card .budget-v3-table .budget-v3-item>th,.plan-card .budget-v3-table .budget-v3-item>td{padding-top:var(--space-2);padding-bottom:var(--space-2)}
+.budget-v3-item-name{color:var(--charcoal);font-weight:650;text-decoration:none}
+.budget-v3-item-meta{display:block;margin-top:2px;overflow:hidden;color:var(--muted);font-size:var(--text-sm);font-weight:400;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.budget-v3-row-menu summary{display:flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:auto;border-radius:var(--radius-md);color:var(--muted);text-decoration:none}
+.budget-v3-row-menu summary:hover{background:var(--soft-fern)}
+.budget-v3-row-menu summary svg{width:18px;height:18px}
+.plan-total>th,.plan-total>td{border-top:2px solid var(--pine);border-bottom:0;color:var(--pine);font-weight:800;font-variant-numeric:tabular-nums}
+.plan-total-count{margin-left:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:600}
+@media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
+  .plan-card{padding:0}
+  .plan-card-header{padding:var(--space-3) var(--space-4)}
+  .plan-card-count{display:inline}
+  .plan-card-summary{display:none}
+  .plan-expand-all{min-height:44px;padding:0 var(--space-1);border:0;color:var(--link);text-decoration:underline;text-underline-offset:3px}
+  .plan-expand-all:hover{background:transparent}
+  .plan-group>th{padding:var(--space-2) var(--space-4)}
+  .plan-group th button,.plan-sticky-band button{min-height:44px}
+  .plan-group-line .plan-group-name{flex:1 1 auto;font-size:var(--text-md)}
+  .plan-group-meta{display:flex;align-items:center;gap:var(--space-2);padding-left:var(--space-5)}
+  .plan-group-meta .plan-share-bar{flex:1 1 auto;height:5px}
+  .plan-group-share{flex:none;color:var(--muted);font-size:var(--text-sm);font-weight:650;font-variant-numeric:tabular-nums}
+  .plan-sticky-band{padding:var(--space-2) var(--space-4);box-shadow:var(--shadow-card)}
+  .budget-v3-table .budget-v3-item>th:first-child{padding-left:var(--space-6)}
+  .budget-v3-item-meta{white-space:normal;overflow-wrap:anywhere}
+  .plan-total>th,.plan-total>td{padding:var(--space-3) var(--space-4)}
+}

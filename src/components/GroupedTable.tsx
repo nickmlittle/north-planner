@@ -11,34 +11,43 @@ export interface GroupedTableColumn {
   label: string
   compactLabel?: string
   wideOnly?: boolean
+  /** Named for screen readers only, e.g. a column of row menus. */
+  hiddenLabel?: boolean
 }
 
 const ActiveGroups = createContext<readonly string[]>([])
 
-export function GroupedTableDisclosure({ groupKey, sticky = false, expanded, label, onClick, children }: {
+export function GroupedTableDisclosure({ groupKey, sticky = false, stickable = true, expanded, label, onClick, children }: {
   groupKey: string
   sticky?: boolean
+  /** False when the caller draws no sticky copy for this group, so the in-table control never hands over to one. */
+  stickable?: boolean
   expanded: boolean
   label: string
   onClick: () => void
   children: ReactNode
 }) {
-  const active = useContext(ActiveGroups).includes(groupKey)
+  const active = useContext(ActiveGroups).includes(groupKey) && stickable
   const hidden = sticky ? !active : active
   return <button type="button" data-group-control={groupKey} data-sticky={sticky ? 'true' : undefined}
     tabIndex={hidden ? -1 : undefined} aria-hidden={hidden || undefined} aria-label={label}
     aria-expanded={expanded} onClick={onClick}>{children}</button>
 }
 
-export function GroupedTableBandRow({ group, colSpan, className, dataGroup, children }: {
+export function GroupedTableBandRow({ group, colSpan, className, dataGroup, cells, onClick, children }: {
   group: GroupedTableGroup
   colSpan: number
   className: string
   dataGroup?: string
+  /** Cells after the heading, for bands that line their figures up with the columns. */
+  cells?: ReactNode
+  /** A pointer convenience for the whole band; the heading's own control stays the accessible one. */
+  onClick?: () => void
   children: ReactNode
 }) {
   return <tr className={className} data-group-level={group.level} data-group-key={group.key}
-    data-parent-key={group.parentKey} data-budget-group={dataGroup}><th scope="row" colSpan={colSpan}>{children}</th></tr>
+    data-parent-key={group.parentKey} data-budget-group={dataGroup}
+    onClick={onClick && (event => { if (!(event.target as HTMLElement).closest('button,a,input,select,summary')) onClick() })}><th scope="row" colSpan={colSpan}>{children}</th>{cells}</tr>
 }
 
 /** Presentation and scroll behavior only; callers own their rows and actions. */
@@ -181,7 +190,7 @@ export function GroupedTable({ columns, groups, renderStickyGroup, focusFallback
       <table className={`grouped-table ${className ?? ''}`}>
         <caption className="visually-hidden">{caption}</caption>
         <thead><tr>{columns.map(column => <th key={column.key} scope="col" className={column.wideOnly ? 'grouped-table-wide-only' : undefined}>
-          {column.compactLabel ? <><span className="grouped-table-wide-label">{column.label}</span><span className="grouped-table-compact-label">{column.compactLabel}</span></> : column.label}
+          {column.hiddenLabel ? <span className="visually-hidden">{column.label}</span> : column.compactLabel ? <><span className="grouped-table-wide-label">{column.label}</span><span className="grouped-table-compact-label">{column.compactLabel}</span></> : column.label}
         </th>)}</tr></thead>
         {rowGroups ? children : <tbody>{children}</tbody>}
         {footer && <tfoot>{footer}</tfoot>}
