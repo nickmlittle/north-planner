@@ -6,22 +6,20 @@ afterEach(() => window.history.replaceState(null, '', '/'))
 
 it('parses direct, legacy and invalid navigation URLs', () => {
   expect(parseNavigation('?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')).toEqual({
-    view: 'budget', budgetView: 'transfers', month: '2026-02', transferAccount: 'account-1', planDestination: null,
+    view: 'budget', budgetView: 'transfers', month: '2026-02', planDestination: null,
   })
   expect(parseNavigation('?view=dashboard&budgetView=unknown&month=2026-13')).toEqual({
-    view: 'budget', budgetView: 'plan', month: currentMonth(), transferAccount: null, planDestination: null,
+    view: 'budget', budgetView: 'plan', month: currentMonth(), planDestination: null,
   })
   expect(parseNavigation('?view=budget').budgetView).toBe('plan')
 })
 
-it('updates tab, month and detail without discarding unrelated query parameters', () => {
-  window.history.replaceState(null, '', '/?view=budget&custom=keep')
-  navigateTo({ budgetView: 'transfers', month: '2026-04', transferAccount: 'joint' })
+it('updates tab and month without discarding unrelated query parameters, and drops retired detail links', () => {
+  window.history.replaceState(null, '', '/?view=budget&custom=keep&transferAccount=joint')
+  navigateTo({ budgetView: 'transfers', month: '2026-04' })
   expect(window.location.search).toContain('budgetView=transfers')
   expect(window.location.search).toContain('month=2026-04')
-  expect(window.location.search).toContain('transferAccount=joint')
   expect(window.location.search).toContain('custom=keep')
-  navigateTo({ view: 'household' })
   expect(window.location.search).not.toContain('transferAccount')
 })
 

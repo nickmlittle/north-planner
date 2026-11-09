@@ -37,7 +37,7 @@ Zero allocations create no actionable steps. Existing income-policy fields remai
 
 Source accounts, automation and account operating permissions have not been verified. A complete calculated instruction does not mean a bank payment is required, manual, authorised or completed. The app does not execute payments.
 
-Funding dependencies link each joint pot step to that person's account-funding requirement. A sole-owner pot step depends on all contributions to its account. These links describe planning order, not tracked payment completion.
+Funding dependencies link each joint pot step to that person's account-funding requirement. A sole-owner pot step depends on all contributions to its account. These links describe planning order, not tracked payment completion. The mobile step list orders each person's steps by account, funding first and then that account's pot moves; where a pot move depends on someone else's funding, it says so in a caption rather than reordering across people.
 
 ## Totals, precision and incomplete data
 
