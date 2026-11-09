@@ -1010,6 +1010,11 @@ small, footer { color: var(--muted) }
 .plan-card-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:700}
 .plan-card-count{display:none;color:var(--muted);font-size:var(--text-sm);font-weight:600}
 .plan-card-summary{margin:2px 0 0;color:var(--muted);font-size:var(--text-sm)}
+.plan-grouping{display:inline-flex;gap:2px;padding:var(--space-1);border-radius:var(--radius-pill);background:var(--soft-fern)}
+.plan-grouping button{min-height:32px;margin:0;padding:0 var(--space-4);border:0;border-radius:var(--radius-pill);background:transparent;color:var(--muted);font:650 var(--text-sm) var(--font-family);cursor:pointer}
+.plan-grouping button:hover{color:var(--pine)}
+.plan-grouping button[aria-pressed=true]{background:var(--pine);color:var(--white)}
+.plan-grouping button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 .plan-expand-all{min-height:36px;margin:0;padding:0 var(--space-4);border:1px solid var(--line-strong);border-radius:var(--radius-pill);background:transparent;color:var(--pine);font:650 var(--text-sm) var(--font-family);cursor:pointer}
 .plan-expand-all:hover{background:var(--soft-fern)}
 .plan-expand-all:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
@@ -1051,9 +1056,11 @@ small, footer { color: var(--muted) }
 .plan-total-count{margin-left:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:600}
 @media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .plan-card{padding:0}
-  .plan-card-header{padding:var(--space-3) var(--space-4)}
+  .plan-card-header{row-gap:var(--space-2);padding:var(--space-3) var(--space-4)}
   .plan-card-count{display:inline}
   .plan-card-summary{display:none}
+  .plan-grouping{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;order:3}
+  .plan-grouping button{min-height:44px;font-size:var(--text-md)}
   .plan-expand-all{min-height:44px;padding:0 var(--space-1);border:0;color:var(--link);text-decoration:underline;text-underline-offset:3px}
   .plan-expand-all:hover{background:transparent}
   .plan-group>th{padding:var(--space-2) var(--space-4)}

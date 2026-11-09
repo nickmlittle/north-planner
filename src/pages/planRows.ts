@@ -5,6 +5,8 @@ import type { PlanDestination } from '../state/navigation'
 import { destinationLabel } from './budgetLabels'
 
 export type PlanGroup = { name: string; key: string; items: BudgetItem[] }
+/** How the Plan bands its items: by what they are for, or by where the money goes. */
+export type PlanGrouping = 'category' | 'destination'
 export type PlanFilterValues = { query: string; owner: string; category: string }
 
 /** Owner bands, and Owner filter options, in household order. */
@@ -35,6 +37,11 @@ export function planItemLabels(document: BudgetDocument, accountLabels: Readonly
     destinationLabel(item: BudgetItem) {
       const account = accountFor(item), destination = item.destination
       return destinationLabel((account && accountLabels.get(account.id)) ?? 'Account', destination.kind === 'pot' ? potNamed(destination.potId) ?? 'Pot' : undefined)
+    },
+    /** Where on Transfers the item's money goes: the account, and the pot's place in the budget (-1 for direct to the account). */
+    destinationPlace(item: BudgetItem) {
+      const destination = item.destination
+      return { accountId: accountFor(item)?.id, potIndex: destination.kind === 'pot' ? pots.findIndex(pot => pot.id === destination.potId) : -1 }
     },
     fundingLabel(item: BudgetItem) {
       if (item.funding === 'fixed') return 'Fixed amounts'
@@ -78,24 +85,33 @@ export function planDestinationLabel(document: BudgetDocument, destination: Plan
 }
 
 /** The group an item sits in on the Plan. Items whose category has gone share one "Uncategorised" group. */
-export function planGroupKey(item: BudgetItem, labels: PlanItemLabels) {
+export function planGroupKey(item: BudgetItem, grouping: PlanGrouping, labels: PlanItemLabels) {
+  if (grouping === 'destination') return item.destination.kind === 'pot' ? `destination:pot:${item.destination.potId}` : `destination:account:${item.destination.accountId}`
   return `category:${labels.categoryName(item) === undefined ? '' : item.categoryId}`
 }
 
 /**
- * The Plan's rows after search and filters, banded by category in first-appearance order.
- * Owner is a filter only: every screen size shows the same groups.
+ * The Plan's rows after search and filters. Owner is a filter only: every screen size shows the same groups.
+ * Categories keep first-appearance order. Destinations follow Transfers: accounts in `accountOrder`, then each account's
+ * direct items before its pots, in budget order.
  */
-export function groupPlanItems(items: BudgetItem[], filters: PlanFilterValues, labels: PlanItemLabels): { groups: PlanGroup[]; matching: BudgetItem[] } {
+export function groupPlanItems(items: BudgetItem[], filters: PlanFilterValues, labels: PlanItemLabels, grouping: PlanGrouping = 'category', accountOrder: readonly string[] = []): { groups: PlanGroup[]; matching: BudgetItem[] } {
   const matching = items.filter(item => labels.matchesSearch(item, filters.query)
     && (filters.category === 'All' || item.categoryId === filters.category)
     && (filters.owner === 'All' || labels.ownerGroup(item) === filters.owner))
   const groups = new Map<string, PlanGroup>()
   for (const item of matching) {
-    const key = planGroupKey(item, labels)
-    const group = groups.get(key) ?? { name: labels.categoryName(item) ?? 'Uncategorised', key, items: [] }
+    const key = planGroupKey(item, grouping, labels)
+    const group = groups.get(key) ?? { name: grouping === 'destination' ? labels.destinationLabel(item) : labels.categoryName(item) ?? 'Uncategorised', key, items: [] }
     group.items.push(item)
     groups.set(key, group)
   }
-  return { groups: [...groups.values()], matching }
+  if (grouping === 'category') return { groups: [...groups.values()], matching }
+  const rank = (group: PlanGroup) => {
+    const place = labels.destinationPlace(group.items[0]!), account = place.accountId ? accountOrder.indexOf(place.accountId) : -1
+    return [account < 0 ? Infinity : account, place.potIndex < 0 && group.items[0]!.destination.kind === 'pot' ? Infinity : place.potIndex]
+  }
+  const ranked = [...groups.values()].map(group => ({ group, rank: rank(group) }))
+  ranked.sort((a, b) => a.rank[0]! - b.rank[0]! || a.rank[1]! - b.rank[1]!)
+  return { groups: ranked.map(row => row.group), matching }
 }
