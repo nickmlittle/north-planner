@@ -969,3 +969,16 @@ it.each([
   render(<SeededHarness initial={initial}/>)
   expect(document.querySelector('.budget-v3-summary-note')).toHaveTextContent(text)
 })
+
+it('states a shared income change range once and prefixes amounts with £',()=>{
+  const initial=seededDocument()
+  initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:300000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:200000,changes:{}}]
+  render(<SeededHarness initial={initial}/>)
+  fireEvent.click(screen.getAllByRole('button',{name:'Edit income'})[0]!)
+  const nick=screen.getByLabelText('Nick — Job · Employment'),immy=screen.getByLabelText('Immy — Job · Employment')
+  const form=nick.closest('form')!
+  expect(within(form).getAllByText(/^Changes apply:/)).toHaveLength(1)
+  expect(nick).toHaveAccessibleDescription(/^Changes apply: .* onward\.$/)
+  expect(immy.getAttribute('aria-describedby')).toBe(nick.getAttribute('aria-describedby'))
+  expect(nick.parentElement).toHaveClass('budget-money-field')
+})

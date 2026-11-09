@@ -71,18 +71,19 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
   const selected = currentView === 'household' ? 'household' : budgetView
   const pageTitle = selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : 'Household'
   const destinations = [
-    { id: 'plan', label: 'Plan', Icon: Wallet, action: () => onSelectBudgetView('plan'), disabled: !setupComplete },
-    { id: 'transfers', label: 'Transfers', Icon: ArrowLeftRight, action: () => onSelectBudgetView('transfers'), disabled: !setupComplete },
-    { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household'), disabled: false },
+    { id: 'plan', label: 'Plan', Icon: Wallet, action: () => onSelectBudgetView('plan') },
+    { id: 'transfers', label: 'Transfers', Icon: ArrowLeftRight, action: () => onSelectBudgetView('transfers') },
+    { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household') },
   ] as const
   return <>
     <header className="mobile-app-header"><h1>{pageTitle}</h1><button type="button" className="mobile-utility-trigger" aria-label="Account and save status" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={18} aria-hidden="true" /></button></header>
     {status === 'Save failed' && <p className="mobile-save-alert" role="alert">Save failed. Open account and save status for details.</p>}
-    <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(({ id, label, Icon, action, disabled }) => <button key={id} type="button" aria-current={selected === id ? 'page' : undefined} disabled={disabled} onClick={action}><Icon size={22} strokeWidth={2} aria-hidden="true" /><span>{label}</span></button>)}</nav>
+    {/* Until setup is done there is nowhere else to go, so no greyed-out promises. */}
+    {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(({ id, label, Icon, action }) => <button key={id} type="button" aria-current={selected === id ? 'page' : undefined} onClick={action}><Icon size={22} strokeWidth={2} aria-hidden="true" /><span>{label}</span></button>)}</nav>}
     <aside className={`planner-sidebar is-compact${desktopExpanded ? ' desktop-expanded' : ''}`} aria-label="Application navigation">
       <div className="sidebar-rail">
         <div className="desktop-sidebar-header"><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={() => setDesktopExpanded(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button><span className="desktop-sidebar-brand" aria-hidden="true"><AnimatedSidebarText text="north." /></span></div>
-        <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">{([{ id: 'household', label: 'Household', Icon: UserRoundGroup }, { id: 'budget', label: 'Budget', Icon: Wallet }] as const).map(destination => {
+        <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">{([{ id: 'household', label: 'Household', Icon: UserRoundGroup }, { id: 'budget', label: 'Budget', Icon: Wallet }] as const).filter(destination => setupComplete || destination.id !== 'budget').map(destination => {
           const Icon = destination.Icon
           return <button key={destination.id} type="button" className="sidebar-link" aria-current={currentView === destination.id ? 'page' : undefined} aria-label={destination.label} title={destination.label} onClick={() => onSelectView(destination.id)}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span><span className="sidebar-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={destination.label} /></span></button>
         })}</nav>

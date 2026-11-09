@@ -155,9 +155,22 @@ it('gates direct Budget URLs until household setup is complete', () => {
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers')
   render(<App />)
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
-  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
-  expect(within(nav).getByRole('button', { name: 'Transfers' })).toBeDisabled()
-  expect(within(nav).getByRole('button', { name: 'Household' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
+  expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).queryByRole('button', { name: 'Budget' })).not.toBeInTheDocument()
+})
+
+it('reopens on the Plan or Transfers view used last on this device', async () => {
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Home', adults: [{ id: 'a', name: 'Alex' }] }
+  saved.workflow.setupComplete = true
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  const first = render(<App />)
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Transfers' }))
+  expect(window.location.search).toContain('budgetView=transfers')
+  first.unmount()
+  window.history.replaceState(null, '', '/')
+  render(<App />)
+  expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
 })
 
 it('preserves the saved check icon and removes the mobile drawer', async () => {
