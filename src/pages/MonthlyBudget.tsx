@@ -107,7 +107,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const destinationItems=items.filter(matchesPlanDestination)
  const planDestinationLabel=(()=>{if(!planDestination)return '';if(planDestination.kind==='pot'){const pot=document.budget.pots.find(row=>row.id===planDestination.id);if(!pot)return 'Destination no longer available';const account=allMatrixLabels.get(pot.accountId),name=/\bpot$/i.test(pot.name)?pot.name:`${pot.name} pot`;return account?`${name} · ${account}`:'Destination no longer available'}const account=allMatrixLabels.get(planDestination.id);return account?planDestination.kind==='direct'?`Direct to account · ${account}`:account:'Destination no longer available'})()
  const searchMatch=(item:BudgetItem)=>{const needle=query.trim().toLocaleLowerCase();if(!needle)return true;const c=categories.find(x=>x.id===item.categoryId)?.name??'',a=accountFor(item),destination=item.destination,p=destination.kind==='pot'?document.budget.pots.find(x=>x.id===destination.potId)?.name??'':'';const owner=ownerGroup(item);return [item.name,c,a?.name,a?.provider,accountTypeLabel(a?.accountTypeId),p,owner].some(v=>v?.toLocaleLowerCase().includes(needle))}
- const rowsByOwner=new Map<string,Map<string,BudgetItem[]>>();for(const item of destinationItems.filter(item=>searchMatch(item)&&(!mobilePresentation||categoryFilter==='All'||item.categoryId===categoryFilter))){const owner=ownerGroup(item),cat=categories.find(c=>c.id===item.categoryId)?.name??'Uncategorised';const cats=rowsByOwner.get(owner)??new Map<string,BudgetItem[]>();cats.set(cat,[...(cats.get(cat)??[]),item]);rowsByOwner.set(owner,cats)}const grouped=[...rowsByOwner]
+ const rowsByOwner=new Map<string,Map<string,BudgetItem[]>>();for(const item of destinationItems.filter(item=>searchMatch(item)&&(categoryFilter==='All'||item.categoryId===categoryFilter))){const owner=ownerGroup(item),cat=categories.find(c=>c.id===item.categoryId)?.name??'Uncategorised';const cats=rowsByOwner.get(owner)??new Map<string,BudgetItem[]>();cats.set(cat,[...(cats.get(cat)??[]),item]);rowsByOwner.set(owner,cats)}const grouped=[...rowsByOwner]
  const total=items.reduce((sum,item)=>sum+item.amountPence,0)
  const transferAccounts=transfers.accounts.map(account=>({...account,incomplete:account.incomplete||instructions?.accounts.find(row=>row.accountId===account.accountId)?.status==='needs-review'})).sort((a,b)=>{
   const accountA=document.budget.accounts.find(account=>account.id===a.accountId),accountB=document.budget.accounts.find(account=>account.id===b.accountId)
@@ -183,11 +183,15 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const searchMode=!!query.trim()
  const destinationGroupKey=(key:string)=>`${month}:${planDestination?.kind}:${planDestination?.id}:${key}`
  const groupCollapsed=(key:string)=>query?!!searchCollapsed[key]:planDestination?!!destinationCollapsed[destinationGroupKey(key)]:!!planCollapsed[key]
- const visibleOwners=ownerOrder.flatMap(owner=>{const cats=visibleGrouped.find(([label])=>label===owner)?.[1];if(!cats)return [];const ownerItems=[...cats.values()].flat();const key=`owner:${owner}`;return [{name:owner,key,items:ownerItems,collapsed:groupCollapsed(key),categories:[...cats].map(([name,items])=>{const key=`${owner}:${name}`;return {name,key,items,collapsed:groupCollapsed(key)}})}]})
+ // Desktop groups by category only: the owner is already in the Destination column and the Owner filter.
+ const flatPlan=!mobilePresentation
+ const ownerGroups=ownerOrder.flatMap(owner=>{const cats=visibleGrouped.find(([label])=>label===owner)?.[1];if(!cats)return [];const ownerItems=[...cats.values()].flat();const key=`owner:${owner}`;return [{name:owner,key,items:ownerItems,collapsed:groupCollapsed(key),categories:[...cats].map(([name,items])=>{const key=`${owner}:${name}`;return {name,key,items,collapsed:groupCollapsed(key)}})}]})
+ const flatCategories=(()=>{const shown=new Set(visibleGrouped.flatMap(([,cats])=>[...cats.values()].flat())),cats=new Map<string,BudgetItem[]>();for(const item of destinationItems){if(!shown.has(item))continue;const cat=categories.find(c=>c.id===item.categoryId)?.name??'Uncategorised';cats.set(cat,[...(cats.get(cat)??[]),item])}return [...cats].map(([name,items])=>{const key=`category:${name}`;return {name,key,items,collapsed:groupCollapsed(key)}})})()
+ const visibleOwners=flatPlan?(flatCategories.length?[{name:'All',key:'owner:All',items:flatCategories.flatMap(category=>category.items),collapsed:false,categories:flatCategories}]:[]):ownerGroups
  const scopedPlan=mobilePresentation&&mobileBudgetView==='plan'&&!!planDestination
  const compactPlan=mobilePresentation&&mobileBudgetView==='plan'&&!!window.matchMedia
- const omitOwner=scopedPlan&&visibleOwners.length===1
- const singleScope=omitOwner&&visibleOwners[0]!.categories.length===1
+ const omitOwner=flatPlan||(scopedPlan&&visibleOwners.length===1)
+ const singleScope=scopedPlan&&visibleOwners.length===1&&visibleOwners[0]!.categories.length===1
  const matchingItems=visibleGrouped.flatMap(([,cats])=>[...cats.values()].flat())
  const searchRef=useRef<HTMLInputElement>(null)
  const captureBrowseScroll=()=>{
@@ -302,8 +306,8 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  {showPlanFilters&&<div className="budget-v3-scroll-tools">{scopedPlan?<details className="budget-v3-scoped-filters"><summary>Search and filter{query||ownerFilter!=='All'||categoryFilter!=='All'?' · active':''}</summary>{planFilters}</details>:planFilters}</div>}
  {searchMode&&<p className="budget-v3-search-count" role="status">{matchingItems.length} matching {matchingItems.length===1?'item':'items'} · Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</p>}
  {!items.length&&!planDestination?<div className="budget-v3-empty"><p>{resolved.sourceMonth||resolved.importedBaseline?'This budget has no items yet.':'There is no budget for this month yet.'}</p><button className="primary-button" onClick={()=>start()}>Add item</button></div>:!visibleGrouped.length?<p className="budget-v3-empty">{planDestination&&!destinationItems.length?`No items go to ${planDestinationLabel} for ${monthLabel(month)}.`:searchMode?`No items match “${query.trim()}” within the current filters. Try another search or clear the search.`:'No items match this destination and owner/category filter.'}</p>:<GroupedTable
-  wrapClassName="budget-v3-table-wrap" className="budget-v3-table"
-  regionLabel="Plan table" caption={searchMode?'Matching budget items':'Budget items by owner and category'}
+  wrapClassName={`budget-v3-table-wrap${flatPlan?' is-flat':''}`} className="budget-v3-table"
+  regionLabel="Plan table" caption={searchMode?'Matching budget items':flatPlan?'Budget items by category':'Budget items by owner and category'}
   columns={mobilePresentation?[
    {key:'item',label:'Item'}, {key:'amount',label:'Amount'}, {key:'actions',label:'Actions'},
   ]:[
@@ -318,7 +322,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
     {(searchMode||compactPlan||singleScope||!category.collapsed)&&category.items.map(item=>{const impact=inlineId===item.id?quickImpact(item):undefined;return <Fragment key={item.id}><tr className="budget-v3-item" onClick={e=>{if((e.target as HTMLElement).closest('button,a,input,select,summary,details,label,form'))return;start(item)}}>
      <th scope="row" data-label="Item">
       <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={()=>start(item)}><span>{item.name}</span></button>
-      {searchMode&&<span className="budget-v3-result-context">{owner.name} · {category.name}</span>}
+      {searchMode&&<span className="budget-v3-result-context">{ownerGroup(item)} · {category.name}</span>}
       <span className="budget-v3-mobile-item-meta"><span className="visually-hidden">Funding: </span>{fundingLabel(item)}{(!scopedPlan||planDestination?.kind==='account')&&<><span aria-hidden="true"> · </span><span className="visually-hidden">Destination: </span><span className="budget-v3-compact-destination">{shortDestinationLabel(item)}</span></>}</span>
      </th>
      <td data-label="Monthly amount">{inlineId===item.id?<span className="budget-v3-inline-cell budget-money-field"><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-describedby={`inline-scope-${item.id}${formError?` inline-error-${item.id}`:''}`} className="budget-v3-inline-amount" autoFocus inputMode="decimal" value={inlineValue} onChange={e=>{setInlineValue(e.target.value);setFormError('')}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();cancelInline()}}}/></span>:item.frequency==='monthly'&&item.funding!=='fixed'?<button type="button" data-amount-trigger={item.id} className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={inlineId===item.id} onClick={e=>{inlineTrigger.current=e.currentTarget;setInlineId(item.id);setInlineValue((item.amountPence/100).toFixed(2));setFormError('');setInlineSavedItem(null)}}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>:<span className="budget-v3-static-amount">{pounds(item.amountPence)}</span>}</td>
