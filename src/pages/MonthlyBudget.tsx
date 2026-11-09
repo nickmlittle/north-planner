@@ -25,11 +25,11 @@ import { accountOptionLabels, matrixAccountLabels } from './budgetLabels'
 import { formatEditScope, formatMonth } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
 import type { MatrixReturn, PlanDestination, StepsReturn } from '../state/navigation'
+import { MOBILE_QUERY } from '../breakpoints'
 
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onOpenPlanDestination?: (destination: PlanDestination, origin?: MatrixReturn) => void; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; matrixReturn?: MatrixReturn | null; stepsReturn?: StepsReturn | null; planItemId?: string }
-const mobileQuery = '(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse)'
-const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(mobileQuery); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
-const getMobile = () => !window.matchMedia || window.matchMedia(mobileQuery).matches
+const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
+const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const monthLabel = formatMonth
 const shift = (month: string, by: number) => { const [y,m] = month.split('-').map(Number); const d = new Date(y!,m!-1+by,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { MOBILE_QUERY } from './breakpoints'
 
 // Keeps styles.css on its design tokens: raw values live only in the :root block at the top,
 // and everything after it goes through var(--…). See the token pass in UX review §6.5.
@@ -45,6 +46,18 @@ describe('design tokens', () => {
     const spacing = /^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/
     const offScale = (value: string) => [...value.matchAll(/(^|[^\w.-])(-?)(\d+)px\b/g)].some(([, , minus, n]) => !minus && +n! > 2 && +n! < 40)
     expect(offenders(d => spacing.test(d.property) && offScale(d.value))).toEqual([])
+  })
+
+  it('uses only the three width breakpoints (640 / 768 / 1100) and the landscape-phone query', () => {
+    const widths = [...css.matchAll(/@media[^{]*/g)].flatMap(([query]) => [...query.matchAll(/(min|max)-width:\s*(\d+)px/g)].map(([, kind, n]) => `${kind}-${n}`))
+    expect([...new Set(widths)].filter(w => !['max-640', 'min-641', 'max-767', 'min-768', 'max-980', 'min-981', 'max-1099', 'min-1100'].includes(w))).toEqual([])
+  })
+
+  it('keeps the CSS mobile query in step with MOBILE_QUERY in breakpoints.ts', () => {
+    const normalise = (query: string) => query.replace(/\s+/g, '')
+    const cssMobile = [...css.matchAll(/@media([^{]*max-width:\s*767px[^{]*)\{/g)].map(([, query]) => normalise(query!)).filter(query => query.includes('orientation'))
+    expect(cssMobile.length).toBeGreaterThan(0)
+    expect(new Set(cssMobile)).toEqual(new Set([normalise(MOBILE_QUERY)]))
   })
 
   it('uses shadow tokens', () => {
