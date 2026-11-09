@@ -858,8 +858,10 @@ small, .muted, footer { color: #59665a; }
 .budget-impact{margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#f5f7f2;font-size:13px;line-height:1.45}
 .budget-impact>strong{color:var(--pine)}
 .budget-impact p{margin:7px 0}
-.budget-impact details{margin-top:10px}
-.budget-impact summary{min-height:44px;color:var(--pine);font-weight:650;cursor:pointer}
+.budget-impact details{margin:6px 0 -6px}
+.budget-impact summary{display:flex;align-items:center;gap:6px;min-height:44px;color:var(--pine);font-weight:650;cursor:pointer}
+.budget-impact summary::before{content:"▸"}.budget-impact details[open]>summary::before{content:"▾"}
+.budget-impact summary::-webkit-details-marker{display:none}
 .budget-impact-compact{margin:4px 0}
 .budget-affected-banner{margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:8px;background:#e7eee6;font-size:13px}
 .budget-affected-banner p{margin:5px 0 0}
@@ -1308,3 +1310,10 @@ small, .muted, footer { color: #59665a; }
 .budget-v3-amount:hover,.budget-v3-amount:focus-visible{border-color:var(--fern)}
 .budget-v3-amount-icon{flex:none;width:12px;height:12px;color:var(--muted)}
 .budget-v3-compact-group>span:last-child{margin-left:auto;font-weight:500}
+.confirm-dialog-body p{margin:12px 0 0}
+.confirm-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:20px}
+.budget-manage-close{display:flex;align-items:center;justify-content:center;width:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:6px;background:transparent;color:var(--pine);cursor:pointer}
+.budget-manage-close svg{width:20px;height:20px}
+.budget-manage-close:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+/* Keep quick-edit Save clear of the fixed mobile nav when the form scrolls into view. */
+@media(max-width:767px){.budget-v3-inline-row form{scroll-margin-bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
