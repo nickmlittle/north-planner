@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { useState } from 'react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { MonthlyBudget } from './MonthlyBudget'
+// Small fixtures still drive search and filters; the threshold has its own test.
+vi.mock('./planListConfig', () => ({ PLAN_FILTER_MIN_ITEMS: 0 }))
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals()})
 function Harness(){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument}/>}
 function createAccountInPicker(form: HTMLElement, owner='Nick', provider='Monzo', nickname='') {
@@ -42,25 +44,28 @@ it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harnes
 it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Classification'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getAllByText('Income details')[0]!);expect(screen.getAllByText('Additional income').some(node=>node.closest('div')?.textContent?.includes('£400.00'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.budget-v3-owner')).not.toBeInTheDocument()})
 it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}});expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
-it('opens at owner level and retains category expansion across collapse, filters and months',()=>{
+it('opens expanded and keeps collapse state across filters, months and remounts',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'hierarchy-item',name:'Groceries',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:12000,amountPence:12000,frequency:'monthly',funding:'equal'}]}
-  render(<SeededHarness initial={initial}/>)
-  expect(screen.getByRole('button',{name:/^Nick,/})).toHaveAttribute('aria-expanded','false')
-  expect(screen.queryByRole('button',{name:/^Bills,/})).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
+  const {unmount}=render(<SeededHarness initial={initial}/>)
+  expect(screen.getByRole('button',{name:/^Nick,/})).toHaveAttribute('aria-expanded','true')
   const category=screen.getByRole('button',{name:/^Bills,/})
-  expect(category).toHaveAttribute('aria-expanded','false')
-  expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
+  expect(category).toHaveAttribute('aria-expanded','true')
+  expect(screen.getByText('Groceries')).toBeVisible()
   fireEvent.click(category)
-  expect(screen.getByText('Groceries')).toBeVisible()
+  expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
   fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
-  expect(screen.getByText('Groceries')).toBeVisible()
+  expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}})
   fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'All'}})
   fireEvent.click(screen.getByRole('button',{name:/Next month/}))
   fireEvent.click(screen.getByRole('button',{name:/Previous month/}))
+  expect(screen.getByRole('button',{name:/^Bills,/})).toHaveAttribute('aria-expanded','false')
+  unmount()
+  render(<SeededHarness initial={initial}/>)
+  expect(screen.getByRole('button',{name:/^Bills,/})).toHaveAttribute('aria-expanded','false')
+  fireEvent.click(screen.getByRole('button',{name:/^Bills,/}))
   expect(screen.getByText('Groceries')).toBeVisible()
 })
 it('shows direct search matches and restores the saved group state when cleared',()=>{
@@ -117,7 +122,7 @@ it('keeps compact destination details and opens editing from the row menu',()=>{
   fireEvent.click(within(summary.closest('details')!).getByRole('button',{name:'Edit'}))
   expect(screen.getByRole('form',{name:'Edit budget item'})).toBeVisible()
 })
-it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));fireEvent.click(screen.getByRole('button',{name:/^Nick,/}));fireEvent.click(document.querySelector<HTMLButtonElement>('.budget-v3-category button')!);expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Nick · Monzo · Current')})
+it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Nick · Monzo · Current')})
 
 it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick · Monzo · Current account · Everyday')})
 
@@ -306,8 +311,6 @@ it('keeps the saved destination while changing branches and asks to finish or ke
   const month = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month] = { items: [{ id: 'item1', name: 'Groceries', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 12000, amountPence: 12000, frequency: 'monthly', funding: 'equal' }] }
   render(<SeededHarness initial={initial}/>)
-  fireEvent.click(screen.getByRole('button', { name: /^Nick,/ }))
-  fireEvent.click(document.querySelector<HTMLButtonElement>('.budget-v3-category button')!)
   fireEvent.click(screen.getByRole('button', { name: 'Groceries' }))
   const form = screen.getByRole('form', { name: 'Edit budget item' })
   expect(within(form).getByText(/Nick · Monzo · Current account · Spending/)).toBeVisible()
@@ -512,8 +515,6 @@ it('shows missing income without blocking an income-ratio item from saving', () 
   fireEvent.change(within(row).getByLabelText('Funding type'), { target: { value: 'proportional' } })
   expect(within(row).getByText('Add employment income to calculate')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
-  fireEvent.click(screen.getByRole('button', { name: /^Nick,/ }))
-  fireEvent.click(document.querySelector<HTMLButtonElement>('.budget-v3-category button')!)
   expect(screen.getByText('No income yet')).toBeVisible()
 })
 
@@ -644,8 +645,6 @@ it('keeps a single operable sticky group context as boundaries cross and results
   const month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'sticky-item',name:'Groceries',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:12000,amountPence:12000,frequency:'monthly',funding:'equal'}]}
   render(<SeededHarness initial={initial}/>)
-  fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
-  fireEvent.click(document.querySelector<HTMLButtonElement>('.budget-v3-category button')!)
   const wrap=document.querySelector<HTMLDivElement>('.budget-v3-table-wrap')!
   wrap.style.overflowY='auto'
   const rect=(top:number,bottom:number,height=bottom-top)=>({top,bottom,height,left:0,right:800,width:800,x:0,y:top,toJSON:()=>({})})

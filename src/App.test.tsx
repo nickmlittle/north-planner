@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from './App'
 import { budgetStorageKey } from './state/useBudgetDocument'
 import { newBudgetDocument } from './domain/budgetDocument'
+// Small fixtures still drive search and filters; the threshold has its own test.
+vi.mock('./pages/planListConfig', () => ({ PLAN_FILTER_MIN_ITEMS: 0 }))
 
 afterEach(() => { cleanup(); localStorage.clear(); window.history.replaceState(null, '', '/'); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
