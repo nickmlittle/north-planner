@@ -711,6 +711,10 @@ small, .muted, footer { color: #59665a; }
 .budget-v3-inline-amount{box-sizing:border-box;width:min(100%,240px);min-width:0;min-height:44px;padding:8px;font:inherit;font-size:16px}
 .budget-v3-inline-controls button{min-height:44px;padding:8px 12px}
 .budget-v3-inline-row p{margin:0;color:#a42a27}
+.budget-v3-inline-cell{display:inline-block;width:6.5em}
+.budget-v3-inline-cell .budget-v3-inline-amount{padding-left:20px!important;padding-right:6px}
+.budget-v3-inline-cell .budget-v3-inline-amount{width:100%;min-height:44px;padding:6px 8px;text-align:right}
+.budget-v3-inline-controls .primary-button,.budget-v3-inline-controls .secondary-button{min-height:44px;padding:8px 16px}
 .budget-v3-table thead th{color:var(--muted);font-size:11px;font-weight:650}
 .budget-v3-owner th{background:#e7eee6;color:var(--pine);font-size:13px}.budget-v3-category th{padding-left:var(--budget-category-indent);background:#f5f6f2;color:var(--charcoal);font-size:12px}
 .budget-v3-item th:first-child{padding-left:38px}.budget-v3-amount{padding:3px;border:0;background:none;color:var(--pine);font:600 14px var(--font-family);cursor:pointer}
@@ -907,7 +911,7 @@ small, .muted, footer { color: #59665a; }
 .budget-v3-menu-actions button{display:block;width:100%;min-height:44px;padding:8px 12px;border:0;background:transparent;color:var(--pine);font:inherit;text-align:left;cursor:pointer}
 .budget-v3-menu-actions button:last-child{color:#873d2b}
 .budget-v3-compact-edit,.budget-v3-menu-icon,.budget-v3-compact-destination,.budget-v3-compact-only{display:none}
-.budget-v3-item-name{max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-decoration-color:#929b89;text-underline-offset:3px;cursor:pointer}
+.budget-v3-item-name{display:block;width:100%;max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-decoration-color:#929b89;text-underline-offset:3px;cursor:pointer}
 .budget-v3-item-name span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .budget-v3-item-name:focus-visible,.budget-v3-row-menu summary:focus-visible,.budget-v3-menu-actions button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 .budget-v3-overlay[hidden]{display:none}
@@ -1087,7 +1091,7 @@ small, .muted, footer { color: #59665a; }
   .budget-v3-table .budget-v3-item th:first-child{padding-left:9px;min-width:0;font-weight:600;overflow-wrap:anywhere}
   .budget-v3-table .budget-v3-item td:nth-child(2){text-align:right}
   .budget-v3-table .budget-v3-item td:nth-child(3){text-align:right}
-  .budget-v3-item-name{display:block;min-height:44px;max-width:100%;color:var(--pine);text-decoration:underline;text-decoration-color:#929b89;text-underline-offset:3px;overflow-wrap:anywhere}
+  .budget-v3-item-name{display:block;width:100%;min-height:44px;max-width:100%;color:var(--pine);text-decoration:underline;text-decoration-color:#929b89;text-underline-offset:3px;overflow-wrap:anywhere}
   .budget-v3-item-name span{white-space:normal;overflow:visible;text-overflow:clip}
   .budget-v3-mobile-item-meta{display:block;margin-top:3px;color:var(--muted);font-size:11px;font-weight:400;line-height:1.3;overflow-wrap:anywhere}
   .budget-v3-row-menu{display:inline-block;margin:0}
@@ -1283,3 +1287,6 @@ small, .muted, footer { color: #59665a; }
 
 .transfer-calculation-note{margin:8px 0 12px;color:var(--muted);font-size:12px;font-weight:400;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
 .budget-v3-transfers .transfer-calculation-note{max-width:75ch}
+.budget-money-field{position:relative;display:block;min-width:0}
+.budget-money-field::before{content:'£';position:absolute;z-index:1;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;pointer-events:none}
+.budget-money-field>input{box-sizing:border-box;width:100%;padding-left:24px!important}
