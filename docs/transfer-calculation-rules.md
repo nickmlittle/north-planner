@@ -12,6 +12,8 @@
 | Pot movement | A subsequent movement from a parent account into one of its pots. It is already included in account funding, not a second contribution. |
 | Breakdown | The budget items and original contributors that explain an amount. |
 
+The UI uses four words for these: **Available**, **Planned**, **Funding** (contributions and account funding requirements) and **Move** (pot movements). See the [glossary](product-design-spec.md#glossary).
+
 Periods and inheritance follow the [recurring monthly budget contract](recurring-monthly-budget-rules.md). Instructions are derived from the selected month's resolved items, income and shared destinations. They are not stored payments or frozen historical records.
 
 ## Contribution calculations

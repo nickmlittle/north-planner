@@ -56,7 +56,6 @@ export function AccountAccess() {
 
   return <main className="account-screen">
     <p className="eyebrow">North Planner</p><h1>Save your budget</h1>
-    <p className="page-description">Sign in with a passkey to access your budget on any device.</p>
     <div className="account-options">
       <button className="primary-button" type="button" onClick={() => void signInWithPasskey()} disabled={busy || !supportsPasskeys()}>
         {busy ? 'Please wait…' : 'Sign in with a passkey'}
@@ -65,7 +64,7 @@ export function AccountAccess() {
       <button className="secondary-button" type="button" onClick={() => void continueWithGoogle()} disabled={busy}>
         Continue with Google
       </button>
-      <p className="account-hint">New here? Continue with Google, then add a passkey to make future sign-ins faster.</p>
+      <p className="account-hint">New here? Continue with Google, then add a passkey.</p>
       <button className="text-button" type="button" onClick={() => { setShowEmail(value => !value); setMessage('') }} aria-expanded={showEmail}>
         {showEmail ? 'Hide email sign-in' : 'Use an email sign-in link'}
       </button>

@@ -58,7 +58,7 @@ it('previews an edit and routes its saved account change to the same month in Tr
   expect(window.location.search).toContain('budgetView=transfers')
   expect(window.location.search).toContain('month=2026-02')
   expect(window.history.state.northAffectedTransfers.accounts).toMatchObject([{ accountId: 'account-1', beforePence: 10000, afterPence: 10100 }])
-  expect(within(screen.getByRole('region', { name: 'Transfers by person' })).getAllByText('Changed by recent edit').length).toBeGreaterThan(0)
+  expect(within(screen.getByRole('region', { name: 'Steps by person' })).getAllByText('Changed by recent edit').length).toBeGreaterThan(0)
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
@@ -398,14 +398,14 @@ it('offers View Transfers for a direct filtered link in the selected month', asy
   fireEvent.click(within(banner).getByRole('button', { name: 'View Transfers' }))
   expect(window.location.search).toContain('budgetView=transfers')
   expect(window.location.search).toContain('month=2026-02')
-  expect(await screen.findByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Steps by person' })).toBeInTheDocument()
 })
 
 it('has no matrix on phone Transfers', async () => {
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedMixedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
-  expect(await screen.findByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Steps by person' })).toBeInTheDocument()
   expect(screen.queryByRole('group', { name: 'Transfers view' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Matrix' })).not.toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Transfer matrix' })).not.toBeInTheDocument()
@@ -415,7 +415,7 @@ it('shows the step list for an old destination detail link', async () => {
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')
   render(<App />)
-  expect(await screen.findByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Steps by person' })).toBeInTheDocument()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Sam steps' })).toHaveTextContent('Fund Alex · Monzo · Current account£50.00')
   // The retired parameter goes on the next navigation.

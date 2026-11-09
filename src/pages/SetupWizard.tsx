@@ -75,7 +75,6 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
   return <PageFrame className="household-setup-page setup-wizard" title={current.title} headingRef={heading} beforeHeading={progress}>
     {step === 1 && <form onSubmit={continueFromHousehold} noValidate>
       <section className="setup-card">
-        <p className="setup-intro">Name the household this budget is for. You can change it later.</p>
         <label className="setup-field">Household name<input aria-label="Household name" value={household.name} onChange={event => setDocument(state => ({ ...state, household: { ...state.household, name: event.target.value } }))} aria-invalid={attempted && !household.name.trim()} placeholder="e.g. Alex + Sam" /></label>
       </section>
       {attempted && !household.name.trim() && <p role="alert" className="input-error">Enter a household name.</p>}
@@ -83,7 +82,7 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
     </form>}
     {step === 2 && <form onSubmit={continueFromAdults} noValidate>
       <section className="setup-card">
-        <p className="setup-intro">Add each adult who pays into the household. Shared items are split between them, either equally or in proportion to their pay.</p>
+        <p className="setup-intro">Shared items are split between the adults, equally or by pay.</p>
         <AdultsFields document={document} setDocument={setDocument} attempted={attempted} />
       </section>
       {attempted && !householdReady(household) && <p role="alert" className="input-error">Add at least one adult and give each a name.</p>}
@@ -91,7 +90,7 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
     </form>}
     {step === 3 && <form onSubmit={finish} noValidate>
       <section className="setup-card setup-pay">
-        <p className="setup-intro">North uses take-home pay to work out each adult’s share of items split in proportion to pay. You can add other income later from Month &amp; income.</p>
+        <p className="setup-intro">Take-home pay sets each adult’s share of items split by pay.</p>
         {adults.map(person => <label className="setup-field" key={person.id}>{person.name}’s monthly take-home pay<span className="budget-money-field"><input inputMode="decimal" value={pay[person.id] ?? ''} onChange={event => setPay(state => ({ ...state, [person.id]: event.target.value }))} aria-invalid={attempted && !validAmount(pay[person.id] ?? '')} /></span></label>)}
       </section>
       {attempted && adults.some(person => !validAmount(pay[person.id] ?? '')) && <p role="alert" className="input-error">Enter pay as an amount in pounds, like 2450 or 2450.50.</p>}
