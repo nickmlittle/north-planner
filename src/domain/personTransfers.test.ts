@@ -3,8 +3,8 @@ import { expect, it } from 'vitest'
 import { decodeBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { resolveBudget } from './monthlyBudget'
-import { personTransferPlans } from './personTransfers'
-import { buildTransferInstructions } from './transferInstructions'
+import { orderTransferAccounts, personTransferPlans, type TransferAccount } from './personTransfers'
+import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
 
 function baseline() {
   const document = decodeBudgetDocument(JSON.parse(readFileSync(new URL('../../docs/fixtures/plan-transfers-baseline.json', import.meta.url), 'utf8')))
@@ -74,4 +74,24 @@ it('moves accounts that cannot be calculated out of the steps and marks them not
   const noIncome = plans(document)
   expect(noIncome.needsReview.some(account => account.notCalculated && account.reason === 'unallocated')).toBe(true)
   for (const plan of noIncome.people) expect(plan.rows.some(row => noIncome.needsReview.some(account => account.accountId === row.accountId))).toBe(false)
+})
+
+it('orders transfer rows joint first, then by person in household order, then by label', () => {
+  const document = baseline(), ids = document.household.adults.map(person => person.id), month = '2026-11'
+  const transfers = budgetTransfers(document.budget, ids, month, resolveBudget(document.budget, month).items)
+  const labels = new Map(document.budget.accounts.map(account => [account.id, `${account.provider} ${account.name}`]))
+  const ordered = orderTransferAccounts([...transfers.accounts].reverse(), buildTransferInstructions(document, month), document.budget.accounts, ids, labels)
+  const owners = ordered.map(row => document.budget.accounts.find(account => account.id === row.accountId)!.ownerPersonIds)
+  const rank = (owner: readonly string[]) => owner.length > 1 ? -1 : ids.indexOf(owner[0]!)
+  expect(owners.map(rank)).toEqual([...owners.map(rank)].sort((a, b) => a - b))
+  expect(owners[0]!.length).toBeGreaterThan(1)
+  for (let i = 1; i < ordered.length; i++) if (rank(owners[i]!) === rank(owners[i - 1]!)) expect(labels.get(ordered[i - 1]!.accountId)!.localeCompare(labels.get(ordered[i]!.accountId)!)).toBeLessThanOrEqual(0)
+})
+
+it('puts unowned accounts last and marks accounts the instructions flag for review as incomplete', () => {
+  const row = (accountId: string) => ({ accountId, amountPence: 100, incomplete: false } as unknown as TransferAccount)
+  const accounts = [{ id: 'none', ownerPersonIds: [] }, { id: 'solo', ownerPersonIds: ['p1'] }, { id: 'joint', ownerPersonIds: ['p1', 'p2'] }]
+  const instructions = { accounts: [{ accountId: 'solo', status: 'needs-review' }] } as unknown as TransferInstructions
+  const ordered = orderTransferAccounts([row('none'), row('solo'), row('joint')], instructions, accounts, ['p1', 'p2'], new Map())
+  expect(ordered.map(account => [account.accountId, account.incomplete])).toEqual([['joint', false], ['solo', true], ['none', false]])
 })
