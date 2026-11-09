@@ -9,9 +9,9 @@ const plural = (count: number, word: string) => `${count} ${count === 1 ? word :
 
 /** Why an account's steps are withheld, and what to do about it. */
 function reviewReasonText(reason: NeedsReviewReason) {
-  if (reason === 'unavailable') return 'Transfer instructions are unavailable. Review this account before moving money.'
+  if (reason === 'unavailable') return 'Can’t work out this account. Check it before moving money.'
   if (reason === 'missing-pot-owner') return 'Assign an account owner to decide who moves money into its pots.'
-  return 'Some items here can’t be funded yet. Resolve them before moving money.'
+  return 'Some items here can’t be funded yet.'
 }
 
 type Adults = BudgetDocument['household']['adults']

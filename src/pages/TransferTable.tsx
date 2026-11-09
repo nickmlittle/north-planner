@@ -26,7 +26,7 @@ export function TransferTable({ accounts, people, adults, labels, potName, affec
   const amountCell = (notCalculated: boolean, pence: number) => notCalculated ? '—' : pounds(pence)
   const byPersonCells = (rows: PersonAmount[], notCalculated: boolean) => rows.map(row => <td key={row.personId}>{amountCell(notCalculated, row.amountPence)}</td>)
   return <div className="budget-v3-transfer-table-wrap"><table className="budget-v3-transfer-table">
-    <caption className="visually-hidden">Monthly transfer amounts by destination and person</caption>
+    <caption className="visually-hidden">Funding by account and person</caption>
     <thead><tr><th scope="col">Destination</th>{people.map(person => <th scope="col" key={person.personId}>{adults.find(row => row.id === person.personId)?.name ?? 'Person'}</th>)}<th scope="col">Total</th></tr></thead>
     <tbody>{accounts.map(account => {
       const label = labels.get(account.accountId) ?? 'Account'
@@ -47,6 +47,6 @@ export function TransferTable({ accounts, people, adults, labels, potName, affec
         </>}
       </Fragment>
     })}</tbody>
-    <tfoot><tr className={incomplete ? 'is-incomplete' : undefined}><th scope="row">Funding total</th>{people.map(person => <td key={person.personId}>{pounds(person.plannedPence)}</td>)}<td>{pounds(accounts.reduce((sum, account) => sum + account.amountPence, 0))}{incomplete ? ' *' : ''}</td></tr></tfoot>
+    <tfoot><tr className={incomplete ? 'is-incomplete' : undefined}><th scope="row">Total</th>{people.map(person => <td key={person.personId}>{pounds(person.plannedPence)}</td>)}<td>{pounds(accounts.reduce((sum, account) => sum + account.amountPence, 0))}{incomplete ? ' *' : ''}</td></tr></tfoot>
   </table></div>
 }

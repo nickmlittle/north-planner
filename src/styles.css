@@ -925,7 +925,7 @@ small, footer { color: var(--muted) }
 .transfer-person-prompt{margin:0 0 var(--space-3);padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card)}
 .transfer-person-prompt p{margin:0 0 var(--space-2);color:var(--charcoal);font-size:var(--text-md)}
 .transfer-person-prompt .transfer-person-switch{margin:0}
-.transfer-person-prompt .transfer-person-hint{margin:var(--space-2) 0 0;color:var(--muted);font-size:var(--text-sm)}
+
 .transfer-calculation-note>p{margin:0}
 .transfer-calculation-note>p+p{margin-top:var(--space-1)}
 
