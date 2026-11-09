@@ -39,7 +39,7 @@ describe('design tokens', () => {
 
   it('keeps the body floor: nothing below --text-xs, and xs is for uppercase labels and badges only', () => {
     const xs = declarations.filter(d => /var\(--text-xs\)/.test(d.value)).map(d => d.selector)
-    expect(xs.every(selector => /eyebrow|transfer-matrix-incomplete|budget-v3-picker small/.test(selector))).toBe(true)
+    expect(xs.every(selector => /eyebrow|budget-v3-picker small/.test(selector))).toBe(true)
   })
 
   it('uses spacing tokens; raw px only for 1–2px nudges, negative offsets and 40px+ layout geometry', () => {

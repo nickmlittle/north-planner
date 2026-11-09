@@ -1,24 +1,13 @@
 export type PlannerView = 'household' | 'budget'
 export type BudgetView = 'plan' | 'transfers'
 export type PlanDestination = { kind: 'account' | 'direct' | 'pot'; id: string }
-export type MatrixReturn = { key: string; month: string; expandedIds: string[]; scrollTop: number; scrollLeft: number; destination: PlanDestination; accountId: string }
 /** Where "See items" in the payday steps was opened from, so Back to Transfers lands on the same account. */
 export type StepsReturn = { key: string; month: string; accountId: string }
 // Origins created in this page load; a reloaded or shared Plan link has none, so it offers View Transfers instead of Back.
 const liveTransfersOrigins = new Set<string>()
-export function markMatrixOrigin(origin: MatrixReturn) {
-  window.history.replaceState({ ...window.history.state, northMatrixReturn: origin }, '')
-  liveTransfersOrigins.add(origin.key)
-}
 export function markStepsOrigin(origin: StepsReturn) {
   window.history.replaceState({ ...window.history.state, northStepsReturn: origin }, '')
   liveTransfersOrigins.add(origin.key)
-}
-export function matrixReturnFromState(): MatrixReturn | null {
-  const value = window.history.state?.northMatrixReturn as MatrixReturn | undefined
-  return value && value.month === parseNavigation(window.location.search).month && Array.isArray(value.expandedIds)
-    && value.expandedIds.every(id => typeof id === 'string') && Number.isFinite(value.scrollTop) && Number.isFinite(value.scrollLeft)
-    && typeof value.key === 'string' && typeof value.accountId === 'string' && !!value.destination?.id ? value : null
 }
 export function stepsReturnFromState(): StepsReturn | null {
   const value = window.history.state?.northStepsReturn as StepsReturn | undefined

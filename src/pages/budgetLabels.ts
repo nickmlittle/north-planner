@@ -51,8 +51,8 @@ export function accountOptionLabels(accounts: BudgetAccount[], adults: Adult[], 
   }))
 }
 
-/** Compact matrix labels keep destinations identifiable without repeating account type. */
-export function matrixAccountLabels(accounts: BudgetAccount[], adults: Adult[]): Map<string, string> {
+/** Compact labels ("Owner · Account") keep destinations identifiable without repeating account type. */
+export function compactAccountLabels(accounts: BudgetAccount[], adults: Adult[]): Map<string, string> {
   const compact = accounts.map(account => `${accountOwnerLabel(account, adults)} · ${account.name}`)
   const compactCounts = new Map<string, number>()
   compact.forEach(label => compactCounts.set(label, (compactCounts.get(label) ?? 0) + 1))
