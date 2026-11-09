@@ -73,7 +73,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     })
   }
 
-  return <div className="payday" role="region" aria-label="Transfers by person">
+  return <div className="payday" role="region" aria-label="Steps by person">
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>

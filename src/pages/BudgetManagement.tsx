@@ -120,9 +120,8 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
     return <form className="budget-manage-form" aria-label={`${recordId ? 'Edit' : 'Add'} ${kind}`} onSubmit={save}>
       {draft.kind === 'account' ? <AccountFields value={draft} adults={adults} onChange={value => setDraft({ ...draft, ...value })}/>
         : <label>{kind === 'pot' ? 'Pot name' : 'Category name'}<input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })}/></label>}
-      {draft.kind === 'pot' && <><label>Parent account<select value={draft.accountId} onChange={event => setDraft({ ...draft, accountId: event.target.value })}><option value="">Choose an account</option>{groups.flatMap(group => group.accounts).map(account => <option key={account.id} value={account.id}>{optionLabels.get(account.id)}</option>)}</select></label>{draft.accountId !== pots.find(pot => pot.id === recordId)?.accountId && <p className="budget-manage-note">Changing this account updates transfer totals for budget items assigned to this pot in every month.</p>}</>}
+      {draft.kind === 'pot' && <><label>Parent account<select value={draft.accountId} onChange={event => setDraft({ ...draft, accountId: event.target.value })}><option value="">Choose an account</option>{groups.flatMap(group => group.accounts).map(account => <option key={account.id} value={account.id}>{optionLabels.get(account.id)}</option>)}</select></label>{draft.accountId !== pots.find(pot => pot.id === recordId)?.accountId && <p className="budget-manage-note">Updates funding for this pot’s items in every month.</p>}</>}
       {draft.kind === 'bulk-pot' && preview && <>
-        <p className="budget-manage-note">Choose accounts. Each new pot will be independent.</p>
         <button type="button" className="text-button" onClick={() => setDraft({ ...draft, accountIds: draft.accountIds.length === accounts.length ? [] : accounts.map(account => account.id) })}>{draft.accountIds.length === accounts.length ? 'Clear all accounts' : 'Select all accounts'}</button>
         {groups.map(group => {
           const allSelected = group.accounts.every(account => draft.accountIds.includes(account.id))
@@ -131,7 +130,6 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
             {group.accounts.map(account => <label key={account.id}><input type="checkbox" checked={draft.accountIds.includes(account.id)} onChange={event => setDraft({ ...draft, accountIds: event.target.checked ? [...draft.accountIds, account.id] : draft.accountIds.filter(id => id !== account.id) })}/><span>{rowLabels.get(account.id)}{draft.name.trim() && preview.skip.some(row => row.id === account.id) && <small>Already exists — will be skipped</small>}</span></label>)}
           </fieldset>
         })}
-        <p className="budget-manage-note" role="status">Create {countLabel(preview.create.length, 'pot')}; skip {preview.skip.length} existing.</p>
         {draft.name.trim() && draft.accountIds.length > 0 && !preview.create.length && <p className="budget-manage-note">All selected accounts already have this pot.</p>}
         {!draft.accountIds.length && <p className="budget-manage-note">Select at least one account.</p>}
       </>}
@@ -172,7 +170,7 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
         <span>{item.label}</span>{' '}<small>{item.count(document)}</small>
       </button>)}</div>
     </div>
-    <p className="budget-manage-note">Accounts, pots and categories are shared across all budget months. Changes here affect every month.</p>
+    <p className="budget-manage-note">Shared by every month.</p>
     {status && <p className="budget-manage-message" role="status">{status}</p>}
     <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} className="budget-manage-content">
       <button type="button" className="secondary-button" disabled={tab === 'pot' && !accounts.length} onClick={() => begin(tab)}>Add {tab}</button>{formFor(tab, null)}

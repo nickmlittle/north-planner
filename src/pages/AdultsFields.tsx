@@ -17,6 +17,6 @@ export function AdultsFields({ document, setDocument, attempted }: {
       <button type="button" className="text-button" onClick={() => setRemoving(person.id)}>Remove</button>
     </div>)}
     <button type="button" className="secondary-button" onClick={() => setDocument(current => ({ ...current, household: { ...current.household, adults: [...current.household.adults, { id: crypto.randomUUID(), name: '' }] } }))}>+ Add an adult</button>
-    {removing && <div className="removal-panel" role="group" aria-label="Confirm adult removal"><p>Remove this adult? People referenced by account ownership, income, or saved contributions cannot be removed until those references are reassigned.</p><button type="button" className="secondary-button" onClick={() => setRemoving(null)}>Keep adult</button><button type="button" className="danger-button" onClick={() => { setDocument(current => removeAdult(current, removing)); setRemoving(null) }}>Remove adult</button></div>}
+    {removing && <div className="removal-panel" role="group" aria-label="Confirm adult removal"><p>Remove this adult? Anyone who owns an account, has income or pays a fixed amount can’t be removed until that is reassigned.</p><button type="button" className="secondary-button" onClick={() => setRemoving(null)}>Keep adult</button><button type="button" className="danger-button" onClick={() => { setDocument(current => removeAdult(current, removing)); setRemoving(null) }}>Remove adult</button></div>}
   </>
 }

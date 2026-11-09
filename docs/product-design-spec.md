@@ -60,7 +60,7 @@ Mobile uses a compact page heading and labeled bottom navigation for Plan, Trans
 
 ### Plan
 
-Present the selected month, whether its budget is saved or inherited, and the scope of edits near the top. The balance is a signed state with clear balanced, left-to-allocate or over-budget wording. Desktop shows a wider summary, actions and grouped table; mobile puts a compact balance and details control above item discovery, with owner/category group headings and visible item rows.
+Present the selected month and whether its budget is saved or inherited near the top. The scope of an edit is shown where it is saved. The balance reads “£X left”, “£X over” or “Balanced”. Desktop shows a wider summary, actions and grouped table; mobile puts a compact balance and details control above item discovery, with owner/category group headings and visible item rows.
 
 Search matches item names, categories, owners and destination account/provider/type/pot text. Owner, category and destination filters constrain matches where available. A nonblank search shows direct matching rows with context and a matching count and total. Clearing returns to the prior browsing context and focus; search and filters persist while switching mounted views but reset on reload. Keep item editing and amounts discoverable in both browse and search states.
 
@@ -68,7 +68,7 @@ Quick amount editing and the full editor must make the affected date range clear
 
 ### Transfers
 
-Desktop Transfers compares people and destinations in a table, including account totals, direct allocations and pots. Mobile asks once per device whose transfers to show (each adult, or Both) and leads with that person's total and step count. Below it is one ordered, numbered step list per person: fund an account, then the pot moves out of that account, indented beneath it. Captions name cross-person dependencies ("Includes £436.70 from Ben", "Ada moves it into Spending"). Each account offers "See N items", which opens Plan filtered to that account; Back to Transfers returns to the same step. Accounts that need review have their steps withheld and are listed afterwards with any known amounts, "Not calculated" where there are none, and the reason. There is no separate destination detail screen, and nothing is ticked off: the list is planned amounts, not payment status. A matrix preview offers a comparative view. Use the existing calculation notes to explain what the figures mean.
+Desktop Transfers compares people and destinations in a table, including account totals, direct allocations and pots. Mobile asks once per device whose transfers to show (each adult, or Both) and leads with that person's total and step count. Below it is one ordered, numbered step list per person: fund an account, then the pot moves out of that account, indented beneath it. Captions name cross-person dependencies ("Includes £436.70 from Ben", "Ada moves it into Spending"). Each account offers "See N items", which opens Plan filtered to that account; Back to Transfers returns to the same step. Accounts that need review have their steps withheld and are listed afterwards with any known amounts, "Not calculated" where there are none, and the reason. There is no separate destination detail screen, and nothing is ticked off: the list is planned amounts, not payment status. The only standing caveat is “Planned amounts, not payments.” with an ⓘ.
 
 Zero and unresolved allocations are different states. Do not imply that a missing calculation is a completed zero. Show warnings and the route to fix missing input near the affected information. Transfers show planned funding and movements, not payment execution, automatic-payment detection or paid/unpaid tracking.
 
@@ -80,7 +80,22 @@ Dialogs and sheets need an accessible title, keyboard containment, Escape/close 
 
 ### Language
 
-Use plain, concise British English and familiar household finance terms. Label actions with verbs (“Edit income”, “Add item”) and show amounts with their meaning (“Funding total”, “Budget balance”). Explain scope in calendar months. State what needs attention and how to resolve it without blame. Avoid implying a payment has happened or that an account owner necessarily funds every item.
+Use plain, concise British English and familiar household finance terms. Label actions with verbs (“Edit income”, “Add item”) and name amounts with the glossary below. Explain scope in calendar months. State what needs attention and how to resolve it without blame. Avoid implying a payment has happened or that an account owner necessarily funds every item.
+
+Keep text to what changes a decision: the scope and impact above Save, real warnings, and empty states. Don't explain what a label or number already says, and don't repeat a caveat that is already on the screen. Put secondary detail behind one ⓘ.
+
+#### Glossary
+
+These four words are the only names for these concepts in the UI. `src/copy.vocabulary.test.ts` fails CI on the retired ones.
+
+| Word | Means | Not |
+| --- | --- | --- |
+| **Available** | Income for the month, for the household or for one person. | Available income, available money |
+| **Planned** | The total of the month's items. The balance against Available reads “£X left”, “£X over” or “Balanced”. | Planned budget, Budget balance, remaining, left to allocate, shortfall |
+| **Funding** / **Fund** | What one person pays into one account, including its pots. A fixed-rule item has **Fixed amounts**, and its remainder is “unassigned”. | Funding total, contributions, allocations, Transfers by destination |
+| **Move** | Money moved from an account into one of its pots. It is already inside the account's funding. | Pot movements as an extra amount, “Ada moves” for a funding total |
+
+“Transfers” is only the name of the screen.
 
 ## Review checklist for future changes
 

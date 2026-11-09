@@ -166,7 +166,6 @@ it('creates independent pots in one update and skips existing case-insensitive n
   change(form, 'Pot name', ' Spending ')
   fireEvent.click(within(form).getByRole('button', { name: 'Select all accounts' }))
   expect(within(form).getByText('Already exists — will be skipped')).toBeVisible()
-  expect(within(form).getByRole('status')).toHaveTextContent('Create 2 pots; skip 1 existing.')
   result.onChange.mockClear()
   fireEvent.click(within(form).getByRole('button', { name: 'Create 2 pots' }))
   expect(result.onChange).toHaveBeenCalledTimes(1)

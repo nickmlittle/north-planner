@@ -7,9 +7,9 @@
 
 North is a household budget planner. Set up a household, add recurring income sources, then plan budget items by category, funding rule, and destination account or pot. A new budget starts with no accounts, categories, pots, items, or income sources.
 
-Budget snapshots and income histories use independent calendar-month effective dates. Editing an inherited budget creates a snapshot for that month; later snapshots remain independent. Income changes affect available money and, for employment sources, income-ratio funding. Editors show the affected calendar-month range before saving. Past months remain editable; shared accounts, pots and categories affect all months. See the [recurring and monthly budget rules](docs/recurring-monthly-budget-rules.md) for examples and the future shared-access design.
+Budget snapshots and income histories use independent calendar-month effective dates. Editing an inherited budget creates a snapshot for that month; later snapshots remain independent. Income changes affect Available and, for employment sources, income-ratio funding. Editors show the affected calendar-month range before saving. Past months remain editable; shared accounts, pots and categories affect all months. See the [recurring and monthly budget rules](docs/recurring-monthly-budget-rules.md) for examples and the future shared-access design.
 
-Transfer views show exact pounds and pence. Account funding includes its pot allocations; subsequent pot movements are not extra contributions. See the [transfer calculation rules](docs/transfer-calculation-rules.md) for responsibilities, rounding and incomplete instructions.
+Transfer views show exact pounds and pence. An account's funding includes its pots; moving money into a pot afterwards is not extra funding. See the [transfer calculation rules](docs/transfer-calculation-rules.md) for responsibilities, rounding and incomplete instructions.
 
 ## Run locally
 

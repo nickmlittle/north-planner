@@ -23,6 +23,6 @@ export function HouseholdSetup({ document, setDocument, onContinue }: {
       <AdultsFields document={document} setDocument={setDocument} attempted={attempted} />
     </section>
     {attempted && !ready && <p role="alert" className="input-error">Enter a household name and at least one adult name.</p>}
-    <button type="button" className="primary-button" onClick={() => { setAttempted(true); if (ready) onContinue() }}>Continue to Budget</button>
+    <button type="button" className="primary-button" onClick={() => { setAttempted(true); if (ready) onContinue() }}>Continue to Plan</button>
   </PageFrame>
 }
