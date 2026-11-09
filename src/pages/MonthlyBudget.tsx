@@ -47,7 +47,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const [localMonth,setLocalMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const month=sharedMonth??localMonth
  const setMonth=onMonthChange??setLocalMonth
- const [editor,setEditor]=useState(false),[editingItem,setEditingItem]=useState<BudgetItem>(),[management,setManagement]=useState(false),[incomeOpen,setIncomeOpen]=useState(false)
+ const [editor,setEditor]=useState(false),[editingItem,setEditingItem]=useState<BudgetItem>(),[editorTemplate,setEditorTemplate]=useState<BudgetItem>(),[editorSession,setEditorSession]=useState(0),[management,setManagement]=useState(false),[incomeOpen,setIncomeOpen]=useState(false)
  const [batchMessage,setBatchMessage]=useState('')
  const [savedImpact,setSavedImpact]=useState<BudgetImpact|null>(null)
  const [ownerFilter,setOwnerFilter]=useState('All')
@@ -103,7 +103,8 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
  const selectedPersonPlan=transferPerson&&transferPerson!=='both'?personPlans.people.find(plan=>plan.personId===transferPerson):undefined
  const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length}
- const start=(item?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditor(true)}
+ const start=(item?:BudgetItem,template?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditorTemplate(template);setEditorSession(session=>session+1);setEditor(true)}
+ const duplicate=(item:BudgetItem)=>start(undefined,item)
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)
   if('error' in result)return result.error
@@ -179,7 +180,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  {showPlanFilters&&<div className="budget-v3-scroll-tools">{scopedPlan?<details className="budget-v3-scoped-filters"><summary>Search and filter{query||ownerFilter!=='All'||categoryFilter!=='All'?' · active':''}</summary>{planFilters}</details>:planFilters}</div>}
  {searchMode&&<p className="budget-v3-search-count" role="status">{matchingItems.length} matching {matchingItems.length===1?'item':'items'} · Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</p>}
  <PlanTable document={document} setDocument={setDocument} month={month} editScopeLabel={editScopeLabel} groups={planGroups} labels={labels} query={query} planDestination={planDestination} view={mobileBudgetView} mobilePresentation={mobilePresentation} scoped={scopedPlan} openGroups={openGroups} onOpenGroupsChange={setOpenGroups} grouping={grouping} onGroupingChange={chooseGrouping} planTotalPence={total} filterKey={`${ownerFilter}\u0000${categoryFilter}\u0000${grouping}`} editorOpen={editor} empty={planEmpty}
-  onEdit={start} onRemove={removeItem} onQuickEditOpen={()=>setInlineSavedItem(null)} onAmountSaved={(name,impact)=>{setSavedImpact(impact);setInlineSavedItem(name)}} focusFallback={()=>searchRef.current?.focus({preventScroll:true})}/>
+  onEdit={start} onRemove={removeItem} onDuplicate={duplicate} onQuickEditOpen={()=>setInlineSavedItem(null)} onAmountSaved={(name,impact)=>{setSavedImpact(impact);setInlineSavedItem(name)}} focusFallback={()=>searchRef.current?.focus({preventScroll:true})}/>
  {(batchMessage||inlineFeedback||savedImpact?.month===month)&&<div className="budget-save-result"><button type="button" className="budget-save-dismiss" aria-label="Dismiss save result" onClick={()=>{setBatchMessage('');setInlineSavedItem(null);setSavedImpact(null)}}>×</button>{batchMessage&&<div className="budget-v3-save-status" role="status">{saveStatus==='Not saved'?'Budget could not be saved. Check save status.':saveStatus==='Saving…'||saveStatus==='Unsaved changes'?'Saving budget item…':batchMessage}</div>}{inlineFeedback&&<div className="budget-v3-save-status" role={saveStatus==='Not saved'?'alert':'status'}>{inlineFeedback}</div>}{savedImpact?.month===month&&(saveStatus==='Saved'||!saveStatus)&&onViewAffectedTransfers&&<button type="button" className="secondary-button budget-view-affected" onClick={()=>onViewAffectedTransfers(savedImpact)}>View affected transfers</button>}</div>}</section>
  </PageFrame>
  {confirm&&<ConfirmDialog title={confirm.title} confirmLabel={confirm.confirmLabel} danger returnFocusTo={confirm.returnFocusTo} onCancel={()=>setConfirm(null)} onConfirm={()=>{confirm.onConfirm();setConfirm(null)}}>{confirm.body}</ConfirmDialog>}
@@ -193,7 +194,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
    <p>Each account’s funding already includes its moves.</p>
   </>}
  </BudgetInfoDialog>}
- {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)} onRemove={editingItem&&(()=>{const id=editingItem.id;setEditor(false);setDocument(current=>({...current,budget:updateBudgetAtMonth(current.budget,month,old=>old.filter(i=>i.id!==id))}))})}/>}
+ {editor&&<BudgetItemEditor key={editorSession} document={document} month={month} item={editingItem} template={editorTemplate} onDuplicate={editingItem&&(()=>duplicate(editingItem))} onSave={saveBatch} onClose={()=>setEditor(false)} onRemove={editingItem&&(()=>{const id=editingItem.id;setEditor(false);setDocument(current=>({...current,budget:updateBudgetAtMonth(current.budget,month,old=>old.filter(i=>i.id!==id))}))})}/>}
  {incomeOpen&&<IncomeDialog document={document} setDocument={setDocument} month={month} onClose={()=>setIncomeOpen(false)}/>}
  {management&&<BudgetManagement document={document} setDocument={setDocument} onClose={()=>setManagement(false)}/>}
  </>
