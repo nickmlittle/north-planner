@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { buildTransferInstructions, type TransferInstructions } from '../domain/transferInstructions'
-import { budgetEditScope, incomeEditScope, budgetDateMarkers, incomeDateMarkers, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, updateIncomeAtMonth, type BudgetItem } from '../domain/monthlyBudget'
+import { budgetEditScope, budgetDateMarkers, incomeDateMarkers, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, type BudgetItem } from '../domain/monthlyBudget'
 import { PageFrame } from '../components/PageFrame'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PLAN_FILTER_MIN_ITEMS } from './planListConfig'
@@ -12,6 +12,8 @@ import { BudgetManagement } from './BudgetManagement'
 import { BudgetItemEditor } from './BudgetItemEditor'
 import { BudgetInfoDialog, MobileBudgetSummary } from './MobileBudgetViews'
 import { TransfersPanel } from './TransfersPanel'
+import { MonthControl } from './MonthControl'
+import { IncomeDialog } from './IncomeDialog'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
 import { commitItemBatch, moneyPence, type BudgetItemBatch } from '../domain/budgetItemDrafts'
@@ -27,18 +29,10 @@ import { MOBILE_QUERY } from '../breakpoints'
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string }
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
-const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const monthLabel = formatMonth
-const shift = (month: string, by: number) => { const [y,m] = month.split('-').map(Number); const d = new Date(y!,m!-1+by,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
 const pounds = (pence: number) => formatGBP(pence / 100)
 const PLAN_COLLAPSED_KEY = 'north.plan.collapsed'
 const readPlanCollapsed = (): Record<string, boolean> => { try { const value: unknown = JSON.parse(window.sessionStorage.getItem(PLAN_COLLAPSED_KEY) ?? '{}'); return value && typeof value === 'object' ? value as Record<string, boolean> : {} } catch { return {} } }
-const id = () => crypto.randomUUID()
-
-function MonthControl({month,onChange,budgetMarkers,incomeMarkers}:{month:string;onChange:(value:string)=>void;budgetMarkers:string[];incomeMarkers:string[]}) {
- const [open,setOpen]=useState(false), [year,setYear]=useState(Number(month.slice(0,4)))
- return <div className="budget-v3-month"><button type="button" aria-label="Previous month" onClick={()=>onChange(shift(month,-1))}>‹</button><button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={()=>{setYear(Number(month.slice(0,4)));setOpen(!open)}}>{monthLabel(month)}</button><button type="button" aria-label="Next month" onClick={()=>onChange(shift(month,1))}>›</button>{open&&<div className="budget-v3-picker" role="dialog" aria-label="Choose budget month"><header><button type="button" onClick={()=>setYear(year-1)}>‹</button>{year}<button type="button" onClick={()=>setYear(year+1)}>›</button></header><div>{monthNames.map((name,i)=>{const key=`${year}-${String(i+1).padStart(2,'0')}`;const b=budgetMarkers.includes(key),inc=incomeMarkers.includes(key);return <button type="button" key={key} aria-label={`${name} ${year}${b?', budget updated':''}${inc?', income updated':''}`} onClick={()=>{onChange(key);setOpen(false)}}>{name.slice(0,3)}{(b||inc)&&<small aria-hidden="true">{b?'●':''}{inc?'•':''}</small>}</button>})}</div><p>● Budget updated · • Income updated</p></div>}</div>
-}
 
 export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId}:Props) {
  const mobilePresentation=useSyncExternalStore(subscribeMobile,getMobile,()=>false)
@@ -67,8 +61,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  useEffect(()=>{try{window.sessionStorage.setItem(PLAN_COLLAPSED_KEY,JSON.stringify(planCollapsed))}catch{/* storage unavailable */}},[planCollapsed])
  const [searchCollapsed,setSearchCollapsed]=useState<Record<string,boolean>>({})
  const [destinationCollapsed,setDestinationCollapsed]=useState<Record<string,boolean>>({})
- const [incomeDraft,setIncomeDraft]=useState<Record<string,string>>({})
- const [newIncomeName,setNewIncomeName]=useState(''),[newIncomePerson,setNewIncomePerson]=useState(document.household.adults[0]?.id??''),[newIncomeType,setNewIncomeType]=useState<'employment'|'additional'>('employment'),[newIncomeAmount,setNewIncomeAmount]=useState(''),[incomeHelp,setIncomeHelp]=useState(false)
  const [inlineId,setInlineId]=useState<string|null>(null),[inlineValue,setInlineValue]=useState(''),[formError,setFormError]=useState('')
  const [inlineSavedItem,setInlineSavedItem]=useState<string|null>(null)
  // The consequence sits above Save; keep the whole quick-edit form (and so Save) in view as it grows.
@@ -78,7 +70,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  useEffect(()=>{const timer=window.setTimeout(()=>{setInlineId(null);setFormError('');setInlineSavedItem(null)},0);return()=>window.clearTimeout(timer)},[month,mobileBudgetView,planDestination,ownerFilter,categoryFilter,query])
  const resolved=resolveBudget(document.budget,month), items=resolved.items, adults=document.household.adults
  const editScopeLabel=formatEditScope(budgetEditScope(document.budget,month))
- const openIncome=()=>{setIncomeDraft({});setIncomeOpen(true)}
+ const openIncome=()=>setIncomeOpen(true)
  const incomes=resolveIncomeSources(document.budget,month), transfers=budgetTransfers(document.budget,adults.map(p=>p.id),month,items)
  let instructions:TransferInstructions|undefined
  try{instructions=buildTransferInstructions(document,month)}catch{/* Keep the comparison view available; unavailable instructions are labelled below. */}
@@ -136,9 +128,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const shortDestinationLabel=(item:BudgetItem)=>{const destination=item.destination;if(destination.kind==='pot'){const name=document.budget.pots.find(p=>p.id===destination.potId)?.name??'Pot';return /\bpot$/i.test(name)?name:`${name} pot`}return accountFor(item)?.name??'Account'}
  const fundingLabel=(item:BudgetItem)=>item.funding==='fixed'?'Fixed contributions':item.funding==='proportional'?'Income ratio':item.funding==='equal'?'Equal split':item.funding==='single'?`One person · ${adults.find(a=>a.id===item.singleFunderId)?.name??'Person'}`:'Custom split'
  const incomeTotal=incomes.filter(x=>x.type==='employment').reduce((s,x)=>s+x.amountPence,0),available=transfers.availablePence,availableBasis=available===0?'no income yet':incomeTotal===0?'none from employment':incomeTotal===available?'all from employment':`${pounds(incomeTotal)} from employment`
- // Say the range once when every source shares it; per field only where they differ.
- const incomeScopes=incomes.map(source=>formatEditScope(incomeEditScope(source,month))),sharedIncomeScope=incomeScopes.length>0&&incomeScopes.every(scope=>scope===incomeScopes[0])?incomeScopes[0]:null
- const saveIncome=(e:FormEvent)=>{e.preventDefault();setDocument(current=>{let budget=current.budget;for(const source of budget.incomeSources){if(incomeDraft[source.id]!==undefined)budget=updateIncomeAtMonth(budget,month,source.id,Math.max(0,Math.round(Number(incomeDraft[source.id])*100)))}if(newIncomeName.trim()&&newIncomePerson)budget={...budget,incomeSources:[...budget.incomeSources,{id:id(),personId:newIncomePerson,name:newIncomeName.trim(),type:newIncomeType,baseAmountPence:Math.max(0,Math.round(Number(newIncomeAmount||0)*100)),baseEffectiveFrom:month,changes:{}}]};return {...current,budget}});setIncomeOpen(false);setNewIncomeName('');setNewIncomeAmount('')}
  const ownerOrder=['Joint',...adults.map(p=>p.name),'Needs owner']
  const visibleGrouped=ownerFilter==='All'?grouped:grouped.filter(([owner])=>owner===ownerFilter)
  const searchMode=!!query.trim()
@@ -266,7 +255,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   </>}
  </BudgetInfoDialog>}
  {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)}/>}
- {incomeOpen&&<div className="budget-v3-overlay"><form className="budget-v3-panel" onSubmit={saveIncome}><h2>Income for {monthLabel(month)}</h2><p className="budget-income-intro">Income changes don’t create a budget <span className="budget-nowrap">date. <button type="button" className="budget-v3-info" aria-label="About income changes" aria-expanded={incomeHelp} onClick={()=>setIncomeHelp(v=>!v)}>ⓘ</button></span></p>{incomeHelp&&<p className="budget-edit-scope">Employment income sets proportional shares; additional income affects available money only. £0 stops a source for its affected months. Later recorded income changes stay unchanged.</p>}{sharedIncomeScope&&<p id="income-scope-shared" className="budget-edit-scope">Changes apply: {sharedIncomeScope}.</p>}{incomes.map(source=><div className="budget-income-source" key={source.id}><label>{adults.find(a=>a.id===source.personId)?.name} — {source.name} · {source.type==='employment'?'Employment':'Additional'}<span className="budget-money-field"><input aria-describedby={sharedIncomeScope?'income-scope-shared':`income-scope-${source.id}`} inputMode="decimal" value={incomeDraft[source.id]??(source.amountPence/100).toFixed(2)} onChange={e=>setIncomeDraft(x=>({...x,[source.id]:e.target.value}))}/></span></label>{!sharedIncomeScope&&<p id={`income-scope-${source.id}`} className="budget-edit-scope">Changes apply: {formatEditScope(incomeEditScope(source,month))}.</p>}</div>)}<fieldset><legend>Add recurring income source</legend><p className="budget-edit-scope">New income applies: {formatEditScope({fromMonth:month,throughMonth:null})}.</p><label>Person<select value={newIncomePerson} onChange={e=>setNewIncomePerson(e.target.value)}>{adults.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>Source name<input value={newIncomeName} onChange={e=>setNewIncomeName(e.target.value)} placeholder="Parents"/></label><label>Classification<select value={newIncomeType} onChange={e=>setNewIncomeType(e.target.value as 'employment'|'additional')}><option value="employment">Employment income</option><option value="additional">Additional income</option></select></label><label>Monthly amount<span className="budget-money-field"><input inputMode="decimal" value={newIncomeAmount} onChange={e=>setNewIncomeAmount(e.target.value)}/></span></label></fieldset><div className="budget-v3-actions"><button type="button" className="secondary-button" onClick={()=>setIncomeOpen(false)}>Cancel</button><button className="primary-button">Save income</button></div></form></div>}
+ {incomeOpen&&<IncomeDialog document={document} setDocument={setDocument} month={month} onClose={()=>setIncomeOpen(false)}/>}
  {management&&<BudgetManagement document={document} setDocument={setDocument} onClose={()=>setManagement(false)}/>}
  </>
 }
