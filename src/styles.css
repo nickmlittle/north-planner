@@ -1289,3 +1289,13 @@ small, .muted, footer { color: #59665a; }
 .budget-money-field{position:relative;display:block;min-width:0}
 .budget-money-field::before{content:'£';position:absolute;z-index:1;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;pointer-events:none}
 .budget-money-field>input{box-sizing:border-box;width:100%;padding-left:24px!important}
+.transfer-view-switch{display:inline-grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--line);border-radius:9px;background:#eef0e8}
+.transfer-matrix-preview-control .transfer-view-switch button{min-height:40px;min-width:88px;padding:6px 16px;border:0;border-radius:6px;background:transparent;color:var(--pine);font:650 14px var(--font-family);cursor:pointer}
+.transfer-matrix-preview-control .transfer-view-switch button[aria-pressed="true"]{background:var(--pine);color:white;box-shadow:0 1px 3px #28382a24}
+.transfer-view-switch button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.transfer-calculation-note>p{margin:0}
+.transfer-calculation-note>p+p{margin-top:4px}
+.budget-v3-transfer-warning>p{margin:0}
+.budget-v3-transfer-warning details{margin-top:2px}
+.budget-v3-transfer-warning summary{min-height:32px;display:flex;align-items:center;color:var(--pine);font-weight:650;cursor:pointer}
+.budget-v3-transfer-warning ul{margin:4px 0 0;padding-left:18px;columns:2;column-gap:24px}

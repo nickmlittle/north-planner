@@ -24,6 +24,8 @@ function sumAmounts(accounts: readonly MatrixAccountRow[], model: TransferMatrix
 type Leaf = { key: string; account: MatrixAccountRow; allocation: MatrixDirectRow | MatrixPotRow; label: string; destination: PlanDestination }
 type ProviderGroup = { key: string; label: string; accounts: MatrixAccountRow[]; amounts: MatrixAmounts; leaves: Leaf[] }
 type OwnerGroup = { key: string; label: string; providers: ProviderGroup[]; amounts: MatrixAmounts }
+/** An owner with one provider shows one merged band ("Ada · Starling") rather than repeating the provider beneath it. */
+const soleProvider = (owner: OwnerGroup) => owner.providers.length === 1 ? owner.providers[0] : undefined
 
 function groupedAccounts(model: TransferMatrixModel): OwnerGroup[] {
   const ownerKey = (account: MatrixAccountRow) => account.ownerPersonIds.length > 1 ? 'joint' : account.ownerPersonIds.length === 1 ? `person:${account.ownerPersonIds[0]}` : 'unassigned'
@@ -56,12 +58,11 @@ function groupedAccounts(model: TransferMatrixModel): OwnerGroup[] {
 }
 
 /** Read-only planned contributions; each lower level breaks down the subtotal above. */
-export function MobileTransferMatrix({ model, labels, onPlanDestination, onViewAccount, restoredExpandedIds }: {
+export function MobileTransferMatrix({ model, labels, onPlanDestination, restoredExpandedIds }: {
   model: TransferMatrixModel
   labels: ReadonlyMap<string, string>
   onPlanDestination?: (destination: PlanDestination, accountId: string, expandedIds: string[]) => void
   restoredExpandedIds?: string[]
-  onViewAccount?: () => void
 }) {
   const [hasOverflow, setHasOverflow] = useState(false)
   const [showGuidance, setShowGuidance] = useState(false)
@@ -71,7 +72,7 @@ export function MobileTransferMatrix({ model, labels, onPlanDestination, onViewA
   const visibleOwners = owners.map(owner => ({ ...owner, collapsed: collapsed.has(owner.key) }))
   const groups: GroupedTableGroup[] = visibleOwners.flatMap(owner => [
     { key: owner.key, level: 0 },
-    ...(!owner.collapsed ? owner.providers.map(provider => ({ key: provider.key, level: 1, parentKey: owner.key })) : []),
+    ...(!owner.collapsed && !soleProvider(owner) ? owner.providers.map(provider => ({ key: provider.key, level: 1, parentKey: owner.key })) : []),
   ])
   const toggle = (key: string, sticky: boolean) => {
     if (sticky && !collapsed.has(key)) {
@@ -106,10 +107,11 @@ export function MobileTransferMatrix({ model, labels, onPlanDestination, onViewA
       onClick={() => onPlanDestination(destination, account.accountId, expandedIds)}>{label}</GroupedTableAction> : <span>{label}</span>
   const renderStickyGroup = (group: GroupedTableGroup) => {
     const owner = owners.find(row => row.key === group.key)
-    const provider = owners.flatMap(row => row.providers).find(row => row.key === group.key)
+    const sole = owner && soleProvider(owner)
+    const provider = sole ?? owners.flatMap(row => row.providers).find(row => row.key === group.key)
     const amounts = owner?.amounts ?? provider?.amounts
     if (!amounts) return null
-    const name = owner?.label ?? provider?.label ?? ''
+    const name = owner ? sole ? `${owner.label} · ${sole.label}` : owner.label : provider?.label ?? ''
     return <div key={group.key} className={`grouped-table-sticky-band transfer-matrix-sticky-level-${group.level}`}>
       <div className="transfer-matrix-sticky-label">{parentContent(group.key, name, provider, true)}{amounts.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</div>
       {amounts.byPerson.map(person => <span key={person.personId}>{pounds(person.amountPence)}</span>)}<strong>{pounds(amounts.allocatedPence)}</strong>
@@ -118,7 +120,7 @@ export function MobileTransferMatrix({ model, labels, onPlanDestination, onViewA
 
   return <section className="transfer-matrix" aria-labelledby="transfer-matrix-title">
     <div className="transfer-matrix-intro">
-      <div className="transfer-matrix-intro-heading"><h3 id="transfer-matrix-title">Planned contributions</h3>{onViewAccount && <button type="button" className="transfer-matrix-view-control" data-matrix-preview-toggle aria-label="Return to account view" onClick={onViewAccount}>Account view</button>}</div>
+      <div className="transfer-matrix-intro-heading"><h3 id="transfer-matrix-title">Planned contributions</h3></div>
       <div className="transfer-matrix-cue"><span>Funding requirements · exact amounts</span><button type="button" className="transfer-matrix-info" aria-label="About planned contributions" aria-expanded={showGuidance} aria-controls="transfer-matrix-guidance" onClick={() => setShowGuidance(value => !value)}>ⓘ</button></div>
       <p id="transfer-matrix-guidance" hidden={!showGuidance}>These are account funding requirements, not payment records. Each row below breaks down the subtotal above; do not add it again. Pot allocations are moved within the account after funding. Source accounts and automatic payments are not recorded.</p>
       {model.totals.incomplete && <p className="transfer-matrix-warning" role="status"><strong>Incomplete allocation.</strong> {pounds(model.totals.plannedPence)} planned; {pounds(model.totals.unallocatedPence)} still unallocated. The table shows allocated amounts.</p>}
@@ -131,13 +133,24 @@ export function MobileTransferMatrix({ model, labels, onPlanDestination, onViewA
         columns={[{ key: 'destination', label: 'Destination' }, ...model.contributors.map(person => ({ key: person.personId, label: person.name })), { key: 'total', label: 'Total' }]}
         groups={groups} renderStickyGroup={renderStickyGroup}
         footer={<tr><th scope="row" aria-label={`Funding total${model.totals.incomplete ? ' Incomplete' : ''}`}>Funding total{model.totals.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={model.totals}/></tr>}>
-        {visibleOwners.flatMap(owner => [
+        {visibleOwners.flatMap(owner => {
+          const sole = soleProvider(owner)
+          const leafRow = (leaf: Leaf, parentLabel: string, level: number, parentKey: string) => <tr key={leaf.key} className="transfer-matrix-allocation" data-group-level={level} data-group-key={leaf.key} data-parent-key={parentKey}><th scope="row" aria-label={`${parentLabel}: ${leaf.label}${leaf.allocation.incomplete ? ' Incomplete' : ''}`}>{action(leaf.destination, leaf.account, leaf.label, leaf.key)}{leaf.allocation.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={leaf.allocation}/></tr>
+          if (sole) {
+            const label = `${owner.label} · ${sole.label}`
+            return [
+              <tr key={owner.key} className="transfer-matrix-owner" data-group-level="0" data-group-key={owner.key}><th scope="row" aria-label={`${label}${owner.amounts.incomplete ? ' Incomplete' : ''}`}>{parentContent(owner.key, label, sole)}{owner.amounts.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={owner.amounts}/></tr>,
+              ...(!owner.collapsed ? sole.leaves.map(leaf => leafRow(leaf, `${owner.label}: ${sole.label}`, 1, owner.key)) : []),
+            ]
+          }
+          return [
           <tr key={owner.key} className="transfer-matrix-owner" data-group-level="0" data-group-key={owner.key}><th scope="row" aria-label={`${owner.label}${owner.amounts.incomplete ? ' Incomplete' : ''}`}>{parentContent(owner.key, owner.label)}{owner.amounts.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={owner.amounts}/></tr>,
           ...(!owner.collapsed ? owner.providers.flatMap(provider => [
             <tr key={provider.key} className="transfer-matrix-provider" data-group-level="1" data-group-key={provider.key} data-parent-key={owner.key}><th scope="row" aria-label={`${owner.label}: ${provider.label}${provider.amounts.incomplete ? ' Incomplete' : ''}`}>{parentContent(provider.key, provider.label, provider)}{provider.amounts.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={provider.amounts}/></tr>,
-            ...(!collapsed.has(provider.key) ? provider.leaves.map(leaf => <tr key={leaf.key} className="transfer-matrix-allocation" data-group-level="2" data-group-key={leaf.key} data-parent-key={provider.key}><th scope="row" aria-label={`${owner.label}: ${provider.label}: ${leaf.label}${leaf.allocation.incomplete ? ' Incomplete' : ''}`}>{action(leaf.destination, leaf.account, leaf.label, leaf.key)}{leaf.allocation.incomplete && <span className="transfer-matrix-incomplete" aria-hidden="true">!</span>}</th><AmountCells amounts={leaf.allocation}/></tr>) : []),
+            ...(!collapsed.has(provider.key) ? provider.leaves.map(leaf => leafRow(leaf, `${owner.label}: ${provider.label}`, 2, provider.key)) : []),
           ]) : []),
-        ])}
+          ]
+        })}
       </GroupedTable>
     </>}
   </section>

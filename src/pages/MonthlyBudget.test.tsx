@@ -515,7 +515,11 @@ it('shows missing income without blocking an income-ratio item from saving', () 
   fireEvent.change(within(row).getByLabelText('Funding type'), { target: { value: 'proportional' } })
   expect(within(row).getByText('Add employment income to calculate')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
-  expect(screen.getByText('No income yet')).toBeVisible()
+  expect(within(document.querySelector<HTMLElement>('.budget-v3-table')!).getByText('No income yet')).toBeVisible()
+  const warning=screen.getByText(/1 item can’t be funded yet/).closest<HTMLElement>('.budget-v3-transfer-warning')!
+  expect(within(warning).getByText('Show items')).toBeVisible()
+  expect(within(warning).getByRole('button',{name:'Edit income'})).toBeVisible()
+  expect(screen.queryByText(/Planned amounts, not payments/)).not.toBeInTheDocument()
 })
 
 it('protects changed drafts through Cancel, backdrop and Escape, then restores focus on discard', () => {
@@ -901,9 +905,9 @@ it('explains the owner-handled pot movement without changing contribution attrib
   fireEvent.click(account)
   const dialog = screen.getByRole('dialog', { name: 'Monzo · Current account' })
   expect(dialog).toHaveTextContent('Funding total£100.01')
-  expect(dialog).toHaveTextContent('After account funding: Nick moves £100.01 into this pot.')
+  expect(dialog).toHaveTextContent('Nick moves £100.01 into this pot.')
   expect(dialog).not.toHaveTextContent('Immy moves')
-  expect(dialog).toHaveTextContent('not an extra contribution')
+  expect(dialog).toHaveTextContent('included in the account funding total')
   expect(dialog).toHaveTextContent('money already in the account may not need transferring')
 })
 
@@ -918,5 +922,5 @@ it('marks missing pot responsibility as needing review and withholds movement wo
   fireEvent.click(account)
   const dialog = screen.getByRole('dialog', { name: 'Monzo · Current account' })
   expect(dialog).toHaveTextContent('Assign an account owner to determine who moves money into pots.')
-  expect(dialog).not.toHaveTextContent('After account funding:')
+  expect(dialog).not.toHaveTextContent(/moves £/)
 })
