@@ -145,7 +145,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, owners
         ? <span className="budget-v3-inline-cell budget-money-field"><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-describedby={`inline-scope-${item.id}${formError ? ` inline-error-${item.id}` : ''}`} className="budget-v3-inline-amount" autoFocus inputMode="decimal" value={inlineValue} onChange={event => { setInlineValue(event.target.value); setFormError('') }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}/></span>
         : item.frequency === 'monthly' && item.funding !== 'fixed'
           ? <button type="button" data-amount-trigger={item.id} className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={editing} onClick={event => { inlineTrigger.current = event.currentTarget; setInlineId(item.id); setInlineValue((item.amountPence / 100).toFixed(2)); setFormError(''); onQuickEditOpen() }}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>
-          : <span className="budget-v3-static-amount">{pounds(item.amountPence)}</span>}</td>
+          : <span className="budget-v3-amount is-static"><span>{pounds(item.amountPence)}</span><span aria-hidden="true" className="budget-v3-amount-icon"/></span>}</td>
       {!mobilePresentation && <><td data-label="Funding">{labels.fundingLabel(item)}</td><td data-label="Destination">{labels.destinationLabel(item)}</td></>}
       <td data-label="Actions"><button className="text-button budget-v3-wide-edit" onClick={() => edit(item)}>Edit</button><details className="budget-v3-row-menu" onToggle={event => {
         const menu = event.currentTarget
