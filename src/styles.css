@@ -1221,7 +1221,10 @@ small, .muted, footer { color: #59665a; }
   .monthly-budget-page.mobile-budget-view-transfers .budget-v3-transfer-heading{display:none}
   .budget-mobile-destinations{display:block;min-width:0}
   .budget-destination-group{min-width:0}
-  .monthly-budget-page .budget-destination-group>h3{margin:0;padding:12px 16px 6px;color:var(--muted);font-size:13px;font-weight:700;line-height:1.35}
+  .monthly-budget-page .budget-destination-group>h3{display:flex;justify-content:space-between;gap:8px;margin:0;padding:12px 16px 6px;color:var(--muted);font-size:13px;font-weight:700;line-height:1.35}
+  .budget-destination-group-total{font-variant-numeric:tabular-nums}
+  .budget-destination-nothing{color:var(--muted);font-size:13px;text-align:right}
+  .budget-destination-empty{margin:0;padding:12px 16px;color:var(--muted);font-size:13px}
   .budget-destination-group ul{margin:0;padding:0;list-style:none}
   .budget-destination-group li{margin:0;padding:0;border-top:1px solid var(--line)}
   .budget-destination-row{display:grid;gap:5px;box-sizing:border-box;width:100%;min-height:88px;margin:0;padding:10px 16px;border:0;background:transparent;color:var(--charcoal);font:inherit;text-align:left;cursor:pointer}
@@ -1304,6 +1307,14 @@ small, .muted, footer { color: #59665a; }
 .transfer-matrix-preview-control .transfer-view-switch button{min-height:40px;min-width:88px;padding:6px 16px;border:0;border-radius:6px;background:transparent;color:var(--pine);font:650 14px var(--font-family);cursor:pointer}
 .transfer-matrix-preview-control .transfer-view-switch button[aria-pressed="true"]{background:var(--pine);color:white;box-shadow:0 1px 3px #28382a24}
 .transfer-view-switch button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+/* Whose transfers: same segmented look as List | Matrix, sized for 2–4 names. */
+.transfer-person-switch{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));width:100%;box-sizing:border-box;margin:0 0 12px}
+.transfer-person-switch button{min-height:44px;padding:6px 12px;border:0;border-radius:6px;background:transparent;color:var(--pine);font:650 14px var(--font-family);cursor:pointer;overflow-wrap:anywhere}
+.transfer-person-switch button[aria-pressed="true"]{background:var(--pine);color:white;box-shadow:0 1px 3px #28382a24}
+.transfer-person-prompt{margin:0 0 12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.transfer-person-prompt p{margin:0 0 8px;color:var(--charcoal);font-size:14px}
+.transfer-person-prompt .transfer-person-switch{margin:0}
+.transfer-person-prompt .transfer-person-hint{margin:8px 0 0;color:var(--muted);font-size:12px}
 .transfer-calculation-note>p{margin:0}
 .transfer-calculation-note>p+p{margin-top:4px}
 .budget-v3-transfer-warning>p{margin:0}
