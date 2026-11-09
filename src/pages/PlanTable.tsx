@@ -8,7 +8,7 @@ import { GroupedTable, GroupedTableBandRow, GroupedTableDisclosure, type Grouped
 import { ImpactPreview } from '../components/ImpactPreview'
 import { formatGBP } from '../formatting/money'
 import type { PlanDestination } from '../state/navigation'
-import type { PlanGroup, PlanItemLabels } from './planRows'
+import type { PlanGroup, PlanGrouping, PlanItemLabels } from './planRows'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const withAmount = (document: BudgetDocument, month: string, itemId: string, pence: number) => ({ ...document, budget: updateBudgetAtMonth(document.budget, month, old => old.map(row => row.id === itemId ? { ...row, entryAmountPence: pence, amountPence: pence } : row)) })
@@ -38,6 +38,9 @@ type Props = {
   /** Groups opened while browsing. Groups start closed; Transfers' destination view starts them open and keeps its own. */
   openGroups: Readonly<Record<string, boolean>>
   onOpenGroupsChange: Dispatch<SetStateAction<Record<string, boolean>>>
+  /** Bands by category or by destination; each keeps its own open groups. */
+  grouping: PlanGrouping
+  onGroupingChange: (grouping: PlanGrouping) => void
   /** The month's whole plan, for each group's share of it. */
   planTotalPence: number
   /** Changes when the Owner or Category filter does; closes the quick edit like a search would. */
@@ -54,7 +57,7 @@ type Props = {
 }
 
 /** The Plan's items in one card: collapsible groups with their share of the plan, a Total row, the row menu and the quick amount edit. */
-export function PlanTable({ document, setDocument, month, editScopeLabel, groups, labels, query, planDestination, view, mobilePresentation, scoped, openGroups, onOpenGroupsChange, planTotalPence, filterKey, editorOpen, empty, onEdit, onRemove, onQuickEditOpen, onAmountSaved, focusFallback }: Props) {
+export function PlanTable({ document, setDocument, month, editScopeLabel, groups, labels, query, planDestination, view, mobilePresentation, scoped, openGroups, onOpenGroupsChange, grouping, onGroupingChange, planTotalPence, filterKey, editorOpen, empty, onEdit, onRemove, onQuickEditOpen, onAmountSaved, focusFallback }: Props) {
   const [destinationClosed, setDestinationClosed] = useState<Record<string, boolean>>({})
   const [inlineId, setInlineId] = useState<string | null>(null), [inlineValue, setInlineValue] = useState(''), [formError, setFormError] = useState('')
   const [impactRetry, setImpactRetry] = useState(0)
@@ -144,8 +147,8 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     const editing = inlineId === item.id
     const impact = editing ? quickImpact(item) : undefined
     const category = labels.categoryName(item) ?? 'Uncategorised'
-    // A pot or direct-to-account view already names the destination, so the line says the category instead.
-    const sameDestination = !!planDestination && planDestination.kind !== 'account'
+    // Destination bands, or a pot or direct-to-account view, already name the destination, so the line says the category instead.
+    const sameDestination = !searchMode && (grouping === 'destination' || (!!planDestination && planDestination.kind !== 'account'))
     return <Fragment key={item.id}><tr className="budget-v3-item" onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
       <th scope="row">
         <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
@@ -183,15 +186,18 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     <div className="plan-card-header">
       <div className="plan-card-heading">
         <h2 id="plan-card-title">Budget items<span className="plan-card-count" aria-hidden="true"> · {shown.length}</span></h2>
-        <p className="plan-card-summary">{banded ? `${groups.length} ${groups.length === 1 ? 'category' : 'categories'} · ` : ''}{itemCount(shown.length)}</p>
+        <p className="plan-card-summary">{banded ? `${groups.length} ${grouping === 'destination' ? groups.length === 1 ? 'destination' : 'destinations' : groups.length === 1 ? 'category' : 'categories'} · ` : ''}{itemCount(shown.length)}</p>
       </div>
+      {!searchMode && <div className="plan-grouping" role="group" aria-label="Group items by">
+        {(['category', 'destination'] as const).map(value => <button key={value} type="button" aria-pressed={grouping === value} onClick={() => { if (grouping !== value) onGroupingChange(value) }}>{value === 'category' ? 'Category' : 'Destination'}</button>)}
+      </div>}
       {banded && <button type="button" className="plan-expand-all" onClick={() => { if (anyOpen) closeInline(); groups.forEach(group => setGroupOpen(group.key, !anyOpen)) }}>{anyOpen ? 'Collapse all' : 'Expand all'}</button>}
     </div>
     <GroupedTable
       wrapClassName={`budget-v3-table-wrap${desktop ? ' is-flat' : ''}`} className="budget-v3-table"
-      regionLabel="Plan table" caption={searchMode ? 'Matching budget items' : 'Budget items by category'}
+      regionLabel="Plan table" caption={searchMode ? 'Matching budget items' : `Budget items by ${grouping}`}
       columns={desktop ? [
-        { key: 'item', label: banded ? 'Category' : 'Item' }, { key: 'share', label: 'Share of plan' },
+        { key: 'item', label: !banded ? 'Item' : grouping === 'destination' ? 'Destination' : 'Category' }, { key: 'share', label: 'Share of plan' },
         { key: 'amount', label: 'Monthly' }, { key: 'actions', label: 'Actions', hiddenLabel: true },
       ] : [
         { key: 'item', label: 'Item' }, { key: 'amount', label: 'Amount' }, { key: 'actions', label: 'Actions' },
@@ -199,7 +205,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
       groups={tableGroups} renderStickyGroup={renderStickyGroup} focusFallback={focusFallback}
       footer={!searchMode && shown.length ? <tr className="plan-total"><th scope="row">Total <span className="plan-total-count">{itemCount(shown.length)}</span></th>{desktop && <td className="plan-share-cell"/>}<td className="plan-amount-cell">{pounds(sumOf(shown))}</td><td className="plan-actions-cell"/></tr> : undefined}>
       {groups.map(group => <Fragment key={group.key}>
-        {banded && <GroupedTableBandRow group={{ key: group.key, level: 0 }} colSpan={desktop ? 1 : colSpan} className={`plan-group${isOpen(group.key) ? ' is-open' : ''}`} dataGroup="category"
+        {banded && <GroupedTableBandRow group={{ key: group.key, level: 0 }} colSpan={desktop ? 1 : colSpan} className={`plan-group${isOpen(group.key) ? ' is-open' : ''}`} dataGroup={grouping}
           cells={desktop ? groupFigures(group, 'td') : undefined} onClick={() => toggleGroup(group)}>{groupButton(group)}</GroupedTableBandRow>}
         {isOpen(group.key) && group.items.map(itemRows)}
       </Fragment>)}

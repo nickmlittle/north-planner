@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { MonthlyBudget } from './MonthlyBudget'
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.sessionStorage.clear() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.sessionStorage.clear(); window.localStorage.clear() })
 const expandAll = () => fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
 
 function withItems(count: number): BudgetDocument {
@@ -150,4 +150,37 @@ it('puts phone filters in a sheet behind one Filter button that counts what is a
   expect(add).toHaveAccessibleName('Add item')
   fireEvent.click(add)
   expect(screen.getByRole('form', { name: 'Add item' })).toBeInTheDocument()
+})
+
+it('switches between Category and Destination bands, remembers the choice, and keeps each grouping’s open groups', () => {
+  desktop()
+  const { unmount } = render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" mobileBudgetView="plan"/>)
+  const switcher = screen.getByRole('group', { name: 'Group items by' })
+  expect(within(switcher).getByRole('button', { name: 'Category' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: /^Bills,/ }))
+  fireEvent.click(within(switcher).getByRole('button', { name: 'Destination' }))
+  expect(within(switcher).getByRole('button', { name: 'Destination' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('table', { name: 'Budget items by destination' })).toBeInTheDocument()
+  expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent('Destination')
+  expect(bandNames('destination')).toHaveLength(2)
+  expect(within(screen.getByRole('region', { name: 'Budget items' })).getByText('2 destinations · 5 items')).toBeInTheDocument()
+  expect(itemNames()).toEqual([])
+  fireEvent.click(document.querySelector<HTMLButtonElement>('tr[data-budget-group="destination"] th button')!)
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema'])
+  // Destination bands name the account, so each item's line names its category instead.
+  expect(document.querySelector('.budget-v3-item-meta')).toHaveTextContent('Category: Bills')
+  unmount()
+  render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" mobileBudgetView="plan"/>)
+  expect(screen.getByRole('button', { name: 'Destination' })).toHaveAttribute('aria-pressed', 'true')
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema'])
+  fireEvent.click(screen.getByRole('button', { name: 'Category' }))
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone'])
+})
+
+it('hides the grouping switch while searching', () => {
+  desktop()
+  render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" mobileBudgetView="plan"/>)
+  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  expect(screen.queryByRole('group', { name: 'Group items by' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Expand all' })).not.toBeInTheDocument()
 })

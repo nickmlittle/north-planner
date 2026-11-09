@@ -27,6 +27,16 @@ it('puts items whose category has gone in one Uncategorised group', () => {
   expect(groups.map(group => [group.name, group.items.length])).toEqual([['Uncategorised', 2]])
 })
 
+it('bands by destination in Transfers order: each account, its direct items, then its pots in budget order', () => {
+  const accountOrder = ['joint', 'saving', 'ada', 'ben']
+  const { groups } = groupPlanItems(items, all, labels, 'destination', accountOrder)
+  expect(groups.map(group => group.name)).toEqual(['Monzo Joint', 'Bills · Monzo Joint', 'Holidays · Monzo Joint', 'Emergency · Monzo Joint Savings', 'Spending · Starling Ada', 'Spending · Nationwide Ben'])
+  expect(groups[0]!.key).toBe('destination:account:joint')
+  expect(groups[1]!.key).toBe('destination:pot:bills')
+  expect(groups.flatMap(group => group.items)).toHaveLength(items.length)
+  expect(groups.find(group => group.key === 'destination:pot:bills')!.items.every(item => item.destination.kind === 'pot' && item.destination.potId === 'bills')).toBe(true)
+})
+
 it('applies search, Owner and Category together, and returns nothing when none match', () => {
   const ada = groupPlanItems(items, { ...all, owner: 'Ada' }, labels)
   expect(ada.matching.length).toBeGreaterThan(0)
