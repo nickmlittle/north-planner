@@ -1317,3 +1317,18 @@ small, .muted, footer { color: #59665a; }
 .budget-manage-close:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 /* Keep quick-edit Save clear of the fixed mobile nav when the form scrolls into view. */
 @media(max-width:767px){.budget-v3-inline-row form{scroll-margin-bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
+/* Unfunded-items warning: one compact block, text-link action at every width, a visible disclosure marker. */
+.budget-v3-transfer-warning{padding:10px 12px;font-size:13px}
+.budget-v3-transfer-warning>p{margin:0}
+.budget-v3-transfer-warning button{display:inline-flex;align-items:center;min-height:44px;margin:-12px 0;padding:0 4px;border:0;background:none;color:var(--pine);font:650 13px var(--font-family);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.budget-v3-transfer-warning details{margin:4px 0 0}
+.budget-v3-transfer-warning summary{display:list-item;min-height:0;padding:2px 0;color:var(--pine);font-weight:650;cursor:pointer}
+.budget-not-calculated{color:#a54232;font-size:.85em;font-weight:600}
+/* Destination detail: the amounts you move lead; the pot total is a caption. */
+.budget-destination-allocation header{align-items:baseline}
+.budget-destination-subtotal{flex:none;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.budget-destination-detail .budget-destination-allocation .budget-contributions{margin:8px 0 0;color:var(--charcoal);font-size:15px}
+.budget-destination-detail .budget-destination-allocation .budget-contributions dd{font-weight:650}
+/* Merged single-account bands: line the action label up with plain owner labels while keeping a 44px chevron target. */
+.transfer-matrix-parent-content button:first-child:has(+ .transfer-matrix-parent-action){margin-right:-22px}
+.transfer-matrix-parent-content .transfer-matrix-parent-action{position:relative}
