@@ -1,7 +1,5 @@
 import { useId, useState } from 'react'
-import type { BudgetDocument } from '../domain/budgetDocument'
 import type { TransferInstructionAccount } from '../domain/transferInstructions'
-import { formatGBP } from '../formatting/money'
 
 /** The headline stays short; the caveats sit behind an ⓘ so they don't outrank the amounts. */
 export function AccountFundingNote() {
@@ -13,12 +11,9 @@ export function AccountFundingNote() {
   </div>
 }
 
-export function PotMovementNote({ account, potId, document }: {
-  account: TransferInstructionAccount | undefined; potId: string; document: BudgetDocument
-}) {
+/** Explains why pot movements can't be listed; when they can, the breakdown lists them itself. */
+export function PotMovementNote({ account }: { account: TransferInstructionAccount | undefined }) {
   if (!account) return <p className="transfer-calculation-note">Pot instructions are unavailable. Review this account before moving money.</p>
   if (account.status === 'needs-review') return <p className="transfer-calculation-note budget-allocation-incomplete">Account instructions need review before money is moved.{account.issues.some(issue => issue.kind === 'missing-pot-owner') ? ' Assign an account owner to determine who moves money into pots.' : ' Resolve incomplete funding allocations.'}</p>
-  const movements = account.potMovements.filter(step => step.destination.kind === 'pot' && step.destination.potId === potId)
-  if (!movements.length) return <p className="transfer-calculation-note">No pot movement required.</p>
-  return <p className="transfer-calculation-note">{movements.map(step => `${document.household.adults.find(person => person.id === step.personId)?.name ?? 'Person'} moves ${formatGBP(step.amountPence / 100)}`).join('; ')} into this pot.</p>
+  return null
 }
