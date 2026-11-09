@@ -710,7 +710,7 @@ small, .muted, footer { color: #59665a; }
 .budget-v3-inline-controls>span{font-weight:650}
 .budget-v3-inline-amount{box-sizing:border-box;width:min(100%,240px);min-width:0;min-height:44px;padding:8px;font:inherit;font-size:16px}
 .budget-v3-inline-controls button{min-height:44px;padding:8px 12px}
-.budget-v3-inline-row p{margin:0;color:#a42a27}
+.budget-v3-inline-row p{margin:0}.budget-v3-inline-row [role=alert]{color:#a42a27}
 .budget-v3-inline-cell{display:inline-block;width:6.5em}
 .budget-v3-inline-cell .budget-v3-inline-amount{padding-left:20px!important;padding-right:6px}
 .budget-v3-inline-cell .budget-v3-inline-amount{width:100%;min-height:44px;padding:6px 8px;text-align:right}
@@ -818,7 +818,7 @@ small, .muted, footer { color: #59665a; }
 .budget-batch-empty{padding:14px;color:var(--muted);font-size:13px}.budget-batch-panel .budget-batch-error{margin:8px 0 0;color:#9f362b;font-size:12px;font-weight:500;line-height:1.5}
 .budget-batch-panel [aria-invalid=true]{border-color:#b35040}
 .budget-batch-footer{position:sticky;bottom:0;flex:none;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;padding:16px 24px;border-top:1px solid var(--line);background:var(--card)}
-.budget-batch-footer>div:first-child{display:grid;gap:4px;font-size:13px}.budget-batch-footer span{color:var(--muted);font-size:12px}.budget-batch-footer>div:last-child{display:flex;gap:8px}.budget-batch-footer button{min-height:44px}
+.budget-batch-summary{display:grid;gap:4px;font-size:13px}.budget-batch-summary span{color:var(--muted);font-size:12px}.budget-batch-actions{display:flex;gap:8px;margin-left:auto}.budget-batch-footer button{min-height:44px}
 @media(max-width:1000px){.budget-batch-shared{grid-template-columns:minmax(170px,210px) minmax(0,1fr)}.budget-batch-table th:nth-child(1){width:19%}.budget-batch-table th:nth-child(2){width:14%}.budget-batch-table th:nth-child(3){width:14%}.budget-batch-table th:nth-child(4){width:18%}.budget-batch-table th:nth-child(5){width:27%}}
 @media(max-width:850px){
   .budget-batch-shared{grid-template-columns:1fr}.budget-batch-table,.budget-batch-table tbody{display:block}.budget-batch-table thead{display:none}
@@ -833,7 +833,8 @@ small, .muted, footer { color: #59665a; }
   .budget-batch-panel{height:94dvh;max-height:94dvh;border-radius:0;padding:0}.budget-batch-header{padding:18px}.budget-batch-header h2{font-size:20px}
   .budget-batch-body{flex:1;padding:18px}.budget-batch-shared{gap:16px;margin-bottom:8px}.budget-batch-footer{padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px))}
   .budget-batch-panel input,.budget-batch-panel select{font-size:16px}
-  .budget-batch-footer>div:first-child{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}.budget-batch-footer>div:last-child{justify-content:flex-end;width:100%}
+  .budget-batch-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}.budget-batch-actions{justify-content:flex-end;width:100%}
+  .budget-batch-footer{gap:10px}
 }
 .budget-single-panel{max-width:660px;margin:auto}
 .budget-batch-dialog:has(.budget-single-panel){width:min(660px,100%)}
@@ -863,6 +864,14 @@ small, .muted, footer { color: #59665a; }
 .budget-impact summary::before{content:"▸"}.budget-impact details[open]>summary::before{content:"▾"}
 .budget-impact summary::-webkit-details-marker{display:none}
 .budget-impact-compact{margin:4px 0}
+.budget-impact-plain .budget-impact-scope{margin:0;color:var(--muted);font-size:12px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.budget-impact-error{margin:6px 0 0;font-size:12px;font-weight:500}.budget-impact-error .text-button{min-height:44px}
+/* The consequence sits directly above Save; open detail scrolls inside the footer rather than covering the form. */
+.budget-batch-footer>.budget-impact,.budget-batch-footer>.budget-impact-plain{flex:1 0 100%;margin:0}
+.budget-batch-footer .budget-impact{padding:8px 12px}.budget-batch-footer .budget-impact p{margin:4px 0}
+.budget-batch-footer .budget-impact-changes{max-height:30dvh;overflow:auto}
+.budget-batch-footer .budget-impact-error{color:#9f362b}
+.confirm-dialog-body .budget-impact{margin:12px 0 0}.confirm-dialog-body .budget-impact-plain{margin-top:12px}.confirm-dialog-body .budget-impact-plain .budget-impact-scope{color:inherit;font-size:inherit}
 .budget-affected-banner{margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:8px;background:#e7eee6;font-size:13px}
 .budget-affected-banner p{margin:5px 0 0}
 .budget-affected-label{display:block;color:var(--pine);font-size:11px;font-weight:650}
@@ -1283,7 +1292,6 @@ small, .muted, footer { color: #59665a; }
 
 /* Effective-month context is visible before an edit is committed. */
 .budget-edit-scope{margin:0 0 12px;color:var(--muted);font-size:12px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
-.budget-inline-scope{display:block;margin:6px 0 0;max-width:180px;white-space:normal}
 .budget-income-source label{display:grid;gap:5px;color:var(--charcoal);font-size:12px;font-weight:650}
 .budget-income-source .budget-edit-scope{margin:5px 0 0}
 

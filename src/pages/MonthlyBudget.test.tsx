@@ -895,6 +895,44 @@ it('explains what replaces a removed budget date, including when there is no pre
   expect(savedBudget().snapshots['2027-03']?.items).toHaveLength(1)
 })
 
+it('shows the balance change of a removal directly above its confirm button', () => {
+  render(<MonthRulesHarness/>)
+  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.click(screen.getByLabelText('More actions for Rent'))
+  fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+  const dialog = screen.getByRole('dialog', { name: 'Remove Rent?' })
+  const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
+  expect(impact).toHaveTextContent('Before removing')
+  expect(impact).toHaveTextContent('Changes apply: December 2026–February 2027. Later saved budgets stay unchanged.')
+  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £2,100.00')
+  expect(impact.compareDocumentPosition(within(dialog).getByRole('button', { name: 'Remove item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('shows the balance change of removing a budget date', () => {
+  render(<MonthRulesHarness month="2026-11"/>)
+  fireEvent.click(screen.getAllByRole('button', { name: 'Remove budget date' })[0]!)
+  const dialog = screen.getByRole('dialog', { name: 'Remove the November 2026 budget date?' })
+  const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
+  expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget. Later saved budgets stay unchanged.')
+  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £2,100.00')
+})
+
+it('puts the full editor’s scope and impact in the footer, directly above Save', () => {
+  render(<MonthRulesHarness/>)
+  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Rent' }))
+  const form = screen.getByRole('form', { name: 'Edit budget item' })
+  const body = form.querySelector<HTMLElement>('.budget-batch-body')!, footer = form.querySelector<HTMLElement>('.budget-batch-footer')!
+  expect(body).not.toHaveTextContent('Changes apply')
+  expect(footer).toHaveTextContent('Changes apply: December 2026–February 2027. Later saved budgets stay unchanged.')
+  expect(footer).not.toHaveTextContent('1 item')
+  fireEvent.change(within(form).getByLabelText('Monthly amount'), { target: { value: '150' } })
+  const impact = within(footer).getByRole('region', { name: 'Impact preview' })
+  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £1,950.00')
+  expect(within(body).queryByRole('region', { name: 'Impact preview' })).not.toBeInTheDocument()
+  expect(impact.compareDocumentPosition(within(footer).getByRole('button', { name: 'Save item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
 it('shows independent source scopes and clears income drafts between editing sessions', () => {
   render(<MonthRulesHarness/>)
   fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
