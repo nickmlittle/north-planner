@@ -150,6 +150,8 @@ body { background: var(--cream); color: var(--charcoal) }
 .account-form input:focus-visible { outline-color: var(--orange) }
 .primary-button { background: var(--pine); border-color: var(--pine); border-radius: var(--radius-md)}
 .primary-button:hover { background: var(--pine-strong) }
+.primary-button:disabled, .secondary-button:disabled { opacity: .45; cursor: default }
+.primary-button:disabled:hover { background: var(--pine) }
 .secondary-button { color: var(--pine); background: transparent; border-color: var(--line-strong); border-radius: var(--radius-md)}
 .secondary-button:hover { background: var(--soft-fern) }
 .text-button { color: var(--link) }
@@ -490,7 +492,9 @@ small, footer { color: var(--muted) }
 .budget-batch-overlay{align-items:center;justify-content:center;padding:var(--space-5);box-sizing:border-box}
 .budget-batch-dialog{width:min(1220px,100%);min-width:0;max-height:100%;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-dialog)}
 .budget-batch-panel{display:flex;flex-direction:column;width:100%;height:auto;max-height:min(880px,calc(100dvh - 48px));gap:0;padding:0;overflow:hidden;box-shadow:none}
-.budget-batch-header{flex:none;padding:var(--space-5) var(--space-5) var(--space-4);border-bottom:1px solid var(--line)}
+.budget-batch-header{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);padding:var(--space-5) var(--space-5) var(--space-4);border-bottom:1px solid var(--line)}
+.budget-batch-header .dialog-close{margin:calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0}
+.budget-batch-remove{min-height:44px;margin:0;color:var(--status-error)}
 .budget-batch-header p{margin:var(--space-2) 0 0;color:var(--muted);font-size:var(--text-sm);line-height:1.5}
 .budget-batch-body{flex:0 1 auto;min-height:0;overflow:auto;padding:var(--space-5) var(--space-5);scroll-padding:16px}
 .budget-batch-shared{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);align-items:start;gap:var(--space-4);margin-bottom:var(--space-2)}
@@ -529,7 +533,7 @@ small, footer { color: var(--muted) }
   .budget-batch-panel{border-radius:0;padding:0}.budget-batch-header{padding:var(--space-4)}.budget-batch-header h2{font-size:var(--text-xl)}
   .budget-batch-body{flex:1;padding:var(--space-4)}.budget-batch-shared{gap:var(--space-4);margin-bottom:var(--space-2)}.budget-batch-footer{padding:var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom,0px))}
   .budget-batch-panel input,.budget-batch-panel select{font-size:var(--text-lg)}
-  .budget-batch-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}.budget-batch-actions{justify-content:flex-end;width:100%}
+  .budget-batch-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}.budget-batch-actions{justify-content:flex-end;width:100%}.budget-batch-remove+.budget-batch-actions{width:auto}
   .budget-batch-footer{gap:var(--space-2)}
 }
 .budget-single-panel{max-width:660px;margin:auto}
@@ -951,9 +955,9 @@ small, footer { color: var(--muted) }
 .budget-v3-compact-group>span:last-child{margin-left:auto;font-weight:500}
 .confirm-dialog-body p{margin:var(--space-3) 0 0}
 .confirm-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)}
-.budget-manage-close{display:flex;align-items:center;justify-content:center;width:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
-.budget-manage-close svg{width:20px;height:20px}
-.budget-manage-close:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.dialog-close{display:flex;flex:none;align-items:center;justify-content:center;width:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
+.dialog-close svg{width:20px;height:20px}
+.dialog-close:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
 /* Keep quick-edit Save clear of the fixed mobile nav when the form scrolls into view. */
 @media(max-width:767px){.budget-v3-inline-row form{scroll-margin-bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
 /* Unfunded-items warning: one compact block, text-link action at every width, a visible disclosure marker. */
