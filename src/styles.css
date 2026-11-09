@@ -483,7 +483,7 @@ small, footer { color: var(--muted) }
 .budget-batch-header p{margin:var(--space-2) 0 0;color:var(--muted);font-size:var(--text-sm);line-height:1.5}
 .budget-batch-body{flex:0 1 auto;min-height:0;overflow:auto;padding:var(--space-5) var(--space-5);scroll-padding:16px}
 .budget-batch-shared{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);align-items:start;gap:var(--space-4);margin-bottom:var(--space-2)}
-.budget-batch-category{display:grid;gap:var(--space-3)}.budget-batch-shared-label{display:block;margin-bottom:var(--space-2);color:var(--charcoal);font-size:var(--text-sm);font-weight:600}.budget-batch-shared-note{margin:0 0 var(--space-4);color:var(--muted);font-size:var(--text-sm);line-height:1.5}
+.budget-batch-category{display:grid;gap:var(--space-3)}.budget-batch-shared-label{display:block;margin-bottom:var(--space-2);color:var(--charcoal);font-size:var(--text-sm);font-weight:600}
 .budget-batch-category label,.budget-batch-table label{display:grid;gap:var(--space-2);min-width:0;color:var(--charcoal);font-size:var(--text-sm);font-weight:600}
 .budget-batch-destination{min-width:0}.budget-batch-destination:focus-visible{outline:2px solid var(--pine);outline-offset:3px;border-radius:var(--radius-lg)}
 .budget-batch-table{width:100%;table-layout:fixed;border-collapse:collapse;text-align:left}

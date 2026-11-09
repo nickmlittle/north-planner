@@ -119,7 +119,7 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
   ]
 
   return <section className={`destination-picker${step === 'selected' ? ' destination-picker-selected' : ''}`} aria-label="Destination" onChangeCapture={onDraftChange}>
-    <h3 ref={headingRef} tabIndex={-1}>{step === 'selected' ? 'Selected destination' : step === 'owner' ? 'Choose an owner' : step === 'account' ? 'Choose an account' : 'Choose an account or pot'}</h3>
+    <h3 ref={headingRef} tabIndex={-1}>{step === 'selected' ? 'Destination' : step === 'owner' ? 'Choose an owner' : step === 'account' ? 'Choose an account' : 'Choose an account or pot'}</h3>
     {step === 'selected' ? <div className="destination-picked"><strong>{currentLabel}</strong><button type="button" className="secondary-button" onClick={() => { setOwnerKey(currentOwnerKey); setAccountId(currentAccountId ?? ''); move('pot') }}>Change</button></div> : <>
       {value.destination && <div className="destination-keep"><button type="button" className="text-button" onClick={keepCurrent}>← Keep current</button><span>{currentLabel}</span></div>}
       {step !== 'owner' && <nav className="destination-crumbs" aria-label="Destination path"><button type="button" onClick={() => { setAccountId(''); setCreation(null); move('owner') }}>Owners</button><span aria-hidden="true">›</span>{step === 'account' ? <strong>{ownerLabel}</strong> : <><button type="button" onClick={() => { setAccountId(''); setCreation(null); move('account') }}>{ownerLabel}</button><span aria-hidden="true">›</span><strong>{account ? labels.get(account.id) : 'Account'}</strong></>}</nav>}
