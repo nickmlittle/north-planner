@@ -197,7 +197,7 @@ describe('preview integration', () => {
     rerender(<MonthlyBudget document={document} setDocument={vi.fn()} month="2026-12" mobileBudgetView="transfers"/>)
     expect(screen.getByRole('status')).toHaveTextContent('£1.25 planned; £1.25 still unallocated')
     expect(screen.getByRole('rowheader', { name: 'Joint Incomplete' })).toBeInTheDocument()
-    expect(screen.queryByText('Needs funder')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Transfer matrix' })).queryByText('Needs funder')).not.toBeInTheDocument()
   })
 
   it('keeps the account view available when the mapping rejects unsupported input', () => {

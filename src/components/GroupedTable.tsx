@@ -146,6 +146,13 @@ export function GroupedTable({ columns, groups, renderStickyGroup, focusFallback
   }, [groups, onOverflowChange])
 
   useLayoutEffect(() => {
+    // Rows scrolled into view must clear the band actually drawn, which can be taller than its source row.
+    const wrap = wrapRef.current
+    const height = wrap?.querySelector('.grouped-table-sticky-context')?.getBoundingClientRect().height ?? 0
+    if (wrap && height > 0) wrap.style.setProperty('--grouped-sticky-height', `${height}px`)
+  }, [activeKeys])
+
+  useLayoutEffect(() => {
     const key = focusedGroup.current
     const wrap = wrapRef.current
     if (!key || !wrap) return
