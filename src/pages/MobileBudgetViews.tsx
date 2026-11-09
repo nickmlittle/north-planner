@@ -3,6 +3,7 @@ import { ModalDialog } from '../components/ModalDialog'
 import { Info } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { balanceLabel, formatGBP } from '../formatting/money'
+import { stepSummary } from './budgetLabels'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 
@@ -11,7 +12,7 @@ export function BudgetInfoDialog({ title, onClose, children }: { title: string; 
 }
 
 type Adults = BudgetDocument['household']['adults']
-export type TransferPersonChoice = { adults: Adults; selection: string | 'both' | null; onSelect: (value: string) => void; plan?: { name: string; fundingPence: number; stepCount: number }; reviewCount?: number }
+export type TransferPersonChoice = { adults: Adults; selection: string | 'both' | null; onSelect: (value: string) => void; plan?: { name: string; fundingPence: number; fundCount: number; moveCount: number }; reviewCount?: number }
 
 /** Ada · Ben · Both. Unchosen, it asks once; afterwards it is a plain switch. */
 function TransferPersonSwitch({ adults, selection, onSelect }: TransferPersonChoice) {
@@ -29,7 +30,7 @@ export function MobileBudgetSummary({ view, available, availableBasis, planned, 
   const balanceText = balanceLabel(balance)
   const personal = !plan ? person?.plan : undefined
   const review = person?.reviewCount ? `${person.reviewCount} ${person.reviewCount === 1 ? 'account needs' : 'accounts need'} review` : incomplete ? 'Some accounts need review' : ''
-  const transfersStatus = personal ? [`${personal.stepCount} ${personal.stepCount === 1 ? 'step' : 'steps'}`, review].filter(Boolean).join(' · ') : review || (hasItems ? 'All items funded' : '')
+  const transfersStatus = personal ? [stepSummary(personal), review].filter(Boolean).join(' · ') : review || (hasItems ? 'All items funded' : '')
   return <section className={`budget-mobile-summary${plan ? balance < 0 ? ' is-deficit' : balance > 0 ? ' is-surplus' : ' is-balanced' : ''}`} aria-label={`${plan ? 'Plan' : 'Transfers'} summary`}>
     {!plan && person && person.adults.length > 1 && <TransferPersonSwitch {...person}/>}
     <div className="budget-mobile-summary-heading"><h2>{plan ? 'Plan' : personal ? `${personal.name}’s funding` : 'Funding'}</h2>{!plan && <button type="button" aria-label="Transfers summary details" onClick={onDetails}><Info aria-hidden="true"/></button>}</div>

@@ -112,3 +112,9 @@ export function shortAccountLabels(accounts: BudgetAccount[], adults: Adult[]): 
 export function destinationLabel(account: string, potName?: string): string {
   return potName ? `${potName} · ${account}` : account
 }
+
+/** "4 to fund · 4 moves": bank transfers and in-app pot moves counted apart. Zero parts are left out. */
+export function stepSummary({ fundCount, moveCount }: { fundCount: number; moveCount: number }): string {
+  const parts = [fundCount ? `${fundCount} to fund` : '', moveCount ? `${moveCount} ${moveCount === 1 ? 'move' : 'moves'}` : ''].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'No steps'
+}

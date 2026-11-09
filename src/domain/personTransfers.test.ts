@@ -29,6 +29,8 @@ it('gives each person what they fund, reconciling to the household total', () =>
   expect(ada.fundingPence + ben.fundingPence).toBe(764187)
   expect(result.needsReview).toEqual([])
   // One step per funded account plus one per pot move.
+  for (const plan of [ada, ben]) expect(plan.fundCount + plan.moveCount).toBe(plan.stepCount)
+  for (const plan of [ada, ben]) expect(plan.moveCount).toBe(plan.rows.reduce((sum, row) => sum + row.potMoves.length, 0))
   for (const plan of [ada, ben]) expect(plan.stepCount).toBe(plan.rows.filter(row => row.fundingPence > 0).length + plan.rows.reduce((sum, row) => sum + row.potMoves.length, 0))
 })
 

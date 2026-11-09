@@ -78,7 +78,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const chooseTransferPerson=(value:string)=>{rememberTransferPerson(value);setStoredTransferPerson(value)}
  const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
  const selectedPersonPlan=transferPerson&&transferPerson!=='both'?personPlans.people.find(plan=>plan.personId===transferPerson):undefined
- const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,stepCount:selectedPersonPlan.stepCount},reviewCount:personPlans.needsReview.length}
+ const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length}
  const start=(item?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditor(true)}
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)

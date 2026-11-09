@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import { Info } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { addIncomeSource, incomeEditScope, resolveIncomeSources, updateIncomeAtMonth } from '../domain/monthlyBudget'
 import { formatEditScope, formatMonth } from '../formatting/month'
@@ -39,7 +40,7 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
 
   return <div className="budget-v3-overlay"><form className="budget-v3-panel" onSubmit={save}>
     <h2>Income for {formatMonth(month)}</h2>
-    <p className="budget-income-intro">Income changes don’t create a budget <span className="budget-nowrap">date. <button type="button" className="budget-v3-info" aria-label="About income changes" aria-expanded={help} onClick={() => setHelp(value => !value)}>ⓘ</button></span></p>
+    <p className="budget-income-intro">Income changes don’t create a budget <span className="budget-nowrap">date. <button type="button" className="budget-v3-info" aria-label="About income changes" aria-expanded={help} onClick={() => setHelp(value => !value)}><Info aria-hidden="true"/></button></span></p>
     {help && <p className="budget-edit-scope">Salary sets each person’s share. Other income only adds to Available. £0 stops a source.</p>}
     {sharedScope && <p id="income-scope-shared" className="budget-edit-scope">Changes apply: {sharedScope}.</p>}
     {incomes.map(source => <div className="budget-income-source" key={source.id}>
