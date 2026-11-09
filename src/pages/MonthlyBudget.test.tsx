@@ -31,7 +31,7 @@ function addItem(name='Apple TV',amount='8.99',nickname='',funding?:string) {
   const category=document.querySelector<HTMLButtonElement>('.budget-v3-category button')!
   if(category.getAttribute('aria-expanded')==='false')fireEvent.click(category)
 }
-it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByRole('heading',{name:'Start your plan'})).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Current account')})
+it('starts with no budget records and adds a categorized item with a staged account',()=>{render(<Harness/>);expect(screen.getByRole('heading',{name:'Start your plan'})).toBeVisible();addItem();expect(screen.getByText('Apple TV')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Nick');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Subscriptions');expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Monzo Nick')})
 it('prompts for the first item, and for income only while there is none',()=>{
   render(<Harness/>)
   const prompt=document.querySelector<HTMLElement>('.budget-first-run')!
@@ -50,7 +50,7 @@ it('keeps mobile Plan headings and funding context in a semantic three-column ta
   addItem()
   const table=screen.getByRole('table',{name:'Budget items by owner and category'})
   expect(within(table).getAllByRole('columnheader').map(header=>header.textContent)).toEqual(['Item','Amount','Actions'])
-  expect(within(table).getByRole('rowheader',{name:/Apple TV/})).toHaveTextContent('Destination: Current account')
+  expect(within(table).getByRole('rowheader',{name:/Apple TV/})).toHaveTextContent('Destination: Monzo Nick')
   expect(table.querySelector('.budget-v3-owner th')).toHaveAttribute('colspan','3')
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
@@ -179,13 +179,13 @@ it('opens the editor from anywhere on the row except its controls',()=>{
 it('keeps compact destination details and opens editing from the row menu',()=>{
   render(<Harness/>);addItem()
   const row=screen.getByRole('button',{name:'Apple TV'}).closest('tr')!
-  expect(row.querySelector('.budget-v3-compact-destination')).toHaveTextContent(/^Current account$/)
+  expect(row.querySelector('.budget-v3-compact-destination')).toHaveTextContent(/^Monzo Nick$/)
   const summary=within(row).getByLabelText('More actions for Apple TV')
   fireEvent.click(summary)
   fireEvent.click(within(summary.closest('details')!).getByRole('button',{name:'Edit'}))
   expect(screen.getByRole('form',{name:'Edit item'})).toBeVisible()
 })
-it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills pot')})
+it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Monzo Nick')})
 
 it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Everyday')})
 
@@ -224,19 +224,19 @@ it('lists each person’s payday steps in order, with pot moves under their acco
   expect(within(transfers).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£25.00 · 3 steps','Immy£20.00 · 1 step'])
   const nick=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nick)).toEqual([
-    '1Fund Nick · Monzo · Current account£20.00See 3 items',
-    '2Move to Spending from Nick · Monzo · Current account£30.00Includes £15.00 from Immy',
-    '3Fund Immy · Nationwide · Mortgage£5.00See 1 item',
+    '1Fund Monzo Nick£20.00See 3 items',
+    '2Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
+    '3Fund Nationwide Immy£5.00See 1 item',
   ])
   expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-pot-move')
   // Immy pays into Nick's account; Nick moves her share on, so she has no pot step there.
-  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['1Fund Nick · Monzo · Current account£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
+  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['1Fund Monzo Nick£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
   expect(transfers).not.toHaveTextContent('Direct item')
   expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Funding£45.00All items funded')
   expect(document.querySelector('.budget-v3-transfer-table')).toHaveTextContent('Direct to account')
   expect(document.querySelector('.budget-v3-transfer-table')).toHaveTextContent('Spending')
   // Items live in Plan now; there is no detail screen to open.
-  fireEvent.click(within(nick).getByRole('button',{name:'See 3 items for Nick · Monzo · Current account'}))
+  fireEvent.click(within(nick).getByRole('button',{name:'See 3 items for Monzo Nick'}))
   expect(seeItems).toHaveBeenCalledWith('a1')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
@@ -272,8 +272,8 @@ it('asks once whose transfers to show, then remembers the choice on this device'
   // The hero names the person, so the list needs no heading of its own.
   expect(within(overview).queryAllByRole('heading',{level:3})).toHaveLength(0)
   expect(stepTexts(overview)).toEqual([
-    '1Fund Nick · Monzo · Current account£20.00Nick moves £15.00 of it into Spending',
-    '2Fund Immy · Nationwide · Mortgage£5.00',
+    '1Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending',
+    '2Fund Nationwide Immy£5.00',
   ])
   unmount()
   render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
@@ -283,7 +283,7 @@ it('asks once whose transfers to show, then remembers the choice on this device'
   fireEvent.click(within(again).getByRole('button',{name:'Nick'}))
   expect(again).toHaveTextContent('Nick’s funding£20.00')
   expect(again).toHaveTextContent('2 steps')
-  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('2Move to Spending from Nick · Monzo · Current account£30.00Includes £15.00 from Immy')
+  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('2Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy')
   fireEvent.click(within(again).getByRole('button',{name:'Both'}))
   expect(window.localStorage.getItem('north.transferPerson')).toBe('both')
   expect(again).toHaveTextContent('Funding£45.00')
@@ -327,7 +327,7 @@ it('leaves people with nothing to move out of the steps',()=>{
   render(<SeededHarness initial={initial} view="transfers"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£5.00 · 1 step'])
-  expect(stepTexts(overview)).toEqual(['1Fund Nick · Monzo · Current account£5.00'])
+  expect(stepTexts(overview)).toEqual(['1Fund Monzo Nick£5.00'])
   expect(overview).not.toHaveTextContent('Immy')
   expect(overview).not.toHaveTextContent('Sam')
   // Without a Plan route there is nowhere for "See items" to go.
@@ -336,7 +336,7 @@ it('leaves people with nothing to move out of the steps',()=>{
   expect(screen.getByRole('region',{name:'Steps by person'})).toHaveTextContent('Sam has nothing to move this month.')
 })
 
-it('lists steps by who pays, with owner labels, duplicate account suffixes and nonzero pence',()=>{
+it('lists steps by who pays, with short account names, duplicate suffixes and nonzero pence',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.household.adults.push({id:'sam',name:'Sam'})
   initial.budget.accounts=[
@@ -353,7 +353,7 @@ it('lists steps by who pays, with owner labels, duplicate account suffixes and n
   const overview=screen.getByRole('region',{name:'Steps by person'})
 expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£0.06 · 6 steps'])
   const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.payday-step-label')!.textContent)
-  expect(labels).toEqual(['Fund Joint · Monzo · Current account · Home','Fund Nick · Monzo · Current account · Everyday (Account 1)','Fund Nick · Monzo · Current account · Everyday (Account 2)','Fund Immy · HL · S&S ISA · ISA','Fund Sam · Barclays · Current account · Cash','Fund Needs owner · Needs bank / provider · Old account'])
+  expect(labels).toEqual(['Fund Home','Fund Everyday (Account 1)','Fund Everyday (Account 2)','Fund ISA','Fund Cash','Fund Old account'])
   expect(within(overview).getAllByRole('listitem')[1]).toHaveTextContent('£0.01')
 })
 
@@ -368,11 +368,11 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(overview.querySelector('ol')).toBeNull()
   const review=within(overview).getByRole('region',{name:'Needs review'})
-  expect(review).toHaveTextContent('Nick · Monzo · Current account—Not calculated')
+  expect(review).toHaveTextContent('Monzo Nick—Not calculated')
   expect(review).not.toHaveTextContent('£0.00')
   expect(review).toHaveTextContent('Some items here can’t be funded yet.')
   expect(review).not.toHaveTextContent('Unfunded')
-  fireEvent.click(within(review).getByRole('button',{name:'See 1 item for Nick · Monzo · Current account'}))
+  fireEvent.click(within(review).getByRole('button',{name:'See 1 item for Monzo Nick'}))
   expect(seeItems).toHaveBeenCalledWith('a1')
   fireEvent.click(within(warning).getByRole('button',{name:'Edit income'}))
   expect(screen.getByRole('heading',{name:/Income for/})).toBeVisible()
@@ -414,7 +414,7 @@ it('keeps a large destination to one funding step and one pot step',()=>{
   initial.budget.snapshots[month]={items:Array.from({length:23},(_,index)=>({id:`item-${index}`,name:`Budget item ${index+1}`,categoryId:'bills',destination:{kind:'pot' as const,potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly' as const,funding:'equal' as const}))}
   render(<SeededHarness initial={initial} view="transfers" onSeeTransferItems={vi.fn()}/>)
   const nick=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nick)).toEqual(['1Fund Nick · Monzo · Current account£115.00See 23 items','2Move to Spending from Nick · Monzo · Current account£230.00Includes £115.00 from Immy'])
+  expect(stepTexts(nick)).toEqual(['1Fund Monzo Nick£115.00See 23 items','2Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
   expect(nick).not.toHaveTextContent('Budget item 1')
 })
 
@@ -427,7 +427,7 @@ it('navigates an existing account and pot and saves the selected stable pot ID',
   fireEvent.click(within(form).getByRole('button', { name: 'Nick' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Monzo · Current account' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Spending' }))
-  expect(within(form).getByText(/Nick · Monzo · Current account · Spending/)).toBeVisible()
+  expect(within(form).getByText(/Spending · Monzo Nick/)).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
   const items = Object.values(savedBudget().snapshots).flatMap(snapshot => snapshot.items)
   expect(items).toHaveLength(1)
@@ -443,12 +443,12 @@ it('keeps the saved destination while changing branches and asks to finish or ke
   render(<SeededHarness initial={initial}/>)
   fireEvent.click(screen.getByRole('button', { name: 'Groceries' }))
   const form = screen.getByRole('form', { name: 'Edit item' })
-  expect(within(form).getByText(/Nick · Monzo · Current account · Spending/)).toBeVisible()
+  expect(within(form).getByText(/Spending · Monzo Nick/)).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Change' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Owners' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Immy' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Nationwide · Mortgage' }))
-  expect(within(form).getByText('Nick · Monzo · Current account · Spending')).toBeVisible()
+  expect(within(form).getByText('Spending · Monzo Nick')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
   expect(within(form).getByRole('alert')).toHaveTextContent('Finish choosing a destination, or keep the current one.')
   expect(within(form).getByLabelText('Item name')).toHaveValue('Groceries')
@@ -920,7 +920,7 @@ it('preserves month, search and owner when switching views',()=>{
   fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Nick'}})
   rerender(<SeededHarness initial={initial} view="transfers"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nickSteps)).toEqual(['1Fund Nick · Monzo · Current account£5.00','2Move to Spending from Nick · Monzo · Current account£10.00Includes £5.00 from Immy'])
+  expect(stepTexts(nickSteps)).toEqual(['1Fund Monzo Nick£5.00','2Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
   const row=within(nickSteps).getAllByRole('listitem')[0]
   const trigger=screen.getByRole('button',{name:'Transfers summary details'})
   trigger.focus();fireEvent.click(trigger)
@@ -1084,10 +1084,10 @@ it('explains the owner-handled pot movement without changing contribution attrib
   initial.budget.snapshots['2026-12'] = { items: [{ id: 'personal-pot', name: 'Personal pot funding', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 10001, amountPence: 10001, frequency: 'monthly', funding: 'fixed', contributions: [{ personId: 'nick', amountPence: 3000 }, { personId: 'immy', amountPence: 7001 }] }] }
   render(<MonthRulesHarness initial={initial} view="transfers"/>)
   // Immy funds £70.01 of Nick's account, but Nick (the owner) makes the whole pot move.
-  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['1Fund Nick · Monzo · Current account£70.01Nick moves it into Spending'])
+  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['1Fund Monzo Nick£70.01Nick moves it into Spending'])
   expect(stepTexts(screen.getByRole('region', { name: 'Nick steps' }))).toEqual([
-    '1Fund Nick · Monzo · Current account£30.00',
-    '2Move to Spending from Nick · Monzo · Current account£100.01Includes £70.01 from Immy',
+    '1Fund Monzo Nick£30.00',
+    '2Move to Spending from Monzo Nick£100.01Includes £70.01 from Immy',
   ])
   // Funding still reconciles to the account total; the pot move is not added on top.
   expect(document.querySelector('.budget-v3-transfer-table tfoot')).toHaveTextContent('£100.01')
@@ -1101,7 +1101,7 @@ it('marks missing pot responsibility as needing review and withholds its steps',
   const overview = screen.getByRole('region', { name: 'Steps by person' })
   expect(overview.querySelector('ol')).toBeNull()
   const review = within(overview).getByRole('region', { name: 'Needs review' })
-  expect(review).toHaveTextContent('Needs owner · Monzo')
+  expect(review).toHaveTextContent('Monzo · Needs owner')
   expect(review).toHaveTextContent('Assign an account owner to decide who moves money into its pots.')
   expect(review).not.toHaveTextContent(/moves £/)
 })

@@ -1,5 +1,5 @@
 import type { BudgetAccount, BudgetPot } from '../domain/monthlyBudget'
-import { accountTypeLabel } from '../domain/accountTypes'
+import { accountTypeLabel, accountTypes } from '../domain/accountTypes'
 
 type Adult = { id: string; name: string }
 export const budgetCollator = new Intl.Collator('en-GB', { sensitivity: 'base', numeric: true })
@@ -65,16 +65,40 @@ export function accountOptionLabels(accounts: BudgetAccount[], adults: Adult[], 
   }))
 }
 
-/** Compact labels ("Owner · Account") keep destinations identifiable without repeating account type. */
-export function compactAccountLabels(accounts: BudgetAccount[], adults: Adult[]): Map<string, string> {
-  const compact = accounts.map(account => `${accountOwnerLabel(account, adults)} · ${account.name}`)
-  const compactCounts = new Map<string, number>()
-  compact.forEach(label => compactCounts.set(label, (compactCounts.get(label) ?? 0) + 1))
-  const qualified = accounts.map((account, index) => compactCounts.get(compact[index]!)! > 1
-    ? `${compact[index]} · ${account.provider?.trim() || accountTypeLabel(account.accountTypeId) || 'Account'}`
-    : compact[index]!)
-  const qualifiedCounts = new Map<string, number>()
-  qualified.forEach(label => qualifiedCounts.set(label, (qualifiedCounts.get(label) ?? 0) + 1))
+/** True when the stored name is the user's own (not just the account type the form filled in). */
+function hasNickname(account: BudgetAccount): boolean {
+  const name = account.name.trim().toLocaleLowerCase()
+  return !!name && !accountTypes.some(type => type.label.toLocaleLowerCase() === name)
+}
+
+/** The account's type label; migrated accounts may only have it as their stored name. */
+const typeOf = (account: BudgetAccount) => accountTypeLabel(account.accountTypeId) || (hasNickname(account) ? '' : account.name.trim())
+
+/**
+ * The one short name for an account wherever a chosen destination is shown (Plan, editor, Transfers):
+ * the nickname, else "Monzo Joint" / "Starling Ada". Without a bank it's "Joint · Current account";
+ * without an owner, "Monzo · Needs owner". Clashes add a short type ("Monzo Joint Savings", a lone current
+ * account keeps the plain name), then "(Account N)".
+ */
+export function shortAccountLabels(accounts: BudgetAccount[], adults: Adult[]): Map<string, string> {
+  const base = accounts.map(account => {
+    if (hasNickname(account)) return account.name.trim()
+    const owner = accountOwnerLabel(account, adults), provider = account.provider?.trim()
+    if (!provider) return `${owner} · ${typeOf(account) || 'Account'}`
+    return owner === 'Needs owner' ? `${provider} · ${owner}` : `${provider} ${owner}`
+  })
+  const counts = (labels: string[]) => labels.reduce((map, label) => map.set(label, (map.get(label) ?? 0) + 1), new Map<string, number>())
+  // In a clash, a lone current account keeps the plain name ("Monzo Joint"); the others add a short type ("Monzo Joint Savings").
+  const isCurrent = (account: BudgetAccount) => typeOf(account).toLocaleLowerCase() === 'current account'
+  const qualified = accounts.map((account, index) => {
+    const label = base[index]!, type = typeOf(account)
+    const clash = accounts.filter((_, other) => base[other] === label)
+    if (clash.length < 2 || !type || label.includes(type) || clash.every(other => typeOf(other) === type)) return label
+    if (isCurrent(account) && clash.filter(isCurrent).length === 1) return label
+    const shortType = type.replace(/ account$/i, '')
+    return label.includes(' · ') ? `${label} · ${shortType}` : `${label} ${shortType}`
+  })
+  const qualifiedCounts = counts(qualified)
   const seen = new Map<string, number>()
   return new Map(accounts.map((account, index) => {
     const label = qualified[index]!
@@ -82,4 +106,9 @@ export function compactAccountLabels(accounts: BudgetAccount[], adults: Adult[])
     seen.set(label, number)
     return [account.id, qualifiedCounts.get(label)! > 1 ? `${label} (Account ${number})` : label]
   }))
+}
+
+/** "Bills · Monzo Joint" for a pot, "Monzo Joint" for an account directly. */
+export function destinationLabel(account: string, potName?: string): string {
+  return potName ? `${potName} · ${account}` : account
 }

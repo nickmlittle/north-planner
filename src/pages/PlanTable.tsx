@@ -139,7 +139,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, owners
       <th scope="row" data-label="Item">
         <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
         {searchMode && <span className="budget-v3-result-context">{labels.ownerGroup(item)} · {category.name}</span>}
-        <span className="budget-v3-mobile-item-meta"><span className="visually-hidden">Funding: </span>{labels.fundingLabel(item)}{(!scoped || planDestination?.kind === 'account') && <><span aria-hidden="true"> · </span><span className="visually-hidden">Destination: </span><span className="budget-v3-compact-destination">{labels.shortDestinationLabel(item)}</span></>}</span>
+        <span className="budget-v3-mobile-item-meta"><span className="visually-hidden">Funding: </span>{labels.fundingLabel(item)}{(!scoped || planDestination?.kind === 'account') && <><span aria-hidden="true"> · </span><span className="visually-hidden">Destination: </span><span className="budget-v3-compact-destination">{labels.destinationLabel(item)}</span></>}</span>
       </th>
       <td data-label="Monthly amount">{editing
         ? <span className="budget-v3-inline-cell budget-money-field"><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-describedby={`inline-scope-${item.id}${formError ? ` inline-error-${item.id}` : ''}`} className="budget-v3-inline-amount" autoFocus inputMode="decimal" value={inlineValue} onChange={event => { setInlineValue(event.target.value); setFormError('') }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}/></span>

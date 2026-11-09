@@ -58,7 +58,7 @@ export function TransfersPanel({ document, transfers, accounts, instructions, un
   }, [affectedKey, affectedTransfers])
 
   return <section className="budget-v3-transfers budget-v3-people-summary" id="budget-transfers-panel" aria-label="Funding">
-    {affectedTransfers && view === 'transfers' && <div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account => <p key={account.accountId}>{document.budget.accounts.find(row => row.id === account.accountId)?.name ?? 'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
+    {affectedTransfers && view === 'transfers' && <div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account => <p key={account.accountId}>{labels.get(account.accountId) ?? 'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
     <div className="budget-v3-desktop-people"><h2>Funding</h2>
       <div className="budget-v3-person-grid">{transfers.people.map(person => <article key={person.personId}>
         <h4>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</h4>

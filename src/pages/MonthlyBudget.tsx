@@ -21,7 +21,7 @@ import { ImpactPreview } from '../components/ImpactPreview'
 import { commitItemBatch, type BudgetItemBatch } from '../domain/budgetItemDrafts'
 import { orderTransferAccounts, personTransferPlans } from '../domain/personTransfers'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../state/transferPerson'
-import { accountOptionLabels, compactAccountLabels } from './budgetLabels'
+import { accountOptionLabels, shortAccountLabels } from './budgetLabels'
 import { formatEditScope, formatMonth } from '../formatting/month'
 import { balanceLabel, formatGBP } from '../formatting/money'
 import type { PlanDestination, StepsReturn } from '../state/navigation'
@@ -66,10 +66,11 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  try{instructions=buildTransferInstructions(document,month)}catch{/* Keep the comparison view available; unavailable instructions are labelled below. */}
  const unfundedItems=items.filter(item=>transfers.unresolvedItemIds.includes(item.id))
  const accountLabels=accountOptionLabels(document.budget.accounts,adults)
- const compactLabels=compactAccountLabels(document.budget.accounts,adults)
- const labels=planItemLabels(document,accountLabels)
+ // One short account name wherever a destination is shown; the long labels only order Transfers.
+ const shortLabels=shortAccountLabels(document.budget.accounts,adults)
+ const labels=planItemLabels(document,shortLabels)
  const destinationItems=items.filter(item=>matchesPlanDestination(item,planDestination,labels))
- const planDestinationLabel=destinationFilterLabel(document,planDestination,compactLabels)
+ const planDestinationLabel=destinationFilterLabel(document,planDestination,shortLabels)
  const total=items.reduce((sum,item)=>sum+item.amountPence,0)
  const transferAccounts=orderTransferAccounts(transfers.accounts,instructions,document.budget.accounts,adults.map(person=>person.id),accountLabels)
  const [storedTransferPerson,setStoredTransferPerson]=useState(readTransferPerson)
@@ -126,7 +127,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const mobileBudgetDateStatus=resolved.hasExplicitBudget?'Budget set':resolved.sourceMonth?`Using budget from ${monthLabel(resolved.sourceMonth)}`:resolved.importedBaseline?'Using imported legacy budget':'No budget is set for this month'
  const budgetDateNote=<div className="budget-v3-date-note"><span className="budget-v3-date-note-desktop">{desktopBudgetDateStatus}{selectedMonthIncomeUpdated?` · Income updated ${monthLabel(month)}`:''}</span><span className="budget-v3-date-note-mobile">{mobileBudgetDateStatus}</span></div>
  const budgetHeader=<><div className="budget-v3-toolbar budget-desktop-toolbar"><div className="budget-v3-tools"><button className="secondary-button" onClick={()=>openIncome()}>Edit income</button><button className="secondary-button" onClick={()=>setManagement(true)}>Manage accounts, pots &amp; categories</button><button className="primary-button" onClick={()=>start()}>Add item</button></div></div><div className="budget-mobile-plan-heading"><h2>Budget items</h2><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div></>
- const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={accountLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
+ const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={shortLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const planFilters=<PlanFilters query={query} onQueryChange={updateSearch} onSearchStart={captureBrowseScroll} inputRef={searchRef} owner={ownerFilter} onOwnerChange={setOwnerFilter} ownerOrder={ownerOrder} category={categoryFilter} onCategoryChange={setCategoryFilter} categories={document.budget.categories}/>
  const firstRun=!Object.keys(document.budget.snapshots).length&&document.budget.importedBaseline===undefined

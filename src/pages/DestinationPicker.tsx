@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { BudgetAccount, BudgetDestination, BudgetPot, MonthlyBudget } from '../domain/monthlyBudget'
 import { accountTypeLabel, isAccountTypeId } from '../domain/accountTypes'
 import { AccountFields, type AccountFieldsValue } from './AccountFields'
-import { accountOptionLabels, accountOwnerGroups, accountOwnerKey, budgetCollator } from './budgetLabels'
+import { accountOptionLabels, accountOwnerGroups, accountOwnerKey, budgetCollator, destinationLabel, shortAccountLabels } from './budgetLabels'
 import type { DestinationSelection } from '../domain/budgetItemDrafts'
 
 export type { DestinationSelection } from '../domain/budgetItemDrafts'
@@ -50,6 +50,7 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
   const group = groups.find(row => row.key === ownerKey)
   const account = accounts.find(row => row.id === accountId)
   const labels = accountOptionLabels(accounts, adults, false)
+  const shortLabels = shortAccountLabels(accounts, adults)
   const namedPotsFor = (id: string | undefined) => {
     const rows = pots.filter(pot => pot.accountId === id).sort((a, b) => budgetCollator.compare(a.name, b.name) || a.id.localeCompare(b.id))
     const totals = new Map<string, number>()
@@ -68,7 +69,7 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
   const ownerLabel = group?.label ?? (account ? ownerName(accountOwnerKey(account)) : '')
   const currentPot = pots.find(pot => pot.id === currentPotId)
   const currentPotLabel = namedPotsFor(currentAccountId).find(row => row.pot.id === currentPotId)?.label ?? currentPot?.name
-  const currentLabel = value.destination ? `${currentAccount ? ownerName(currentOwnerKey) : ''} · ${currentAccount ? labels.get(currentAccount.id) : 'Account'}${currentPotLabel ? ` · ${currentPotLabel}` : ' · Account directly'}` : ''
+  const currentLabel = value.destination ? destinationLabel((currentAccount && shortLabels.get(currentAccount.id)) ?? 'Account', currentPotLabel) : ''
   const isCurrent = (destination: BudgetDestination) => !!value.destination && (destination.kind === 'pot' ? currentPotId === destination.potId : value.destination.kind === 'account' && value.destination.accountId === destination.accountId)
   const currentMark = (current: boolean) => current ? { 'aria-current': 'true' as const, className: 'destination-bubble destination-current' } : { className: 'destination-bubble' }
 
