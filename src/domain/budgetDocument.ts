@@ -172,6 +172,11 @@ function isV2Document(raw: unknown): raw is { version: 2; household: { name: str
   return value.version === 2 && !!value.workflow && typeof (value.workflow as { setupComplete?: unknown }).setupComplete === 'boolean' && !!household && typeof household.name === 'string' && Array.isArray(household.adults) && !!budget && Array.isArray(budget.pots) && Array.isArray(budget.categories) && Array.isArray(budget.lines) && Array.isArray(budget.incomes)
 }
 
+/** Setup's minimum: a household name and at least one named adult. */
+export function householdReady(household: BudgetDocument['household']): boolean {
+  return !!household.name.trim() && household.adults.length > 0 && household.adults.every(person => !!person.name.trim())
+}
+
 export function renameAdult(document: BudgetDocument, id: string, name: string): BudgetDocument {
   return { ...document, household: { ...document.household, adults: document.household.adults.map(person => person.id === id ? { ...person, name } : person) } }
 }

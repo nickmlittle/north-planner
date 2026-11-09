@@ -11,10 +11,17 @@ afterEach(() => { cleanup(); localStorage.clear(); window.history.replaceState(n
 
 async function completeSetup() {
   fireEvent.change(screen.getByLabelText('Household name'), { target: { value: 'Alex household' } })
-  fireEvent.click(screen.getByRole('button', { name: '+ Add an adult' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
   fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Alex' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
   await screen.findByRole('heading', { name: 'Monthly budget' })
+}
+
+function expectNoBudgetNavigation() {
+  expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
+  const sidebar = within(screen.getByRole('navigation', { name: 'Main navigation' }))
+  expect(sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Household'])
 }
 
 function savedTransferDocument() {
@@ -59,8 +66,8 @@ it('starts with household setup and saves only the new budget key', async () => 
   localStorage.setItem('north.household.v2', '{"old":"data"}')
   render(<App />)
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
-  fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
-  expect(screen.getByRole('alert')).toHaveTextContent('at least one adult')
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a household name.')
   await completeSetup()
   expect(screen.getByRole('heading', { name: 'Monthly budget' })).toBeVisible()
   expect(JSON.parse(localStorage.getItem(budgetStorageKey)!)).toMatchObject({ household: { name: 'Alex household', adults: [{ name: 'Alex' }] } })
@@ -166,6 +173,59 @@ it('gates direct Budget URLs until household setup is complete', () => {
   expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
   const sidebar = within(screen.getByRole('navigation', { name: 'Main navigation' }))
   expect(sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Household'])
+})
+
+it('walks setup one step at a time: Household, Adults, then Pay', async () => {
+  window.history.replaceState(null, '', '/?view=budget&budgetView=plan&month=2026-11')
+  render(<App />)
+  expect(screen.getByRole('list', { name: 'Setup steps' }).querySelector('[aria-current="step"]')).toHaveTextContent('Household')
+  fireEvent.change(screen.getByLabelText('Household name'), { target: { value: 'Home' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByRole('heading', { name: 'Who’s in the household?' })).toHaveFocus()
+  expectNoBudgetNavigation()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Add at least one adult and give each a name.')
+  fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Ada' } })
+  fireEvent.click(screen.getByRole('button', { name: '+ Add an adult' }))
+  fireEvent.change(screen.getByLabelText('Adult 2 name'), { target: { value: 'Ben' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(screen.getByLabelText('Household name')).toHaveValue('Home')
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByLabelText('Adult 2 name')).toHaveValue('Ben')
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  expect(screen.getByRole('heading', { name: 'Monthly pay' })).toHaveFocus()
+  expectNoBudgetNavigation()
+  fireEvent.change(screen.getByLabelText('Ada’s monthly take-home pay'), { target: { value: 'lots' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter pay as an amount in pounds')
+  expect(screen.getByRole('heading', { name: 'Monthly pay' })).toBeVisible()
+  fireEvent.change(screen.getByLabelText('Ada’s monthly take-home pay'), { target: { value: '2,450.50' } })
+  fireEvent.change(screen.getByLabelText('Ben’s monthly take-home pay'), { target: { value: '1800' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }))
+  await screen.findByRole('heading', { name: 'Monthly budget' })
+  expect(window.location.search).toContain('budgetView=plan')
+  const saved = JSON.parse(localStorage.getItem(budgetStorageKey)!)
+  const [ada, ben] = saved.household.adults
+  expect(saved.workflow.setupComplete).toBe(true)
+  expect(saved.budget.incomeSources).toMatchObject([
+    { personId: ada.id, name: 'Pay', type: 'employment', baseAmountPence: 245050, baseEffectiveFrom: '2026-11' },
+    { personId: ben.id, name: 'Pay', type: 'employment', baseAmountPence: 180000, baseEffectiveFrom: '2026-11' },
+  ])
+})
+
+it('resumes setup at the first unfinished step and saves no income when pay is skipped', async () => {
+  const saved = newBudgetDocument()
+  saved.household = { name: 'Home', adults: [{ id: 'a', name: '' }] }
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  const first = render(<App />)
+  expect(screen.getByRole('heading', { name: 'Who’s in the household?' })).toBeVisible()
+  fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Ada' } })
+  first.unmount()
+  render(<App />)
+  expect(screen.getByRole('heading', { name: 'Monthly pay' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
+  await screen.findByRole('heading', { name: 'Monthly budget' })
+  expect(JSON.parse(localStorage.getItem(budgetStorageKey)!).budget.incomeSources).toEqual([])
 })
 
 it('reopens on the Plan or Transfers view used last on this device', async () => {
