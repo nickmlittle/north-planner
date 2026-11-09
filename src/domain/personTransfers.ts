@@ -78,3 +78,23 @@ export function personTransferPlans(accounts: readonly TransferAccount[], instru
   })
   return { people, needsReview }
 }
+
+type OwnedAccount = { id: string; ownerPersonIds: readonly string[] }
+
+/**
+ * Transfer rows in reading order: joint accounts, then each person's own in household order, then accounts with no owner.
+ * Ties sort by label. An account the instructions flag for review counts as incomplete.
+ */
+export function orderTransferAccounts(accounts: readonly TransferAccount[], instructions: TransferInstructions | undefined, budgetAccounts: readonly OwnedAccount[], personIds: readonly string[], labels: ReadonlyMap<string, string>): TransferAccount[] {
+  const owned = (accountId: string) => budgetAccounts.find(account => account.id === accountId)
+  const groupRank = (account?: OwnedAccount) => !account?.ownerPersonIds.length ? 2 : account.ownerPersonIds.length > 1 ? 0 : 1
+  const personRank = (account?: OwnedAccount) => account?.ownerPersonIds.length === 1 ? personIds.indexOf(account.ownerPersonIds[0]!) : -1
+  return accounts
+    .map(account => ({ ...account, incomplete: account.incomplete || instructions?.accounts.find(row => row.accountId === account.accountId)?.status === 'needs-review' }))
+    .sort((a, b) => {
+      const accountA = owned(a.accountId), accountB = owned(b.accountId)
+      return groupRank(accountA) - groupRank(accountB)
+        || personRank(accountA) - personRank(accountB)
+        || (labels.get(a.accountId) ?? '').localeCompare(labels.get(b.accountId) ?? '')
+    })
+}

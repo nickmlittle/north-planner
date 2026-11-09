@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { buildTransferInstructions, type TransferInstructions } from '../domain/transferInstructions'
-import { AccountFundingNote } from './TransferCalculationNotes'
 import { budgetEditScope, incomeEditScope, budgetDateMarkers, incomeDateMarkers, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, updateIncomeAtMonth, type BudgetItem } from '../domain/monthlyBudget'
 import { PageFrame } from '../components/PageFrame'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -12,12 +11,12 @@ import { GroupedTable, GroupedTableBandRow, GroupedTableDisclosure, type Grouped
 import { BudgetManagement } from './BudgetManagement'
 import { BudgetItemEditor } from './BudgetItemEditor'
 import { BudgetInfoDialog, MobileBudgetSummary } from './MobileBudgetViews'
-import { PaydaySteps } from './PaydaySteps'
+import { TransfersPanel } from './TransfersPanel'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
 import { commitItemBatch, moneyPence, type BudgetItemBatch } from '../domain/budgetItemDrafts'
 import { accountTypeLabel } from '../domain/accountTypes'
-import { accountPeople as accountPeopleFor, personTransferPlans } from '../domain/personTransfers'
+import { orderTransferAccounts, personTransferPlans } from '../domain/personTransfers'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../state/transferPerson'
 import { accountOptionLabels, compactAccountLabels } from './budgetLabels'
 import { formatEditScope, formatMonth } from '../formatting/month'
@@ -32,7 +31,6 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const monthLabel = formatMonth
 const shift = (month: string, by: number) => { const [y,m] = month.split('-').map(Number); const d = new Date(y!,m!-1+by,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
 const pounds = (pence: number) => formatGBP(pence / 100)
-const signedPounds = (pence: number) => pence < 0 ? `−${pounds(Math.abs(pence))}` : pounds(pence)
 const PLAN_COLLAPSED_KEY = 'north.plan.collapsed'
 const readPlanCollapsed = (): Record<string, boolean> => { try { const value: unknown = JSON.parse(window.sessionStorage.getItem(PLAN_COLLAPSED_KEY) ?? '{}'); return value && typeof value === 'object' ? value as Record<string, boolean> : {} } catch { return {} } }
 const id = () => crypto.randomUUID()
@@ -57,7 +55,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const mobileBudgetView=sharedMobileBudgetView??'plan'
  const planFocusItem=useRef<string|null>(planItemId??null),previousBudgetView=useRef(mobileBudgetView)
  const planDestinationHeading=useRef<HTMLDivElement>(null),previousPlanDestination=useRef<string|null>(null)
- const [transferCollapsed,setTransferCollapsed]=useState<Record<string,boolean>>({})
  const [infoDialog,setInfoDialog]=useState<'month'|'plan'|'transfers'|null>(null)
  const monthOptionsRef=useRef<HTMLButtonElement>(null), optionsHandoff=useRef(false)
  useLayoutEffect(()=>{
@@ -86,7 +83,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  let instructions:TransferInstructions|undefined
  try{instructions=buildTransferInstructions(document,month)}catch{/* Keep the comparison view available; unavailable instructions are labelled below. */}
  const unfundedItems=items.filter(item=>transfers.unresolvedItemIds.includes(item.id))
- const transferWarning=unfundedItems.length>0||!instructions
  const categories=document.budget.categories
  const accountLabels=accountOptionLabels(document.budget.accounts,adults)
  const compactLabels=compactAccountLabels(document.budget.accounts,adults)
@@ -103,41 +99,13 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const searchMatch=(item:BudgetItem)=>{const needle=query.trim().toLocaleLowerCase();if(!needle)return true;const c=categories.find(x=>x.id===item.categoryId)?.name??'',a=accountFor(item),destination=item.destination,p=destination.kind==='pot'?document.budget.pots.find(x=>x.id===destination.potId)?.name??'':'';const owner=ownerGroup(item);return [item.name,c,a?.name,a?.provider,accountTypeLabel(a?.accountTypeId),p,owner].some(v=>v?.toLocaleLowerCase().includes(needle))}
  const rowsByOwner=new Map<string,Map<string,BudgetItem[]>>();for(const item of destinationItems.filter(item=>searchMatch(item)&&(categoryFilter==='All'||item.categoryId===categoryFilter))){const owner=ownerGroup(item),cat=categories.find(c=>c.id===item.categoryId)?.name??'Uncategorised';const cats=rowsByOwner.get(owner)??new Map<string,BudgetItem[]>();cats.set(cat,[...(cats.get(cat)??[]),item]);rowsByOwner.set(owner,cats)}const grouped=[...rowsByOwner]
  const total=items.reduce((sum,item)=>sum+item.amountPence,0)
- const transferAccounts=transfers.accounts.map(account=>({...account,incomplete:account.incomplete||instructions?.accounts.find(row=>row.accountId===account.accountId)?.status==='needs-review'})).sort((a,b)=>{
-  const accountA=document.budget.accounts.find(account=>account.id===a.accountId),accountB=document.budget.accounts.find(account=>account.id===b.accountId)
-  const rank=(account:typeof accountA)=>!account?.ownerPersonIds.length?2:account.ownerPersonIds.length>1?0:1
-  const groupRank=rank(accountA)-rank(accountB)
-  if(groupRank)return groupRank
-  const personRank=(account:typeof accountA)=>account?.ownerPersonIds.length===1?adults.findIndex(person=>person.id===account.ownerPersonIds[0]):-1
-  const ownerRank=personRank(accountA)-personRank(accountB)
-  return ownerRank|| (accountLabels.get(a.accountId)??'').localeCompare(accountLabels.get(b.accountId)??'')
- })
- const accountPeople=(account:typeof transfers.accounts[number])=>accountPeopleFor(account,transfers.people.map(person=>person.personId))
+ const transferAccounts=orderTransferAccounts(transfers.accounts,instructions,document.budget.accounts,adults.map(person=>person.id),accountLabels)
  const [storedTransferPerson,setStoredTransferPerson]=useState(readTransferPerson)
  const transferPerson=resolveTransferPerson(storedTransferPerson,adults.map(person=>person.id))
  const chooseTransferPerson=(value:string)=>{rememberTransferPerson(value);setStoredTransferPerson(value)}
  const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
  const selectedPersonPlan=transferPerson&&transferPerson!=='both'?personPlans.people.find(plan=>plan.personId===transferPerson):undefined
  const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,stepCount:selectedPersonPlan.stepCount},reviewCount:personPlans.needsReview.length}
- const potName=(potId:string)=>document.budget.pots.find(pot=>pot.id===potId)?.name??'Pot'
- const itemCounts=new Map(transferAccounts.map(account=>[account.accountId,account.items.length]))
- // Back from "See items": land on the same account's link, once per visit.
- const restoredStepsKey=useRef<string|null>(null)
- useLayoutEffect(()=>{
-  if(!stepsReturn||mobileBudgetView!=='transfers'||restoredStepsKey.current===stepsReturn.key)return
-  restoredStepsKey.current=stepsReturn.key
-  const target=[...window.document.querySelectorAll<HTMLButtonElement>('[data-see-items]')].find(button=>button.dataset.seeItems===stepsReturn.accountId)
-  target?.focus({preventScroll:true});target?.scrollIntoView?.({block:'center'})
- },[stepsReturn,mobileBudgetView])
- // After an edit, bring the first changed account's step into view instead of opening a detail screen.
- const affectedKey=mobilePresentation&&mobileBudgetView==='transfers'&&affectedTransfers?`${affectedTransfers.month}:${affectedTransfers.accounts.map(row=>row.accountId).join(',')}`:null
- const shownAffectedKey=useRef<string|null>(null)
- useLayoutEffect(()=>{
-  if(!affectedKey||shownAffectedKey.current===affectedKey)return
-  shownAffectedKey.current=affectedKey
-  const ids=affectedTransfers?.accounts.map(row=>row.accountId)??[]
-  ;[...window.document.querySelectorAll<HTMLElement>('.payday [data-payday-account]')].find(step=>ids.includes(step.dataset.paydayAccount??''))?.scrollIntoView?.({block:'center'})
- },[affectedKey,affectedTransfers])
  const start=(item?:BudgetItem)=>{setInlineId(null);setInlineSavedItem(null);setSavedImpact(null);setFormError('');setEditingItem(item);setEditor(true)}
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)
@@ -242,33 +210,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const mobileBudgetDateStatus=resolved.hasExplicitBudget?'Budget set':resolved.sourceMonth?`Using budget from ${monthLabel(resolved.sourceMonth)}`:resolved.importedBaseline?'Using imported legacy budget':'No budget is set for this month'
  const budgetDateNote=<div className="budget-v3-date-note"><span className="budget-v3-date-note-desktop">{desktopBudgetDateStatus}{` · Budget edits apply: ${editScopeLabel}`}{selectedMonthIncomeUpdated?` · Income updated ${monthLabel(month)}`:''}</span><span className="budget-v3-date-note-mobile">{mobileBudgetDateStatus}</span></div>
  const budgetHeader=<><div className="budget-v3-toolbar budget-desktop-toolbar"><div className="budget-v3-tools"><button className="secondary-button" onClick={()=>openIncome()}>Edit income</button><button className="secondary-button" onClick={()=>setManagement(true)}>Manage accounts, pots &amp; categories</button><button className="primary-button" onClick={()=>start()}>Add item</button></div></div><div className="budget-mobile-plan-heading"><h2>Budget items</h2><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div></>
- const peopleSummary=<section className="budget-v3-transfers budget-v3-people-summary" id="budget-transfers-panel" aria-label="People and transfers">
-  {affectedTransfers&&mobileBudgetView==='transfers'&&<div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account=><p key={account.accountId}>{document.budget.accounts.find(row=>row.id===account.accountId)?.name??'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
-  <div className="budget-v3-desktop-people"><h2>People &amp; transfers</h2>
-  <h3>Monthly plan by person</h3>
-  <div className="budget-v3-person-grid">{transfers.people.map(person=>{const p=adults.find(a=>a.id===person.personId);return <article key={person.personId}>
-   <h4>{p?.name??'Person'}</h4>
-   <dl className="budget-v3-person-metrics"><div><dt>Available</dt><dd>{pounds(person.availablePence)}</dd></div><div><dt>Planned contributions</dt><dd>{pounds(person.plannedPence)}</dd></div><div className={person.remainingPence<0?'is-negative':''}><dt>Remaining</dt><dd>{signedPounds(person.remainingPence)}</dd></div></dl>
-   <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Employment income</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Additional income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
-  </article>})}</div></div>
-  {unfundedItems.length>0&&<div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length===1?'item':'items'} can’t be funded yet.</strong> <button type="button" onClick={()=>openIncome()}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item=><li key={item.id}>{item.name}</li>)}</ul></details></div>}
-  {!instructions&&<p className="budget-v3-transfer-warning" role="alert">Transfer instructions are unavailable. The comparison below may be incomplete; review the budget before moving money.</p>}
-  {transferAccounts.length===0?<div className="budget-v3-transfer-empty"><h3>No transfers planned</h3><p>Budget items assigned to accounts or pots will appear here.</p></div>:<>
-   {!transferWarning&&<AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Transfers by destination</h3>{instructions?.incomplete&&<span className="budget-desktop-only">Account instructions need review: *</span>}</div>
-   <div className="budget-v3-transfer-table-wrap"><table className="budget-v3-transfer-table">
-    <caption className="visually-hidden">Monthly transfer amounts by destination and person</caption>
-    <thead><tr><th scope="col">Destination</th>{transfers.people.map(person=><th scope="col" key={person.personId}>{adults.find(row=>row.id===person.personId)?.name??'Person'}</th>)}<th scope="col">Total</th></tr></thead>
-    <tbody>{transferAccounts.map(account=>{const label=accountLabels.get(account.accountId)??'Account',collapsed=transferCollapsed[account.accountId]??false,hasDetails=account.hasPots,notCalculated=account.incomplete&&account.amountPence===0;return <Fragment key={account.accountId}>
-     <tr className={`budget-v3-transfer-account${account.incomplete?' is-incomplete':''}${affectedTransfers?.accounts.some(row=>row.accountId===account.accountId)?' is-affected':''}`}><th scope="row">{hasDetails?<button type="button" aria-expanded={!collapsed} onClick={()=>setTransferCollapsed(current=>({...current,[account.accountId]:!collapsed}))}>{collapsed?<ChevronRight aria-hidden="true"/>:<ChevronDown aria-hidden="true"/>}<span>{label}</span></button>:<span>{label}</span>}{affectedTransfers?.accounts.some(row=>row.accountId===account.accountId)&&<small className="budget-affected-label">Changed by recent edit</small>}</th>{accountPeople(account).map(person=><td key={person.personId}>{notCalculated?'—':pounds(person.amountPence)}</td>)}<td>{notCalculated?<span className="budget-not-calculated">Not calculated</span>:<>{pounds(account.amountPence)}{account.incomplete?' *':''}</>}</td></tr>
-     {hasDetails&&!collapsed&&<>{account.hasDirect&&<tr className="budget-v3-transfer-child"><th scope="row">Direct to account</th>{transfers.people.map(person=><td key={person.personId}>{notCalculated?'—':pounds(account.directByPerson.find(row=>row.personId===person.personId)?.amountPence??0)}</td>)}<td>{notCalculated?'—':pounds(account.directAmountPence)}</td></tr>}{account.pots.map(pot=><Fragment key={pot.potId}><tr className="budget-v3-transfer-child"><th scope="row">{document.budget.pots.find(row=>row.id===pot.potId)?.name??'Pot'}</th>{pot.byPerson.map(row=><td key={row.personId}>{notCalculated?'—':pounds(row.amountPence)}</td>)}<td>{notCalculated?'—':pounds(pot.amountPence)}</td></tr></Fragment>)}</>}
-    </Fragment>})}</tbody>
-    <tfoot><tr className={instructions?.incomplete?'is-incomplete':undefined}><th scope="row">Funding total</th>{transfers.people.map(person=><td key={person.personId}>{pounds(person.plannedPence)}</td>)}<td>{pounds(transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0))}{instructions?.incomplete?' *':''}</td></tr></tfoot>
-   </table></div>
-   {transferAccounts.some(account=>account.hasPots)&&<p className="budget-v3-transfer-rounding">Pot movements are already inside each account total.</p>}
-   <PaydaySteps plans={personPlans} selection={transferPerson} labels={accountLabels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeTransferItems} affectedAccounts={affectedTransfers?.accounts.map(row=>row.accountId)}/>
-
-  </>}
- </section>
+ const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={accountLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const planFilters=<div className="budget-v3-controls"><div className="budget-v3-search-field"><label className="budget-v3-search"><span className="budget-v3-search-label">Search items, categories, owners, accounts or pots</span><input ref={searchRef} value={query} onPointerDownCapture={captureBrowseScroll} onFocus={captureBrowseScroll} onChange={e=>updateSearch(e.target.value)} placeholder="Search budget"/></label>{searchMode&&<button type="button" className="budget-v3-search-clear" onClick={()=>{updateSearch('');window.requestAnimationFrame(()=>searchRef.current?.focus({preventScroll:true}))}}>Clear search</button>}</div><label className="budget-v3-filter budget-v3-owner-filter">Owner<select className="budget-v3-filter-select" value={ownerFilter} onChange={e=>setOwnerFilter(e.target.value)}><option>All</option>{ownerOrder.filter(owner=>owner!=='Needs owner').map(owner=><option key={owner}>{owner}</option>)}{ownerOrder.includes('Needs owner')&&<option>Needs owner</option>}</select></label><label className="budget-v3-filter budget-v3-category-filter">Category<select className="budget-v3-filter-select" value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option value="All">All</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label></div>
  return <><PageFrame afterHeading={<div className="budget-v3-date-selector"><MonthControl month={month} onChange={setMonth} budgetMarkers={budgetDateMarkers(document.budget)} incomeMarkers={incomeDateMarkers(document.budget)}/><div className="budget-v3-date-context">{budgetDateNote}<button ref={monthOptionsRef} type="button" className="text-button budget-mobile-month-options" onClick={()=>setInfoDialog('month')}>Month &amp; income</button><div className="budget-v3-date-action">{resolved.hasExplicitBudget&&<button className="text-button budget-v3-remove-date" onClick={removeDate}>Remove budget date</button>}</div></div></div>} title="Monthly budget" headingClass="route-heading visually-hidden" className={`monthly-budget-page budget-view-${mobileBudgetView}${scopedPlan?' scoped-plan':''}`} contentWidth="wide" pageControls={budgetHeader} afterSummary={peopleSummary} summary={<><div className="budget-v3-summary budget-desktop-summary"><span><small>Available this month</small><strong>{pounds(available)}</strong><span className="budget-v3-summary-note">{availableBasis}</span></span><span><small>Planned budget</small><strong>{pounds(total)}</strong></span><span className={available-total<0?'is-deficit':''}><small>Budget balance</small><strong>{available-total<0?`${pounds(total-available)} over`:`${pounds(available-total)} remaining`}</strong></span></div><MobileBudgetSummary view={mobileBudgetView} available={available} planned={total} allocated={transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0)} hasItems={items.length>0} incomplete={!instructions||instructions.incomplete} onDetails={()=>setInfoDialog(mobileBudgetView)} person={transferPersonChoice}/></>}>
