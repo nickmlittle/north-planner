@@ -54,7 +54,7 @@ it('keeps mobile Plan headings and funding context in a semantic three-column ta
   expect(table.querySelector('.budget-v3-owner th')).toHaveAttribute('colspan','3')
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
-it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Classification'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getAllByText('Income details')[0]!);expect(screen.getAllByText('Additional income').some(node=>node.closest('div')?.textContent?.includes('£400.00'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
+it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Type'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getAllByText('Income details')[0]!);expect(screen.getAllByText('Other income').some(node=>node.closest('div')?.textContent?.includes('£400.00'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.budget-v3-owner')).not.toBeInTheDocument()})
 it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}});expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
 it('opens expanded and keeps collapse state across filters, months and remounts',()=>{
@@ -840,8 +840,8 @@ it.each([
   expect(summary).not.toHaveTextContent('Budget balance')
   expect(summary).not.toHaveTextContent('Employment split basis')
   expect(summary).toHaveTextContent(`Available£${(income/100).toFixed(2)}Planned£10.00`)
-  // The basis only shows when it isn't the usual "all from employment".
-  if(income) expect(summary).not.toHaveTextContent('from employment')
+  // The basis only shows when it isn't the usual "all from salary".
+  if(income) expect(summary).not.toHaveTextContent('from salary')
   else expect(summary).toHaveTextContent('Available: no income yet')
   expect(within(summary).queryByRole('button')).not.toBeInTheDocument()
 })
@@ -906,7 +906,7 @@ it('hands off from month options to income and management and restores focus',()
   expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
   const management=screen.getByRole('dialog',{name:'Manage accounts, pots & categories'})
   expect(management).toContainElement(document.activeElement as HTMLElement)
-  fireEvent.click(within(management).getByRole('button',{name:'Done'}))
+  fireEvent.click(within(management).getByRole('button',{name:'Close'}))
   expect(trigger).toHaveFocus()
 })
 
@@ -1042,18 +1042,21 @@ it('puts the full editor’s scope and impact in the footer, directly above Save
 it('shows independent source scopes and clears income drafts between editing sessions', () => {
   render(<MonthRulesHarness/>)
   fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
-  let pay = screen.getByLabelText('Nick — Salary · Employment')
+  let pay = screen.getByLabelText('Nick — Salary')
   expect(pay).toHaveAccessibleDescription('Changes apply: December 2026–January 2027.')
-  expect(screen.getByLabelText('Immy — Gift · Additional')).toHaveAccessibleDescription('Changes apply: December 2026.')
+  expect(screen.getByLabelText('Immy — Gift · Other income')).toHaveAccessibleDescription('Changes apply: December 2026.')
+  expect(screen.queryByLabelText('Source name')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Add income source' }))
+  expect(screen.getByLabelText('Person')).toHaveFocus()
   expect(screen.getByText('New income applies: December 2026 onward.')).toBeVisible()
   fireEvent.change(pay, { target: { value: '2200' } })
   fireEvent.change(screen.getByLabelText('Source name'), { target: { value: 'Parents' } })
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
-  pay = screen.getByLabelText('Nick — Salary · Employment')
-  expect(pay).toHaveValue('2000.00')
-  expect(screen.getByLabelText('Source name')).toHaveValue('')
-  fireEvent.change(pay, { target: { value: '2300' } })
+  pay = screen.getByLabelText('Nick — Salary')
+  expect(pay).toHaveValue('2,000.00')
+  expect(screen.queryByLabelText('Source name')).not.toBeInTheDocument()
+  fireEvent.change(pay, { target: { value: '2,300.00' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save income' }))
   expect(savedBudget().incomeSources[0]?.changes).toEqual({ '2026-12': 230000, '2027-02': 300000 })
   expect(savedBudget().incomeSources[1]?.changes).toEqual({ '2027-01': 20000 })
@@ -1104,8 +1107,8 @@ it('marks missing pot responsibility as needing review and withholds its steps',
 })
 
 it.each([
-  {sources:[{id:'gift',personId:'nick',name:'Gift',type:'additional' as const,baseAmountPence:5000,changes:{}}],text:'none from employment'},
-  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'£50.00 from employment'},
+  {sources:[{id:'gift',personId:'nick',name:'Gift',type:'additional' as const,baseAmountPence:5000,changes:{}}],text:'none from salary'},
+  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'£50.00 from salary'},
 ])('explains where available money comes from: $text',({sources,text})=>{
   const initial=seededDocument()
   initial.budget.incomeSources=sources
@@ -1118,10 +1121,11 @@ it('states a shared income change range once and prefixes amounts with £',()=>{
   initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:300000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:200000,changes:{}}]
   render(<SeededHarness initial={initial}/>)
   fireEvent.click(screen.getAllByRole('button',{name:'Edit income'})[0]!)
-  const nick=screen.getByLabelText('Nick — Job · Employment'),immy=screen.getByLabelText('Immy — Job · Employment')
+  const nick=screen.getByLabelText('Nick — Job · Salary'),immy=screen.getByLabelText('Immy — Job · Salary')
   const form=nick.closest('form')!
   expect(within(form).getAllByText(/^Changes apply:/)).toHaveLength(1)
   expect(nick).toHaveAccessibleDescription(/^Changes apply: .* onward\.$/)
   expect(immy.getAttribute('aria-describedby')).toBe(nick.getAttribute('aria-describedby'))
   expect(nick.parentElement).toHaveClass('budget-money-field')
+  expect(nick).toHaveValue('3,000.00')
 })

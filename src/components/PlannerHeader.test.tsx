@@ -18,6 +18,27 @@ it('keeps save failures visible and exposes account actions in the utility sheet
   expect(signOut).toHaveBeenCalledOnce()
 })
 
+it.each([
+  ['Saving…', 'Saving…', '◌'],
+  ['Unsaved changes', 'Unsaved changes', '◌'],
+  ['Loading budget…', 'Loading…', '◌'],
+  ['Choose a version', 'Choose a version', '!'],
+  ['Not saved', 'Save failed', '!'],
+])('shows a status only when it isn’t Saved: %s', (saveStatus, label, mark) => {
+  render(<PlannerHeader currentView="budget" budgetView="plan" setupComplete saveStatus={saveStatus} onSelectView={() => {}} onSelectBudgetView={() => {}} />)
+  expect(screen.getByRole('button', { name: 'Account and save status' })).toHaveTextContent(mark)
+  expect(document.querySelector('.sidebar-status')).toHaveAttribute('aria-label', label)
+})
+
+it('shows no status mark when saved, but the sheet still says Saved', () => {
+  render(<PlannerHeader currentView="budget" budgetView="plan" setupComplete saveStatus="Saved" onSelectView={() => {}} onSelectBudgetView={() => {}} />)
+  const trigger = screen.getByRole('button', { name: 'Account and save status' })
+  expect(trigger.textContent).toBe('')
+  expect(document.querySelector('.sidebar-status')).toBeNull()
+  fireEvent.click(trigger)
+  expect(within(screen.getByRole('dialog', { name: 'Account and save status' })).getByText('Saved')).toBeInTheDocument()
+})
+
 it('offers the same Plan, Transfers and Household destinations in the desktop sidebar as on the phone', () => {
   const selectBudgetView = vi.fn(), selectView = vi.fn()
   render(<PlannerHeader currentView="budget" budgetView="transfers" setupComplete onSelectView={selectView} onSelectBudgetView={selectBudgetView} />)
