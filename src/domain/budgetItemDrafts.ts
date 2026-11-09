@@ -51,11 +51,11 @@ export function readItemDraft(row: BudgetItemDraft, categoryId: string, destinat
     item.singleFunderId = row.singleFunderId
   }
   if (row.funding === 'fixed') {
-    if (Object.entries(row.contributions).some(([id, value]) => !personIds.includes(id) && value.trim())) return fail('contributions', 'Update contributions for the current household members.')
+    if (Object.entries(row.contributions).some(([id, value]) => !personIds.includes(id) && value.trim())) return fail('contributions', 'Update the fixed amounts for the current adults.')
     const amounts = personIds.map(personId => ({ personId, amountPence: row.contributions[personId]?.trim() ? moneyPence(row.contributions[personId]!) : 0 }))
-    if (amounts.some(value => value.amountPence === undefined)) return fail('contributions', 'Enter non-negative monthly contributions with up to two decimal places.')
+    if (amounts.some(value => value.amountPence === undefined)) return fail('contributions', 'Enter fixed amounts of £0 or more, with up to two decimal places.')
     const contributions = amounts.map(value => ({ personId: value.personId, amountPence: value.amountPence! }))
-    if (contributions.reduce((sum, value) => sum + value.amountPence, 0) !== item.amountPence) return fail('contributions', `Monthly contributions must total £${(item.amountPence / 100).toFixed(2)}.`)
+    if (contributions.reduce((sum, value) => sum + value.amountPence, 0) !== item.amountPence) return fail('contributions', `Fixed amounts must total £${(item.amountPence / 100).toFixed(2)}.`)
     item.contributions = contributions.filter(value => value.amountPence > 0)
   }
   if (row.funding === 'custom') {

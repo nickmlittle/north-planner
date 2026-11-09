@@ -36,14 +36,14 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
   return <div className="budget-v3-overlay"><form className="budget-v3-panel" onSubmit={save}>
     <h2>Income for {formatMonth(month)}</h2>
     <p className="budget-income-intro">Income changes don’t create a budget <span className="budget-nowrap">date. <button type="button" className="budget-v3-info" aria-label="About income changes" aria-expanded={help} onClick={() => setHelp(value => !value)}>ⓘ</button></span></p>
-    {help && <p className="budget-edit-scope">Employment income sets proportional shares; additional income affects available money only. £0 stops a source for its affected months. Later recorded income changes stay unchanged.</p>}
+    {help && <p className="budget-edit-scope">Employment income sets each person’s share. Additional income only adds to Available. £0 stops a source.</p>}
     {sharedScope && <p id="income-scope-shared" className="budget-edit-scope">Changes apply: {sharedScope}.</p>}
     {incomes.map(source => <div className="budget-income-source" key={source.id}>
       <label>{adults.find(adult => adult.id === source.personId)?.name} — {source.name} · {source.type === 'employment' ? 'Employment' : 'Additional'}<span className="budget-money-field"><input aria-describedby={sharedScope ? 'income-scope-shared' : `income-scope-${source.id}`} inputMode="decimal" value={draft[source.id] ?? (source.amountPence / 100).toFixed(2)} onChange={event => setDraft(current => ({ ...current, [source.id]: event.target.value }))}/></span></label>
       {!sharedScope && <p id={`income-scope-${source.id}`} className="budget-edit-scope">Changes apply: {scopes[incomes.indexOf(source)]}.</p>}
     </div>)}
     <fieldset><legend>Add recurring income source</legend>
-      <p className="budget-edit-scope">New income applies: {formatEditScope({ fromMonth: month, throughMonth: null })}.</p>
+      {sharedScope !== formatEditScope({ fromMonth: month, throughMonth: null }) && <p className="budget-edit-scope">New income applies: {formatEditScope({ fromMonth: month, throughMonth: null })}.</p>}
       <label>Person<select value={newPerson} onChange={event => setNewPerson(event.target.value)}>{adults.map(adult => <option key={adult.id} value={adult.id}>{adult.name}</option>)}</select></label>
       <label>Source name<input value={newName} onChange={event => setNewName(event.target.value)} placeholder="Parents"/></label>
       <label>Classification<select value={newType} onChange={event => setNewType(event.target.value as IncomeType)}><option value="employment">Employment income</option><option value="additional">Additional income</option></select></label>
