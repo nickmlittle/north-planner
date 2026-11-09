@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// Locks today's passing contrast into CI before the design-token refactor changes colours.
-// Tokens are read from styles.css so a token edit is checked; literal backgrounds are the
-// surfaces those tokens actually sit on today.
+// Locks text contrast into CI. Colours are read from the :root tokens in styles.css, and
+// styles.tokens.test.ts keeps colour literals out of the rest of the file, so new colours land here.
 const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8')
 const rootBlock = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map(match => match[1]).join(';')
 const token = (name: string) => {
@@ -22,24 +21,18 @@ const contrast = (a: string, b: string) => {
   return (light! + 0.05) / (dark! + 0.05)
 }
 
-const STATUS_RED = '#a54232'
-const surfaces = {
-  cream: () => token('cream'),
-  card: () => token('card'),
-  page: () => '#f7f8f4',
-  'inline editor': () => '#f5f7f2',
-  'group band': () => '#e7eee6',
-  'table header': () => '#f2f5ef',
-  'warning': () => '#fbf0ed',
-}
-const text = { charcoal: () => token('charcoal'), pine: () => token('pine'), muted: () => token('muted'), 'status red': () => STATUS_RED }
+// Every surface text sits on, and every text colour, comes from a :root token.
+const surfaces = ['cream', 'card', 'white', 'surface-field', 'surface-subtle', 'surface-header', 'surface-band', 'soft-fern', 'status-error-bg', 'status-review-bg']
+const text = ['charcoal', 'pine', 'muted', 'link', 'status-ok', 'status-error', 'status-review']
 
 describe('text contrast (WCAG AA, 4.5:1)', () => {
-  for (const [textName, foreground] of Object.entries(text)) {
-    for (const [surfaceName, background] of Object.entries(surfaces)) {
-      it(`${textName} on ${surfaceName}`, () => expect(contrast(foreground(), background())).toBeGreaterThanOrEqual(4.5))
+  for (const foreground of text) {
+    for (const background of surfaces) {
+      it(`${foreground} on ${background}`, () => expect(contrast(token(foreground), token(background))).toBeGreaterThanOrEqual(4.5))
     }
   }
-  it('white on pine (primary buttons)', () => expect(contrast('#ffffff', token('pine'))).toBeGreaterThanOrEqual(4.5))
-  it('white on danger (destructive buttons)', () => expect(contrast('#ffffff', '#963c34')).toBeGreaterThanOrEqual(4.5))
+  it('white on pine (primary buttons)', () => expect(contrast(token('white'), token('pine'))).toBeGreaterThanOrEqual(4.5))
+  it('white on pine-strong (primary hover)', () => expect(contrast(token('white'), token('pine-strong'))).toBeGreaterThanOrEqual(4.5))
+  it('white on danger (destructive buttons)', () => expect(contrast(token('white'), token('danger'))).toBeGreaterThanOrEqual(4.5))
+  it('cream on pine (sidebar)', () => expect(contrast(token('cream'), token('pine'))).toBeGreaterThanOrEqual(4.5))
 })
