@@ -1,11 +1,11 @@
-import { useId, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
-import { X } from 'lucide-react'
+import { useId, useRef, useState, type Dispatch, type FormEvent, type KeyboardEvent, type ReactNode, type SetStateAction } from 'react'
+import { ChevronDown, ChevronRight, X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { BudgetAccount, BudgetCategory, BudgetPot } from '../domain/monthlyBudget'
 import { accountTypeLabel, isAccountTypeId } from '../domain/accountTypes'
 import { createPotsForAccounts, planPotCreation } from '../domain/bulkPots'
 import { AccountFields, type AccountFieldsValue } from './AccountFields'
-import { accountOptionLabels, accountOwnerGroups, accountOwnerKey, budgetCollator } from './budgetLabels'
+import { accountOptionLabels, accountOwnerGroups, accountOwnerLabel, sortPotsForManage } from './budgetLabels'
 
 type Kind = 'account' | 'pot' | 'category'
 type Draft = ({ kind: 'account'; id: string | null } & AccountFieldsValue)
@@ -14,6 +14,11 @@ type Draft = ({ kind: 'account'; id: string | null } & AccountFieldsValue)
   | { kind: 'category'; id: string | null; name: string }
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; onClose: () => void }
 const countLabel = (count: number, singular: string) => `${count} ${singular}${count === 1 ? '' : 's'}`
+const tabs: Array<{ kind: Kind; label: string; count: (document: BudgetDocument) => number }> = [
+  { kind: 'account', label: 'Accounts', count: document => document.budget.accounts.length },
+  { kind: 'pot', label: 'Pots', count: document => document.budget.pots.length },
+  { kind: 'category', label: 'Categories', count: document => document.budget.categories.length },
+]
 
 function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategory): Draft {
   if (kind === 'account') {
@@ -28,16 +33,10 @@ function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategor
   return { kind, id: record?.id ?? null, name: record?.name ?? '' }
 }
 
-function Disclosure({ label, count, noun, expanded, controls, onClick, level = 'section' }: { label: string; count?: number; noun?: readonly [string, string]; expanded: boolean; controls: string; onClick: () => void; level?: 'section' | 'owner' }) {
-  return <button type="button" className={`budget-manage-disclosure is-${level}`} aria-label={`${label}${count === undefined ? '' : ` ${count}`}`} aria-expanded={expanded} aria-controls={controls} onClick={onClick}>
-    <span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span>{label}</span>{count !== undefined && <small> {noun ? `${count} ${count === 1 ? noun[0] : noun[1]}` : count}</small>}
-  </button>
-}
-
 export function BudgetManagement({ document, setDocument, onClose }: Props) {
   const prefix = useId()
-  const [openSection, setOpenSection] = useState<Kind | null>(null)
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([])
+  const [tab, setTab] = useState<Kind>('account')
+  const tabRefs = useRef<Partial<Record<Kind, HTMLButtonElement | null>>>({})
   const [draft, setDraft] = useState<Draft | null>(null)
   const [original, setOriginal] = useState('')
   const [error, setError] = useState('')
@@ -56,31 +55,25 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
     return true
   }
   function clearDraft() { setDraft(null); setOriginal(''); setError('') }
-  function toggleSection(kind: Kind) {
-    if (!canLeave()) return
-    clearDraft()
-    setOpenSection(openSection === kind ? null : kind)
-    setStatus('')
+  function selectTab(kind: Kind) {
+    if (kind === tab) return true
+    if (!canLeave()) return false
+    clearDraft(); setTab(kind); setStatus('')
+    return true
   }
-  function toggleGroup(kind: Kind, key: string) {
-    const groupId = `${kind}:${key}`
-    const record = draft?.kind === 'account' ? accounts.find(account => account.id === draft.id)
-      : draft?.kind === 'pot' ? accounts.find(account => account.id === pots.find(pot => pot.id === draft.id)?.accountId) : undefined
-    if (expandedGroups.includes(groupId) && draftKind === kind && record && accountOwnerKey(record) === key) {
-      if (!canLeave()) return
-      clearDraft()
-    }
-    setExpandedGroups(current => current.includes(groupId) ? current.filter(value => value !== groupId) : [...current, groupId])
+  function onTabKey(event: KeyboardEvent) {
+    const kinds = tabs.map(item => item.kind)
+    const index = kinds.indexOf(tab)
+    const next = { ArrowRight: kinds[(index + 1) % kinds.length], ArrowLeft: kinds[(index + kinds.length - 1) % kinds.length], Home: kinds[0], End: kinds[kinds.length - 1] }[event.key]
+    if (!next) return
+    event.preventDefault()
+    if (selectTab(next)) tabRefs.current[next]?.focus()
   }
   function begin(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategory) {
     if (!canLeave()) return
     const next = draftFor(kind, record)
     if (draft?.kind === next.kind && draft.id === next.id) { clearDraft(); return }
-    setDraft(next); setOriginal(JSON.stringify(next)); setError(''); setStatus(''); setOpenSection(kind)
-  }
-  function reveal(kind: Kind, account: BudgetAccount) {
-    const key = `${kind}:${accountOwnerKey(account)}`
-    setExpandedGroups(current => current.includes(key) ? current : [...current, key])
+    setDraft(next); setOriginal(JSON.stringify(next)); setError(''); setStatus(''); setTab(kind)
   }
   function save(event: FormEvent) {
     event.preventDefault()
@@ -94,7 +87,6 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
       setDocument(current => ({ ...current, budget: { ...current.budget, accounts: draft.id
         ? current.budget.accounts.map(row => row.id === draft.id ? { ...row, ...account, legacyOwner: undefined } : row)
         : [...current.budget.accounts, account] } }))
-      reveal('account', account)
     } else if (draft.kind === 'bulk-pot') {
       const preview = planPotCreation(document.budget, draft.name, draft.accountIds)
       if (!draft.name.trim() || !preview.create.length) return
@@ -113,7 +105,6 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
         const account = accounts.find(account => account.id === draft.accountId)
         if (!account) { setError('Choose an account for this pot.'); return }
         setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === draft.id ? { ...row, name, accountId: draft.accountId } : row) } }))
-        reveal('pot', account)
       } else {
         if (categories.some(category => category.id !== draft.id && category.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) { setError('A category with this name already exists.'); return }
         const category = { id: draft.id ?? crypto.randomUUID(), name }
@@ -149,37 +140,44 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
     </form>
   }
 
-  function row(kind: Kind, record: BudgetAccount | BudgetPot | BudgetCategory, summary: ReactNode, detail?: ReactNode) {
+  function ownerChip(account: BudgetAccount | undefined) {
+    const label = account ? accountOwnerLabel(account, adults) : 'Needs owner'
+    return <span className={`budget-manage-chip${label === 'Needs owner' ? ' is-review' : ''}`}>{label}</span>
+  }
+  function row(kind: Kind, record: BudgetAccount | BudgetPot | BudgetCategory, summary: ReactNode, { owner, detail, label }: { owner?: BudgetAccount; detail?: ReactNode; label?: string } = {}) {
     const expanded = draftKind === kind && draft?.id === record.id
-    return <div className="budget-manage-row" key={record.id}><button type="button" aria-label={kind === 'pot' ? `${record.name} · ${detail}` : undefined} aria-expanded={expanded} aria-controls={formId(kind, record.id)} onClick={() => begin(kind, record)}><strong><span aria-hidden="true">{expanded ? '▾' : '▸'} </span>{summary}</strong>{detail && <small> {detail}</small>}</button><div id={formId(kind, record.id)} hidden={!expanded}>{formFor(kind, record.id)}</div></div>
+    const Chevron = expanded ? ChevronDown : ChevronRight
+    return <div className="budget-manage-row" key={record.id}>
+      <button type="button" aria-label={label} aria-expanded={expanded} aria-controls={formId(kind, record.id)} onClick={() => begin(kind, record)}>
+        <Chevron className="budget-manage-chevron" aria-hidden="true"/>
+        <span className="budget-manage-row-text"><span className="budget-manage-row-title"><strong>{summary}</strong>{owner && <>{' '}{ownerChip(owner)}</>}</span>{detail && <small>{' '}{detail}</small>}</span>
+      </button>
+      <div id={formId(kind, record.id)} hidden={!expanded}>{formFor(kind, record.id)}</div>
+    </div>
   }
-  function ownerGroups(kind: 'account' | 'pot') {
-    return groups.map(group => {
-      const accountIds = new Set(group.accounts.map(account => account.id))
-      const rows = kind === 'pot' ? pots.filter(pot => accountIds.has(pot.accountId)).sort((a, b) => budgetCollator.compare(a.name, b.name) || budgetCollator.compare(optionLabels.get(a.accountId) ?? '', optionLabels.get(b.accountId) ?? '') || a.id.localeCompare(b.id)) : group.accounts
-      if (!rows.length) return null
-      const expanded = expandedGroups.includes(`${kind}:${group.key}`)
-      const controls = `${prefix}-${kind}-${group.key}`
-      return <div className="budget-manage-group" key={group.key}>
-        <h4><Disclosure level="owner" label={group.label} count={rows.length} expanded={expanded} controls={controls} onClick={() => toggleGroup(kind, group.key)}/></h4>
-        <div id={controls} className="budget-manage-owner-content" hidden={!expanded}>{expanded && (kind === 'account'
-          ? group.accounts.map(account => row('account', account, rowLabels.get(account.id), <>{countLabel(pots.filter(pot => pot.accountId === account.id).length, 'pot')}{(!account.ownerPersonIds.length || !account.provider?.trim()) && ' · Needs details'}{!account.accountTypeId && ' · Needs account type'}</>))
-          : (rows as BudgetPot[]).map(pot => row('pot', pot, pot.name, optionLabels.get(pot.accountId))))}</div>
-      </div>
-    })
+  function rows(kind: Kind) {
+    if (kind === 'category') return categories.map(category => row('category', category, category.name))
+    if (kind === 'account') return groups.flatMap(group => group.accounts).map(account => row('account', account, rowLabels.get(account.id), { owner: account,
+      detail: <>{countLabel(pots.filter(pot => pot.accountId === account.id).length, 'pot')}{(!account.ownerPersonIds.length || !account.provider?.trim()) && ' · Needs details'}{!account.accountTypeId && ' · Needs account type'}</> }))
+    return sortPotsForManage(pots, accounts, adults).map(pot => row('pot', pot, pot.name, { owner: accounts.find(account => account.id === pot.accountId), detail: rowLabels.get(pot.accountId), label: `${pot.name} · ${optionLabels.get(pot.accountId)}` }))
   }
-  const sections: Array<{ kind: Kind; label: string; count: number }> = [{ kind: 'account', label: 'Accounts', count: accounts.length }, { kind: 'pot', label: 'Pots', count: pots.length }, { kind: 'category', label: 'Categories', count: categories.length }]
+  const tabId = (kind: Kind) => `${prefix}-tab-${kind}`
+  const panelId = `${prefix}-panel`
+  const active = tabs.find(item => item.kind === tab)!
+  const close = () => { if (canLeave()) onClose() }
   return <div className="budget-v3-overlay"><div className="budget-v3-panel budget-manage-panel" role="dialog" aria-label="Manage accounts, pots & categories">
-    <div className="budget-manage-header"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={() => { if (canLeave()) onClose() }}>Done</button><button type="button" className="budget-manage-close" aria-label="Close" onClick={() => { if (canLeave()) onClose() }}><X aria-hidden="true"/></button></div>
+    <div className="budget-manage-header">
+      <div className="budget-manage-titlebar"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={close}>Done</button><button type="button" className="budget-manage-close" aria-label="Close" onClick={close}><X aria-hidden="true"/></button></div>
+      <div className="budget-manage-tabs" role="tablist" aria-label="Manage" onKeyDown={onTabKey}>{tabs.map(item => <button type="button" role="tab" key={item.kind} id={tabId(item.kind)} ref={element => { tabRefs.current[item.kind] = element }} aria-selected={tab === item.kind} aria-controls={panelId} tabIndex={tab === item.kind ? 0 : -1} onClick={() => selectTab(item.kind)}>
+        <span>{item.label}</span>{' '}<small>{item.count(document)}</small>
+      </button>)}</div>
+    </div>
     <p className="budget-manage-note">Accounts, pots and categories are shared across all budget months. Changes here affect every month.</p>
     {status && <p className="budget-manage-message" role="status">{status}</p>}
-    {sections.map(section => <section key={section.kind} className="budget-manage-section">
-      <h3><Disclosure label={section.label} count={section.count} noun={[section.kind, section.label.toLowerCase()]} expanded={openSection === section.kind} controls={`${prefix}-${section.kind}`} onClick={() => toggleSection(section.kind)}/></h3>
-      <div id={`${prefix}-${section.kind}`} className="budget-manage-content" hidden={openSection !== section.kind}>{openSection === section.kind && <>
-        <button type="button" className="secondary-button" disabled={section.kind === 'pot' && !accounts.length} onClick={() => begin(section.kind)}>Add {section.kind}</button>{formFor(section.kind, null)}
-        {!section.count && <p>{section.kind === 'pot' && !accounts.length ? 'Add an account before creating a pot.' : `No ${section.label.toLowerCase()} yet.`}</p>}
-        {section.kind === 'category' ? categories.map(category => row('category', category, category.name)) : ownerGroups(section.kind)}
-      </>}</div>
-    </section>)}
+    <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} className="budget-manage-content">
+      <button type="button" className="secondary-button" disabled={tab === 'pot' && !accounts.length} onClick={() => begin(tab)}>Add {tab}</button>{formFor(tab, null)}
+      {!active.count(document) && <p>{tab === 'pot' && !accounts.length ? 'Add an account before creating a pot.' : `No ${active.label.toLowerCase()} yet.`}</p>}
+      {rows(tab)}
+    </div>
   </div></div>
 }
