@@ -179,7 +179,7 @@ describe('preview integration', () => {
     window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-11')
     const url = window.location.href, length = window.history.length
     render(<MonthlyBudget document={document} setDocument={setDocument} month="2026-11" mobileBudgetView="transfers"/>)
-    expect(screen.getByRole('region', { name: 'Transfers by account owner' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Matrix' }))
     expect(screen.getByRole('region', { name: 'Transfer matrix' })).toBeInTheDocument()
     expect(window.location.href).toBe(url)
@@ -187,8 +187,8 @@ describe('preview integration', () => {
     expect(setDocument).not.toHaveBeenCalled()
     expect(document).toEqual(original)
     fireEvent.click(screen.getByRole('button', { name: 'List' }))
-    const overview = screen.getByRole('region', { name: 'Transfers by account owner' })
-    fireEvent.click(within(overview).getByRole('button', { name: /Joint · Monzo · Household/ }))
+    const overview = screen.getByRole('region', { name: 'Transfers by person' })
+    fireEvent.click(within(overview).getAllByRole('button', { name: /Joint · Monzo · Household/ })[0]!)
     expect(screen.getByRole('dialog', { name: 'Monzo · Household' })).toBeInTheDocument()
   })
 
@@ -210,6 +210,6 @@ describe('preview integration', () => {
     render(<MonthlyBudget document={document} setDocument={vi.fn()} month="2026-11" mobileBudgetView="transfers"/>)
     fireEvent.click(screen.getByRole('button', { name: 'Matrix' }))
     expect(screen.getByRole('status')).toHaveTextContent('matrix is unavailable')
-    expect(screen.getByRole('region', { name: 'Transfers by account owner' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
   })
 })

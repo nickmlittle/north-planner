@@ -6,6 +6,7 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import type { TransferInstructionAccount } from '../domain/transferInstructions'
 import { AccountFundingNote, PotMovementNote } from './TransferCalculationNotes'
 import type { budgetTransfers } from '../domain/budgetTransfers'
+import type { PersonTransferPlans } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
@@ -16,16 +17,30 @@ export function BudgetInfoDialog({ title, onClose, children }: { title: string; 
   return <ModalDialog title={title} onClose={onClose}>{children}</ModalDialog>
 }
 
-export function MobileBudgetSummary({ view, available, planned, allocated, hasItems, incomplete, onDetails }: {
-  view: 'plan' | 'transfers'; available: number; planned: number; allocated: number; hasItems: boolean; incomplete: boolean; onDetails: () => void
+type Adults = BudgetDocument['household']['adults']
+export type TransferPersonChoice = { adults: Adults; selection: string | 'both' | null; onSelect: (value: string) => void; plan?: { name: string; fundingPence: number; stepCount: number } }
+
+/** Ada · Ben · Both. Unchosen, it asks once; afterwards it is a plain switch. */
+function TransferPersonSwitch({ adults, selection, onSelect }: TransferPersonChoice) {
+  const options = [...adults.map(adult => ({ value: adult.id, label: adult.name })), { value: 'both', label: 'Both' }]
+  const group = <div className="transfer-view-switch transfer-person-switch" role="group" aria-label="Whose transfers">{options.map(option => <button type="button" key={option.value} aria-pressed={selection === option.value} onClick={() => onSelect(option.value)}>{option.label}</button>)}</div>
+  if (selection) return group
+  return <div className="transfer-person-prompt"><p><strong>Who’s moving money on this phone?</strong></p>{group}<p className="transfer-person-hint">You can change this any time.</p></div>
+}
+
+export function MobileBudgetSummary({ view, available, planned, allocated, hasItems, incomplete, onDetails, person }: {
+  view: 'plan' | 'transfers'; available: number; planned: number; allocated: number; hasItems: boolean; incomplete: boolean; onDetails: () => void; person?: TransferPersonChoice
 }) {
   const plan = view === 'plan', balance = available - planned
   const balanceText = balance === 0 ? 'Budget balanced' : `${pounds(Math.abs(balance))} ${balance < 0 ? 'over' : 'left to allocate'}`
+  const personal = !plan ? person?.plan : undefined
+  const transfersStatus = personal ? `${personal.stepCount} ${personal.stepCount === 1 ? 'step' : 'steps'}${incomplete ? ' · Instructions need review' : ''}` : incomplete ? 'Instructions need review' : hasItems ? 'All items allocated' : 'No allocations yet'
   return <section className={`budget-mobile-summary${plan ? balance < 0 ? ' is-deficit' : balance > 0 ? ' is-surplus' : ' is-balanced' : ''}`} aria-label={`${plan ? 'Plan' : 'Transfers'} summary`}>
-    <div className="budget-mobile-summary-heading"><h2>{plan ? 'Budget balance' : 'Funding total'}</h2><button type="button" aria-label={`${plan ? 'Plan' : 'Transfers'} summary details`} onClick={onDetails}>{plan && <span className="budget-plan-details-label">Details</span>}<Info aria-hidden="true"/></button></div>
-    <p className="budget-mobile-summary-value">{plan ? balance < 0 ? <><span className="budget-mobile-summary-context">Planned {pounds(planned)} of {pounds(available)}</span><span className="budget-balance-over">{balanceText}</span></> : balanceText : pounds(allocated)}</p>
+    {!plan && person && person.adults.length > 1 && <TransferPersonSwitch {...person}/>}
+    <div className="budget-mobile-summary-heading"><h2>{plan ? 'Budget balance' : personal ? `${personal.name} moves` : 'Funding total'}</h2><button type="button" aria-label={`${plan ? 'Plan' : 'Transfers'} summary details`} onClick={onDetails}>{plan && <span className="budget-plan-details-label">Details</span>}<Info aria-hidden="true"/></button></div>
+    <p className="budget-mobile-summary-value">{plan ? balance < 0 ? <><span className="budget-mobile-summary-context">Planned {pounds(planned)} of {pounds(available)}</span><span className="budget-balance-over">{balanceText}</span></> : balanceText : pounds(personal ? personal.fundingPence : allocated)}</p>
     {plan ? <dl className="budget-mobile-summary-support"><div><dt>Available income</dt><dd>{pounds(available)}</dd></div><div><dt>Planned budget</dt><dd>{pounds(planned)}</dd></div></dl>
-      : <p className={`budget-mobile-allocation-status${incomplete ? ' budget-allocation-incomplete' : ''}`}>{incomplete ? 'Instructions need review' : hasItems ? 'All items allocated' : 'No allocations yet'}</p>}
+      : <p className={`budget-mobile-allocation-status${incomplete ? ' budget-allocation-incomplete' : ''}`}>{transfersStatus}</p>}
   </section>
 }
 
@@ -33,31 +48,51 @@ function Contributions({ people, adults }: { people: PersonAmount[]; adults: Bud
   return <dl className="budget-contributions">{people.map(person => <div key={person.personId}><dt>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</dt><dd>{pounds(person.amountPence)}</dd></div>)}</dl>
 }
 
-export type MobileTransferGroup = { key: string; label: string; accounts: Transfers['accounts'] }
-
-export function MobileTransferOverview({ groups, labels, adults, accountPeople, onOpen, affectedAccounts }: {
-  groups: MobileTransferGroup[]
+/** Who pays, not who owns: one group per person (or the chosen one), then anything not calculated. */
+export function MobileTransferOverview({ plans, selection, accounts, labels, adults, potName, onOpen, affectedAccounts }: {
+  plans: PersonTransferPlans
+  selection: string | 'both' | null
+  accounts: Transfers['accounts']
   labels: Map<string, string>
-  adults: BudgetDocument['household']['adults']
-  accountPeople: (account: Transfers['accounts'][number]) => PersonAmount[]
+  adults: Adults
+  potName: (potId: string) => string
   onOpen: (accountId: string, trigger: HTMLButtonElement) => void
   affectedAccounts?: readonly string[]
 }) {
-  return <div className="budget-mobile-destinations" role="region" aria-label="Transfers by account owner">
-    {groups.filter(group => group.accounts.length > 0).map(group => <section className="budget-destination-group" key={group.key} aria-label={`${group.label} destinations`}>
-      <h3>{group.label}</h3>
-      <ul>{group.accounts.map(account => {
-        const label = labels.get(account.accountId) ?? 'Account'
-        const nonzeroPeople = accountPeople(account).filter(person => person.amountPence !== 0)
-        // A missing calculation must not read as a completed £0.00.
-        const notCalculated = account.incomplete && account.amountPence === 0
-        return <li key={account.accountId}><button type="button" className="budget-destination-row" data-transfer-account={account.accountId} aria-label={`${group.label} · ${label}, ${notCalculated ? 'funding not calculated' : `${pounds(account.amountPence)} funding required`}, ${account.items.length} ${account.items.length === 1 ? 'item' : 'items'}${account.incomplete ? ', account instructions need review' : ''}`} onClick={event => onOpen(account.accountId,event.currentTarget)}>
-          <span className="budget-destination-main"><span className="budget-destination-name">{label}</span><strong className="budget-destination-total">{notCalculated ? '—' : pounds(account.amountPence)}</strong></span>
-          <span className="budget-destination-contribution-line">{nonzeroPeople.length ? nonzeroPeople.map((person, index) => <span key={person.personId}>{index > 0 && <span aria-hidden="true"> · </span>}{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'} {pounds(person.amountPence)}</span>) : notCalculated ? <span className="budget-not-calculated">Not calculated</span> : 'No contribution allocated'}</span>
-          <span className="budget-destination-meta"><span>{account.items.length} {account.items.length === 1 ? 'item' : 'items'}{affectedAccounts?.includes(account.accountId) && <span className="budget-affected-label"> · Changed by recent edit</span>}{account.incomplete && <span className="budget-allocation-incomplete"> · Account instructions need review</span>}</span><ChevronRight size={18} aria-hidden="true" /></span>
+  const shown = plans.people.filter(plan => plan.rows.length > 0 && (!selection || selection === 'both' || plan.personId === selection))
+  const name = (personId: string) => adults.find(adult => adult.id === personId)?.name ?? 'Person'
+  const meta = (account: Transfers['accounts'][number]) => <span className="budget-destination-meta"><span>{account.items.length} {account.items.length === 1 ? 'item' : 'items'}{affectedAccounts?.includes(account.accountId) && <span className="budget-affected-label"> · Changed by recent edit</span>}{account.incomplete && <span className="budget-allocation-incomplete"> · Account instructions need review</span>}</span><ChevronRight size={18} aria-hidden="true" /></span>
+  const itemsText = (account: Transfers['accounts'][number]) => `${account.items.length} ${account.items.length === 1 ? 'item' : 'items'}${account.incomplete ? ', account instructions need review' : ''}`
+  const notCalculated = plans.notCalculated.flatMap(id => accounts.filter(account => account.accountId === id))
+  const chosen = selection && selection !== 'both' ? name(selection) : null
+  return <div className="budget-mobile-destinations" role="region" aria-label="Transfers by person">
+    {!shown.length && !notCalculated.length && <p className="budget-destination-empty">{chosen ? `${chosen} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
+    {shown.map(plan => <section className="budget-destination-group" key={plan.personId} aria-label={`${name(plan.personId)} transfers`}>
+      <h3><span>{name(plan.personId)}</span><span className="budget-destination-group-total">{pounds(plan.fundingPence)}</span></h3>
+      <ul>{plan.rows.map(row => {
+        const account = accounts.find(item => item.accountId === row.accountId)!
+        const label = labels.get(row.accountId) ?? 'Account'
+        const moved = row.potMoves.reduce((sum, move) => sum + move.amountPence, 0)
+        const into = row.potMoves.length === 1 ? potName(row.potMoves[0]!.potId) : `${row.potMoves.length} pots`
+        const moveText = row.potMoves.length ? `Then move ${pounds(moved)} into ${into}` : ''
+        return <li key={row.accountId}><button type="button" className="budget-destination-row" data-transfer-account={row.accountId} aria-label={`${label}, ${row.fundingPence > 0 ? `${name(plan.personId)} funds ${pounds(row.fundingPence)}` : 'nothing to fund'}${moveText ? `, then moves ${pounds(moved)} into ${into}` : ''}, ${itemsText(account)}`} onClick={event => onOpen(row.accountId, event.currentTarget)}>
+          <span className="budget-destination-main"><span className="budget-destination-name">{label}</span>{row.fundingPence > 0 ? <strong className="budget-destination-total">{pounds(row.fundingPence)}</strong> : <span className="budget-destination-nothing">Nothing to fund</span>}</span>
+          {moveText && <span className="budget-destination-contribution-line">{moveText}</span>}
+          {meta(account)}
         </button></li>
       })}</ul>
     </section>)}
+    {notCalculated.length > 0 && <section className="budget-destination-group" aria-label="Needs review destinations">
+      <h3><span>Needs review</span></h3>
+      <ul>{notCalculated.map(account => {
+        const label = labels.get(account.accountId) ?? 'Account'
+        return <li key={account.accountId}><button type="button" className="budget-destination-row" data-transfer-account={account.accountId} aria-label={`${label}, funding not calculated, ${itemsText(account)}`} onClick={event => onOpen(account.accountId, event.currentTarget)}>
+          <span className="budget-destination-main"><span className="budget-destination-name">{label}</span><strong className="budget-destination-total">—</strong></span>
+          <span className="budget-destination-contribution-line"><span className="budget-not-calculated">Not calculated</span></span>
+          {meta(account)}
+        </button></li>
+      })}</ul>
+    </section>}
   </div>
 }
 

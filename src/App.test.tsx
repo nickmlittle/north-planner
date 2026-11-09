@@ -218,7 +218,7 @@ it('opens a destination URL and restores the overview with Back and browser Forw
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
-  const row = await screen.findByRole('button', { name: /Alex · Monzo · Current account, £100.00 funding required/ })
+  const row = await screen.findByRole('button', { name: /^Alex · Monzo · Current account, Alex funds £50\.00/ })
   row.focus()
   const originalLength = window.history.length
   fireEvent.click(row)
