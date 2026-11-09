@@ -20,6 +20,10 @@ type Props = {
   onClose: () => void
   /** Edit mode: remove the item after the editor's own confirm. */
   onRemove?: () => void
+  /** Edit mode: start a new item from the saved one (after confirming any unsaved changes are dropped). */
+  onDuplicate?: () => void
+  /** Add mode: prefill the one new item from this one, keeping its funding when the destination changes. */
+  template?: BudgetItem
 }
 const pounds = (pence: number) => formatGBP(pence / 100)
 const fundingOptions: Array<{ value: FundingRule; label: string }> = [
@@ -38,13 +42,14 @@ function destinationFunding(document: BudgetDocument, selection: DestinationSele
   return personalOwner ? { funding: 'single', singleFunderId: personalOwner.id } : { funding: 'proportional', singleFunderId: document.household.adults[0]?.id ?? '' }
 }
 
-export function BudgetItemEditor({ document, month, item, onSave, onClose, onRemove }: Props) {
+export function BudgetItemEditor({ document, month, item, onSave, onClose, onRemove, onDuplicate, template }: Props) {
   const adults = document.household.adults
-  const [rows, setRows] = useState<BudgetItemDraft[]>(() => [item ? itemDraft(item) : newItemDraft(crypto.randomUUID(), adults[0]?.id ?? '')])
-  const [categoryId, setCategoryId] = useState(item?.categoryId ?? document.budget.categories[0]?.id ?? '__new__')
+  const [rows, setRows] = useState<BudgetItemDraft[]>(() => [item ? itemDraft(item) : template ? { ...itemDraft(template), id: crypto.randomUUID(), name: `${template.name} (copy)` } : newItemDraft(crypto.randomUUID(), adults[0]?.id ?? '')])
+  const source = item ?? template
+  const [categoryId, setCategoryId] = useState(source?.categoryId ?? document.budget.categories[0]?.id ?? '__new__')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryId] = useState(() => crypto.randomUUID())
-  const [destination, setDestination] = useState<DestinationSelection>(item ? { destination: item.destination } : {})
+  const [destination, setDestination] = useState<DestinationSelection>(source ? { destination: source.destination } : {})
   const [destinationTouched, setDestinationTouched] = useState(false)
   const [destinationBrowsing, setDestinationBrowsing] = useState(false)
   const [error, setError] = useState<BatchError>()
@@ -53,14 +58,15 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
   const detailsRef = useRef<HTMLDetailsElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const pendingFocus = useRef<string | null>(null)
-  const fundingOverrides = useRef(new Set<string>())
+  const fundingOverrides = useRef(new Set<string>(template ? [rows[0]!.id] : []))
   const triggerRef = useRef<HTMLElement | null>(null)
   const dirty = destinationTouched || !!newCategoryName || initial !== JSON.stringify({ rows, categoryId, destination })
   const includedRows = rows.filter(row => row.touched || row.name.trim() || row.amount.trim())
   const total = includedRows.reduce((sum, row) => sum + monthlyContributionPence(moneyPence(row.amount) ?? 0, row.frequency), 0)
-  const [discarding, setDiscarding] = useState(false)
+  const [discarding, setDiscarding] = useState<false | 'close' | 'duplicate'>(false)
   const [removing, setRemoving] = useState(false)
-  const close = () => { if (dirty) setDiscarding(true); else onClose() }
+  const close = () => { if (dirty) setDiscarding('close'); else onClose() }
+  const duplicate = () => { if (dirty) setDiscarding('duplicate'); else onDuplicate?.() }
 
   useEffect(() => {
     triggerRef.current = globalThis.document.activeElement as HTMLElement | null
@@ -165,7 +171,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
   const fieldError = (row: BudgetItemDraft, field: string) => error?.rowId === row.id && error.field === field
   const errorText = (row: BudgetItemDraft, field: string) => fieldError(row, field) ? <p id={`${row.id}-${field}-error`} className="budget-batch-error" role="alert">{error!.message}</p> : null
   const descriptionId = (row: BudgetItemDraft, field: string) => fieldError(row, field) ? `${row.id}-${field}-error` : undefined
-  const title = item ? 'Edit item' : 'Add items'
+  const title = item ? 'Edit item' : template ? 'Duplicate item' : 'Add items'
   const monthText = new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
   const editRow = item ? rows[0] : undefined
   const editRead = editRow ? readItemDraft({ ...editRow, name: editRow.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id)) : undefined
@@ -234,11 +240,11 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
         <footer className="budget-batch-footer">
           <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRows(current => [...current])}/>
           {!item && <div className="budget-batch-summary" aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div>}
-          {item && onRemove && <button type="button" className="text-button budget-batch-remove" onClick={() => setRemoving(true)}>Remove item</button>}
+          {item && (onRemove || onDuplicate) && <div className="budget-batch-item-actions">{onDuplicate && <button type="button" className="text-button" onClick={duplicate}>Duplicate</button>}{onRemove && <button type="button" className="text-button budget-batch-remove" onClick={() => setRemoving(true)}>Remove item</button>}</div>}
           <div className="budget-batch-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={(!!draftImpact && 'error' in draftImpact) || (!item && !includedRows.length)}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>
     </section>
-    {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard unsaved items?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { setDiscarding(false); onClose() }}><p>Your changes haven’t been saved.</p></ConfirmDialog>}
+    {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard unsaved items?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { const next = discarding; setDiscarding(false); if (next === 'duplicate') onDuplicate?.(); else onClose() }}><p>{discarding === 'duplicate' ? 'Your changes haven’t been saved. The copy starts from the saved item.' : 'Your changes haven’t been saved.'}</p></ConfirmDialog>}
     {removing && item && onRemove && <RemoveConfirm document={document} month={month} item={item} onCancel={() => setRemoving(false)} onConfirm={onRemove}/>}
   </div>
 }

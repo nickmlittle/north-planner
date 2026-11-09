@@ -519,6 +519,8 @@ small, footer { color: var(--muted) }
 .budget-batch-header{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);padding:var(--space-5) var(--space-5) var(--space-4);border-bottom:1px solid var(--line)}
 .budget-batch-header .dialog-close{margin:calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0}
 .budget-batch-remove{min-height:44px;margin:0;color:var(--status-error)}
+.budget-batch-item-actions{display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--space-4)}
+.budget-batch-item-actions .text-button{min-height:44px;margin:0}
 .budget-batch-header p{margin:var(--space-2) 0 0;color:var(--muted);font-size:var(--text-sm);line-height:1.5}
 .budget-batch-body{flex:0 1 auto;min-height:0;overflow:auto;padding:var(--space-5) var(--space-5);scroll-padding:16px}
 .budget-batch-shared{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);align-items:start;gap:var(--space-4);margin-bottom:var(--space-2)}
@@ -557,7 +559,7 @@ small, footer { color: var(--muted) }
   .budget-batch-panel{border-radius:0;padding:0}.budget-batch-header{padding:var(--space-4)}.budget-batch-header h2{font-size:var(--text-xl)}
   .budget-batch-body{flex:1;padding:var(--space-4)}.budget-batch-shared{gap:var(--space-4);margin-bottom:var(--space-2)}.budget-batch-footer{padding:var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom,0px))}
   .budget-batch-panel input,.budget-batch-panel select{font-size:var(--text-lg)}
-  .budget-batch-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}.budget-batch-actions{justify-content:flex-end;width:100%}.budget-batch-remove+.budget-batch-actions{width:auto}
+  .budget-batch-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}.budget-batch-actions{justify-content:flex-end;width:100%}.budget-batch-item-actions+.budget-batch-actions{width:auto}
   .budget-batch-footer{gap:var(--space-2)}
 }
 .budget-single-panel{max-width:660px;margin:auto}
@@ -1028,7 +1030,7 @@ small, footer { color: var(--muted) }
 .plan-card .budget-v3-table .plan-actions-cell{text-align:right}
 .plan-group{cursor:pointer}
 .plan-group>th,.plan-group>td{padding-top:var(--space-2);padding-bottom:var(--space-2);background:var(--surface-band);color:var(--pine)}
-.plan-group:hover>th,.plan-group:hover>td{background:var(--surface-band-hover)}
+@media(hover:hover){.plan-group:hover>th,.plan-group:hover>td{background:var(--surface-band-hover)}}
 .plan-group th button,.plan-sticky-band button{display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:var(--space-1);width:100%;min-height:36px;margin:0;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .plan-group th button[aria-hidden=true]{visibility:hidden}
 .plan-group th button:focus-visible,.plan-sticky-band button:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
@@ -1056,6 +1058,13 @@ small, footer { color: var(--muted) }
 .plan-total-count{margin-left:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:600}
 @media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .plan-card{padding:0}
+  .monthly-budget-page .plan-card .budget-v3-table thead{position:static}
+  .plan-card .budget-v3-table thead th{height:0;padding-top:0;padding-bottom:0;border:0;line-height:0;color:transparent;overflow:hidden}
+  .plan-card .budget-v3-table thead th:first-child{width:auto}
+  .plan-card .budget-v3-table thead th:nth-child(2){width:104px}
+  .plan-card .budget-v3-table .budget-v3-item>th,.plan-card .budget-v3-table .budget-v3-item>td{padding-top:var(--space-2);padding-bottom:var(--space-2);vertical-align:middle}
+  .plan-card .budget-v3-table .budget-v3-item>td.plan-amount-cell{padding-right:var(--space-3);padding-left:0}
+  .plan-card .budget-v3-item-name{min-height:0;font-size:var(--text-md)}
   .plan-card-header{row-gap:var(--space-2);padding:var(--space-3) var(--space-4)}
   .plan-card-count{display:inline}
   .plan-card-summary{display:none}
