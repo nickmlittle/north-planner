@@ -1,6 +1,6 @@
 # Recurring plans and monthly budgets
 
-**Status:** Agreed with Nick on 7 November 2026; implementation of [item 1.1](plan-transfers-ux-implementation-plan.md#11-define-the-recurring-plan-and-monthly-budget-model).
+**Status:** Agreed with Nick on 7 November 2026; implementation of [item 1.1](https://github.com/nickmlittle/north-planner/blob/0f2d2b6/docs/plan-transfers-ux-implementation-plan.md#11-define-the-recurring-plan-and-monthly-budget-model).
 
 ## Product contract
 

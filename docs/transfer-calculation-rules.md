@@ -1,6 +1,6 @@
 # Transfer calculation and money-movement rules
 
-**Status:** Agreed with Nick on 7 November 2026; implementation of [roadmap item 1.2](plan-transfers-ux-implementation-plan.md#12-define-how-transfer-instructions-are-calculated).
+**Status:** Agreed with Nick on 7 November 2026; implementation of [roadmap item 1.2](https://github.com/nickmlittle/north-planner/blob/0f2d2b6/docs/plan-transfers-ux-implementation-plan.md#12-define-how-transfer-instructions-are-calculated).
 
 ## Meaning of the amounts
 

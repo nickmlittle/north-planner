@@ -2,7 +2,7 @@
 
 **Audience:** future developers, designers and coding agents. **Updated:** 9 November 2026.
 
-This is the shared direction for new work and a description of the current interface. The financial contracts in [recurring and monthly budget rules](recurring-monthly-budget-rules.md) and [transfer calculation rules](transfer-calculation-rules.md) govern the detailed behavior. The [implementation roadmap](plan-transfers-ux-implementation-plan.md) contains proposals and unfinished work, not an authoritative description of shipped features. When changing behavior, update the relevant contract and this guide together. Where this guide says **Direction**, it describes a goal for future work, not a claim that every existing screen meets it.
+This is the shared direction for new work and a description of the current interface. The financial contracts in [recurring and monthly budget rules](recurring-monthly-budget-rules.md) and [transfer calculation rules](transfer-calculation-rules.md) govern the detailed behavior. When changing behavior, update the relevant contract and this guide together. Where this guide says **Direction**, it describes a goal for future work, not a claim that every existing screen meets it.
 
 ## Purpose and product principles
 
