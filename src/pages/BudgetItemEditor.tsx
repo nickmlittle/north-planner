@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Keyb
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
 import { commitItemBatch, itemDraft, moneyPence, newItemDraft, readItemDraft, type BatchError, type BudgetItemBatch, type BudgetItemDraft, type DestinationSelection } from '../domain/budgetItemDrafts'
-import { budgetEditScope, monthlyContributionPence, type BudgetItem, type FundingRule } from '../domain/monthlyBudget'
+import { budgetEditScope, monthlyContributionPence, updateBudgetAtMonth, type BudgetItem, type FundingRule } from '../domain/monthlyBudget'
+import { X } from 'lucide-react'
 import { formatEditScope } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
 import { DestinationPicker } from './DestinationPicker'
@@ -17,6 +18,8 @@ type Props = {
   item?: BudgetItem
   onSave: (batch: BudgetItemBatch) => BatchError | undefined
   onClose: () => void
+  /** Edit mode: remove the item after the editor's own confirm. */
+  onRemove?: () => void
 }
 const pounds = (pence: number) => formatGBP(pence / 100)
 const fundingOptions: Array<{ value: FundingRule; label: string }> = [
@@ -35,7 +38,7 @@ function destinationFunding(document: BudgetDocument, selection: DestinationSele
   return personalOwner ? { funding: 'single', singleFunderId: personalOwner.id } : { funding: 'proportional', singleFunderId: document.household.adults[0]?.id ?? '' }
 }
 
-export function BudgetItemEditor({ document, month, item, onSave, onClose }: Props) {
+export function BudgetItemEditor({ document, month, item, onSave, onClose, onRemove }: Props) {
   const adults = document.household.adults
   const [rows, setRows] = useState<BudgetItemDraft[]>(() => [item ? itemDraft(item) : newItemDraft(crypto.randomUUID(), adults[0]?.id ?? '')])
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? document.budget.categories[0]?.id ?? '__new__')
@@ -56,6 +59,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const includedRows = rows.filter(row => row.touched || row.name.trim() || row.amount.trim())
   const total = includedRows.reduce((sum, row) => sum + monthlyContributionPence(moneyPence(row.amount) ?? 0, row.frequency), 0)
   const [discarding, setDiscarding] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const close = () => { if (dirty) setDiscarding(true); else onClose() }
 
   useEffect(() => {
@@ -63,7 +67,12 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
     const previousOverflow = globalThis.document.body.style.overflow
     globalThis.document.body.style.overflow = 'hidden'
     formRef.current?.querySelector<HTMLElement>('[data-editor-heading]')?.focus()
-    return () => { globalThis.document.body.style.overflow = previousOverflow; triggerRef.current?.focus() }
+    // A removed item takes its row (the usual trigger) with it, so fall back to the Plan table.
+    return () => {
+      globalThis.document.body.style.overflow = previousOverflow
+      const trigger = triggerRef.current
+      ;(trigger && !trigger.isConnected ? globalThis.document.querySelector<HTMLElement>('.budget-v3-table-wrap') : trigger)?.focus()
+    }
   }, [])
 
   useEffect(() => {
@@ -169,7 +178,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   return <div ref={overlayRef} className="budget-v3-overlay budget-batch-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close() }}>
     <section className="budget-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="budget-batch-title">
       <form ref={formRef} className={`budget-v3-panel budget-batch-panel${item ? ' budget-single-panel' : ''}`} aria-label={item ? 'Edit item' : 'Add item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
-        <header className="budget-batch-header"><h2 id="budget-batch-title" data-editor-heading tabIndex={-1}>{title}</h2><p>{monthText}</p></header>
+        <header className="budget-batch-header"><div><h2 id="budget-batch-title" data-editor-heading tabIndex={-1}>{title}</h2><p>{monthText}</p></div><button type="button" className="dialog-close" aria-label="Close" onClick={close}><X aria-hidden="true"/></button></header>
         <div className="budget-batch-body">
           {item && editRow ? <div className="budget-single-fields">
             <label>Item name<input data-error-key={`${editRow.id}:name`} value={editRow.name} aria-invalid={fieldError(editRow, 'name')} aria-describedby={descriptionId(editRow, 'name')} onChange={event => update(editRow.id, { name: event.target.value })}/></label>{errorText(editRow, 'name')}
@@ -225,9 +234,18 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
         <footer className="budget-batch-footer">
           <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRows(current => [...current])}/>
           {!item && <div className="budget-batch-summary" aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div>}
-          <div className="budget-batch-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
+          {item && onRemove && <button type="button" className="text-button budget-batch-remove" onClick={() => setRemoving(true)}>Remove item</button>}
+          <div className="budget-batch-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={(!!draftImpact && 'error' in draftImpact) || (!item && !includedRows.length)}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>
     </section>
     {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard unsaved items?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { setDiscarding(false); onClose() }}><p>Your changes haven’t been saved.</p></ConfirmDialog>}
+    {removing && item && onRemove && <RemoveConfirm document={document} month={month} item={item} onCancel={() => setRemoving(false)} onConfirm={onRemove}/>}
   </div>
+}
+
+function RemoveConfirm({ document, month, item, onCancel, onConfirm }: { document: BudgetDocument; month: string; item: BudgetItem; onCancel: () => void; onConfirm: () => void }) {
+  const next = { ...document, budget: updateBudgetAtMonth(document.budget, month, items => items.filter(row => row.id !== item.id)) }
+  return <ConfirmDialog title={`Remove ${item.name}?`} confirmLabel="Remove item" danger onCancel={onCancel} onConfirm={onConfirm} returnFocusTo={() => globalThis.document.querySelector<HTMLElement>('.budget-v3-table-wrap')}>
+    <ImpactPreview label="Before removing" scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}.`} result={budgetImpact(document, next, month, [])} document={next}/>
+  </ConfirmDialog>
 }

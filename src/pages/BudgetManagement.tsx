@@ -165,7 +165,7 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
   const close = () => { if (canLeave()) onClose() }
   return <div className="budget-v3-overlay"><div className="budget-v3-panel budget-manage-panel" role="dialog" aria-label="Manage accounts, pots & categories">
     <div className="budget-manage-header">
-      <div className="budget-manage-titlebar"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={close}>Done</button><button type="button" className="budget-manage-close" aria-label="Close" onClick={close}><X aria-hidden="true"/></button></div>
+      <div className="budget-manage-titlebar"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={close}>Done</button><button type="button" className="dialog-close" aria-label="Close" onClick={close}><X aria-hidden="true"/></button></div>
       <div className="budget-manage-tabs" role="tablist" aria-label="Manage" onKeyDown={onTabKey}>{tabs.map(item => <button type="button" role="tab" key={item.kind} id={tabId(item.kind)} ref={element => { tabRefs.current[item.kind] = element }} aria-selected={tab === item.kind} aria-controls={panelId} tabIndex={tab === item.kind ? 0 : -1} onClick={() => selectTab(item.kind)}>
         <span>{item.label}</span>{' '}<small>{item.count(document)}</small>
       </button>)}</div>

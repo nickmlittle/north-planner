@@ -148,7 +148,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
    <p>Each account’s funding already includes its moves.</p>
   </>}
  </BudgetInfoDialog>}
- {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)}/>}
+ {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)} onRemove={editingItem&&(()=>{const id=editingItem.id;setEditor(false);setDocument(current=>({...current,budget:updateBudgetAtMonth(current.budget,month,old=>old.filter(i=>i.id!==id))}))})}/>}
  {incomeOpen&&<IncomeDialog document={document} setDocument={setDocument} month={month} onClose={()=>setIncomeOpen(false)}/>}
  {management&&<BudgetManagement document={document} setDocument={setDocument} onClose={()=>setManagement(false)}/>}
  </>
