@@ -147,10 +147,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   </>:infoDialog==='plan'?<>
    <dl className="budget-info-metrics"><div><dt>Available<small>{availableBasis}</small></dt><dd>{pounds(available)}</dd></div><div><dt>Planned</dt><dd>{pounds(total)}</dd></div></dl>
   </>:<>
-   <p>These are account funding requirements. Pot allocations are included in those totals, then moved within the account. Sources, automatic payments and payment status are not recorded.</p>
-   <dl className="budget-info-metrics"><div><dt>Destination accounts</dt><dd>{transferAccounts.length}</dd></div></dl>
-   <p>Amounts include exact pennies. Account totals include their allocations once; do not add the breakdown again.</p>
-   {(instructions?.incomplete??transfers.unresolvedItemIds.length>0)&&<p>Totals include calculated contributions only. Review incomplete allocations or missing pot responsibility before using the account instructions.</p>}
+   <p>Each account’s funding already includes its moves.</p>
   </>}
  </BudgetInfoDialog>}
  {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)}/>}

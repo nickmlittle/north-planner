@@ -6,13 +6,12 @@ import type { BudgetItem } from '../domain/monthlyBudget'
 import type { PersonTransferPlans, TransferAccount } from '../domain/personTransfers'
 import type { TransferInstructions } from '../domain/transferInstructions'
 import type { StepsReturn } from '../state/navigation'
-import { formatGBP } from '../formatting/money'
+import { balanceLabel, formatGBP } from '../formatting/money'
 import { AccountFundingNote } from './TransferCalculationNotes'
 import { PaydaySteps } from './PaydaySteps'
 import { TransferTable } from './TransferTable'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
-const signedPounds = (pence: number) => pence < 0 ? `−${pounds(Math.abs(pence))}` : pounds(pence)
 
 type Props = {
   document: BudgetDocument
@@ -58,21 +57,20 @@ export function TransfersPanel({ document, transfers, accounts, instructions, un
     ;[...window.document.querySelectorAll<HTMLElement>('.payday [data-payday-account]')].find(step => ids.includes(step.dataset.paydayAccount ?? ''))?.scrollIntoView?.({ block: 'center' })
   }, [affectedKey, affectedTransfers])
 
-  return <section className="budget-v3-transfers budget-v3-people-summary" id="budget-transfers-panel" aria-label="People and transfers">
+  return <section className="budget-v3-transfers budget-v3-people-summary" id="budget-transfers-panel" aria-label="Funding">
     {affectedTransfers && view === 'transfers' && <div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account => <p key={account.accountId}>{document.budget.accounts.find(row => row.id === account.accountId)?.name ?? 'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
-    <div className="budget-v3-desktop-people"><h2>People &amp; transfers</h2>
-      <h3>Monthly plan by person</h3>
+    <div className="budget-v3-desktop-people"><h2>Funding</h2>
       <div className="budget-v3-person-grid">{transfers.people.map(person => <article key={person.personId}>
         <h4>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</h4>
-        <dl className="budget-v3-person-metrics"><div><dt>Available</dt><dd>{pounds(person.availablePence)}</dd></div><div><dt>Planned contributions</dt><dd>{pounds(person.plannedPence)}</dd></div><div className={person.remainingPence < 0 ? 'is-negative' : ''}><dt>Remaining</dt><dd>{signedPounds(person.remainingPence)}</dd></div></dl>
+        <dl className="budget-v3-person-metrics"><div><dt>Available</dt><dd>{pounds(person.availablePence)}</dd></div><div><dt>Funding</dt><dd>{pounds(person.plannedPence)}</dd></div><div className={person.remainingPence < 0 ? 'is-negative' : ''}><dt>Balance</dt><dd>{balanceLabel(person.remainingPence)}</dd></div></dl>
         <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Employment income</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Additional income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
       </article>)}</div></div>
     {unfundedItems.length > 0 && <div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length === 1 ? 'item' : 'items'} can’t be funded yet.</strong> <button type="button" onClick={onEditIncome}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item => <li key={item.id}>{item.name}</li>)}</ul></details></div>}
-    {!instructions && <p className="budget-v3-transfer-warning" role="alert">Transfer instructions are unavailable. The comparison below may be incomplete; review the budget before moving money.</p>}
-    {accounts.length === 0 ? <div className="budget-v3-transfer-empty"><h3>No transfers planned</h3><p>Budget items assigned to accounts or pots will appear here.</p></div> : <>
-      {unfundedItems.length === 0 && instructions && <AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Transfers by destination</h3>{instructions?.incomplete && <span className="budget-desktop-only">Account instructions need review: *</span>}</div>
+    {!instructions && <p className="budget-v3-transfer-warning" role="alert">Can’t work out funding. Check the plan before moving money.</p>}
+    {accounts.length === 0 ? <div className="budget-v3-transfer-empty"><h3>Nothing to fund yet</h3></div> : <>
+      {unfundedItems.length === 0 && instructions && <AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Funding by account</h3>{instructions?.incomplete && <span className="budget-desktop-only">* Needs review</span>}</div>
       <TransferTable accounts={accounts} people={transfers.people} adults={adults} labels={labels} potName={potName} affectedAccounts={affectedAccounts} incomplete={instructions?.incomplete}/>
-      {accounts.some(account => account.hasPots) && <p className="budget-v3-transfer-rounding">Pot movements are already inside each account total.</p>}
+      {accounts.some(account => account.hasPots) && <p className="budget-v3-transfer-rounding">Each account’s funding already includes its moves.</p>}
       <PaydaySteps plans={plans} selection={personSelection} labels={labels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeItems} affectedAccounts={affectedAccounts}/>
     </>}
   </section>

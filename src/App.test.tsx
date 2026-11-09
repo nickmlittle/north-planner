@@ -383,7 +383,7 @@ it('keeps a scoped empty Plan state after removal and returns to an empty Transf
   expect(screen.getByText(/No items go to/)).toBeVisible()
   window.history.back()
   await waitFor(() => expect(window.location.search).toContain('budgetView=transfers'))
-  expect(screen.getByText(/No transfers planned/)).toBeVisible()
+  expect(screen.getByText(/Nothing to fund yet/)).toBeVisible()
   window.history.forward()
   await waitFor(() => expect(window.location.search).toContain('budgetView=plan'))
   await waitFor(() => expect(screen.getByRole('region', { name: 'Plan destination filter' })).toHaveFocus())
