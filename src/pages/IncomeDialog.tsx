@@ -1,0 +1,54 @@
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import type { BudgetDocument } from '../domain/budgetDocument'
+import { incomeEditScope, resolveIncomeSources, updateIncomeAtMonth } from '../domain/monthlyBudget'
+import { formatEditScope, formatMonth } from '../formatting/month'
+
+type IncomeType = 'employment' | 'additional'
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; onClose: () => void }
+
+const pence = (value: string) => Math.max(0, Math.round(Number(value || 0) * 100))
+
+/** Edit each income source for the month, or add a recurring one. Drafts live only while the dialog is open. */
+export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
+  const adults = document.household.adults
+  const incomes = resolveIncomeSources(document.budget, month)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [newName, setNewName] = useState('')
+  const [newPerson, setNewPerson] = useState(adults[0]?.id ?? '')
+  const [newType, setNewType] = useState<IncomeType>('employment')
+  const [newAmount, setNewAmount] = useState('')
+  const [help, setHelp] = useState(false)
+  // Say the range once when every source shares it; per field only where they differ.
+  const scopes = incomes.map(source => formatEditScope(incomeEditScope(source, month)))
+  const sharedScope = scopes.length > 0 && scopes.every(scope => scope === scopes[0]) ? scopes[0] : null
+
+  const save = (event: FormEvent) => {
+    event.preventDefault()
+    setDocument(current => {
+      let budget = current.budget
+      for (const source of budget.incomeSources) if (draft[source.id] !== undefined) budget = updateIncomeAtMonth(budget, month, source.id, pence(draft[source.id]!))
+      if (newName.trim() && newPerson) budget = { ...budget, incomeSources: [...budget.incomeSources, { id: crypto.randomUUID(), personId: newPerson, name: newName.trim(), type: newType, baseAmountPence: pence(newAmount), baseEffectiveFrom: month, changes: {} }] }
+      return { ...current, budget }
+    })
+    onClose()
+  }
+
+  return <div className="budget-v3-overlay"><form className="budget-v3-panel" onSubmit={save}>
+    <h2>Income for {formatMonth(month)}</h2>
+    <p className="budget-income-intro">Income changes don’t create a budget <span className="budget-nowrap">date. <button type="button" className="budget-v3-info" aria-label="About income changes" aria-expanded={help} onClick={() => setHelp(value => !value)}>ⓘ</button></span></p>
+    {help && <p className="budget-edit-scope">Employment income sets proportional shares; additional income affects available money only. £0 stops a source for its affected months. Later recorded income changes stay unchanged.</p>}
+    {sharedScope && <p id="income-scope-shared" className="budget-edit-scope">Changes apply: {sharedScope}.</p>}
+    {incomes.map(source => <div className="budget-income-source" key={source.id}>
+      <label>{adults.find(adult => adult.id === source.personId)?.name} — {source.name} · {source.type === 'employment' ? 'Employment' : 'Additional'}<span className="budget-money-field"><input aria-describedby={sharedScope ? 'income-scope-shared' : `income-scope-${source.id}`} inputMode="decimal" value={draft[source.id] ?? (source.amountPence / 100).toFixed(2)} onChange={event => setDraft(current => ({ ...current, [source.id]: event.target.value }))}/></span></label>
+      {!sharedScope && <p id={`income-scope-${source.id}`} className="budget-edit-scope">Changes apply: {scopes[incomes.indexOf(source)]}.</p>}
+    </div>)}
+    <fieldset><legend>Add recurring income source</legend>
+      <p className="budget-edit-scope">New income applies: {formatEditScope({ fromMonth: month, throughMonth: null })}.</p>
+      <label>Person<select value={newPerson} onChange={event => setNewPerson(event.target.value)}>{adults.map(adult => <option key={adult.id} value={adult.id}>{adult.name}</option>)}</select></label>
+      <label>Source name<input value={newName} onChange={event => setNewName(event.target.value)} placeholder="Parents"/></label>
+      <label>Classification<select value={newType} onChange={event => setNewType(event.target.value as IncomeType)}><option value="employment">Employment income</option><option value="additional">Additional income</option></select></label>
+      <label>Monthly amount<span className="budget-money-field"><input inputMode="decimal" value={newAmount} onChange={event => setNewAmount(event.target.value)}/></span></label>
+    </fieldset>
+    <div className="budget-v3-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button">Save income</button></div>
+  </form></div>
+}
