@@ -7,7 +7,7 @@ import { formatEditScope } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
 import { DestinationPicker } from './DestinationPicker'
 import { budgetImpact } from '../domain/budgetImpact'
-import { BudgetImpactSummary } from './BudgetImpactSummary'
+import { ImpactPreview } from '../components/ImpactPreview'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
 type Props = {
@@ -172,7 +172,6 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
       <form ref={formRef} className={`budget-v3-panel budget-batch-panel${item ? ' budget-single-panel' : ''}`} aria-label={item ? 'Edit budget item' : 'Add item'} noValidate onSubmit={save} onKeyDown={onKeyDown}>
         <header className="budget-batch-header"><h2 id="budget-batch-title" data-editor-heading tabIndex={-1}>{title}</h2><p>{monthText} · {item ? 'Update this item’s details.' : 'Choose a category and destination, then add one or more items.'}</p></header>
         <div className="budget-batch-body">
-          <p className="budget-edit-scope">Changes apply: {formatEditScope(budgetEditScope(document.budget, month))}. Later saved budgets stay unchanged.</p>
           {item && editRow ? <div className="budget-single-fields">
             <label>Item name<input data-error-key={`${editRow.id}:name`} value={editRow.name} aria-invalid={fieldError(editRow, 'name')} aria-describedby={descriptionId(editRow, 'name')} onChange={event => update(editRow.id, { name: event.target.value })}/></label>{errorText(editRow, 'name')}
             <label>{editRow.frequency === 'annually' ? 'Annual amount' : 'Monthly amount'}<span className="budget-money-field"><input inputMode="decimal" data-error-key={`${editRow.id}:amount`} value={editRow.amount} aria-invalid={fieldError(editRow, 'amount')} aria-describedby={descriptionId(editRow, 'amount')} onChange={event => update(editRow.id, { amount: event.target.value })}/></span></label>{editRow.frequency === 'annually' && <small>Monthly equivalent: {pounds(monthlyContributionPence(moneyPence(editRow.amount) ?? 0, 'annually'))}</small>}{errorText(editRow, 'amount')}
@@ -184,7 +183,6 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
             {editRow.funding === 'custom' && <div className="budget-single-allocation"><strong>Relative weights</strong>{adults.map(person => <label key={person.id}>{person.name}<input inputMode="decimal" aria-label={`${person.name} relative weight`} data-error-key={`${editRow.id}:customShares`} value={editRow.customShares[person.id] ?? ''} onChange={event => update(editRow.id, { customShares: { ...editRow.customShares, [person.id]: event.target.value } })}/></label>)}</div>}
             {errorText(editRow, 'singleFunderId')}{errorText(editRow, 'contributions')}{errorText(editRow, 'customShares')}
             <div className="budget-single-contributions"><strong>Monthly contributions</strong>{editPreview?.unresolvedItemIds.length ? <p>Add employment income to calculate contributions.</p> : <dl>{adults.map(person => <div key={person.id}><dt>{person.name}</dt><dd>{editPreview ? pounds(editPreview.people.find(row => row.personId === person.id)?.plannedPence ?? 0) : '—'}</dd></div>)}</dl>}{splitChanged && <p>Saving this change will update what household members contribute.</p>}</div>
-            {draftImpact && ('impact' in draftImpact ? <BudgetImpactSummary impact={draftImpact.impact} document={draftResult && 'document' in draftResult ? draftResult.document : document}/> : <p role="alert" className="budget-batch-error">{draftImpact.error} <button type="button" onClick={() => setRows(current => [...current])}>Retry</button></p>)}
             <details ref={detailsRef} className="budget-single-details"><summary>More details · {editRow.frequency === 'annually' ? 'Annually' : 'Monthly'}</summary><label>Frequency<select data-error-key={`${editRow.id}:frequency`} value={editRow.frequency} onChange={event => update(editRow.id, { frequency: event.target.value as BudgetItemDraft['frequency'] })}><option value="monthly">Monthly</option><option value="annually">Annually</option></select></label>{errorText(editRow, 'frequency')}</details>
           </div> : <>
           <div className="budget-batch-shared">
@@ -224,10 +222,12 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
           {!rows.length && <p className="budget-batch-empty">No items yet. Add a row to get started.</p>}
           {!item && <button className="secondary-button budget-batch-add" type="button" data-error-key="rows" onClick={addRow}>Add another item</button>}
           {error?.field === 'rows' && <p className="budget-batch-error" role="alert">{error.message}</p>}
-          {draftImpact && ('impact' in draftImpact ? <BudgetImpactSummary impact={draftImpact.impact} document={draftResult && 'document' in draftResult ? draftResult.document : document}/> : <p role="alert" className="budget-batch-error">{draftImpact.error} <button type="button" onClick={() => setRows(current => [...current])}>Retry</button></p>)}
           </>}
         </div>
-        <footer className="budget-batch-footer"><div aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div><div><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
+        <footer className="budget-batch-footer">
+          <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}. Later saved budgets stay unchanged.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRows(current => [...current])}/>
+          {!item && <div className="budget-batch-summary" aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div>}
+          <div className="budget-batch-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>
     </section>
     {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard unsaved items?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { setDiscarding(false); onClose() }}><p>Your changes haven’t been saved.</p></ConfirmDialog>}
