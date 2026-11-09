@@ -40,7 +40,8 @@ export function validMonth(value: string | null): value is string {
 
 export function parseNavigation(search: string): NavigationState {
   const params = new URLSearchParams(search)
-  const budgetView = params.get('budgetView') === 'transfers' ? 'transfers' : 'plan'
+  const requested = params.get('budgetView')
+  const budgetView: BudgetView = requested === 'transfers' || requested === 'plan' ? requested : lastBudgetView()
   return {
     view: params.get('view') === 'household' ? 'household' : 'budget',
     budgetView,
@@ -50,9 +51,21 @@ export function parseNavigation(search: string): NavigationState {
   }
 }
 
+const LAST_BUDGET_VIEW_KEY = 'north.budgetView'
+
+/** A cold open with no view in the URL returns to the Plan/Transfers view used last on this device. */
+function lastBudgetView(): BudgetView {
+  try { return window.localStorage.getItem(LAST_BUDGET_VIEW_KEY) === 'transfers' ? 'transfers' : 'plan' } catch { return 'plan' }
+}
+
+function rememberBudgetView(view: BudgetView) {
+  try { window.localStorage.setItem(LAST_BUDGET_VIEW_KEY, view) } catch { /* Per-device convenience only. */ }
+}
+
 export function navigateTo(next: Partial<NavigationState>, { replace = false, historyState = null }: { replace?: boolean; historyState?: unknown } = {}) {
   const current = parseNavigation(window.location.search)
   const state = { ...current, ...next }
+  if (state.view === 'budget') rememberBudgetView(state.budgetView)
   const url = new URL(window.location.href)
   url.searchParams.set('view', state.view)
   if (state.view === 'budget') url.searchParams.set('budgetView', state.budgetView)

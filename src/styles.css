@@ -1332,3 +1332,9 @@ small, .muted, footer { color: #59665a; }
 /* Merged single-account bands: line the action label up with plain owner labels while keeping a 44px chevron target. */
 .transfer-matrix-parent-content button:first-child:has(+ .transfer-matrix-parent-action){margin-right:-22px}
 .transfer-matrix-parent-content .transfer-matrix-parent-action{position:relative}
+.budget-income-intro{margin:4px 0 0;color:var(--charcoal);font-size:14px;line-height:1.5}
+.budget-nowrap{white-space:nowrap}
+/* Routine over-budget state: normal weight, status colour on the overage only (spec: no alarming language for routine work). */
+.monthly-budget-page.mobile-budget-view-plan .budget-mobile-summary-value{font-weight:500}
+.budget-mobile-summary.is-deficit .budget-mobile-summary-value{color:var(--charcoal)}
+.budget-mobile-summary .budget-balance-over{color:#a54232}
