@@ -13,21 +13,19 @@ import { BudgetManagement } from './BudgetManagement'
 import { BudgetItemEditor } from './BudgetItemEditor'
 import { BudgetInfoDialog, MobileBudgetSummary } from './MobileBudgetViews'
 import { PaydaySteps } from './PaydaySteps'
-import { MobileTransferMatrix } from './MobileTransferMatrix'
-import { buildTransferMatrixModel, type TransferMatrixModel } from '../domain/transferMatrix'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
 import { commitItemBatch, moneyPence, type BudgetItemBatch } from '../domain/budgetItemDrafts'
 import { accountTypeLabel } from '../domain/accountTypes'
 import { accountPeople as accountPeopleFor, personTransferPlans } from '../domain/personTransfers'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../state/transferPerson'
-import { accountOptionLabels, matrixAccountLabels } from './budgetLabels'
+import { accountOptionLabels, compactAccountLabels } from './budgetLabels'
 import { formatEditScope, formatMonth } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
-import type { MatrixReturn, PlanDestination, StepsReturn } from '../state/navigation'
+import type { PlanDestination, StepsReturn } from '../state/navigation'
 import { MOBILE_QUERY } from '../breakpoints'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onOpenPlanDestination?: (destination: PlanDestination, origin?: MatrixReturn) => void; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; matrixReturn?: MatrixReturn | null; stepsReturn?: StepsReturn | null; planItemId?: string }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string }
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -44,7 +42,7 @@ function MonthControl({month,onChange,budgetMarkers,incomeMarkers}:{month:string
  return <div className="budget-v3-month"><button type="button" aria-label="Previous month" onClick={()=>onChange(shift(month,-1))}>‹</button><button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={()=>{setYear(Number(month.slice(0,4)));setOpen(!open)}}>{monthLabel(month)}</button><button type="button" aria-label="Next month" onClick={()=>onChange(shift(month,1))}>›</button>{open&&<div className="budget-v3-picker" role="dialog" aria-label="Choose budget month"><header><button type="button" onClick={()=>setYear(year-1)}>‹</button>{year}<button type="button" onClick={()=>setYear(year+1)}>›</button></header><div>{monthNames.map((name,i)=>{const key=`${year}-${String(i+1).padStart(2,'0')}`;const b=budgetMarkers.includes(key),inc=incomeMarkers.includes(key);return <button type="button" key={key} aria-label={`${name} ${year}${b?', budget updated':''}${inc?', income updated':''}`} onClick={()=>{onChange(key);setOpen(false)}}>{name.slice(0,3)}{(b||inc)&&<small aria-hidden="true">{b?'●':''}{inc?'•':''}</small>}</button>})}</div><p>● Budget updated · • Income updated</p></div>}</div>
 }
 
-export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onOpenPlanDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,matrixReturn,stepsReturn,planItemId}:Props) {
+export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId}:Props) {
  const mobilePresentation=useSyncExternalStore(subscribeMobile,getMobile,()=>false)
  const [localMonth,setLocalMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const month=sharedMonth??localMonth
@@ -57,8 +55,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const [ownerFilter,setOwnerFilter]=useState('All')
  const [categoryFilter,setCategoryFilter]=useState('All')
  const mobileBudgetView=sharedMobileBudgetView??'plan'
- const [matrixPreview,setMatrixPreview]=useState(false)
- const restoredMatrixKey=useRef<string|null>(null),pendingMatrixScroll=useRef<MatrixReturn|null>(null),planFocusItem=useRef<string|null>(planItemId??null),previousBudgetView=useRef(mobileBudgetView)
+ const planFocusItem=useRef<string|null>(planItemId??null),previousBudgetView=useRef(mobileBudgetView)
  const planDestinationHeading=useRef<HTMLDivElement>(null),previousPlanDestination=useRef<string|null>(null)
  const [transferCollapsed,setTransferCollapsed]=useState<Record<string,boolean>>({})
  const [infoDialog,setInfoDialog]=useState<'month'|'plan'|'transfers'|null>(null)
@@ -86,16 +83,13 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const editScopeLabel=formatEditScope(budgetEditScope(document.budget,month))
  const openIncome=()=>{setIncomeDraft({});setIncomeOpen(true)}
  const incomes=resolveIncomeSources(document.budget,month), transfers=budgetTransfers(document.budget,adults.map(p=>p.id),month,items)
- let matrixModel:TransferMatrixModel|undefined, matrixUnavailable=false
- if(mobilePresentation&&mobileBudgetView==='transfers'&&matrixPreview){try{matrixModel=buildTransferMatrixModel(document,month)}catch{matrixUnavailable=true}}
- const showMatrix=!!matrixModel
  let instructions:TransferInstructions|undefined
  try{instructions=buildTransferInstructions(document,month)}catch{/* Keep the comparison view available; unavailable instructions are labelled below. */}
  const unfundedItems=items.filter(item=>transfers.unresolvedItemIds.includes(item.id))
  const transferWarning=unfundedItems.length>0||!instructions
  const categories=document.budget.categories
  const accountLabels=accountOptionLabels(document.budget.accounts,adults)
- const allMatrixLabels=matrixAccountLabels(document.budget.accounts,adults)
+ const compactLabels=compactAccountLabels(document.budget.accounts,adults)
  const accountFor=(item:BudgetItem)=>{const destination=item.destination;if(destination.kind==='account')return document.budget.accounts.find(a=>a.id===destination.accountId);const potId=destination.potId;return document.budget.accounts.find(a=>a.id===document.budget.pots.find(p=>p.id===potId)?.accountId)}
  const ownerGroup=(item:BudgetItem)=>{const a=accountFor(item);if(!a)return 'Needs owner';if(a.ownerPersonIds.length>1)return 'Joint';if(!a.ownerPersonIds.length)return 'Needs owner';return adults.find(p=>p.id===a.ownerPersonIds[0])?.name??'Needs owner'}
  const matchesPlanDestination=(item:BudgetItem)=>{
@@ -105,7 +99,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   return accountFor(item)?.id===planDestination.id
  }
  const destinationItems=items.filter(matchesPlanDestination)
- const planDestinationLabel=(()=>{if(!planDestination)return '';if(planDestination.kind==='pot'){const pot=document.budget.pots.find(row=>row.id===planDestination.id);if(!pot)return 'Destination no longer available';const account=allMatrixLabels.get(pot.accountId),name=/\bpot$/i.test(pot.name)?pot.name:`${pot.name} pot`;return account?`${name} · ${account}`:'Destination no longer available'}const account=allMatrixLabels.get(planDestination.id);return account?planDestination.kind==='direct'?`Direct to account · ${account}`:account:'Destination no longer available'})()
+ const planDestinationLabel=(()=>{if(!planDestination)return '';if(planDestination.kind==='pot'){const pot=document.budget.pots.find(row=>row.id===planDestination.id);if(!pot)return 'Destination no longer available';const account=compactLabels.get(pot.accountId),name=/\bpot$/i.test(pot.name)?pot.name:`${pot.name} pot`;return account?`${name} · ${account}`:'Destination no longer available'}const account=compactLabels.get(planDestination.id);return account?planDestination.kind==='direct'?`Direct to account · ${account}`:account:'Destination no longer available'})()
  const searchMatch=(item:BudgetItem)=>{const needle=query.trim().toLocaleLowerCase();if(!needle)return true;const c=categories.find(x=>x.id===item.categoryId)?.name??'',a=accountFor(item),destination=item.destination,p=destination.kind==='pot'?document.budget.pots.find(x=>x.id===destination.potId)?.name??'':'';const owner=ownerGroup(item);return [item.name,c,a?.name,a?.provider,accountTypeLabel(a?.accountTypeId),p,owner].some(v=>v?.toLocaleLowerCase().includes(needle))}
  const rowsByOwner=new Map<string,Map<string,BudgetItem[]>>();for(const item of destinationItems.filter(item=>searchMatch(item)&&(categoryFilter==='All'||item.categoryId===categoryFilter))){const owner=ownerGroup(item),cat=categories.find(c=>c.id===item.categoryId)?.name??'Uncategorised';const cats=rowsByOwner.get(owner)??new Map<string,BudgetItem[]>();cats.set(cat,[...(cats.get(cat)??[]),item]);rowsByOwner.set(owner,cats)}const grouped=[...rowsByOwner]
  const total=items.reduce((sum,item)=>sum+item.amountPence,0)
@@ -127,7 +121,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,stepCount:selectedPersonPlan.stepCount},reviewCount:personPlans.needsReview.length}
  const potName=(potId:string)=>document.budget.pots.find(pot=>pot.id===potId)?.name??'Pot'
  const itemCounts=new Map(transferAccounts.map(account=>[account.accountId,account.items.length]))
- const seeTransferItems=(accountId:string)=>{if(onSeeTransferItems)onSeeTransferItems(accountId);else onOpenPlanDestination?.({kind:'account',id:accountId})}
  // Back from "See items": land on the same account's link, once per visit.
  const restoredStepsKey=useRef<string|null>(null)
  useLayoutEffect(()=>{
@@ -140,11 +133,11 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const affectedKey=mobilePresentation&&mobileBudgetView==='transfers'&&affectedTransfers?`${affectedTransfers.month}:${affectedTransfers.accounts.map(row=>row.accountId).join(',')}`:null
  const shownAffectedKey=useRef<string|null>(null)
  useLayoutEffect(()=>{
-  if(!affectedKey||shownAffectedKey.current===affectedKey||showMatrix)return
+  if(!affectedKey||shownAffectedKey.current===affectedKey)return
   shownAffectedKey.current=affectedKey
   const ids=affectedTransfers?.accounts.map(row=>row.accountId)??[]
   ;[...window.document.querySelectorAll<HTMLElement>('.payday [data-payday-account]')].find(step=>ids.includes(step.dataset.paydayAccount??''))?.scrollIntoView?.({block:'center'})
- },[affectedKey,affectedTransfers,showMatrix])
+ },[affectedKey,affectedTransfers])
  const start=(item?:BudgetItem)=>{setInlineId(null);setInlineSavedItem(null);setSavedImpact(null);setFormError('');setEditingItem(item);setEditor(true)}
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)
@@ -223,28 +216,6 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   }
   previousBudgetView.current=mobileBudgetView
  })
- useLayoutEffect(()=>{
-  if(mobileBudgetView==='plan')restoredMatrixKey.current=null
-  if(mobileBudgetView==='transfers'&&matrixReturn&&restoredMatrixKey.current!==matrixReturn.key){
-   restoredMatrixKey.current=matrixReturn.key
-   pendingMatrixScroll.current=matrixReturn
-   setMatrixPreview(true)
-  }
-  if(mobileBudgetView==='transfers'&&pendingMatrixScroll.current&&(showMatrix||matrixUnavailable)){
-   const {destination,accountId,scrollTop,scrollLeft}=pendingMatrixScroll.current
-   const wrap=window.document.querySelector<HTMLElement>('.transfer-matrix-scroll')
-   if(wrap){
-    wrap.scrollTop=Math.max(0,Math.min(scrollTop,wrap.scrollHeight-wrap.clientHeight))
-    wrap.scrollLeft=Math.max(0,Math.min(scrollLeft,wrap.scrollWidth-wrap.clientWidth))
-   }
-   const buttons=Array.from(window.document.querySelectorAll<HTMLButtonElement>('[data-matrix-plan-kind]')).filter(button=>button.getAttribute('aria-hidden')!=='true')
-   const target=buttons.find(button=>button.dataset.matrixPlanKind===destination.kind&&button.dataset.matrixPlanId===destination.id)
-    ??buttons.find(button=>button.dataset.matrixPlanKind==='account'&&button.dataset.matrixPlanId===accountId)
-    ??buttons.find(button=>button.dataset.matrixAccountId===accountId)
-    ??window.document.querySelector<HTMLButtonElement>('[data-matrix-preview-toggle]')
-   target?.focus({preventScroll:true});pendingMatrixScroll.current=null
-  }
- },[mobileBudgetView,matrixReturn,month,showMatrix,matrixUnavailable])
  const groupLabel=(group:{items:BudgetItem[]})=>`${group.items.length} items · ${query||planDestination?'Matching total ':''}${pounds(group.items.reduce((sum,item)=>sum+item.amountPence,0))}`
  const groupButton=(group:{name:string;key:string;items:BudgetItem[];collapsed:boolean},sticky=false)=>{
   const Icon=group.collapsed?ChevronRight:ChevronDown
@@ -281,9 +252,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
    <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Employment income</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Additional income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
   </article>})}</div></div>
   {unfundedItems.length>0&&<div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length===1?'item':'items'} can’t be funded yet.</strong> <button type="button" onClick={()=>openIncome()}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item=><li key={item.id}>{item.name}</li>)}</ul></details></div>}
-  {!instructions&&<p className="budget-v3-transfer-warning" role="alert">Transfer instructions are unavailable. The comparison below may be incomplete; review the budget before moving money.</p>}{mobilePresentation&&mobileBudgetView==='transfers'&&<div className="transfer-matrix-preview-control"><div className="transfer-view-switch" role="group" aria-label="Transfers view"><button type="button" aria-pressed={!showMatrix} onClick={()=>setMatrixPreview(false)}>List</button><button type="button" aria-pressed={showMatrix} data-matrix-preview-toggle onClick={()=>setMatrixPreview(true)}>Matrix</button></div>{matrixUnavailable&&<p role="status">The matrix is unavailable for this budget. The list is still available.</p>}</div>}
-  {transferAccounts.length===0?(showMatrix?null:<div className="budget-v3-transfer-empty"><h3>No transfers planned</h3><p>Budget items assigned to accounts or pots will appear here.</p></div>):<>
-   {!transferWarning&&!showMatrix&&<AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Transfers by destination</h3>{instructions?.incomplete&&<span className="budget-desktop-only">Account instructions need review: *</span>}</div>
+  {!instructions&&<p className="budget-v3-transfer-warning" role="alert">Transfer instructions are unavailable. The comparison below may be incomplete; review the budget before moving money.</p>}
+  {transferAccounts.length===0?<div className="budget-v3-transfer-empty"><h3>No transfers planned</h3><p>Budget items assigned to accounts or pots will appear here.</p></div>:<>
+   {!transferWarning&&<AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Transfers by destination</h3>{instructions?.incomplete&&<span className="budget-desktop-only">Account instructions need review: *</span>}</div>
    <div className="budget-v3-transfer-table-wrap"><table className="budget-v3-transfer-table">
     <caption className="visually-hidden">Monthly transfer amounts by destination and person</caption>
     <thead><tr><th scope="col">Destination</th>{transfers.people.map(person=><th scope="col" key={person.personId}>{adults.find(row=>row.id===person.personId)?.name??'Person'}</th>)}<th scope="col">Total</th></tr></thead>
@@ -294,10 +265,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
     <tfoot><tr className={instructions?.incomplete?'is-incomplete':undefined}><th scope="row">Funding total</th>{transfers.people.map(person=><td key={person.personId}>{pounds(person.plannedPence)}</td>)}<td>{pounds(transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0))}{instructions?.incomplete?' *':''}</td></tr></tfoot>
    </table></div>
    {transferAccounts.some(account=>account.hasPots)&&<p className="budget-v3-transfer-rounding">Pot movements are already inside each account total.</p>}
-   {!showMatrix&&<PaydaySteps plans={personPlans} selection={transferPerson} labels={accountLabels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeTransferItems||onOpenPlanDestination?seeTransferItems:undefined} affectedAccounts={affectedTransfers?.accounts.map(row=>row.accountId)}/>}
+   <PaydaySteps plans={personPlans} selection={transferPerson} labels={accountLabels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeTransferItems} affectedAccounts={affectedTransfers?.accounts.map(row=>row.accountId)}/>
 
   </>}
-  {matrixModel&&<MobileTransferMatrix key={matrixModel.month} model={matrixModel} restoredExpandedIds={matrixReturn?.expandedIds} labels={matrixAccountLabels(document.budget.accounts.filter(account=>matrixModel.accounts.some(row=>row.accountId===account.id)),adults)} onPlanDestination={onOpenPlanDestination?(destination,accountId,expandedIds)=>{const wrap=window.document.querySelector<HTMLElement>('.transfer-matrix-scroll');const origin:MatrixReturn={key:crypto.randomUUID(),month,expandedIds,scrollTop:wrap?.scrollTop??0,scrollLeft:wrap?.scrollLeft??0,destination,accountId};setQuery('');setOwnerFilter('All');setSearchCollapsed({});onOpenPlanDestination(destination,origin)}:undefined}/>}
  </section>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const planFilters=<div className="budget-v3-controls"><div className="budget-v3-search-field"><label className="budget-v3-search"><span className="budget-v3-search-label">Search items, categories, owners, accounts or pots</span><input ref={searchRef} value={query} onPointerDownCapture={captureBrowseScroll} onFocus={captureBrowseScroll} onChange={e=>updateSearch(e.target.value)} placeholder="Search budget"/></label>{searchMode&&<button type="button" className="budget-v3-search-clear" onClick={()=>{updateSearch('');window.requestAnimationFrame(()=>searchRef.current?.focus({preventScroll:true}))}}>Clear search</button>}</div><label className="budget-v3-filter budget-v3-owner-filter">Owner<select className="budget-v3-filter-select" value={ownerFilter} onChange={e=>setOwnerFilter(e.target.value)}><option>All</option>{ownerOrder.filter(owner=>owner!=='Needs owner').map(owner=><option key={owner}>{owner}</option>)}{ownerOrder.includes('Needs owner')&&<option>Needs owner</option>}</select></label><label className="budget-v3-filter budget-v3-category-filter">Category<select className="budget-v3-filter-select" value={categoryFilter} onChange={e=>setCategoryFilter(e.target.value)}><option value="All">All</option>{categories.map(category=><option key={category.id} value={category.id}>{category.name}</option>)}</select></label></div>
@@ -350,7 +320,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
    <p>These are account funding requirements. Pot allocations are included in those totals, then moved within the account. Sources, automatic payments and payment status are not recorded.</p>
    <dl className="budget-info-metrics"><div><dt>Destination accounts</dt><dd>{transferAccounts.length}</dd></div></dl>
    <p>Amounts include exact pennies. Account totals include their allocations once; do not add the breakdown again.</p>
-   {(instructions?.incomplete??matrixModel?.totals.incomplete??transfers.unresolvedItemIds.length>0)&&<p>Totals include calculated contributions only. Review incomplete allocations or missing pot responsibility before using the account instructions.</p>}
+   {(instructions?.incomplete??transfers.unresolvedItemIds.length>0)&&<p>Totals include calculated contributions only. Review incomplete allocations or missing pot responsibility before using the account instructions.</p>}
   </>}
  </BudgetInfoDialog>}
  {editor&&<BudgetItemEditor document={document} month={month} item={editingItem} onSave={saveBatch} onClose={()=>setEditor(false)}/>}

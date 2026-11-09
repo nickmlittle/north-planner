@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 export interface GroupedTableGroup {
   key: string
@@ -28,21 +28,6 @@ export function GroupedTableDisclosure({ groupKey, sticky = false, expanded, lab
   return <button type="button" data-group-control={groupKey} data-sticky={sticky ? 'true' : undefined}
     tabIndex={hidden ? -1 : undefined} aria-hidden={hidden || undefined} aria-label={label}
     aria-expanded={expanded} onClick={onClick}>{children}</button>
-}
-
-export function GroupedTableAction({ groupKey, controlKey, sticky = false, label, onClick, children, className, ...rest }: {
-  groupKey: string
-  controlKey?: string
-  sticky?: boolean
-  label: string
-  onClick: () => void
-  children: ReactNode
-  className?: string
-} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'children' | 'aria-label'>) {
-  const active = useContext(ActiveGroups).includes(groupKey)
-  const hidden = sticky ? !active : active
-  return <button {...rest} type="button" className={className} data-group-control={controlKey ?? groupKey} data-group-active-key={groupKey} data-sticky={sticky ? 'true' : undefined}
-    tabIndex={hidden ? -1 : undefined} aria-hidden={hidden || undefined} aria-label={label} onClick={onClick}>{children}</button>
 }
 
 export function GroupedTableBandRow({ group, colSpan, className, dataGroup, children }: {

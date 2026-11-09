@@ -9,7 +9,7 @@ import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
-import { hasLiveTransfersOrigin, markMatrixOrigin, markStepsOrigin, matrixReturnFromState, navigateTo, parseNavigation, stepsReturnFromState, transfersOriginState, type BudgetView, type MatrixReturn, type PlanDestination, type PlannerView } from './state/navigation'
+import { hasLiveTransfersOrigin, markStepsOrigin, navigateTo, parseNavigation, stepsReturnFromState, transfersOriginState, type BudgetView, type PlanDestination, type PlannerView } from './state/navigation'
 
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
 
@@ -33,10 +33,6 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     if (!setupComplete || (view === 'budget' && navigation.budgetView === nextView)) return
     navigateTo({ view: 'budget', budgetView: nextView })
   }
-  const openPlanDestination = (destination: PlanDestination, origin?: MatrixReturn) => {
-    if (origin) markMatrixOrigin(origin)
-    navigateTo({ view: 'budget', budgetView: 'plan', month: navigation.month, planDestination: destination }, { historyState: origin ? transfersOriginState(origin, destination) : null })
-  }
   /** "See items" in the payday steps: Plan filtered to that account, with Back returning to the same step. */
   const seeTransferItems = (accountId: string) => {
     const origin = { key: crypto.randomUUID(), month: navigation.month, accountId }, destination: PlanDestination = { kind: 'account', id: accountId }
@@ -53,7 +49,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
     {view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
-      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onOpenPlanDestination={openPlanDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} matrixReturn={navigation.budgetView === 'transfers' ? matrixReturnFromState() : null} stepsReturn={navigation.budgetView === 'transfers' ? stepsReturnFromState() : null} onReturnToTransfers={returnToTransfers} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
+      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={navigation.budgetView === 'transfers' ? stepsReturnFromState() : null} onReturnToTransfers={returnToTransfers} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
   </AppLayout>
 }
 
