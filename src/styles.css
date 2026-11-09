@@ -276,6 +276,36 @@ small, footer { color: var(--muted) }
   .mobile-bottom-nav button:focus-visible,.mobile-utility-trigger:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
   .mobile-save-alert{display:block;margin:0;padding:var(--space-2) var(--page-gutter-right) var(--space-2) var(--page-gutter-left);background:var(--status-review-bg);color:var(--status-error);font-size:var(--text-sm)}
 
+  /* Plan and Transfers put ‹ month ▾ › and ⋯ in the header; the title stays for screen readers. */
+  .mobile-header-slot{display:flex;flex:1;min-width:0}
+  .mobile-header-slot:empty{display:none}
+  .mobile-app-header:has(.mobile-header-slot:not(:empty)) h1{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .mobile-app-header:has(.mobile-header-slot:not(:empty)) .mobile-utility-trigger{display:none}
+  .mobile-app-header:has(.mobile-header-slot:not(:empty)){padding-left:max(var(--space-1),env(safe-area-inset-left,0px));padding-right:max(var(--space-1),env(safe-area-inset-right,0px))}
+  .mobile-header-page{display:flex;align-items:center;justify-content:space-between;gap:var(--space-1);width:100%;min-width:0}
+  .mobile-header-page .budget-v3-month{flex-wrap:nowrap;gap:0;min-width:0}
+  .mobile-header-page .budget-v3-month>button{display:inline-flex;align-items:center;justify-content:center;margin:0;border:0;background:transparent}
+  .mobile-header-page .budget-v3-month>button:first-child,.mobile-header-page .budget-v3-month>button:nth-child(3){flex:none;width:44px;min-height:44px;padding:0}
+  .mobile-header-page .budget-v3-month>button:nth-child(2){gap:var(--space-1);min-width:0;min-height:44px;padding:var(--space-1) var(--space-1);font-size:var(--text-lg);font-weight:700;white-space:nowrap}
+  .mobile-header-page .budget-v3-month>button svg{width:20px;height:20px}
+  .mobile-header-page .budget-v3-month>button .budget-v3-month-caret{width:16px;height:16px}
+  .mobile-header-page .budget-v3-month>button:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+  .mobile-header-page .budget-v3-picker{top:48px;left:4px}
+  .budget-mobile-options{display:inline-flex;align-items:center;justify-content:center;gap:2px;flex:none;min-width:44px;min-height:44px;margin:0;padding:var(--space-1);border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);font:inherit;cursor:pointer}
+  .budget-mobile-options svg{width:22px;height:22px}
+  .budget-mobile-options:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+  .monthly-budget-page .budget-page-titlebar .budget-v3-date-context{min-height:0}
+  /* The slim meter docks above the bottom nav, so the table's sticky headings keep the top. */
+  .allocation-meter-mini{position:fixed;z-index:70;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:flex;align-items:center;gap:var(--space-3);height:36px;padding:0 max(var(--page-gutter-right),env(safe-area-inset-right,0px)) 0 max(var(--page-gutter-left),env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--card);color:var(--pine);font-size:var(--text-md);font-weight:700;font-variant-numeric:tabular-nums}
+  .allocation-meter-mini.is-deficit{color:var(--status-error)}
+  .allocation-meter-mini.is-balanced{color:var(--charcoal)}
+  .allocation-meter-mini-balance{flex:none;white-space:nowrap}
+  .allocation-meter-mini-track{flex:1;height:4px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
+  .allocation-meter-mini-fill{display:block;height:100%;border-radius:var(--radius-pill);background:currentColor}
+  .planner-app-content:has(.allocation-meter-mini){padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .planner-app-shell:has(.allocation-meter-mini) .budget-v3-inline-row form{scroll-margin-bottom:calc(108px + env(safe-area-inset-bottom,0px))}
+  .planner-app-shell:has([aria-modal=true]) .allocation-meter-mini,.planner-app-shell:has(.budget-v3-overlay) .allocation-meter-mini{display:none}
+
   .page-frame>.page-frame-heading{display:none}
   .planner-app-shell:has(.budget-v3-overlay) .mobile-bottom-nav,.planner-app-shell:has(.budget-batch-overlay) .mobile-bottom-nav,.planner-app-shell:has([aria-modal=true]) .mobile-bottom-nav{display:none}
 }
@@ -714,6 +744,13 @@ small, footer { color: var(--muted) }
 .allocation-meter-edit svg{width:16px;height:16px}
 .allocation-meter-edit:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
 .allocation-meter-basis{color:var(--muted);font-size:var(--text-sm)}
+.allocation-meter.is-compact{gap:var(--space-2);padding:var(--space-3) var(--space-4) var(--space-2)}
+.allocation-meter.is-compact .allocation-meter-balance strong{font-size:var(--text-2xl);letter-spacing:-.5px}
+.allocation-meter.is-compact .allocation-meter-balance span{font-size:var(--text-lg)}
+.allocation-meter.is-compact .allocation-meter-track{height:8px}
+.allocation-meter.is-compact .allocation-meter-detail{font-size:var(--text-sm)}
+.budget-account-status{margin-top:var(--space-4);padding-top:var(--space-1);border-top:1px solid var(--line)}
+.budget-account-status .mobile-utility-status{margin:var(--space-3) 0}
 @media(prefers-reduced-motion:reduce){.allocation-meter-fill{transition:none}}
 /* ⋯: the budget's less frequent actions. */
 .budget-options-menu{position:relative}
@@ -839,7 +876,7 @@ small, footer { color: var(--muted) }
 .budget-v3-owner button[aria-hidden=true],.budget-v3-category button[aria-hidden=true]{visibility:hidden}
 
 /* Mobile monthly budget: one shared summary rhythm and vertical destinations. */
-.budget-mobile-summary,.payday,.budget-mobile-plan-heading,.budget-mobile-month-options{display:none}
+.budget-mobile-summary,.payday,.budget-mobile-plan-heading{display:none}
 .budget-info-dialog{box-sizing:border-box;position:relative;width:min(440px,calc(100% - 32px));max-height:90dvh;margin:auto;padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);color:var(--charcoal);box-shadow:var(--shadow-dialog);overflow:auto;overscroll-behavior:contain}
 .budget-info-overlay{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;background:var(--scrim)}
 .budget-info-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
@@ -865,7 +902,6 @@ small, footer { color: var(--muted) }
   .monthly-budget-page .budget-desktop-summary,.monthly-budget-page .budget-desktop-toolbar,.monthly-budget-page .budget-desktop-only{display:none}
   .monthly-budget-page>.page-frame-summary{padding:0;margin-bottom:var(--space-3)}
   .monthly-budget-page .budget-v3-date-note{flex:1;min-width:0;font-size:var(--text-sm);text-align:left;overflow-wrap:anywhere}
-  .monthly-budget-page .budget-mobile-month-options{display:block;flex:none;min-height:44px;margin:0 0 0 auto;padding:var(--space-1);font-size:var(--text-sm)}
   .monthly-budget-page .budget-v3-month>button{min-height:44px}
   .budget-mobile-summary{display:grid;gap:var(--space-1);box-sizing:border-box;min-width:0;padding:var(--space-2) var(--space-3) var(--space-3);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card)}
   .budget-mobile-summary-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
@@ -877,27 +913,13 @@ small, footer { color: var(--muted) }
   .monthly-budget-page.budget-view-transfers .budget-mobile-summary-heading h2{font-size:var(--text-md);font-weight:600}
   .monthly-budget-page.budget-view-transfers .budget-mobile-summary-value{font-size:var(--text-2xl)}
   .budget-mobile-allocation-status{margin:2px 0 0;color:var(--muted);font-size:var(--text-sm);line-height:1.4}
-  .budget-mobile-summary.is-deficit .budget-mobile-summary-value,.budget-allocation-incomplete{color:var(--status-error)}
-  .budget-mobile-summary-support{display:flex;gap:var(--space-4);margin:var(--space-1) 0 0;font-size:var(--text-sm);line-height:1.4}
-  .budget-mobile-summary-support>div{min-width:0;overflow-wrap:anywhere}
-  .budget-mobile-summary-support dt{color:var(--muted);font-size:var(--text-sm);line-height:1.5}
-  .budget-mobile-summary-support dd{margin:0;font-size:var(--text-sm);font-weight:650;line-height:1.4;font-variant-numeric:tabular-nums}
+  .budget-allocation-incomplete{color:var(--status-error)}
 
   .budget-mobile-plan-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}
   .budget-mobile-plan-heading h2{margin:0;font-size:var(--text-lg);color:var(--pine)}
   .budget-mobile-plan-heading button{min-height:44px;margin:0;padding:var(--space-2) var(--space-3);font-size:var(--text-md)}
   .monthly-budget-page .budget-v3-filter-select{font-size:var(--text-md)}
   .monthly-budget-page .budget-v3-search input{min-height:44px;margin:0;font-size:var(--text-lg)}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary{display:grid;gap:2px;padding:var(--space-2) var(--space-3)}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-heading{display:contents}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-heading h2{display:none}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-value{order:0;font-size:clamp(var(--text-lg),5vw,var(--text-xl));line-height:1.2}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-support{flex-wrap:wrap;gap:0 var(--space-1);margin:0}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-support>div{display:flex;gap:var(--space-1)}
-  .monthly-budget-page.budget-view-plan .budget-mobile-summary-support>div+div::before{content:'·';color:var(--muted)}
-  .budget-mobile-summary-basis{margin:0;color:var(--muted);font-size:var(--text-sm);line-height:1.4}
-  .budget-mobile-summary.is-surplus .budget-mobile-summary-value{color:var(--pine)}
-  .budget-mobile-summary.is-balanced .budget-mobile-summary-value{color:var(--charcoal)}
   .monthly-budget-page.budget-view-plan .budget-v3-controls{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:var(--space-2);margin-bottom:var(--space-2)}
   .monthly-budget-page.budget-view-plan .budget-v3-search-field{grid-column:1/-1}
   .monthly-budget-page.budget-view-plan .budget-v3-filter{gap:2px;font-size:var(--text-sm)}
@@ -944,7 +966,7 @@ small, footer { color: var(--muted) }
   .payday-see-items{display:inline-flex;align-items:center;gap:2px;justify-self:start;min-height:44px;margin:-8px 0 -12px -4px;padding:0 var(--space-1);border:0;background:none;color:var(--pine);font:650 var(--text-sm) var(--font-family);cursor:pointer}
   .payday-see-items svg{flex:none}
   .payday-see-items:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
-  .budget-mobile-summary button:focus-visible,.budget-mobile-month-options:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+  .budget-mobile-summary button:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
 }
 
 /* Effective-month context is visible before an edit is committed. */
@@ -1002,6 +1024,3 @@ small, footer { color: var(--muted) }
 .budget-income-intro{margin:var(--space-1) 0 0;color:var(--charcoal);font-size:var(--text-md);line-height:1.5}
 .budget-nowrap{white-space:nowrap}
 /* Routine over-budget state: normal weight, status colour on the overage only (spec: no alarming language for routine work). */
-.monthly-budget-page.budget-view-plan .budget-mobile-summary-value{font-weight:500}
-.budget-mobile-summary.is-deficit .budget-mobile-summary-value{color:var(--charcoal)}
-.budget-mobile-summary .budget-balance-over{color:var(--status-error)}

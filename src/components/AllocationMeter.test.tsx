@@ -12,7 +12,7 @@ it.each([
   { available: 400000, planned: 100000, text: '£3,000.00 left', state: 'is-surplus', now: '25' },
 ])('leads with $text', ({ available, planned, text, state, now }) => {
   render(<AllocationMeter availablePence={available} plannedPence={planned} onEditIncome={() => {}}/>)
-  const summary = screen.getByRole('region', { name: 'Budget summary' })
+  const summary = screen.getByRole('region', { name: 'Plan summary' })
   expect(summary).toHaveClass(state)
   expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent(text)
   expect(screen.getByRole('meter', { name: 'Planned' })).toHaveAttribute('aria-valuenow', now)

@@ -13,7 +13,7 @@ function plannedShare(availablePence: number, plannedPence: number): number | nu
  * The Plan's answer first: what's left (or over), then a bar of Planned against Available and the sentence behind it.
  * The pencil edits income, beside the figure it changes. `compact` drops the share and the basis for phones.
  */
-export function AllocationMeter({ availablePence, plannedPence, basis, onEditIncome, compact = false, className = '', label = 'Budget summary' }: {
+export function AllocationMeter({ availablePence, plannedPence, basis, onEditIncome, compact = false, className = '', label = 'Plan summary' }: {
   availablePence: number
   plannedPence: number
   /** Where Available comes from, e.g. "£7,940.00 salary + £400.00 other". */
@@ -41,4 +41,15 @@ export function AllocationMeter({ availablePence, plannedPence, basis, onEditInc
       {!compact && basis && <span className="allocation-meter-basis">({basis})</span>}
     </p>
   </section>
+}
+
+/** The meter in one line, docked above the phone's bottom nav while the card is scrolled away. A visual echo of the card, so hidden from screen readers. */
+export function AllocationMeterMini({ availablePence, plannedPence }: { availablePence: number; plannedPence: number }) {
+  const balance = availablePence - plannedPence
+  const share = plannedShare(availablePence, plannedPence)
+  const fill = share === null ? (plannedPence > 0 ? 100 : 0) : Math.min(share, 100)
+  return <div className={`allocation-meter-mini ${balance < 0 ? 'is-deficit' : balance === 0 ? 'is-balanced' : 'is-surplus'}`} aria-hidden="true">
+    <span className="allocation-meter-mini-balance">{balance === 0 ? 'Balanced' : `${pounds(Math.abs(balance))} ${balance < 0 ? 'over' : 'left'}`}</span>
+    <span className="allocation-meter-mini-track"><span className="allocation-meter-mini-fill" style={{ width: `${fill}%` }}/></span>
+  </div>
 }

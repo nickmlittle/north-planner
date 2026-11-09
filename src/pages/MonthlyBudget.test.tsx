@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { MonthlyBudget } from './MonthlyBudget'
@@ -123,7 +123,7 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   expect(filterValue('Owner')).toBe('Nick')
   expect(scrollTo).toHaveBeenCalledWith(0,420)
 })
-it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(within(screen.getByRole('region',{name:'Plan summary'})).getByText('£10.00 over')).toBeVisible();expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
+it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
 it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{name:'Monthly budget'}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
 it('removes an item from inside its editor after the same confirm, and keeps the edit open on cancel',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
@@ -865,15 +865,14 @@ it.each([
   initial.budget.snapshots[month]={items:[{id:'bill',name:'Bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   render(<SeededHarness initial={initial}/>)
   const summary=screen.getByRole('region',{name:'Plan summary'})
-  expect(summary).toHaveTextContent(text)
-  expect(summary).toHaveTextContent('Available')
-  expect(summary).not.toHaveTextContent('Budget balance')
-  expect(summary).not.toHaveTextContent('Employment split basis')
-  expect(summary).toHaveTextContent(`Available£${(income/100).toFixed(2)}Planned£10.00`)
-  // The basis only shows when it isn't the usual "all from salary".
-  if(income) expect(summary).not.toHaveTextContent('from salary')
-  else expect(summary).toHaveTextContent('Available: no income yet')
-  expect(within(summary).queryByRole('button')).not.toBeInTheDocument()
+  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent(text)
+  expect(summary).toHaveTextContent(`£10.00 planned of £${(income/100).toFixed(2)} available`)
+  expect(within(summary).getByRole('meter',{name:'Planned'})).toBeInTheDocument()
+  // Phones keep the card short: no share and no basis; the pencil still edits income.
+  expect(summary).not.toHaveTextContent('% planned')
+  expect(summary).not.toHaveTextContent('salary')
+  fireEvent.click(within(summary).getByRole('button',{name:'Edit income'}))
+  expect(screen.getByRole('heading',{name:/income/i})).toBeInTheDocument()
 })
 
 it('shows mobile items under combined owner and category headers and filters them',()=>{
@@ -901,9 +900,9 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[]}
   render(<SeededHarness initial={initial}/>)
-  const trigger=screen.getByRole('button',{name:'Month & income'})
+  const trigger=screen.getByRole('button',{name:'Budget and account'})
   trigger.focus();fireEvent.click(trigger)
-  const dialog=screen.getByRole('dialog',{name:'Month & income'})
+  const dialog=screen.getByRole('dialog',{name:'Budget and account'})
   const close=within(dialog).getByRole('button',{name:'Close dialog'}),remove=within(dialog).getByRole('button',{name:/^(Go back to|Clear) the .* budget$/})
   expect(close).toHaveFocus()
   fireEvent.keyDown(close,{key:'Tab',shiftKey:true})
@@ -913,27 +912,27 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   fireEvent.click(remove)
   fireEvent.click(within(screen.getByRole('dialog',{name:/budget\?$/})).getByRole('button',{name:'Cancel'}))
   expect(savedBudget().snapshots[month]).toBeDefined()
-  expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
 })
 
 it('hands off from month options to income and management and restores focus',()=>{
   render(<SeededHarness initial={seededDocument()} view="transfers"/>)
-  const trigger=screen.getByRole('button',{name:'Month & income'})
+  const trigger=screen.getByRole('button',{name:'Budget and account'})
   trigger.focus();fireEvent.click(trigger)
-  let dialog=screen.getByRole('dialog',{name:'Month & income'})
+  let dialog=screen.getByRole('dialog',{name:'Budget and account'})
   expect(within(dialog).queryByRole('button',{name:/^(Go back to|Clear) the/})).not.toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button',{name:'Edit income'}))
-  expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
   const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
   expect(form).toContainElement(document.activeElement as HTMLElement)
   expect(form.closest('.page-frame-body')).toBeNull()
   fireEvent.click(within(form).getByRole('button',{name:'Cancel'}))
   expect(trigger).toHaveFocus()
   fireEvent.click(trigger)
-  dialog=screen.getByRole('dialog',{name:'Month & income'})
+  dialog=screen.getByRole('dialog',{name:'Budget and account'})
   fireEvent.click(within(dialog).getByRole('button',{name:'Manage accounts, pots & categories'}))
-  expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
   const management=screen.getByRole('dialog',{name:'Manage accounts, pots & categories'})
   expect(management).toContainElement(document.activeElement as HTMLElement)
   fireEvent.click(within(management).getByRole('button',{name:'Close'}))
@@ -989,8 +988,8 @@ it.each(['plan', 'transfers'] as const)('identifies inherited months and hides g
   fireEvent.click(screen.getByRole('button', { name: 'December 2026' }))
   expect(within(screen.getByRole('dialog', { name: 'Choose budget month' })).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
   fireEvent.click(screen.getAllByRole('button', { name: 'December 2026' })[0]!)
-  fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
-  const dialog = screen.getByRole('dialog', { name: 'Month & income' })
+  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
+  const dialog = screen.getByRole('dialog', { name: 'Budget and account' })
   expect(dialog).not.toHaveTextContent('Budget edits apply')
   expect(within(dialog).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
 })
@@ -1040,8 +1039,8 @@ it('confirms the exact item-removal range', () => {
 
 it('explains what replaces a cleared budget, including when there is no previous budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
-  fireEvent.click(within(screen.getByRole('dialog', { name: 'Month & income' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Budget and account' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
   const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   expect(dialog).toHaveTextContent('November 2026–February 2027 will use no budget.')
   fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the November 2026 budget' }))
@@ -1064,8 +1063,8 @@ it('shows the balance change of a removal directly above its confirm button', ()
 
 it('shows the balance change of clearing a month budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
-  fireEvent.click(within(screen.getByRole('dialog', { name: 'Month & income' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Budget and account' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
   const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget.')
@@ -1159,6 +1158,7 @@ it.each([
   {sources:[{id:'gift',personId:'nick',name:'Gift',type:'additional' as const,baseAmountPence:5000,changes:{}}],text:'none from salary'},
   {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'(£50.00 salary + £10.00 other)'},
 ])('explains where available money comes from: $text',({sources,text})=>{
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const initial=seededDocument()
   initial.budget.incomeSources=sources
   render(<SeededHarness initial={initial}/>)
@@ -1192,11 +1192,49 @@ it('keeps the budget actions in the ⋯ menu, and Transfers gets neither the met
   fireEvent.click(within(toolbar).getByRole('button', { name: 'More budget options' }))
   fireEvent.click(within(toolbar).getByRole('menuitem', { name: 'Manage accounts, pots & categories' }))
   expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Budget summary' })).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Plan summary' })).toBeInTheDocument()
   unmount()
   render(<SeededHarness initial={seededDocument()} view="transfers"/>)
   const transfersToolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
   expect(within(transfersToolbar).queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
   expect(within(transfersToolbar).getByRole('button', { name: 'More budget options' })).toBeInTheDocument()
-  expect(screen.queryByRole('region', { name: 'Budget summary' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Plan summary' })).not.toBeInTheDocument()
+})
+
+it('puts the budget actions, save status and account in one ⋯ sheet on phones', () => {
+  const signOut = vi.fn()
+  render(<MonthlyBudget document={seededDocument()} setDocument={vi.fn()} saveStatus="Saving…" email="ada@example.com" onSignOut={signOut}/>)
+  expect(screen.queryByRole('button', { name: 'Month & income' })).not.toBeInTheDocument()
+  const trigger = screen.getByRole('button', { name: 'Budget and account' })
+  expect(trigger).toHaveTextContent('◌')
+  fireEvent.click(trigger)
+  const sheet = screen.getByRole('dialog', { name: 'Budget and account' })
+  expect(within(sheet).getByRole('button', { name: 'Edit income' })).toBeInTheDocument()
+  expect(within(sheet).getByRole('button', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
+  expect(within(sheet).getByText('Saving…')).toBeInTheDocument()
+  expect(within(sheet).getByText('ada@example.com')).toBeInTheDocument()
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Sign out' }))
+  expect(signOut).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('dialog', { name: 'Budget and account' })).not.toBeInTheDocument()
+})
+
+it('moves the month and ⋯ into the app header on phones, and docks a slim meter once the card scrolls away', () => {
+  let report: ((entries: Partial<IntersectionObserverEntry>[]) => void) | undefined
+  vi.stubGlobal('IntersectionObserver', class { constructor(callback: (entries: Partial<IntersectionObserverEntry>[]) => void) { report = callback } observe() {} disconnect() {} })
+  const slot = document.createElement('div')
+  slot.id = 'mobile-header-page-slot'
+  document.body.append(slot)
+  try {
+    render(<SeededHarness initial={seededDocument()}/>)
+    expect(within(slot).getByRole('button', { name: 'Previous month' })).toBeInTheDocument()
+    expect(within(slot).getByRole('button', { name: 'Budget and account' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Previous month' })).toHaveLength(1)
+    expect(document.querySelector('.allocation-meter-mini')).toBeNull()
+    act(() => report?.([{ isIntersecting: false, boundingClientRect: { bottom: -10 } as DOMRect }]))
+    const mini = document.querySelector('.allocation-meter-mini')!
+    expect(mini).toHaveAttribute('aria-hidden', 'true')
+    expect(mini).toHaveTextContent(/^£[\d,.]+ (left|over)$|^Balanced$/)
+    act(() => report?.([{ isIntersecting: true, boundingClientRect: { bottom: 200 } as DOMRect }]))
+    expect(document.querySelector('.allocation-meter-mini')).toBeNull()
+  } finally { slot.remove() }
 })
