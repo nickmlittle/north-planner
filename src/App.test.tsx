@@ -12,7 +12,7 @@ async function completeSetup() {
   fireEvent.click(screen.getByRole('button', { name: '+ Add an adult' }))
   fireEvent.change(screen.getByLabelText('Adult 1 name'), { target: { value: 'Alex' } })
   fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
-  await screen.findByRole('heading', { name: 'Budget your month' })
+  await screen.findByRole('heading', { name: 'Monthly budget' })
 }
 
 function savedTransferDocument() {
@@ -36,7 +36,7 @@ it('previews an edit and routes its saved account change to the same month in Tr
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=plan&month=2026-02')
   render(<App />)
-  await screen.findByRole('heading', { name: 'Budget your month' })
+  await screen.findByRole('heading', { name: 'Monthly budget' })
   fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByRole('button', { name: 'Rent' }))
   const form = screen.getByRole('form', { name: 'Edit budget item' })
@@ -57,7 +57,7 @@ it('starts with household setup and saves only the new budget key', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'Continue to Budget' }))
   expect(screen.getByRole('alert')).toHaveTextContent('at least one adult')
   await completeSetup()
-  expect(screen.getByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Monthly budget' })).toBeVisible()
   expect(JSON.parse(localStorage.getItem(budgetStorageKey)!)).toMatchObject({ household: { name: 'Alex household', adults: [{ name: 'Alex' }] } })
   expect(localStorage.getItem('north.household.v2')).toBe('{"old":"data"}')
 })
@@ -73,7 +73,7 @@ it('keeps the sidebar controls and routes between Household and Budget', async (
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   expect(window.location.search).toContain('view=household')
   fireEvent.click(within(nav).getByRole('button', { name: 'Budget' }))
-  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
 })
@@ -98,7 +98,7 @@ it('keeps the selected mobile destination and month in the URL and browser histo
   fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   fireEvent.click(transfers)
-  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
   expect(transfers).toHaveAttribute('aria-current', 'page')
   expect(new URLSearchParams(window.location.search).get('month')).toBe(selectedMonth)
 })
@@ -125,7 +125,7 @@ it('maps removed page URLs to the retained screens', async () => {
   localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
   window.history.replaceState(null, '', '/?view=dashboard&settings=tax&budgetView=amex')
   render(<App />)
-  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
   expect(screen.queryByText('Amex statement')).not.toBeInTheDocument()
 })
 
@@ -136,7 +136,7 @@ it('opens direct Transfers URLs and keeps budget search mounted across tab chang
   localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
-  await screen.findByRole('heading', { name: 'Budget your month' })
+  await screen.findByRole('heading', { name: 'Monthly budget' })
   const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
   expect(within(nav).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('button', { name: 'February 2026' })).toBeInTheDocument()
@@ -174,7 +174,7 @@ it('returns from an old settings URL to Budget through browser navigation', asyn
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   window.history.replaceState(null, '', '/?view=settings&settings=tax')
   fireEvent(window, new PopStateEvent('popstate'))
-  expect(await screen.findByRole('heading', { name: 'Budget your month' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
 })
 
 it('keeps budget ownership aligned after an adult name is edited', () => {

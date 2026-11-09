@@ -27,9 +27,9 @@ function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategor
   return { kind, id: record?.id ?? null, name: record?.name ?? '' }
 }
 
-function Disclosure({ label, count, expanded, controls, onClick, level = 'section' }: { label: string; count?: number; expanded: boolean; controls: string; onClick: () => void; level?: 'section' | 'owner' }) {
+function Disclosure({ label, count, noun, expanded, controls, onClick, level = 'section' }: { label: string; count?: number; noun?: readonly [string, string]; expanded: boolean; controls: string; onClick: () => void; level?: 'section' | 'owner' }) {
   return <button type="button" className={`budget-manage-disclosure is-${level}`} aria-label={`${label}${count === undefined ? '' : ` ${count}`}`} aria-expanded={expanded} aria-controls={controls} onClick={onClick}>
-    <span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span>{label}</span>{count !== undefined && <small> {count}</small>}
+    <span aria-hidden="true">{expanded ? '▾' : '▸'}</span><span>{label}</span>{count !== undefined && <small> {noun ? `${count} ${count === 1 ? noun[0] : noun[1]}` : count}</small>}
   </button>
 }
 
@@ -168,12 +168,12 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
     })
   }
   const sections: Array<{ kind: Kind; label: string; count: number }> = [{ kind: 'account', label: 'Accounts', count: accounts.length }, { kind: 'pot', label: 'Pots', count: pots.length }, { kind: 'category', label: 'Categories', count: categories.length }]
-  return <div className="budget-v3-overlay"><div className="budget-v3-panel budget-manage-panel" role="dialog" aria-label="Manage accounts, pots and categories">
-    <div className="budget-manage-header"><h2>Manage accounts, pots and categories</h2><button type="button" className="secondary-button" onClick={() => { if (canLeave()) onClose() }}>Done</button></div>
+  return <div className="budget-v3-overlay"><div className="budget-v3-panel budget-manage-panel" role="dialog" aria-label="Manage accounts, pots & categories">
+    <div className="budget-manage-header"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={() => { if (canLeave()) onClose() }}>Done</button></div>
     <p className="budget-manage-note">Accounts, pots and categories are shared across all budget months. Changes here affect every month.</p>
     {status && <p className="budget-manage-message" role="status">{status}</p>}
     {sections.map(section => <section key={section.kind} className="budget-manage-section">
-      <h3><Disclosure label={section.label} count={section.count} expanded={openSection === section.kind} controls={`${prefix}-${section.kind}`} onClick={() => toggleSection(section.kind)}/></h3>
+      <h3><Disclosure label={section.label} count={section.count} noun={[section.kind, section.label.toLowerCase()]} expanded={openSection === section.kind} controls={`${prefix}-${section.kind}`} onClick={() => toggleSection(section.kind)}/></h3>
       <div id={`${prefix}-${section.kind}`} className="budget-manage-content" hidden={openSection !== section.kind}>{openSection === section.kind && <>
         <button type="button" className="secondary-button" disabled={section.kind === 'pot' && !accounts.length} onClick={() => begin(section.kind)}>Add {section.kind}</button>{formFor(section.kind, null)}
         {!section.count && <p>{section.kind === 'pot' && !accounts.length ? 'Add an account before creating a pot.' : `No ${section.label.toLowerCase()} yet.`}</p>}
