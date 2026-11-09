@@ -301,7 +301,7 @@ it('navigates an existing account and pot and saves the selected stable pot ID',
   expect(savedBudget().pots).toHaveLength(1)
 })
 
-it('requires a new explicit destination after changing branches while keeping other item fields', () => {
+it('keeps the saved destination while changing branches and asks to finish or keep it before saving', () => {
   const initial = seededDocument()
   const month = `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month] = { items: [{ id: 'item1', name: 'Groceries', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 12000, amountPence: 12000, frequency: 'monthly', funding: 'equal' }] }
@@ -315,8 +315,9 @@ it('requires a new explicit destination after changing branches while keeping ot
   fireEvent.click(within(form).getByRole('button', { name: 'Owners' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Immy' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Nationwide · Mortgage' }))
+  expect(within(form).getByText('Nick · Monzo · Current account · Spending')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
-  expect(within(form).getByRole('alert')).toHaveTextContent('Choose an account or pot destination.')
+  expect(within(form).getByRole('alert')).toHaveTextContent('Finish choosing a destination, or keep the current one.')
   expect(within(form).getByLabelText('Item name')).toHaveValue('Groceries')
   expect(within(form).getByLabelText('Amount')).toHaveValue('120.00')
   expect(within(form).getByLabelText('Funding type')).toHaveValue('equal')
@@ -573,7 +574,7 @@ it('changes the shared category and destination without losing entered rows', ()
   fireEvent.click(within(form).getByRole('button', { name: 'Immy' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Nationwide · Mortgage' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Save 2 items' }))
-  expect(within(form).getByRole('alert')).toHaveTextContent('Choose an account or pot destination.')
+  expect(within(form).getByRole('alert')).toHaveTextContent('Finish choosing a destination, or keep the current one.')
   expect(within(within(form).getByRole('row', { name: 'Item 2' })).getByLabelText('Amount')).toHaveValue('24')
   fireEvent.click(within(form).getByRole('button', { name: 'Use account directly' }))
   fireEvent.click(within(form).getByRole('button', { name: 'Save 2 items' }))

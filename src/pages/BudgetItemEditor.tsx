@@ -41,6 +41,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const [newCategoryId] = useState(() => crypto.randomUUID())
   const [destination, setDestination] = useState<DestinationSelection>(item ? { destination: item.destination } : {})
   const [destinationTouched, setDestinationTouched] = useState(false)
+  const [destinationBrowsing, setDestinationBrowsing] = useState(false)
   const [error, setError] = useState<BatchError>()
   const [initial] = useState(() => JSON.stringify({ rows, categoryId, destination }))
   const formRef = useRef<HTMLFormElement>(null)
@@ -128,7 +129,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
       destination, ...(item ? { editingId: item.id } : {}),
     }
     if (draftImpact && 'error' in draftImpact) return
-    const failure = onSave(batch)
+    const failure: BatchError | undefined = destinationBrowsing ? { field: 'destination', message: 'Finish choosing a destination, or keep the current one.' } : onSave(batch)
     setError(failure)
     if (failure) {
       if (item && (failure.field === 'category' || failure.field === 'frequency')) detailsRef.current!.open = true
@@ -173,7 +174,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
           {item && editRow ? <div className="budget-single-fields">
             <label>Item name<input data-error-key={`${editRow.id}:name`} value={editRow.name} aria-invalid={fieldError(editRow, 'name')} aria-describedby={descriptionId(editRow, 'name')} onChange={event => update(editRow.id, { name: event.target.value })}/></label>{errorText(editRow, 'name')}
             <label>{editRow.frequency === 'annually' ? 'Annual amount' : 'Amount'}<input inputMode="decimal" data-error-key={`${editRow.id}:amount`} value={editRow.amount} aria-invalid={fieldError(editRow, 'amount')} aria-describedby={descriptionId(editRow, 'amount')} onChange={event => update(editRow.id, { amount: event.target.value })}/></label>{editRow.frequency === 'annually' && <small>Monthly equivalent: {pounds(monthlyContributionPence(moneyPence(editRow.amount) ?? 0, 'annually'))}</small>}{errorText(editRow, 'amount')}
-            <div className="budget-single-destination" data-error-key="destination" tabIndex={-1}><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
+            <div className="budget-single-destination" data-error-key="destination" tabIndex={-1}><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)} onBrowsingChange={setDestinationBrowsing}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
             <label>Funding type<select data-error-key={`${editRow.id}:funding`} value={editRow.funding} onChange={event => update(editRow.id, { funding: event.target.value as FundingRule })}>{fundingOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>{errorText(editRow, 'funding')}
             {editRow.funding === 'single' && <label>Person<select data-error-key={`${editRow.id}:singleFunderId`} value={editRow.singleFunderId} onChange={event => update(editRow.id, { singleFunderId: event.target.value })}>{adults.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
             {editRow.funding === 'fixed' && <div className="budget-single-allocation"><strong>Monthly contributions</strong>{adults.map(person => <label key={person.id}>{person.name}<input inputMode="decimal" aria-label={`${person.name} monthly contribution`} data-error-key={`${editRow.id}:contributions`} value={editRow.contributions[person.id] ?? ''} onChange={event => update(editRow.id, { contributions: { ...editRow.contributions, [person.id]: event.target.value } })}/></label>)}{(()=>{const monthly=monthlyContributionPence(moneyPence(editRow.amount)??0,editRow.frequency),allocated=adults.reduce((sum,person)=>sum+(moneyPence(editRow.contributions[person.id]??'')??0),0);return <small>{allocated>monthly?`${pounds(allocated-monthly)} over allocated`:`${pounds(monthly-allocated)} left to allocate`}</small>})()}</div>}
@@ -188,7 +189,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
               {categoryId === '__new__' && <label>New category<input value={newCategoryName} onChange={event => { setNewCategoryName(event.target.value); setError(undefined) }}/></label>}
               {error?.field === 'category' && <p id="budget-category-error" className="budget-batch-error" role="alert">{error.message}</p>}
             </div>
-            <div className="budget-batch-destination" data-error-key="destination" tabIndex={-1}><span className="budget-batch-shared-label">Destination</span><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
+            <div className="budget-batch-destination" data-error-key="destination" tabIndex={-1}><span className="budget-batch-shared-label">Destination</span><DestinationPicker budget={document.budget} adults={adults} value={destination} onChange={changeDestination} onDraftChange={() => setDestinationTouched(true)} onBrowsingChange={setDestinationBrowsing}/>{error?.field === 'destination' && <p className="budget-batch-error" role="alert">{error.message}</p>}</div>
           </div>
           <p className="budget-batch-shared-note">All items share this category and destination. Funding contributions are monthly.</p>
           <table className="budget-batch-table" aria-label="Budget items to save">
