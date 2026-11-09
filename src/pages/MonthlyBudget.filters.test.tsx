@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { MonthlyBudget } from './MonthlyBudget'
 
@@ -28,6 +28,7 @@ it('hides search and filters while the month has fewer than five items', () => {
 it('shows search with matching owner and category filters from five items', () => {
   render(<MonthlyBudget document={withItems(5)} setDocument={vi.fn()} month="2026-11"/>)
   expect(screen.getByPlaceholderText('Search budget')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
   const owner = screen.getByLabelText('Owner'), category = screen.getByLabelText('Category')
   expect(owner).toHaveClass('budget-v3-filter-select')
   expect(category).toHaveClass('budget-v3-filter-select')
@@ -86,4 +87,42 @@ it('names the owner and category of each desktop search result', () => {
   const contexts = (query: string) => { fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: query } }); return [...document.querySelectorAll('.budget-v3-result-context')].map(context => context.textContent) }
   expect(contexts('Phone')).toEqual(['Ada · Bills'])
   expect(contexts('Cinema')).toEqual(['Joint · Fun'])
+})
+
+it('shows Owner and Category as chips on desktop, filled when active, with Clear filters', () => {
+  desktop()
+  render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" mobileBudgetView="plan"/>)
+  expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'Ada' } })
+  expect(screen.getByLabelText('Owner').closest('label')).toHaveClass('is-active')
+  expect(screen.getByLabelText('Category').closest('label')).not.toHaveClass('is-active')
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+  expect(screen.getByLabelText('Owner')).toHaveValue('All')
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone', 'Cinema', 'Books'])
+})
+
+it('puts phone filters in a sheet behind one Filter button that counts what is active, next to +', () => {
+  const onChange = vi.fn()
+  render(<MonthlyBudget document={household()} setDocument={onChange} month="2026-11" mobileBudgetView="plan"/>)
+  expect(screen.queryByLabelText('Owner')).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Budget items' })).not.toBeInTheDocument()
+  const filter = screen.getByRole('button', { name: 'Filter' })
+  fireEvent.click(filter)
+  let sheet = screen.getByRole('dialog', { name: 'Filter' })
+  expect(within(sheet).getByRole('button', { name: 'Clear filters' })).toBeDisabled()
+  fireEvent.change(within(sheet).getByLabelText('Category'), { target: { value: 'fun' } })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+  expect(screen.queryByRole('dialog', { name: 'Filter' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Filter · 1' })).toHaveFocus()
+  expect(itemNames()).toEqual(['Cinema', 'Books'])
+  fireEvent.click(screen.getByRole('button', { name: 'Filter · 1' }))
+  sheet = screen.getByRole('dialog', { name: 'Filter' })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Clear filters' }))
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+  expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+  const add = document.querySelector<HTMLElement>('.budget-v3-controls .budget-add-button')!
+  expect(add).toHaveAccessibleName('Add item')
+  fireEvent.click(add)
+  expect(screen.getByRole('form', { name: 'Add item' })).toBeInTheDocument()
 })

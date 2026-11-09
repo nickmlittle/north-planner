@@ -7,6 +7,21 @@ import { MonthlyBudget } from './MonthlyBudget'
 // Small fixtures still drive search and filters; the threshold has its own test.
 vi.mock('./planListConfig', () => ({ PLAN_FILTER_MIN_ITEMS: 0 }))
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals()})
+
+/** Phones keep Owner and Category in the Filter sheet: open it, choose, close. */
+function filterBy(label: 'Owner' | 'Category', value: string) {
+  fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+  const sheet = screen.getByRole('dialog', { name: 'Filter' })
+  fireEvent.change(within(sheet).getByLabelText(label), { target: { value } })
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+}
+function filterValue(label: 'Owner' | 'Category') {
+  fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+  const sheet = screen.getByRole('dialog', { name: 'Filter' })
+  const value = (within(sheet).getByLabelText(label) as HTMLSelectElement).value
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+  return value
+}
 function Harness(){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument}/>}
 function createAccountInPicker(form: HTMLElement, owner='Nick', provider='Monzo', nickname='') {
   fireEvent.click(within(form).getByRole('button',{name:owner}))
@@ -56,7 +71,7 @@ it('keeps mobile Plan headings and funding context in a semantic three-column ta
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
 it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Type'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getAllByText('Income details')[0]!);expect(screen.getAllByText('Other income').some(node=>node.closest('div')?.textContent?.includes('£400.00'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.budget-v3-owner')).not.toBeInTheDocument()})
-it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}});expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
+it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));filterBy('Owner','Immy');expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
 it('opens expanded and keeps collapse state across filters, months and remounts',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'hierarchy-item',name:'Groceries',categoryId:'bills',destination:{kind:'pot',potId:'p1'},entryAmountPence:12000,amountPence:12000,frequency:'monthly',funding:'equal'}]}
@@ -70,8 +85,8 @@ it('opens expanded and keeps collapse state across filters, months and remounts'
   fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
   fireEvent.click(screen.getByRole('button',{name:/^Nick,/}))
   expect(screen.queryByText('Groceries')).not.toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}})
-  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'All'}})
+  filterBy('Owner','Immy')
+  filterBy('Owner','All')
   fireEvent.click(screen.getByRole('button',{name:/Next month/}))
   fireEvent.click(screen.getByRole('button',{name:/Previous month/}))
   expect(screen.getByRole('button',{name:/^Bills,/})).toHaveAttribute('aria-expanded','false')
@@ -102,10 +117,10 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   fireEvent.pointerDown(search)
   fireEvent.change(search,{target:{value:'  Apple TV  '}})
   expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible()
-  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Nick'}})
+  filterBy('Owner','Nick')
   fireEvent.click(screen.getByRole('button',{name:'Clear search'}))
   expect(search).toHaveValue('')
-  expect(screen.getByLabelText('Owner')).toHaveValue('Nick')
+  expect(filterValue('Owner')).toBe('Nick')
   expect(scrollTo).toHaveBeenCalledWith(0,420)
 })
 it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(within(screen.getByRole('region',{name:'Plan summary'})).getByText('£10.00 over')).toBeVisible();expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
@@ -875,10 +890,10 @@ it('shows mobile items under combined owner and category headers and filters the
   expect(within(table).getByRole('button',{name:'Mortgage'})).toBeVisible()
   expect(table.querySelectorAll('.budget-v3-compact-group')).toHaveLength(2)
   expect(table).toHaveTextContent('Nick · Bills')
-  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Immy'}})
+  filterBy('Owner','Immy')
   expect(within(table).queryByRole('button',{name:'Groceries'})).not.toBeInTheDocument()
   expect(within(table).getByRole('button',{name:'Mortgage'})).toBeVisible()
-  fireEvent.change(screen.getByLabelText('Category'),{target:{value:'other'}})
+  filterBy('Category','other')
   expect(screen.getByText(/No items match/)).toBeVisible()
 })
 
@@ -932,7 +947,7 @@ it('preserves month, search and owner when switching views',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Next month'}))
   const selectedMonth=document.querySelector('.budget-v3-month>button:nth-child(2)')!.textContent
   fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Bill'}})
-  fireEvent.change(screen.getByLabelText('Owner'),{target:{value:'Nick'}})
+  filterBy('Owner','Nick')
   rerender(<SeededHarness initial={initial} view="transfers"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nickSteps)).toEqual(['1Fund Monzo Nick£5.00','2Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
@@ -946,7 +961,7 @@ it('preserves month, search and owner when switching views',()=>{
   expect(trigger).toHaveFocus()
   rerender(<SeededHarness initial={initial} view="plan"/>)
   expect(screen.getByPlaceholderText('Search budget')).toHaveValue('Bill')
-  expect(screen.getByLabelText('Owner')).toHaveValue('Nick')
+  expect(filterValue('Owner')).toBe('Nick')
   expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
   rerender(<SeededHarness initial={initial} view="transfers"/>)
   expect(within(screen.getByRole('region',{name:'Nick steps'})).getAllByRole('listitem')[0]).toBe(row)
