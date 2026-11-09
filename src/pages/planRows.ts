@@ -5,7 +5,6 @@ import type { PlanDestination } from '../state/navigation'
 import { destinationLabel } from './budgetLabels'
 
 export type PlanGroup = { name: string; key: string; items: BudgetItem[] }
-export type PlanOwnerGroup = PlanGroup & { categories: PlanGroup[] }
 export type PlanFilterValues = { query: string; owner: string; category: string }
 
 /** Owner bands, and Owner filter options, in household order. */
@@ -78,35 +77,25 @@ export function planDestinationLabel(document: BudgetDocument, destination: Plan
   return destination.kind === 'direct' ? `Direct to account · ${account}` : account
 }
 
+/** The group an item sits in on the Plan. Items whose category has gone share one "Uncategorised" group. */
+export function planGroupKey(item: BudgetItem, labels: PlanItemLabels) {
+  return `category:${labels.categoryName(item) === undefined ? '' : item.categoryId}`
+}
+
 /**
- * The Plan's rows after search and filters. Phones band by owner then category (owners in household order);
- * desktop (`flat`) bands by category only, under a single "All" owner, in first-appearance order.
+ * The Plan's rows after search and filters, banded by category in first-appearance order.
+ * Owner is a filter only: every screen size shows the same groups.
  */
-export function groupPlanItems(items: BudgetItem[], filters: PlanFilterValues, flat: boolean, ownerOrder: string[], labels: PlanItemLabels): { owners: PlanOwnerGroup[]; matching: BudgetItem[] } {
-  const byOwner = new Map<string, Map<string, BudgetItem[]>>()
-  for (const item of items) {
-    if (!labels.matchesSearch(item, filters.query) || (filters.category !== 'All' && item.categoryId !== filters.category)) continue
-    const owner = labels.ownerGroup(item), category = labels.categoryName(item) ?? 'Uncategorised'
-    const categories = byOwner.get(owner) ?? new Map<string, BudgetItem[]>()
-    categories.set(category, [...(categories.get(category) ?? []), item])
-    byOwner.set(owner, categories)
+export function groupPlanItems(items: BudgetItem[], filters: PlanFilterValues, labels: PlanItemLabels): { groups: PlanGroup[]; matching: BudgetItem[] } {
+  const matching = items.filter(item => labels.matchesSearch(item, filters.query)
+    && (filters.category === 'All' || item.categoryId === filters.category)
+    && (filters.owner === 'All' || labels.ownerGroup(item) === filters.owner))
+  const groups = new Map<string, PlanGroup>()
+  for (const item of matching) {
+    const key = planGroupKey(item, labels)
+    const group = groups.get(key) ?? { name: labels.categoryName(item) ?? 'Uncategorised', key, items: [] }
+    group.items.push(item)
+    groups.set(key, group)
   }
-  const visible = [...byOwner].filter(([owner]) => filters.owner === 'All' || owner === filters.owner)
-  const matching = visible.flatMap(([, categories]) => [...categories.values()].flat())
-  if (flat) {
-    const shown = new Set(matching), byCategory = new Map<string, BudgetItem[]>()
-    for (const item of items) {
-      if (!shown.has(item)) continue
-      const category = labels.categoryName(item) ?? 'Uncategorised'
-      byCategory.set(category, [...(byCategory.get(category) ?? []), item])
-    }
-    const categories = [...byCategory].map(([name, rows]) => ({ name, key: `category:${name}`, items: rows }))
-    return { owners: categories.length ? [{ name: 'All', key: 'owner:All', items: categories.flatMap(category => category.items), categories }] : [], matching }
-  }
-  const owners = ownerOrder.flatMap(owner => {
-    const categories = visible.find(([name]) => name === owner)?.[1]
-    if (!categories) return []
-    return [{ name: owner, key: `owner:${owner}`, items: [...categories.values()].flat(), categories: [...categories].map(([name, rows]) => ({ name, key: `${owner}:${name}`, items: rows })) }]
-  })
-  return { owners, matching }
+  return { groups: [...groups.values()], matching }
 }

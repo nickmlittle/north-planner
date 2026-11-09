@@ -15,7 +15,8 @@ import { IncomeDialog } from './IncomeDialog'
 import { PlanFilters } from './PlanFilters'
 import { PlanTable } from './PlanTable'
 import { usePlanSearch } from './usePlanSearch'
-import { groupPlanItems, matchesPlanDestination, planDestinationLabel as destinationFilterLabel, planItemLabels, planOwnerOrder } from './planRows'
+import { groupPlanItems, matchesPlanDestination, planDestinationLabel as destinationFilterLabel, planGroupKey, planItemLabels, planOwnerOrder } from './planRows'
+import { readOpenPlanGroups, rememberOpenPlanGroups } from '../state/planGroups'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
 import { AllocationMeter, AllocationMeterMini } from '../components/AllocationMeter'
@@ -50,6 +51,8 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const [batchMessage,setBatchMessage]=useState('')
  const [savedImpact,setSavedImpact]=useState<BudgetImpact|null>(null)
  const [ownerFilter,setOwnerFilter]=useState('All')
+ const [openGroups,setOpenGroups]=useState(readOpenPlanGroups)
+ useEffect(()=>rememberOpenPlanGroups(openGroups),[openGroups])
  const [categoryFilter,setCategoryFilter]=useState('All')
  const mobileBudgetView=sharedMobileBudgetView??'plan'
  const planFocusItem=useRef<string|null>(planItemId??null),previousBudgetView=useRef(mobileBudgetView)
@@ -106,6 +109,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   const preview=financial?budgetImpact(document,result.document,month,result.items.map(item=>item.id)):undefined
   if(preview&&'error' in preview)return {field:'rows' as const,message:preview.error}
   setDocument(current=>{const latest=commitItemBatch(current,month,batch);return 'error' in latest?current:latest.document})
+  // Open the groups the saved items sit in, so they are on screen.
+  const savedLabels=planItemLabels(result.document,shortAccountLabels(result.document.budget.accounts,adults))
+  setOpenGroups(open=>({...open,...Object.fromEntries(result.items.map(row=>[planGroupKey(row,savedLabels),true]))}))
   setSavedImpact(preview&&'impact' in preview&&(preview.impact.accounts.length||preview.impact.beforeBalancePence!==preview.impact.afterBalancePence)?preview.impact:null)
   setBatchMessage(batch.editingId?'Budget item updated.':`Created ${result.items.length} budget ${result.items.length===1?'item':'items'}.`)
   setEditor(false)
@@ -125,7 +131,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const basisDetail=available===0||incomeTotal===0||incomeTotal===available?availableBasis:`${pounds(incomeTotal)} salary + ${pounds(available-incomeTotal)} other`
  const ownerOrder=planOwnerOrder(adults)
  const searchMode=!!query.trim()
- const {owners:planOwners,matching:matchingItems}=groupPlanItems(destinationItems,{query,owner:ownerFilter,category:categoryFilter},!mobilePresentation,ownerOrder,labels)
+ const {groups:planGroups,matching:matchingItems}=groupPlanItems(destinationItems,{query,owner:ownerFilter,category:categoryFilter},labels)
  const scopedPlan=mobilePresentation&&mobileBudgetView==='plan'&&!!planDestination
  const searchRef=useRef<HTMLInputElement>(null)
  const planDestinationSignature=mobileBudgetView==='plan'&&planDestination?`${month}:${planDestination.kind}:${planDestination.id}`:null
@@ -134,6 +140,11 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
   previousPlanDestination.current=planDestinationSignature
   if(planDestinationSignature){if(mobilePresentation)window.scrollTo({top:0});planDestinationHeading.current?.focus({preventScroll:true})}
  },[planDestinationSignature,mobilePresentation])
+ // An item opened from Transfers may sit in a closed group: open it, and the focus below finds the row once it renders.
+ const planItem=planItemId?items.find(row=>row.id===planItemId):undefined,planItemGroup=planItem&&planGroupKey(planItem,labels)
+ const revealGroup=mobileBudgetView==='plan'&&!planDestination?planItemGroup:undefined
+ const [revealedGroup,setRevealedGroup]=useState<string|undefined>()
+ if(revealGroup!==revealedGroup){setRevealedGroup(revealGroup);if(revealGroup&&!openGroups[revealGroup])setOpenGroups({...openGroups,[revealGroup]:true})}
  useLayoutEffect(()=>{
   if(previousBudgetView.current==='transfers'&&mobileBudgetView==='plan'&&planItemId)planFocusItem.current=planItemId
   if(mobileBudgetView==='plan'&&planFocusItem.current){
@@ -154,7 +165,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const mobileOptions=<button ref={monthOptionsRef} type="button" className="budget-mobile-options" aria-label="Budget and account" title="Budget and account" aria-haspopup="dialog" onClick={()=>setInfoDialog('month')}>{status!=='Saved'&&<span aria-hidden="true">{statusMark(status)}</span>}<Ellipsis aria-hidden="true"/></button>
  const inHeader=mobilePresentation&&!!headerSlot
  const titlebar=inHeader&&!budgetDateNote?null:<div className="budget-page-titlebar"><div className="budget-v3-date-selector">{!inHeader&&monthControl}<div className="budget-v3-date-context">{budgetDateNote}{mobilePresentation&&!inHeader&&mobileOptions}</div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={budgetOptions}/>{mobileBudgetView==='plan'&&<button type="button" className="primary-button" onClick={()=>start()}><Plus aria-hidden="true"/>Add item</button>}</div></div>
- const budgetHeader=<div className="budget-mobile-plan-heading"><h2>Budget items</h2><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div>
+ const budgetHeader=<div className="budget-mobile-plan-heading"><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div>
  const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={shortLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const planFilters=<PlanFilters query={query} onQueryChange={updateSearch} onSearchStart={captureBrowseScroll} inputRef={searchRef} owner={ownerFilter} onOwnerChange={setOwnerFilter} ownerOrder={ownerOrder} category={categoryFilter} onCategoryChange={setCategoryFilter} categories={document.budget.categories} compact={mobilePresentation} onAdd={mobilePresentation&&mobileBudgetView==='plan'&&!scopedPlan?()=>start():undefined}/>
@@ -165,7 +176,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  <section className="budget-v3-workspace" id="budget-plan-panel" aria-label="Budget planning">{mobileBudgetView==='plan'&&planItemId&&!items.some(item=>item.id===planItemId)&&<p role="status">That budget item is no longer available for {monthLabel(month)}.</p>}{mobileBudgetView==='plan'&&planDestination&&<div ref={planDestinationHeading} className="budget-v3-destination-filter" role="region" aria-label="Plan destination filter" tabIndex={-1}><strong>Showing {matchingItems.length} {matchingItems.length===1?'item':'items'} for {planDestinationLabel} · {monthLabel(month)}</strong><span>Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</span><div className="budget-v3-destination-actions">{onReturnToTransfers&&<button type="button" onClick={onReturnToTransfers}>{hasTransfersOrigin?'Back to Transfers':'View Transfers'}</button>}{onClearPlanDestination&&<button type="button" onClick={onClearPlanDestination}>Clear destination filter</button>}</div></div>}
  {showPlanFilters&&<div className="budget-v3-scroll-tools">{scopedPlan?<details className="budget-v3-scoped-filters"><summary>Search and filter{query||ownerFilter!=='All'||categoryFilter!=='All'?' · active':''}</summary>{planFilters}</details>:planFilters}</div>}
  {searchMode&&<p className="budget-v3-search-count" role="status">{matchingItems.length} matching {matchingItems.length===1?'item':'items'} · Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</p>}
- <PlanTable document={document} setDocument={setDocument} month={month} editScopeLabel={editScopeLabel} owners={planOwners} labels={labels} query={query} planDestination={planDestination} view={mobileBudgetView} mobilePresentation={mobilePresentation} scoped={scopedPlan} filterKey={`${ownerFilter}\u0000${categoryFilter}`} editorOpen={editor} empty={planEmpty}
+ <PlanTable document={document} setDocument={setDocument} month={month} editScopeLabel={editScopeLabel} groups={planGroups} labels={labels} query={query} planDestination={planDestination} view={mobileBudgetView} mobilePresentation={mobilePresentation} scoped={scopedPlan} openGroups={openGroups} onOpenGroupsChange={setOpenGroups} planTotalPence={total} filterKey={`${ownerFilter}\u0000${categoryFilter}`} editorOpen={editor} empty={planEmpty}
   onEdit={start} onRemove={removeItem} onQuickEditOpen={()=>setInlineSavedItem(null)} onAmountSaved={(name,impact)=>{setSavedImpact(impact);setInlineSavedItem(name)}} focusFallback={()=>searchRef.current?.focus({preventScroll:true})}/>
  {(batchMessage||inlineFeedback||savedImpact?.month===month)&&<div className="budget-save-result"><button type="button" className="budget-save-dismiss" aria-label="Dismiss save result" onClick={()=>{setBatchMessage('');setInlineSavedItem(null);setSavedImpact(null)}}>×</button>{batchMessage&&<div className="budget-v3-save-status" role="status">{saveStatus==='Not saved'?'Budget could not be saved. Check save status.':saveStatus==='Saving…'||saveStatus==='Unsaved changes'?'Saving budget item…':batchMessage}</div>}{inlineFeedback&&<div className="budget-v3-save-status" role={saveStatus==='Not saved'?'alert':'status'}>{inlineFeedback}</div>}{savedImpact?.month===month&&(saveStatus==='Saved'||!saveStatus)&&onViewAffectedTransfers&&<button type="button" className="secondary-button budget-view-affected" onClick={()=>onViewAffectedTransfers(savedImpact)}>View affected transfers</button>}</div>}</section>
  </PageFrame>
