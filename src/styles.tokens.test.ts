@@ -41,6 +41,12 @@ describe('design tokens', () => {
     expect(xs.every(selector => /eyebrow|transfer-matrix-incomplete|budget-v3-picker small/.test(selector))).toBe(true)
   })
 
+  it('uses spacing tokens; raw px only for 1–2px nudges, negative offsets and 40px+ layout geometry', () => {
+    const spacing = /^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/
+    const offScale = (value: string) => [...value.matchAll(/(^|[^\w.-])(-?)(\d+)px\b/g)].some(([, , minus, n]) => !minus && +n! > 2 && +n! < 40)
+    expect(offenders(d => spacing.test(d.property) && offScale(d.value))).toEqual([])
+  })
+
   it('uses shadow tokens', () => {
     expect(offenders(d => d.property === 'box-shadow' && d.value !== 'none' && !/var\(--shadow-/.test(d.value) && !/var\(--line\)/.test(d.value))).toEqual([])
   })
