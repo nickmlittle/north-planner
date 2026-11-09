@@ -1142,12 +1142,12 @@ it('marks missing pot responsibility as needing review and withholds its steps',
 
 it.each([
   {sources:[{id:'gift',personId:'nick',name:'Gift',type:'additional' as const,baseAmountPence:5000,changes:{}}],text:'none from salary'},
-  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'£50.00 from salary'},
+  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'(£50.00 salary + £10.00 other)'},
 ])('explains where available money comes from: $text',({sources,text})=>{
   const initial=seededDocument()
   initial.budget.incomeSources=sources
   render(<SeededHarness initial={initial}/>)
-  expect(document.querySelector('.budget-v3-summary-note')).toHaveTextContent(text)
+  expect(document.querySelector('.allocation-meter-basis')).toHaveTextContent(text)
 })
 
 it('states a shared income change range once and prefixes amounts with £',()=>{
@@ -1162,4 +1162,26 @@ it('states a shared income change range once and prefixes amounts with £',()=>{
   expect(immy.getAttribute('aria-describedby')).toBe(nick.getAttribute('aria-describedby'))
   expect(nick.parentElement).toHaveClass('budget-money-field')
   expect(nick).toHaveValue('3,000.00')
+})
+
+it('keeps the budget actions in the ⋯ menu, and Transfers gets neither the meter nor Add item', () => {
+  const { unmount } = render(<SeededHarness initial={seededDocument()}/>)
+  const toolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
+  expect(within(toolbar).getByRole('button', { name: 'Add item' })).toBeInTheDocument()
+  expect(within(toolbar).queryByRole('menuitem')).not.toBeInTheDocument()
+  fireEvent.click(within(toolbar).getByRole('button', { name: 'More budget options' }))
+  expect(within(toolbar).getByRole('menu').textContent).toBe('Edit incomeManage accounts, pots & categories')
+  fireEvent.keyDown(within(toolbar).getByRole('menu'), { key: 'Escape' })
+  expect(within(toolbar).queryByRole('menu')).not.toBeInTheDocument()
+  expect(within(toolbar).getByRole('button', { name: 'More budget options' })).toHaveFocus()
+  fireEvent.click(within(toolbar).getByRole('button', { name: 'More budget options' }))
+  fireEvent.click(within(toolbar).getByRole('menuitem', { name: 'Manage accounts, pots & categories' }))
+  expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Budget summary' })).toBeInTheDocument()
+  unmount()
+  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
+  const transfersToolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
+  expect(within(transfersToolbar).queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
+  expect(within(transfersToolbar).getByRole('button', { name: 'More budget options' })).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Budget summary' })).not.toBeInTheDocument()
 })
