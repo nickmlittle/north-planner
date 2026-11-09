@@ -27,8 +27,8 @@ Changing an item's destination or funding rule follows the budget snapshot range
 | State | Behaviour |
 | --- | --- |
 | No snapshot on or before the month, no imported baseline | No budget is set; offer item creation. Future snapshots do not supply earlier months. |
-| Snapshot in the selected month | Identify it as a saved budget; allow removal of this budget date. |
-| Inherited snapshot | Identify its source month; do not offer removal of a nonexistent budget date. |
+| Snapshot in the selected month | Show no note (the month button and picker markers already say it). The month picker and Month & income offer going back to the budget before it. |
+| Inherited snapshot | Identify its source month ("Using the October 2026 budget"); offer no going back. |
 | Intentional empty snapshot | Keep it as a real boundary. Inherited months remain intentionally empty rather than falling back to an older populated budget. |
 | Imported baseline | Continue using it before the first saved boundary and identify its legacy origin. |
 | Items with unresolved income-ratio funding | Preserve the planned items, show incomplete allocations and offer income correction. Do not imply that every contribution was calculated. |

@@ -889,14 +889,14 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   const trigger=screen.getByRole('button',{name:'Month & income'})
   trigger.focus();fireEvent.click(trigger)
   const dialog=screen.getByRole('dialog',{name:'Month & income'})
-  const close=within(dialog).getByRole('button',{name:'Close dialog'}),remove=within(dialog).getByRole('button',{name:'Remove budget date'})
+  const close=within(dialog).getByRole('button',{name:'Close dialog'}),remove=within(dialog).getByRole('button',{name:/^(Go back to|Clear) the .* budget$/})
   expect(close).toHaveFocus()
   fireEvent.keyDown(close,{key:'Tab',shiftKey:true})
   expect(remove).toHaveFocus()
   fireEvent.keyDown(remove,{key:'Tab'})
   expect(close).toHaveFocus()
   fireEvent.click(remove)
-  fireEvent.click(within(screen.getByRole('dialog',{name:/budget date\?$/})).getByRole('button',{name:'Cancel'}))
+  fireEvent.click(within(screen.getByRole('dialog',{name:/budget\?$/})).getByRole('button',{name:'Cancel'}))
   expect(savedBudget().snapshots[month]).toBeDefined()
   expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
@@ -907,7 +907,7 @@ it('hands off from month options to income and management and restores focus',()
   const trigger=screen.getByRole('button',{name:'Month & income'})
   trigger.focus();fireEvent.click(trigger)
   let dialog=screen.getByRole('dialog',{name:'Month & income'})
-  expect(within(dialog).queryByRole('button',{name:'Remove budget date'})).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button',{name:/^(Go back to|Clear) the/})).not.toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button',{name:'Edit income'}))
   expect(screen.queryByRole('dialog',{name:'Month & income'})).not.toBeInTheDocument()
   const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
@@ -967,14 +967,31 @@ function MonthRulesHarness({ initial = monthRulesDocument(), month = '2026-12', 
   return <><MonthlyBudget document={document} setDocument={setDocument} month={month} mobileBudgetView={view}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
 }
 
-it.each(['plan', 'transfers'] as const)('identifies inherited months and hides date removal in %s', view => {
+it.each(['plan', 'transfers'] as const)('identifies inherited months and hides going back in %s', view => {
   render(<MonthRulesHarness view={view}/>)
-  expect(screen.getAllByText('Using budget from November 2026').length).toBeGreaterThan(0)
-  expect(screen.queryByRole('button', { name: 'Remove budget date' })).not.toBeInTheDocument()
+  expect(screen.getByText('Using the November 2026 budget')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'December 2026' }))
+  expect(within(screen.getByRole('dialog', { name: 'Choose budget month' })).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
+  fireEvent.click(screen.getAllByRole('button', { name: 'December 2026' })[0]!)
   fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
   const dialog = screen.getByRole('dialog', { name: 'Month & income' })
   expect(dialog).not.toHaveTextContent('Budget edits apply')
-  expect(within(dialog).queryByRole('button', { name: 'Remove budget date' })).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
+})
+
+it('says nothing under the month when it has its own budget, and offers going back from the month picker', () => {
+  render(<MonthRulesHarness month="2027-03"/>)
+  expect(screen.queryByText(/^Using the/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Budget set|Income updated/)).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'March 2027' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose budget month' })).getByRole('button', { name: 'Go back to the November 2026 budget' }))
+  expect(screen.queryByRole('dialog', { name: 'Choose budget month' })).not.toBeInTheDocument()
+  const dialog = screen.getByRole('dialog', { name: 'Go back to the November 2026 budget?' })
+  expect(dialog).toHaveTextContent('will use the budget from November 2026.')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Go back to the November 2026 budget' }))
+  expect(savedBudget().snapshots['2027-03']).toBeUndefined()
+  expect(savedBudget().snapshots['2026-11']).toBeDefined()
 })
 
 it('shows scope before full and inline edits and preserves later saved budgets', () => {
@@ -1006,12 +1023,13 @@ it('confirms the exact item-removal range', () => {
   expect(savedBudget().snapshots['2027-03']?.items).toHaveLength(1)
 })
 
-it('explains what replaces a removed budget date, including when there is no previous budget', () => {
+it('explains what replaces a cleared budget, including when there is no previous budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getAllByRole('button', { name: 'Remove budget date' })[0]!)
-  const dialog = screen.getByRole('dialog', { name: 'Remove the November 2026 budget date?' })
+  fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Month & income' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   expect(dialog).toHaveTextContent('November 2026–February 2027 will use no budget.')
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Remove budget date' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the November 2026 budget' }))
   expect(savedBudget().snapshots['2026-11']).toBeUndefined()
   expect(savedBudget().snapshots['2027-03']?.items).toHaveLength(1)
 })
@@ -1029,10 +1047,11 @@ it('shows the balance change of a removal directly above its confirm button', ()
   expect(impact.compareDocumentPosition(within(dialog).getByRole('button', { name: 'Remove item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
-it('shows the balance change of removing a budget date', () => {
+it('shows the balance change of clearing a month budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getAllByRole('button', { name: 'Remove budget date' })[0]!)
-  const dialog = screen.getByRole('dialog', { name: 'Remove the November 2026 budget date?' })
+  fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Month & income' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget.')
   expect(impact).toHaveTextContent('£2,000.00 left → £2,100.00 left')
