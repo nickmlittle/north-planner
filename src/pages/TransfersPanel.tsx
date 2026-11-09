@@ -63,7 +63,7 @@ export function TransfersPanel({ document, transfers, accounts, instructions, un
       <div className="budget-v3-person-grid">{transfers.people.map(person => <article key={person.personId}>
         <h4>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</h4>
         <dl className="budget-v3-person-metrics"><div><dt>Available</dt><dd>{pounds(person.availablePence)}</dd></div><div><dt>Funding</dt><dd>{pounds(person.plannedPence)}</dd></div><div className={person.remainingPence < 0 ? 'is-negative' : ''}><dt>Balance</dt><dd>{balanceLabel(person.remainingPence)}</dd></div></dl>
-        <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Employment income</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Additional income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
+        <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Salary</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Other income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
       </article>)}</div></div>
     {unfundedItems.length > 0 && <div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length === 1 ? 'item' : 'items'} can’t be funded yet.</strong> <button type="button" onClick={onEditIncome}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item => <li key={item.id}>{item.name}</li>)}</ul></details></div>}
     {!instructions && <p className="budget-v3-transfer-warning" role="alert">Can’t work out funding. Check the plan before moving money.</p>}

@@ -245,11 +245,11 @@ it('reopens on the Plan or Transfers view used last on this device', async () =>
   expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
 })
 
-it('preserves the saved check icon and removes the mobile drawer', async () => {
+it('stays quiet when saved and removes the mobile drawer', async () => {
   render(<App />)
   await completeSetup()
-  const saved = document.querySelector('.sidebar-status')!
-  expect(saved.querySelector('path')?.getAttribute('d')).toBe('M20 6 9 17l-5-5')
+  expect(document.querySelector('.sidebar-status')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Account and save status' }).textContent).toBe('')
   expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument()
   expect(document.querySelector('.mobile-sidebar-scrim')).toBeNull()
 })

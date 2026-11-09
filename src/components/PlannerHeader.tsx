@@ -55,19 +55,31 @@ function UtilitySheet({ status, warning, email, onSignOut, onClose }: { status: 
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
   }}>
     <header><h2 id={titleId}>Account and save status</h2><button type="button" aria-label="Close account and save status" onClick={onClose}><X aria-hidden="true" /></button></header>
-    <p className="mobile-utility-status">{status === 'Saved' ? <Check aria-hidden="true" /> : <span aria-hidden="true">{status === 'Saving…' ? '◌' : '!'}</span>}{status}</p>
+    <p className="mobile-utility-status">{status === 'Saved' ? <Check aria-hidden="true" /> : <span aria-hidden="true">{statusMark(status)}</span>}{status}</p>
     {warning && <p role="alert" className="mobile-utility-warning">{warning}</p>}
     {onSignOut && <div className="mobile-utility-account"><p>{email ?? 'Signed in'}</p><button type="button" onClick={() => { onClose(); onSignOut() }}>Sign out</button></div>}
   </section></div>, document.getElementById('root') ?? document.body)
 }
+
+/** The header's words for a save status. "Choose a version" is a conflict, not a save. */
+function saveStatusLabel(saveStatus: string, warning = '') {
+  if (warning || /fail|not saved|error/i.test(saveStatus)) return 'Save failed'
+  if (saveStatus === 'Choose a version') return 'Choose a version'
+  if (saveStatus === 'Saving…') return 'Saving…'
+  if (saveStatus === 'Loading budget…') return 'Loading…'
+  if (saveStatus === 'Unsaved changes') return 'Unsaved changes'
+  return 'Saved'
+}
+const statusMark = (status: string) => status === 'Saving…' || status === 'Loading…' || status === 'Unsaved changes' ? '◌' : '!'
 
 export function PlannerHeader({ currentView, budgetView, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView, onSelectBudgetView, setupComplete }: PlannerHeaderProps) {
   const [accountOpen, setAccountOpen] = useState(false)
   const [warningOpen, setWarningOpen] = useState(false)
   const [utilityOpen, setUtilityOpen] = useState(false)
   const [desktopExpanded, setDesktopExpanded] = useState(false)
-  const status = warning || /fail|not saved|error/i.test(saveStatus) ? 'Save failed' : saveStatus === 'Saving…' ? 'Saving…' : saveStatus === 'Unsaved changes' ? 'Unsaved changes' : 'Saved'
-  const statusIcon = status === 'Saved' ? <Check size={24} strokeWidth={2} aria-hidden="true" /> : <span aria-hidden="true">{status === 'Saving…' ? '◌' : '!'}</span>
+  const status = saveStatusLabel(saveStatus, warning)
+  // Saved is the quiet default: only show a status when there is something to know.
+  const statusIcon = status === 'Saved' ? null : <span aria-hidden="true">{statusMark(status)}</span>
   const selected = currentView === 'household' ? 'household' : budgetView
   const pageTitle = selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : 'Household'
   const destinations = [
@@ -88,7 +100,7 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
         <div className="sidebar-rail-utility">
           {warning && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status">{warning}</div>}</div>}
           {onSignOut && <div className="sidebar-account"><button type="button" className="account-button" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => setAccountOpen(value => !value)}>{(email?.trim()[0] ?? 'A').toUpperCase()}</button><span className="sidebar-account-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={email ?? 'Account'} /></span>{accountOpen && <div className="account-menu"><span className="account-menu-email">{email ?? 'Signed in'}</span><button type="button" onClick={() => { setAccountOpen(false); onSignOut() }}>Sign out</button></div>}</div>}
-          <span className="save-icon sidebar-status" title={status} aria-label={status}>{statusIcon}<span className="sidebar-status-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={status} /></span></span>
+          {status !== 'Saved' && <span className="save-icon sidebar-status" title={status} aria-label={status}>{statusIcon}<span className="sidebar-status-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={status} /></span></span>}
         </div>
       </div>
     </aside>
