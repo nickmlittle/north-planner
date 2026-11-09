@@ -825,6 +825,7 @@ small, footer { color: var(--muted) }
 .budget-info-metrics{display:grid;gap:var(--space-2);margin:var(--space-4) 0}
 .budget-info-metrics>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.6fr);gap:var(--space-3)}
 .budget-info-metrics dd{margin:0;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+.budget-info-metrics small{display:block;font-size:var(--text-sm);font-weight:400;color:var(--muted)}
 .budget-month-actions{display:grid;gap:var(--space-2);margin-top:var(--space-4)}
 .budget-month-actions button{min-height:44px;white-space:normal}
 .budget-month-actions .budget-remove-action{color:var(--status-error);text-align:left;justify-self:start}

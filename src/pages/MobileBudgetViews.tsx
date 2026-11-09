@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ModalDialog } from '../components/ModalDialog'
 import { Info } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { formatGBP } from '../formatting/money'
+import { balanceLabel, formatGBP } from '../formatting/money'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 
@@ -25,15 +25,15 @@ export function MobileBudgetSummary({ view, available, planned, allocated, hasIt
   view: 'plan' | 'transfers'; available: number; planned: number; allocated: number; hasItems: boolean; incomplete: boolean; onDetails: () => void; person?: TransferPersonChoice
 }) {
   const plan = view === 'plan', balance = available - planned
-  const balanceText = balance === 0 ? 'Budget balanced' : `${pounds(Math.abs(balance))} ${balance < 0 ? 'over' : 'left to allocate'}`
+  const balanceText = balanceLabel(balance)
   const personal = !plan ? person?.plan : undefined
   const review = person?.reviewCount ? `${person.reviewCount} ${person.reviewCount === 1 ? 'account needs' : 'accounts need'} review` : incomplete ? 'Instructions need review' : ''
   const transfersStatus = personal ? [`${personal.stepCount} ${personal.stepCount === 1 ? 'step' : 'steps'}`, review].filter(Boolean).join(' · ') : review || (hasItems ? 'All items allocated' : 'No allocations yet')
   return <section className={`budget-mobile-summary${plan ? balance < 0 ? ' is-deficit' : balance > 0 ? ' is-surplus' : ' is-balanced' : ''}`} aria-label={`${plan ? 'Plan' : 'Transfers'} summary`}>
     {!plan && person && person.adults.length > 1 && <TransferPersonSwitch {...person}/>}
-    <div className="budget-mobile-summary-heading"><h2>{plan ? 'Budget balance' : personal ? `${personal.name} moves` : 'Funding total'}</h2><button type="button" aria-label={`${plan ? 'Plan' : 'Transfers'} summary details`} onClick={onDetails}>{plan && <span className="budget-plan-details-label">Details</span>}<Info aria-hidden="true"/></button></div>
+    <div className="budget-mobile-summary-heading"><h2>{plan ? 'Plan' : personal ? `${personal.name} moves` : 'Funding total'}</h2><button type="button" aria-label={`${plan ? 'Plan' : 'Transfers'} summary details`} onClick={onDetails}>{plan && <span className="budget-plan-details-label">Details</span>}<Info aria-hidden="true"/></button></div>
     <p className="budget-mobile-summary-value">{plan ? balance < 0 ? <><span className="budget-mobile-summary-context">Planned {pounds(planned)} of {pounds(available)}</span><span className="budget-balance-over">{balanceText}</span></> : balanceText : pounds(personal ? personal.fundingPence : allocated)}</p>
-    {plan ? <dl className="budget-mobile-summary-support"><div><dt>Available income</dt><dd>{pounds(available)}</dd></div><div><dt>Planned budget</dt><dd>{pounds(planned)}</dd></div></dl>
+    {plan ? <dl className="budget-mobile-summary-support"><div><dt>Available</dt><dd>{pounds(available)}</dd></div><div><dt>Planned</dt><dd>{pounds(planned)}</dd></div></dl>
       : <p className={`budget-mobile-allocation-status${incomplete ? ' budget-allocation-incomplete' : ''}`}>{transfersStatus}</p>}
   </section>
 }

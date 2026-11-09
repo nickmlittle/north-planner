@@ -115,7 +115,7 @@ it('confirms removal from the selected budget month and returns focus to the row
   const menu=screen.getByLabelText('More actions for Apple TV')
   fireEvent.click(menu);fireEvent.click(screen.getByRole('button',{name:'Remove'}))
   const dialog=screen.getByRole('dialog',{name:'Remove Apple TV?'})
-  expect(dialog).toHaveTextContent('“Apple TV” will be removed from the budget.')
+  expect(within(dialog).getByRole('region',{name:'Impact preview'})).toBeVisible()
   expect(within(dialog).getByRole('button',{name:'Cancel'})).toHaveFocus()
   fireEvent.keyDown(dialog,{key:'Escape'})
   expect(screen.queryByRole('dialog',{name:'Remove Apple TV?'})).not.toBeInTheDocument()
@@ -777,7 +777,7 @@ it('keeps a single operable sticky group context as boundaries cross and results
   categoryTop=150
   fireEvent.scroll(wrap)
   await waitFor(()=>expect(wrap.querySelector('.budget-v3-sticky-category')).toHaveTextContent('Bills'))
-  expect(screen.getAllByRole('button',{name:/Bills, 1 items/})).toHaveLength(1)
+  expect(screen.getAllByRole('button',{name:/Bills, 1 item\b/})).toHaveLength(1)
   const sticky=within(wrap.querySelector<HTMLElement>('.budget-v3-sticky-category')!).getByRole('button')
   sticky.focus()
   categoryTop=200;ownerTop=140
@@ -794,8 +794,8 @@ it('keeps a single operable sticky group context as boundaries cross and results
 })
 
 it.each([
-  {income:2000,text:'£10.00 left to allocate'},
-  {income:1000,text:'Budget balanced'},
+  {income:2000,text:'£10.00 left'},
+  {income:1000,text:'Balanced'},
   {income:0,text:'£10.00 over'},
 ])('leads the mobile Plan summary with $text',({income,text})=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
@@ -804,13 +804,14 @@ it.each([
   render(<SeededHarness initial={initial}/>)
   const summary=screen.getByRole('region',{name:'Plan summary'})
   expect(summary).toHaveTextContent(text)
-  expect(summary).toHaveTextContent('Available income')
+  expect(summary).toHaveTextContent('Available')
+  expect(summary).not.toHaveTextContent('Budget balance')
   expect(summary).not.toHaveTextContent('Employment split basis')
   const trigger=within(summary).getByRole('button',{name:'Plan summary details'})
   trigger.focus();fireEvent.click(trigger)
   const dialog=screen.getByRole('dialog',{name:'Plan summary details'})
   expect(dialog).toHaveTextContent(income?'all from employment':'no income yet')
-  expect(dialog).toHaveTextContent('Additional income increases available money')
+  expect(dialog).not.toHaveTextContent('Budget balance is')
   expect(within(dialog).getByRole('button',{name:'Close dialog'})).toHaveFocus()
   fireEvent.keyDown(dialog,{key:'Escape'})
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -930,7 +931,7 @@ it.each(['plan', 'transfers'] as const)('identifies inherited months and hides d
   expect(screen.queryByRole('button', { name: 'Remove budget date' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Month & income' }))
   const dialog = screen.getByRole('dialog', { name: 'Month & income' })
-  expect(dialog).toHaveTextContent('Budget edits apply: December 2026–February 2027.')
+  expect(dialog).not.toHaveTextContent('Budget edits apply')
   expect(within(dialog).queryByRole('button', { name: 'Remove budget date' })).not.toBeInTheDocument()
 })
 
@@ -957,7 +958,7 @@ it('confirms the exact item-removal range', () => {
   fireEvent.click(screen.getByLabelText('More actions for Rent'))
   fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
   const dialog = screen.getByRole('dialog', { name: 'Remove Rent?' })
-  expect(dialog).toHaveTextContent('Changes apply: December 2026–February 2027. Later saved budgets stay unchanged.')
+  expect(dialog).toHaveTextContent('Changes apply: December 2026–February 2027.')
   fireEvent.click(within(dialog).getByRole('button', { name: 'Remove item' }))
   expect(savedBudget().snapshots['2026-12']?.items).toEqual([])
   expect(savedBudget().snapshots['2027-03']?.items).toHaveLength(1)
@@ -967,7 +968,7 @@ it('explains what replaces a removed budget date, including when there is no pre
   render(<MonthRulesHarness month="2026-11"/>)
   fireEvent.click(screen.getAllByRole('button', { name: 'Remove budget date' })[0]!)
   const dialog = screen.getByRole('dialog', { name: 'Remove the November 2026 budget date?' })
-  expect(dialog).toHaveTextContent('November 2026–February 2027 will use no budget. Later saved budgets stay unchanged.')
+  expect(dialog).toHaveTextContent('November 2026–February 2027 will use no budget.')
   fireEvent.click(within(dialog).getByRole('button', { name: 'Remove budget date' }))
   expect(savedBudget().snapshots['2026-11']).toBeUndefined()
   expect(savedBudget().snapshots['2027-03']?.items).toHaveLength(1)
@@ -981,8 +982,8 @@ it('shows the balance change of a removal directly above its confirm button', ()
   const dialog = screen.getByRole('dialog', { name: 'Remove Rent?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('Before removing')
-  expect(impact).toHaveTextContent('Changes apply: December 2026–February 2027. Later saved budgets stay unchanged.')
-  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £2,100.00')
+  expect(impact).toHaveTextContent('Changes apply: December 2026–February 2027.')
+  expect(impact).toHaveTextContent('£2,000.00 left → £2,100.00 left')
   expect(impact.compareDocumentPosition(within(dialog).getByRole('button', { name: 'Remove item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
@@ -991,8 +992,8 @@ it('shows the balance change of removing a budget date', () => {
   fireEvent.click(screen.getAllByRole('button', { name: 'Remove budget date' })[0]!)
   const dialog = screen.getByRole('dialog', { name: 'Remove the November 2026 budget date?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
-  expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget. Later saved budgets stay unchanged.')
-  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £2,100.00')
+  expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget.')
+  expect(impact).toHaveTextContent('£2,000.00 left → £2,100.00 left')
 })
 
 it('puts the full editor’s scope and impact in the footer, directly above Save', () => {
@@ -1002,11 +1003,11 @@ it('puts the full editor’s scope and impact in the footer, directly above Save
   const form = screen.getByRole('form', { name: 'Edit budget item' })
   const body = form.querySelector<HTMLElement>('.budget-batch-body')!, footer = form.querySelector<HTMLElement>('.budget-batch-footer')!
   expect(body).not.toHaveTextContent('Changes apply')
-  expect(footer).toHaveTextContent('Changes apply: December 2026–February 2027. Later saved budgets stay unchanged.')
+  expect(footer).toHaveTextContent('Changes apply: December 2026–February 2027.')
   expect(footer).not.toHaveTextContent('1 item')
   fireEvent.change(within(form).getByLabelText('Monthly amount'), { target: { value: '150' } })
   const impact = within(footer).getByRole('region', { name: 'Impact preview' })
-  expect(impact).toHaveTextContent('Budget balance: £2,000.00 → £1,950.00')
+  expect(impact).toHaveTextContent('£2,000.00 left → £1,950.00 left')
   expect(within(body).queryByRole('region', { name: 'Impact preview' })).not.toBeInTheDocument()
   expect(impact.compareDocumentPosition(within(footer).getByRole('button', { name: 'Save item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })

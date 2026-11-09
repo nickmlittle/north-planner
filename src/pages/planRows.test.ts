@@ -65,7 +65,7 @@ it('describes funding in words', () => {
   expect(as({ funding: 'proportional' })).toBe('Income ratio')
   expect(as({ funding: 'equal' })).toBe('Equal split')
   expect(as({ funding: 'single', singleFunderId: adults[1]!.id })).toBe('One person · Ben')
-  expect(as({ funding: 'fixed' })).toBe('Fixed contributions')
+  expect(as({ funding: 'fixed' })).toBe('Fixed amounts')
 })
 
 it('narrows to a Transfers destination and names it, or says it has gone', () => {

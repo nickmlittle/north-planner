@@ -50,7 +50,7 @@ function household(): BudgetDocument {
   return document
 }
 const desktop = () => vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
-const bandNames = (dataGroup: string) => [...document.querySelectorAll(`tr[data-budget-group="${dataGroup}"]`)].map(row => row.textContent?.replace(/\d+ items.*$/, '').trim())
+const bandNames = (dataGroup: string) => [...document.querySelectorAll(`tr[data-budget-group="${dataGroup}"]`)].map(row => row.textContent?.replace(/\d+ items? ·.*$/, '').trim())
 const itemNames = () => [...document.querySelectorAll('.budget-v3-item-name')].map(button => button.textContent)
 
 it('groups the desktop Plan by category only, across owners', () => {

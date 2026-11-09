@@ -1,13 +1,13 @@
 import type { ImpactResult } from '../domain/budgetImpact'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { formatGBP } from '../formatting/money'
+import { balanceLabel, formatGBP } from '../formatting/money'
 
 const money = (pence: number) => `${pence < 0 ? '−' : ''}${formatGBP(Math.abs(pence) / 100)}`
 
 /**
  * The consequence of a change, always placed directly above the button that commits it.
  * Without a result it is just the scope sentence; with one it adds the balance change and
- * per-person and per-account detail; on error it offers a retry.
+ * per-person and per-account funding; on error it offers a retry.
  */
 export function ImpactPreview({ scopeText, scopeId, result, document, label = 'Before saving', compact = false, onRetry }: {
   scopeText: string
@@ -23,13 +23,12 @@ export function ImpactPreview({ scopeText, scopeId, result, document, label = 'B
   if ('error' in result) return <div className={`budget-impact-plain${compact ? ' budget-impact-compact' : ''}`}>{scope}<p role="alert" className="budget-impact-error">{result.error}{onRetry && <> <button type="button" className="text-button" onClick={onRetry}>Retry</button></>}</p></div>
   const { impact } = result
   const people = impact.people.filter(person => person.beforePence !== person.afterPence)
-  const shortfall = impact.beforeBalancePence >= 0 && impact.afterBalancePence < 0 ? ' · Creates a shortfall' : impact.beforeBalancePence < 0 && impact.afterBalancePence >= 0 ? ' · Resolves the shortfall' : ''
   return <section className={`budget-impact${compact ? ' budget-impact-compact' : ''}`} aria-label="Impact preview">
     {!compact && <strong>{label}</strong>}
     {scope}
-    <p>Budget balance: {money(impact.beforeBalancePence)} → <strong>{money(impact.afterBalancePence)}</strong>{shortfall}</p>
-    {impact.incomplete && <p>Some contributions cannot be allocated yet. Add employment income or complete funding details to see them in Transfers.</p>}
-    {(people.length > 0 || impact.accounts.length > 0) && <details><summary>Contribution and destination changes</summary>
+    <p>{balanceLabel(impact.beforeBalancePence)} → <strong>{balanceLabel(impact.afterBalancePence)}</strong></p>
+    {impact.incomplete && <p>Some items can’t be funded yet.</p>}
+    {(people.length > 0 || impact.accounts.length > 0) && <details><summary>Funding changes</summary>
       <div className="budget-impact-changes">
         {people.map(person => <p key={person.personId}>{document.household.adults.find(row => row.id === person.personId)?.name ?? 'Person'}: {money(person.beforePence)} → {money(person.afterPence)}</p>)}
         {impact.accounts.map(account => <p key={account.accountId}>{document.budget.accounts.find(row => row.id === account.accountId)?.name ?? 'Account'}: {money(account.beforePence)} → {money(account.afterPence)}</p>)}
