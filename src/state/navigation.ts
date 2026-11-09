@@ -2,10 +2,17 @@ export type PlannerView = 'household' | 'budget'
 export type BudgetView = 'plan' | 'transfers'
 export type PlanDestination = { kind: 'account' | 'direct' | 'pot'; id: string }
 export type MatrixReturn = { key: string; month: string; expandedIds: string[]; scrollTop: number; scrollLeft: number; destination: PlanDestination; accountId: string }
-const liveMatrixOrigins = new Set<string>()
+/** Where "See items" in the payday steps was opened from, so Back to Transfers lands on the same account. */
+export type StepsReturn = { key: string; month: string; accountId: string }
+// Origins created in this page load; a reloaded or shared Plan link has none, so it offers View Transfers instead of Back.
+const liveTransfersOrigins = new Set<string>()
 export function markMatrixOrigin(origin: MatrixReturn) {
   window.history.replaceState({ ...window.history.state, northMatrixReturn: origin }, '')
-  liveMatrixOrigins.add(origin.key)
+  liveTransfersOrigins.add(origin.key)
+}
+export function markStepsOrigin(origin: StepsReturn) {
+  window.history.replaceState({ ...window.history.state, northStepsReturn: origin }, '')
+  liveTransfersOrigins.add(origin.key)
 }
 export function matrixReturnFromState(): MatrixReturn | null {
   const value = window.history.state?.northMatrixReturn as MatrixReturn | undefined
@@ -13,12 +20,18 @@ export function matrixReturnFromState(): MatrixReturn | null {
     && value.expandedIds.every(id => typeof id === 'string') && Number.isFinite(value.scrollTop) && Number.isFinite(value.scrollLeft)
     && typeof value.key === 'string' && typeof value.accountId === 'string' && !!value.destination?.id ? value : null
 }
-export function hasLiveMatrixOrigin(destination: PlanDestination | null): boolean {
-  const origin = window.history.state?.northMatrixOrigin as { key: string; month: string; destination: PlanDestination } | undefined
-  const current = parseNavigation(window.location.search)
-  return !!origin && !!destination && liveMatrixOrigins.has(origin.key) && origin.month === current.month && origin.destination.kind === destination.kind && origin.destination.id === destination.id
+export function stepsReturnFromState(): StepsReturn | null {
+  const value = window.history.state?.northStepsReturn as StepsReturn | undefined
+  return value && typeof value.key === 'string' && typeof value.accountId === 'string' && value.month === parseNavigation(window.location.search).month ? value : null
 }
-export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; transferAccount: string | null; planDestination: PlanDestination | null }
+/** History state for a Plan entry opened from Transfers. */
+export const transfersOriginState = (origin: { key: string; month: string }, destination: PlanDestination) => ({ northTransfersOrigin: { key: origin.key, month: origin.month, destination } })
+export function hasLiveTransfersOrigin(destination: PlanDestination | null): boolean {
+  const origin = window.history.state?.northTransfersOrigin as { key: string; month: string; destination: PlanDestination } | undefined
+  const current = parseNavigation(window.location.search)
+  return !!origin && !!destination && liveTransfersOrigins.has(origin.key) && origin.month === current.month && origin.destination.kind === destination.kind && origin.destination.id === destination.id
+}
+export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null }
 
 function parsePlanDestination(raw: string | null): PlanDestination | null {
   if (!raw) return null
@@ -46,7 +59,6 @@ export function parseNavigation(search: string): NavigationState {
     view: params.get('view') === 'household' ? 'household' : 'budget',
     budgetView,
     month: validMonth(params.get('month')) ? params.get('month')! : currentMonth(),
-    transferAccount: params.get('transferAccount') || null,
     planDestination: budgetView === 'plan' ? parsePlanDestination(params.get('planDestination')) : null,
   }
 }
@@ -72,8 +84,8 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   else url.searchParams.delete('budgetView')
   if (next.month !== undefined || url.searchParams.has('month')) url.searchParams.set('month', state.month)
   else url.searchParams.delete('month')
-  if (state.view === 'budget' && state.budgetView === 'transfers' && state.transferAccount) url.searchParams.set('transferAccount', state.transferAccount)
-  else url.searchParams.delete('transferAccount')
+  // The destination detail screen is gone; old links simply land on the step list.
+  url.searchParams.delete('transferAccount')
   if (state.view === 'budget' && state.budgetView === 'plan' && state.planDestination) url.searchParams.set('planDestination', `${state.planDestination.kind}:${state.planDestination.id}`)
   else url.searchParams.delete('planDestination')
   url.searchParams.delete('section')

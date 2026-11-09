@@ -51,7 +51,8 @@ it('previews an edit and routes its saved account change to the same month in Tr
   expect(window.location.search).toContain('budgetView=transfers')
   expect(window.location.search).toContain('month=2026-02')
   expect(window.history.state.northAffectedTransfers.accounts).toMatchObject([{ accountId: 'account-1', beforePence: 10000, afterPence: 10100 }])
-  expect(screen.getAllByText('Changed by recent edit').length).toBeGreaterThan(0)
+  expect(within(screen.getByRole('region', { name: 'Transfers by person' })).getAllByText('Changed by recent edit').length).toBeGreaterThan(0)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
 it('starts with household setup and saves only the new budget key', async () => {
@@ -214,35 +215,26 @@ it('keeps budget ownership aligned after an adult name is edited', () => {
   expect(next.budget.accounts[0].ownerPersonIds).toEqual(['alex'])
 })
 
-it('opens a destination URL and restores the overview with Back and browser Forward', async () => {
+it('opens an account’s items in Plan from its step and comes back to that step with Back and Forward', async () => {
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
-  const row = await screen.findByRole('button', { name: /^Alex · Monzo · Current account, Alex funds £50\.00/ })
-  row.focus()
+  const alex = await screen.findByRole('region', { name: 'Alex steps' })
+  expect(within(alex).getAllByRole('listitem').map(step => step.textContent)).toEqual(['1Fund Alex · Monzo · Current account£50.00See 1 item'])
+  const seeItems = within(alex).getByRole('button', { name: 'See 1 item for Alex · Monzo · Current account' })
   const originalLength = window.history.length
-  fireEvent.click(row)
-  expect(window.location.search).toContain('transferAccount=account-1')
+  fireEvent.click(seeItems)
+  expect(window.location.search).toContain('budgetView=plan')
+  expect(window.location.search).toContain('planDestination=account%3Aaccount-1')
+  expect(window.location.search).toContain('month=2026-02')
   expect(window.history.length).toBe(originalLength + 1)
-  const detail = await screen.findByRole('dialog', { name: 'Monzo · Current account' })
-  const heading = within(detail).getByRole('heading', { name: 'Monzo · Current account' })
-  const back = within(detail).getByRole('button', { name: 'Back to Transfers' })
-  expect(heading).toHaveFocus()
-  fireEvent.keyDown(detail, { key: 'Tab' })
-  expect(back).toHaveFocus()
-  within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Plan' }).focus()
-  expect(heading).toHaveFocus()
-  expect(detail).toHaveTextContent('Alex · February 2026')
-  expect(detail).toHaveTextContent('Alex£50.00Sam£50.00')
-  expect(document.body.style.position).toBe('fixed')
-  expect(document.querySelector('.planner-app-shell')?.closest('[inert]')).not.toBeNull()
-  fireEvent.click(back)
-  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
-  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
-  expect(row).toHaveFocus()
-  expect(document.body.style.position).toBe('')
+  const banner = await screen.findByRole('region', { name: 'Plan destination filter' })
+  expect(banner).toHaveTextContent('Showing 1 item')
+  fireEvent.click(within(banner).getByRole('button', { name: 'Back to Transfers' }))
+  await waitFor(() => expect(window.location.search).toContain('budgetView=transfers'))
+  await waitFor(() => expect(within(screen.getByRole('region', { name: 'Alex steps' })).getByRole('button', { name: /^See 1 item/ })).toHaveFocus())
   window.history.forward()
-  expect(await screen.findByRole('dialog', { name: 'Monzo · Current account' })).toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Plan destination filter' })).toBeInTheDocument()
 })
 
 it('opens the selected-month pot items in Plan and restores the pot action through Back and Forward', async () => {
@@ -400,35 +392,14 @@ it('offers View Transfers for a direct filtered link in the selected month', asy
   expect(screen.getByRole('button', { name: 'Matrix' })).toBeVisible()
 })
 
-it('replaces a direct detail URL when closing and clears an invalid destination', async () => {
+it('shows the step list for an old destination detail link', async () => {
   localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')
   render(<App />)
-  const detail = await screen.findByRole('dialog', { name: 'Monzo · Current account' })
-  const length = window.history.length
-  fireEvent.keyDown(detail, { key: 'Escape' })
-  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
-  expect(window.history.length).toBe(length)
-  cleanup()
-  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=missing')
-  render(<App />)
-  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
-  expect(screen.getByRole('status')).toHaveTextContent('Destination is no longer available')
-})
-
-it('dismisses mobile detail when the viewport becomes desktop', async () => {
-  localStorage.setItem(budgetStorageKey, JSON.stringify(savedTransferDocument()))
-  const listeners = new Set<() => void>()
-  let matches = true
-  vi.stubGlobal('matchMedia', vi.fn(() => ({ get matches() { return matches }, addEventListener: (_: string, listener: () => void) => listeners.add(listener), removeEventListener: (_: string, listener: () => void) => listeners.delete(listener) })))
-  window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')
-  render(<App />)
-  expect(await screen.findByRole('dialog', { name: 'Monzo · Current account' })).toBeInTheDocument()
-  matches = false
-  listeners.forEach(listener => listener())
-  await waitFor(() => expect(window.location.search).not.toContain('transferAccount'))
-  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
-  matches = true
-  listeners.forEach(listener => listener())
-  expect(screen.queryByRole('dialog', { name: 'Monzo · Current account' })).not.toBeInTheDocument()
+  expect(await screen.findByRole('region', { name: 'Transfers by person' })).toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Sam steps' })).toHaveTextContent('Fund Alex · Monzo · Current account£50.00')
+  // The retired parameter goes on the next navigation.
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Plan' }))
+  expect(window.location.search).not.toContain('transferAccount')
 })

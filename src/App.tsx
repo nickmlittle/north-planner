@@ -9,7 +9,7 @@ import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
-import { hasLiveMatrixOrigin, markMatrixOrigin, matrixReturnFromState, navigateTo, parseNavigation, type BudgetView, type MatrixReturn, type PlanDestination, type PlannerView } from './state/navigation'
+import { hasLiveTransfersOrigin, markMatrixOrigin, markStepsOrigin, matrixReturnFromState, navigateTo, parseNavigation, stepsReturnFromState, transfersOriginState, type BudgetView, type MatrixReturn, type PlanDestination, type PlannerView } from './state/navigation'
 
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
 
@@ -28,32 +28,32 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   const navigation = parseNavigation(search)
   const setupComplete = !!document.household.name.trim() && document.household.adults.length > 0 && document.household.adults.every(person => !!person.name.trim()) && document.workflow.setupComplete
   const view: PlannerView = !setupComplete || navigation.view === 'household' ? 'household' : 'budget'
-  const selectView = (nextView: PlannerView) => { if (nextView !== view) navigateTo({ view: nextView, transferAccount: null }) }
+  const selectView = (nextView: PlannerView) => { if (nextView !== view) navigateTo({ view: nextView }) }
   const selectBudgetView = (nextView: BudgetView) => {
     if (!setupComplete || (view === 'budget' && navigation.budgetView === nextView)) return
-    navigateTo({ view: 'budget', budgetView: nextView, transferAccount: null })
+    navigateTo({ view: 'budget', budgetView: nextView })
   }
-  const openTransferAccount = (accountId: string) => navigateTo({ view: 'budget', budgetView: 'transfers', transferAccount: accountId }, { historyState: { northTransferDetail: true } })
-  const closeTransferAccount = () => {
-    if (window.history.state?.northTransferDetail === true) window.history.back()
-    else navigateTo({ transferAccount: null }, { replace: true })
-  }
-  const dismissTransferAccount = () => navigateTo({ transferAccount: null }, { replace: true })
   const openPlanDestination = (destination: PlanDestination, origin?: MatrixReturn) => {
     if (origin) markMatrixOrigin(origin)
-    navigateTo({ view: 'budget', budgetView: 'plan', month: navigation.month, transferAccount: null, planDestination: destination }, { historyState: origin ? { northMatrixOrigin: { key: origin.key, month: origin.month, destination } } : null })
+    navigateTo({ view: 'budget', budgetView: 'plan', month: navigation.month, planDestination: destination }, { historyState: origin ? transfersOriginState(origin, destination) : null })
+  }
+  /** "See items" in the payday steps: Plan filtered to that account, with Back returning to the same step. */
+  const seeTransferItems = (accountId: string) => {
+    const origin = { key: crypto.randomUUID(), month: navigation.month, accountId }, destination: PlanDestination = { kind: 'account', id: accountId }
+    markStepsOrigin(origin)
+    navigateTo({ view: 'budget', budgetView: 'plan', month: navigation.month, planDestination: destination }, { historyState: transfersOriginState(origin, destination) })
   }
   const returnToTransfers = () => {
-    if (hasLiveMatrixOrigin(navigation.planDestination)) window.history.back()
-    else navigateTo({ view: 'budget', budgetView: 'transfers', month: navigation.month, transferAccount: null, planDestination: null })
+    if (hasLiveTransfersOrigin(navigation.planDestination)) window.history.back()
+    else navigateTo({ view: 'budget', budgetView: 'transfers', month: navigation.month, planDestination: null })
   }
   const clearPlanDestination = () => navigateTo({ planDestination: null })
-  const viewAffectedTransfers = (impact: BudgetImpact) => navigateTo({ view: 'budget', budgetView: 'transfers', month: impact.month, transferAccount: impact.accounts.length === 1 && impact.accounts[0]!.afterPence > 0 ? impact.accounts[0]!.accountId : null, planDestination: null }, { historyState: { northAffectedTransfers: impact, ...(impact.accounts.length === 1 && impact.accounts[0]!.afterPence > 0 ? { northTransferDetail: true } : {}) } })
+  const viewAffectedTransfers = (impact: BudgetImpact) => navigateTo({ view: 'budget', budgetView: 'transfers', month: impact.month, planDestination: null }, { historyState: { northAffectedTransfers: impact } })
   const affectedTransfers = navigation.budgetView === 'transfers' && window.history.state?.northAffectedTransfers?.month === navigation.month ? window.history.state.northAffectedTransfers as BudgetImpact : null
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
     {view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
-      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} transferAccount={navigation.transferAccount} onOpenTransferAccount={openTransferAccount} onCloseTransferAccount={closeTransferAccount} onDismissTransferAccount={dismissTransferAccount} planDestination={navigation.planDestination} onOpenPlanDestination={openPlanDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} matrixReturn={navigation.budgetView === 'transfers' ? matrixReturnFromState() : null} onReturnToTransfers={returnToTransfers} hasMatrixOrigin={hasLiveMatrixOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
+      : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onOpenPlanDestination={openPlanDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} matrixReturn={navigation.budgetView === 'transfers' ? matrixReturnFromState() : null} stepsReturn={navigation.budgetView === 'transfers' ? stepsReturnFromState() : null} onReturnToTransfers={returnToTransfers} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
   </AppLayout>
 }
 

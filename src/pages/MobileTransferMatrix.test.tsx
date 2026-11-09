@@ -188,8 +188,7 @@ describe('preview integration', () => {
     expect(document).toEqual(original)
     fireEvent.click(screen.getByRole('button', { name: 'List' }))
     const overview = screen.getByRole('region', { name: 'Transfers by person' })
-    fireEvent.click(within(overview).getAllByRole('button', { name: /Joint · Monzo · Household/ })[0]!)
-    expect(screen.getByRole('dialog', { name: 'Monzo · Household' })).toBeInTheDocument()
+    expect(within(overview).getAllByText(/^Fund Joint · Monzo · Household/).length).toBeGreaterThan(0)
   })
 
   it('updates for the selected month and surfaces incomplete gaps', () => {
