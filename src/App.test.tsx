@@ -67,7 +67,7 @@ it('starts with household setup and saves only the new budget key', async () => 
   expect(localStorage.getItem('north.household.v2')).toBe('{"old":"data"}')
 })
 
-it('keeps the sidebar controls and routes between Household and Budget', async () => {
+it('keeps the sidebar controls and routes between Household, Plan and Transfers', async () => {
   render(<App />)
   await completeSetup()
   fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
@@ -77,8 +77,13 @@ it('keeps the sidebar controls and routes between Household and Budget', async (
   fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   expect(window.location.search).toContain('view=household')
-  fireEvent.click(within(nav).getByRole('button', { name: 'Budget' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'Transfers' }))
   expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
+  expect(window.location.search).toContain('budgetView=transfers')
+  expect(within(nav).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
+  expect(window.location.search).toContain('budgetView=plan')
+  expect(within(nav).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
   fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
   expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
 })
@@ -159,7 +164,8 @@ it('gates direct Budget URLs until household setup is complete', () => {
   render(<App />)
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   expect(screen.queryByRole('navigation', { name: 'Mobile navigation' })).not.toBeInTheDocument()
-  expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).queryByRole('button', { name: 'Budget' })).not.toBeInTheDocument()
+  const sidebar = within(screen.getByRole('navigation', { name: 'Main navigation' }))
+  expect(sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Household'])
 })
 
 it('reopens on the Plan or Transfers view used last on this device', async () => {
