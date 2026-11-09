@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { decodeBudgetDocument } from '../domain/budgetDocument'
 import { resolveBudget, type BudgetItem } from '../domain/monthlyBudget'
-import { accountOptionLabels, compactAccountLabels } from './budgetLabels'
+import { shortAccountLabels } from './budgetLabels'
 import { groupPlanItems, matchesPlanDestination, planDestinationLabel, planItemLabels, planOwnerOrder } from './planRows'
 
 const document = decodeBudgetDocument(JSON.parse(readFileSync(new URL('../../docs/fixtures/plan-transfers-baseline.json', import.meta.url), 'utf8')))!
 const adults = document.household.adults
 const items = resolveBudget(document.budget, '2026-11').items
-const labels = planItemLabels(document, accountOptionLabels(document.budget.accounts, adults))
+const short = shortAccountLabels(document.budget.accounts, adults)
+const labels = planItemLabels(document, short)
 const ownerOrder = planOwnerOrder(adults)
 const all = { query: '', owner: 'All', category: 'All' }
 const itemTo = (accountId: string, potId?: string) => items.find(item => potId ? item.destination.kind === 'pot' && item.destination.potId === potId : item.destination.kind === 'account' && item.destination.accountId === accountId)!
@@ -49,12 +50,11 @@ it('searches account bank and pot names, ignoring case and surrounding space', (
   expect(labels.matchesSearch(itemTo('ben', 'ben-spend'), 'ben')).toBe(true)
 })
 
-it('labels destinations in full on desktop and briefly in the compact row', () => {
+it('labels every destination one way: the pot, then the short account name', () => {
   const bills = itemTo('joint', 'bills')
-  expect(labels.shortDestinationLabel(bills)).toBe('Bills pot')
-  expect(labels.destinationLabel(bills)).toMatch(/^Bills · /)
-  expect(labels.shortDestinationLabel(itemTo('joint'))).toBe('Current account')
-  expect(labels.destinationLabel(itemTo('joint'))).toBe(accountOptionLabels(document.budget.accounts, adults).get('joint'))
+  expect(labels.destinationLabel(bills)).toBe('Bills · Monzo Joint')
+  expect(labels.destinationLabel(itemTo('joint'))).toBe('Monzo Joint')
+  expect(labels.destinationLabel(itemTo('ben', 'ben-spend'))).toMatch(/^.+ · Nationwide Ben$/)
   expect(labels.ownerGroup(itemTo('ada', 'ada-spend'))).toBe('Ada')
   expect(labels.ownerGroup(bills)).toBe('Joint')
 })
@@ -69,14 +69,13 @@ it('describes funding in words', () => {
 })
 
 it('narrows to a Transfers destination and names it, or says it has gone', () => {
-  const compact = compactAccountLabels(document.budget.accounts, adults)
   const pot = { kind: 'pot' as const, id: 'bills' }, direct = { kind: 'direct' as const, id: 'joint' }, account = { kind: 'account' as const, id: 'joint' }
   expect(items.filter(item => matchesPlanDestination(item, pot, labels)).every(item => item.destination.kind === 'pot' && item.destination.potId === 'bills')).toBe(true)
   expect(items.filter(item => matchesPlanDestination(item, direct, labels)).every(item => item.destination.kind === 'account')).toBe(true)
   expect(items.filter(item => matchesPlanDestination(item, account, labels)).length).toBeGreaterThan(items.filter(item => matchesPlanDestination(item, direct, labels)).length)
-  expect(planDestinationLabel(document, pot, compact)).toMatch(/^Bills pot · /)
-  expect(planDestinationLabel(document, direct, compact)).toMatch(/^Direct to account · /)
-  expect(planDestinationLabel(document, { kind: 'pot', id: 'missing' }, compact)).toBe('Destination no longer available')
-  expect(planDestinationLabel(document, null, compact)).toBe('')
+  expect(planDestinationLabel(document, pot, short)).toBe('Bills · Monzo Joint')
+  expect(planDestinationLabel(document, direct, short)).toBe('Direct to account · Monzo Joint')
+  expect(planDestinationLabel(document, { kind: 'pot', id: 'missing' }, short)).toBe('Destination no longer available')
+  expect(planDestinationLabel(document, null, short)).toBe('')
 })
 

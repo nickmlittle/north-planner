@@ -2,6 +2,7 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import type { BudgetItem } from '../domain/monthlyBudget'
 import { accountTypeLabel } from '../domain/accountTypes'
 import type { PlanDestination } from '../state/navigation'
+import { destinationLabel } from './budgetLabels'
 
 export type PlanGroup = { name: string; key: string; items: BudgetItem[] }
 export type PlanOwnerGroup = PlanGroup & { categories: PlanGroup[] }
@@ -10,9 +11,7 @@ export type PlanFilterValues = { query: string; owner: string; category: string 
 /** Owner bands, and Owner filter options, in household order. */
 export const planOwnerOrder = (adults: BudgetDocument['household']['adults']) => ['Joint', ...adults.map(person => person.name), 'Needs owner']
 
-const potLabel = (name: string) => /\bpot$/i.test(name) ? name : `${name} pot`
-
-/** Everything the Plan says about an item besides its name and amount. */
+/** Everything the Plan says about an item besides its name and amount. `accountLabels` are the short names from shortAccountLabels. */
 export function planItemLabels(document: BudgetDocument, accountLabels: ReadonlyMap<string, string>) {
   const { accounts, pots, categories } = document.budget
   const adults = document.household.adults
@@ -33,16 +32,10 @@ export function planItemLabels(document: BudgetDocument, accountLabels: Readonly
     accountFor,
     ownerGroup,
     categoryName,
+    /** "Bills · Monzo Joint", the same on every screen. */
     destinationLabel(item: BudgetItem) {
       const account = accountFor(item), destination = item.destination
-      if (destination.kind === 'pot') return `${potNamed(destination.potId) ?? 'Pot'} · ${account ? accountLabels.get(account.id) : 'Account'}`
-      return account ? accountLabels.get(account.id) ?? 'Account' : 'Account'
-    },
-    /** Owner and bank are already in the group band; rows only need the pot, or the account for direct items. */
-    shortDestinationLabel(item: BudgetItem) {
-      const destination = item.destination
-      if (destination.kind === 'pot') return potLabel(potNamed(destination.potId) ?? 'Pot')
-      return accountFor(item)?.name ?? 'Account'
+      return destinationLabel((account && accountLabels.get(account.id)) ?? 'Account', destination.kind === 'pot' ? potNamed(destination.potId) ?? 'Pot' : undefined)
     },
     fundingLabel(item: BudgetItem) {
       if (item.funding === 'fixed') return 'Fixed amounts'
@@ -71,16 +64,16 @@ export function matchesPlanDestination(item: BudgetItem, destination: PlanDestin
   return labels.accountFor(item)?.id === destination.id
 }
 
-/** "Bills pot · Joint Monzo", "Direct to account · Joint Monzo", or a note that it has gone. */
-export function planDestinationLabel(document: BudgetDocument, destination: PlanDestination | null | undefined, compactLabels: ReadonlyMap<string, string>) {
+/** "Bills · Monzo Joint", "Direct to account · Monzo Joint", or a note that it has gone. */
+export function planDestinationLabel(document: BudgetDocument, destination: PlanDestination | null | undefined, accountLabels: ReadonlyMap<string, string>) {
   if (!destination) return ''
   const gone = 'Destination no longer available'
   if (destination.kind === 'pot') {
     const pot = document.budget.pots.find(row => row.id === destination.id)
-    const account = pot && compactLabels.get(pot.accountId)
-    return pot && account ? `${potLabel(pot.name)} · ${account}` : gone
+    const account = pot && accountLabels.get(pot.accountId)
+    return pot && account ? destinationLabel(account, pot.name) : gone
   }
-  const account = compactLabels.get(destination.id)
+  const account = accountLabels.get(destination.id)
   if (!account) return gone
   return destination.kind === 'direct' ? `Direct to account · ${account}` : account
 }

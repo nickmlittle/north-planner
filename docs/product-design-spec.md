@@ -60,7 +60,7 @@ Mobile uses a compact page heading and labeled bottom navigation for Plan, Trans
 
 ### Plan
 
-Present the selected month and whether its budget is saved or inherited near the top. The scope of an edit is shown where it is saved. The balance reads “£X left”, “£X over” or “Balanced”. Desktop shows a wider summary, actions and grouped table; mobile puts a compact balance and details control above item discovery, with owner/category group headings and visible item rows.
+Present the selected month and whether its budget is saved or inherited near the top. The scope of an edit is shown where it is saved. The balance reads “£X left”, “£X over” or “Balanced”. Desktop shows a wider summary, actions and grouped table; mobile puts a compact balance, with Available · Planned beneath it, above item discovery, with owner/category group headings and visible item rows.
 
 Search matches item names, categories, owners and destination account/provider/type/pot text. Owner, category and destination filters constrain matches where available. A nonblank search shows direct matching rows with context and a matching count and total. Clearing returns to the prior browsing context and focus; search and filters persist while switching mounted views but reset on reload. Keep item editing and amounts discoverable in both browse and search states.
 
@@ -81,6 +81,8 @@ Dialogs and sheets need an accessible title, keyboard containment, Escape/close 
 ### Language
 
 Use plain, concise British English and familiar household finance terms. Label actions with verbs (“Edit income”, “Add item”) and name amounts with the glossary below. Explain scope in calendar months. State what needs attention and how to resolve it without blame. Avoid implying a payment has happened or that an account owner necessarily funds every item.
+
+Name a destination one way everywhere it is shown (Plan rows, the item editor, Transfers): the pot, then the account's short name, as in “Bills · Monzo Joint”. The short name is the account's nickname, or else bank and owner; `shortAccountLabels` in `budgetLabels` is the one place it is built. Pickers and Manage, which choose between accounts, keep the fuller bank · type labels.
 
 Keep text to what changes a decision: the scope and impact above Save, real warnings, and empty states. Don't explain what a label or number already says, and don't repeat a caveat that is already on the screen. Put secondary detail behind one ⓘ.
 
