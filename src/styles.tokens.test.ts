@@ -30,6 +30,17 @@ describe('design tokens', () => {
     expect(offenders(d => d.property === 'border-radius' && !/^(0|50%|(var\(--radius-[a-z]+\)|0)( (var\(--radius-[a-z]+\)|0))*)$/.test(d.value))).toEqual([])
   })
 
+  it('uses the type scale: --text-* tokens, inherit, or a fluid clamp between two of them', () => {
+    const scale = /^(inherit|var\(--text-[\w-]+\)|clamp\(var\(--text-[\w-]+\),\s*[\d.]+vw,\s*var\(--text-[\w-]+\)\))$/
+    expect(offenders(d => d.property === 'font-size' && !scale.test(d.value))).toEqual([])
+    expect(offenders(d => d.property === 'font' && /\d(px|r?em)\b/.test(d.value))).toEqual([])
+  })
+
+  it('keeps the body floor: nothing below --text-xs, and xs is for uppercase labels and badges only', () => {
+    const xs = declarations.filter(d => /var\(--text-xs\)/.test(d.value)).map(d => d.selector)
+    expect(xs.every(selector => /eyebrow|transfer-matrix-incomplete|budget-v3-picker small/.test(selector))).toBe(true)
+  })
+
   it('uses shadow tokens', () => {
     expect(offenders(d => d.property === 'box-shadow' && d.value !== 'none' && !/var\(--shadow-/.test(d.value) && !/var\(--line\)/.test(d.value))).toEqual([])
   })
