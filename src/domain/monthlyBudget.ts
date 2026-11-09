@@ -119,6 +119,11 @@ export function updateIncomeAtMonth(budget: MonthlyBudget, month: string, source
   return found ? { ...budget, incomeSources } : budget
 }
 
+/** A new recurring income source, starting at `month`. */
+export function addIncomeSource(budget: MonthlyBudget, month: string, source: Pick<IncomeSource, 'personId' | 'name' | 'type' | 'baseAmountPence'>): MonthlyBudget {
+  return { ...budget, incomeSources: [...budget.incomeSources, { id: crypto.randomUUID(), ...source, baseEffectiveFrom: month, changes: {} }] }
+}
+
 export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (!value || typeof value !== 'object') return false
   const b = value as MonthlyBudget

@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { incomeEditScope, resolveIncomeSources, updateIncomeAtMonth } from '../domain/monthlyBudget'
+import { addIncomeSource, incomeEditScope, resolveIncomeSources, updateIncomeAtMonth } from '../domain/monthlyBudget'
 import { formatEditScope, formatMonth } from '../formatting/month'
 
 type IncomeType = 'employment' | 'additional'
@@ -27,7 +27,7 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
     setDocument(current => {
       let budget = current.budget
       for (const source of budget.incomeSources) if (draft[source.id] !== undefined) budget = updateIncomeAtMonth(budget, month, source.id, pence(draft[source.id]!))
-      if (newName.trim() && newPerson) budget = { ...budget, incomeSources: [...budget.incomeSources, { id: crypto.randomUUID(), personId: newPerson, name: newName.trim(), type: newType, baseAmountPence: pence(newAmount), baseEffectiveFrom: month, changes: {} }] }
+      if (newName.trim() && newPerson) budget = addIncomeSource(budget, month, { personId: newPerson, name: newName.trim(), type: newType, baseAmountPence: pence(newAmount) })
       return { ...current, budget }
     })
     onClose()

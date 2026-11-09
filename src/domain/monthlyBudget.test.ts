@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { defaultMonthlyBudget, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, updateIncomeAtMonth, type BudgetItem } from './monthlyBudget'
+import { addIncomeSource, defaultMonthlyBudget, resolveBudget, resolveIncomeSources, updateBudgetAtMonth, updateIncomeAtMonth, type BudgetItem } from './monthlyBudget'
 const item=(id:string,amount=10000):BudgetItem=>({id,name:id,categoryId:'c',entryAmountPence:amount,frequency:'monthly',amountPence:amount,destination:{kind:'account',accountId:'a'},funding:'proportional'})
 it('resolves snapshot inheritance and keeps later boundaries independent',()=>{let b=defaultMonthlyBudget();b.categories=[{id:'c',name:'Bills'}];b.accounts=[{id:'a',name:'Bank',ownerPersonIds:['nick']}];b=updateBudgetAtMonth(b,'2026-11',()=>[item('nov',10000)]);b=updateBudgetAtMonth(b,'2027-05',()=>[item('may',30000)]);expect(resolveBudget(b,'2027-01').items[0]?.id).toBe('nov');expect(resolveBudget(b,'2027-01').sourceMonth).toBe('2026-11');b=updateBudgetAtMonth(b,'2027-01',xs=>[...xs,item('jan',5000)]);expect(resolveBudget(b,'2027-02').items.map(x=>x.id)).toEqual(['nov','jan']);expect(resolveBudget(b,'2027-05').items.map(x=>x.id)).toEqual(['may'])})
 it('stores intentional empty snapshots and removes a boundary cleanly',()=>{let b=defaultMonthlyBudget();b.categories=[{id:'c',name:'Bills'}];b.accounts=[{id:'a',name:'Bank',ownerPersonIds:[]}];b=updateBudgetAtMonth(b,'2026-11',()=>[item('x')]);b=updateBudgetAtMonth(b,'2027-01',()=>[]);expect(resolveBudget(b,'2027-01').items).toEqual([]);delete b.snapshots['2027-01'];expect(resolveBudget(b,'2027-01').items[0]?.id).toBe('x')})
@@ -36,4 +36,11 @@ it('preserves later income changes and start dates when correcting an earlier mo
   expect(resolveIncomeSources(budget, '2027-02')[0]?.amountPence).toBe(0)
   expect(resolveIncomeSources(budget, '2027-03')[0]?.amountPence).toBe(200000)
   expect(budget.snapshots).toEqual({})
+})
+
+it('adds a recurring income source that starts at its month', () => {
+  const b = addIncomeSource(defaultMonthlyBudget(), '2026-11', { personId: 'nick', name: 'Pay', type: 'employment', baseAmountPence: 250000 })
+  expect(b.incomeSources).toMatchObject([{ personId: 'nick', name: 'Pay', type: 'employment', baseAmountPence: 250000, baseEffectiveFrom: '2026-11', changes: {} }])
+  expect(resolveIncomeSources(b, '2026-10')).toEqual([])
+  expect(resolveIncomeSources(b, '2027-01').map(x => x.amountPence)).toEqual([250000])
 })

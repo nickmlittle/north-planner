@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import type { BudgetDocument } from './domain/budgetDocument'
+import { householdReady, type BudgetDocument } from './domain/budgetDocument'
 import type { BudgetImpact } from './domain/budgetImpact'
 import { HouseholdSetup } from './pages/HouseholdSetup'
+import { SetupWizard } from './pages/SetupWizard'
 import { useBudgetDocument } from './state/useBudgetDocument'
 import { useCloudBudget } from './state/useCloudBudget'
 import { supabase } from './state/supabase'
@@ -26,7 +27,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
 }) {
   const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
   const navigation = parseNavigation(search)
-  const setupComplete = !!document.household.name.trim() && document.household.adults.length > 0 && document.household.adults.every(person => !!person.name.trim()) && document.workflow.setupComplete
+  const setupComplete = householdReady(document.household) && document.workflow.setupComplete
   const view: PlannerView = !setupComplete || navigation.view === 'household' ? 'household' : 'budget'
   const selectView = (nextView: PlannerView) => { if (nextView !== view) navigateTo({ view: nextView }) }
   const selectBudgetView = (nextView: BudgetView) => {
@@ -47,7 +48,9 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   const viewAffectedTransfers = (impact: BudgetImpact) => navigateTo({ view: 'budget', budgetView: 'transfers', month: impact.month, planDestination: null }, { historyState: { northAffectedTransfers: impact } })
   const affectedTransfers = navigation.budgetView === 'transfers' && window.history.state?.northAffectedTransfers?.month === navigation.month ? window.history.state.northAffectedTransfers as BudgetImpact : null
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete }}>
-    {view === 'household'
+    {!document.workflow.setupComplete
+      ? <SetupWizard document={document} setDocument={setDocument} month={navigation.month} onFinish={() => navigateTo({ view: 'budget', budgetView: 'plan' })} />
+      : view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
       : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={navigation.budgetView === 'transfers' ? stepsReturnFromState() : null} onReturnToTransfers={returnToTransfers} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
   </AppLayout>
