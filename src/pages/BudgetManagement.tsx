@@ -1,4 +1,5 @@
 import { useId, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react'
+import { X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { BudgetAccount, BudgetCategory, BudgetPot } from '../domain/monthlyBudget'
 import { accountTypeLabel, isAccountTypeId } from '../domain/accountTypes'
@@ -169,7 +170,7 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
   }
   const sections: Array<{ kind: Kind; label: string; count: number }> = [{ kind: 'account', label: 'Accounts', count: accounts.length }, { kind: 'pot', label: 'Pots', count: pots.length }, { kind: 'category', label: 'Categories', count: categories.length }]
   return <div className="budget-v3-overlay"><div className="budget-v3-panel budget-manage-panel" role="dialog" aria-label="Manage accounts, pots & categories">
-    <div className="budget-manage-header"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={() => { if (canLeave()) onClose() }}>Done</button></div>
+    <div className="budget-manage-header"><h2>Manage accounts, pots &amp; categories</h2><button type="button" className="secondary-button" onClick={() => { if (canLeave()) onClose() }}>Done</button><button type="button" className="budget-manage-close" aria-label="Close" onClick={() => { if (canLeave()) onClose() }}><X aria-hidden="true"/></button></div>
     <p className="budget-manage-note">Accounts, pots and categories are shared across all budget months. Changes here affect every month.</p>
     {status && <p className="budget-manage-message" role="status">{status}</p>}
     {sections.map(section => <section key={section.kind} className="budget-manage-section">

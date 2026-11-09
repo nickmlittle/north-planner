@@ -8,6 +8,7 @@ import { formatGBP } from '../formatting/money'
 import { DestinationPicker } from './DestinationPicker'
 import { budgetImpact } from '../domain/budgetImpact'
 import { BudgetImpactSummary } from './BudgetImpactSummary'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 type Props = {
   document: BudgetDocument
@@ -53,7 +54,8 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
   const dirty = destinationTouched || !!newCategoryName || initial !== JSON.stringify({ rows, categoryId, destination })
   const includedRows = rows.filter(row => row.touched || row.name.trim() || row.amount.trim())
   const total = includedRows.reduce((sum, row) => sum + monthlyContributionPence(moneyPence(row.amount) ?? 0, row.frequency), 0)
-  const close = () => { if (!dirty || window.confirm('Discard unsaved budget items?')) onClose() }
+  const [discarding, setDiscarding] = useState(false)
+  const close = () => { if (dirty) setDiscarding(true); else onClose() }
 
   useEffect(() => {
     triggerRef.current = globalThis.document.activeElement as HTMLElement | null
@@ -225,8 +227,9 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose }: Pro
           {draftImpact && ('impact' in draftImpact ? <BudgetImpactSummary impact={draftImpact.impact} document={draftResult && 'document' in draftResult ? draftResult.document : document}/> : <p role="alert" className="budget-batch-error">{draftImpact.error} <button type="button" onClick={() => setRows(current => [...current])}>Retry</button></p>)}
           </>}
         </div>
-        <footer className="budget-batch-footer"><div aria-live="polite"><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></div><div><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
+        <footer className="budget-batch-footer"><div aria-live="polite">{includedRows.length ? <><strong>{includedRows.length} {includedRows.length === 1 ? 'item' : 'items'}</strong><span>Monthly total {pounds(total)}</span></> : <span>Nothing added yet</span>}</div><div><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button" disabled={!!draftImpact && 'error' in draftImpact}>{item || rows.length < 2 ? 'Save item' : `Save ${includedRows.length} ${includedRows.length === 1 ? 'item' : 'items'}`}</button></div></footer>
       </form>
     </section>
+    {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard unsaved items?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { setDiscarding(false); onClose() }}><p>Your changes haven’t been saved.</p></ConfirmDialog>}
   </div>
 }

@@ -212,3 +212,16 @@ it('persists typed accounts and nicknames after reopening', () => {
   open('Accounts'); open('Joint')
   expect(screen.getByRole('button', { name: /Nationwide · Mortgage · Home loan/ })).toBeVisible()
 })
+
+it('closes from the × with the same unsaved-edit guard as Done', () => {
+  const result = setup()
+  expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toHaveTextContent('3 accounts')
+  open('Accounts'); open('Joint')
+  fireEvent.click(screen.getByRole('button', { name: /Nationwide · Mortgage/ }))
+  change(screen.getByRole('form', { name: 'Edit account' }), 'Nickname (optional)', 'Home loan')
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  expect(result.onClose).not.toHaveBeenCalled()
+  fireEvent.click(within(screen.getByRole('form', { name: 'Edit account' })).getByRole('button', { name: 'Cancel' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+  expect(result.onClose).toHaveBeenCalledTimes(1)
+})
