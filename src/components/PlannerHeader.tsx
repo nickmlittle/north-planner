@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeftRight, Check, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
+import { ArrowLeftRight, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
+import { AccountStatusPanel } from './AccountStatusPanel'
+import { saveStatusLabel, statusMark } from './saveStatus'
 import type { BudgetView, PlannerView } from '../state/navigation'
 
 export interface PlannerHeaderProps {
@@ -55,22 +57,10 @@ function UtilitySheet({ status, warning, email, onSignOut, onClose }: { status: 
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
   }}>
     <header><h2 id={titleId}>Account and save status</h2><button type="button" aria-label="Close account and save status" onClick={onClose}><X aria-hidden="true" /></button></header>
-    <p className="mobile-utility-status">{status === 'Saved' ? <Check aria-hidden="true" /> : <span aria-hidden="true">{statusMark(status)}</span>}{status}</p>
-    {warning && <p role="alert" className="mobile-utility-warning">{warning}</p>}
-    {onSignOut && <div className="mobile-utility-account"><p>{email ?? 'Signed in'}</p><button type="button" onClick={() => { onClose(); onSignOut() }}>Sign out</button></div>}
+    <AccountStatusPanel status={status} warning={warning} email={email} onSignOut={onSignOut} onBeforeSignOut={onClose} />
   </section></div>, document.getElementById('root') ?? document.body)
 }
 
-/** The header's words for a save status. "Choose a version" is a conflict, not a save. */
-function saveStatusLabel(saveStatus: string, warning = '') {
-  if (warning || /fail|not saved|error/i.test(saveStatus)) return 'Save failed'
-  if (saveStatus === 'Choose a version') return 'Choose a version'
-  if (saveStatus === 'Saving…') return 'Saving…'
-  if (saveStatus === 'Loading budget…') return 'Loading…'
-  if (saveStatus === 'Unsaved changes') return 'Unsaved changes'
-  return 'Saved'
-}
-const statusMark = (status: string) => status === 'Saving…' || status === 'Loading…' || status === 'Unsaved changes' ? '◌' : '!'
 
 export function PlannerHeader({ currentView, budgetView, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView, onSelectBudgetView, setupComplete }: PlannerHeaderProps) {
   const [accountOpen, setAccountOpen] = useState(false)
@@ -88,7 +78,7 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
     { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household') },
   ] as const
   return <>
-    <header className="mobile-app-header"><h1>{pageTitle}</h1><button type="button" className="mobile-utility-trigger" aria-label="Account and save status" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={18} aria-hidden="true" /></button></header>
+    <header className="mobile-app-header"><h1>{pageTitle}</h1>{/* Plan and Transfers put their month and ⋯ here; the title then stays for screen readers only. */}<div id="mobile-header-page-slot" className="mobile-header-slot" /><button type="button" className="mobile-utility-trigger" aria-label="Account and save status" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={18} aria-hidden="true" /></button></header>
     {status === 'Save failed' && <p className="mobile-save-alert" role="alert">Save failed. Open account and save status for details.</p>}
     {/* Until setup is done there is nowhere else to go, so no greyed-out promises. */}
     {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(({ id, label, Icon, action }) => <button key={id} type="button" aria-current={selected === id ? 'page' : undefined} onClick={action}><Icon size={22} strokeWidth={2} aria-hidden="true" /><span>{label}</span></button>)}</nav>}

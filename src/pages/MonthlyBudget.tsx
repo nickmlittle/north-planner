@@ -18,9 +18,12 @@ import { usePlanSearch } from './usePlanSearch'
 import { groupPlanItems, matchesPlanDestination, planDestinationLabel as destinationFilterLabel, planItemLabels, planOwnerOrder } from './planRows'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
-import { AllocationMeter } from '../components/AllocationMeter'
+import { AllocationMeter, AllocationMeterMini } from '../components/AllocationMeter'
+import { AccountStatusPanel } from '../components/AccountStatusPanel'
+import { saveStatusLabel, statusMark } from '../components/saveStatus'
+import { createPortal } from 'react-dom'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
-import { Plus } from 'lucide-react'
+import { Ellipsis, Plus } from 'lucide-react'
 import { commitItemBatch, type BudgetItemBatch } from '../domain/budgetItemDrafts'
 import { orderTransferAccounts, personTransferPlans } from '../domain/personTransfers'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../state/transferPerson'
@@ -30,13 +33,15 @@ import { formatGBP } from '../formatting/money'
 import type { PlanDestination, StepsReturn } from '../state/navigation'
 import { MOBILE_QUERY } from '../breakpoints'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string; warning?: string; email?: string; onSignOut?: () => void }
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 const monthLabel = formatMonth
+const subscribeNothing = () => () => {}
+const findHeaderSlot = () => window.document.getElementById('mobile-header-page-slot')
 const pounds = (pence: number) => formatGBP(pence / 100)
 
-export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId}:Props) {
+export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId,warning='',email,onSignOut}:Props) {
  const mobilePresentation=useSyncExternalStore(subscribeMobile,getMobile,()=>false)
  const [localMonth,setLocalMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const month=sharedMonth??localMonth
@@ -51,6 +56,17 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const planDestinationHeading=useRef<HTMLDivElement>(null),previousPlanDestination=useRef<string|null>(null)
  const [infoDialog,setInfoDialog]=useState<'month'|'transfers'|null>(null)
  const monthOptionsRef=useRef<HTMLButtonElement>(null), optionsHandoff=useRef(false)
+ // The app header's slot for the month and ⋯ on phones; absent when the page renders on its own (tests, setup).
+ const headerSlot=useSyncExternalStore(subscribeNothing,findHeaderSlot,()=>null)
+ // Once the meter card scrolls away on a phone, a slim copy docks above the bottom nav.
+ const meterRef=useRef<HTMLDivElement>(null),[meterOffscreen,setMeterOffscreen]=useState(false)
+ useEffect(()=>{
+  const meter=meterRef.current
+  if(!meter||!mobilePresentation||typeof IntersectionObserver==='undefined')return
+  const observer=new IntersectionObserver(([entry])=>setMeterOffscreen(!!entry&&!entry.isIntersecting&&entry.boundingClientRect.bottom<=0))
+  observer.observe(meter)
+  return()=>{observer.disconnect();setMeterOffscreen(false)}
+ },[mobilePresentation,mobileBudgetView])
  useLayoutEffect(()=>{
   if(!optionsHandoff.current||(!incomeOpen&&!management))return
   const trigger=monthOptionsRef.current
@@ -132,7 +148,12 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const budgetDateNote=carriedOverNote&&<p className="budget-v3-date-note">{carriedOverNote}</p>
  // Desktop: the month is the page title, with the budget's actions on the same row. Phones hide the actions and keep "Month & income".
  const budgetOptions=[{label:'Edit income',onSelect:openIncome},{label:'Manage accounts, pots & categories',onSelect:()=>setManagement(true)}]
- const titlebar=<div className="budget-page-titlebar"><div className="budget-v3-date-selector"><MonthControl month={month} onChange={setMonth} budgetMarkers={budgetDateMarkers(document.budget)} incomeMarkers={incomeDateMarkers(document.budget)} revertLabel={revertLabel} onRevert={removeDate}/><div className="budget-v3-date-context">{budgetDateNote}<button ref={monthOptionsRef} type="button" className="text-button budget-mobile-month-options" onClick={()=>setInfoDialog('month')}>Month &amp; income</button></div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={budgetOptions}/>{mobileBudgetView==='plan'&&<button type="button" className="primary-button" onClick={()=>start()}><Plus aria-hidden="true"/>Add item</button>}</div></div>
+ const monthControl=<MonthControl month={month} onChange={setMonth} budgetMarkers={budgetDateMarkers(document.budget)} incomeMarkers={incomeDateMarkers(document.budget)} revertLabel={revertLabel} onRevert={removeDate}/>
+ const status=saveStatusLabel(saveStatus??'Saved',warning)
+ // Phones: one ⋯ for the budget's actions and the account, beside the month (in the app header when it has room for them).
+ const mobileOptions=<button ref={monthOptionsRef} type="button" className="budget-mobile-options" aria-label="Budget and account" title="Budget and account" aria-haspopup="dialog" onClick={()=>setInfoDialog('month')}>{status!=='Saved'&&<span aria-hidden="true">{statusMark(status)}</span>}<Ellipsis aria-hidden="true"/></button>
+ const inHeader=mobilePresentation&&!!headerSlot
+ const titlebar=inHeader&&!budgetDateNote?null:<div className="budget-page-titlebar"><div className="budget-v3-date-selector">{!inHeader&&monthControl}<div className="budget-v3-date-context">{budgetDateNote}{mobilePresentation&&!inHeader&&mobileOptions}</div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={budgetOptions}/>{mobileBudgetView==='plan'&&<button type="button" className="primary-button" onClick={()=>start()}><Plus aria-hidden="true"/>Add item</button>}</div></div>
  const budgetHeader=<div className="budget-mobile-plan-heading"><h2>Budget items</h2><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div>
  const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={shortLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
@@ -140,7 +161,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const firstRun=!Object.keys(document.budget.snapshots).length&&document.budget.importedBaseline===undefined
  const firstRunEmpty=<div className="budget-v3-empty budget-first-run"><h2>Start your plan</h2><p>Add rent, bills, savings — anything you pay for each month.</p><button className="primary-button" onClick={()=>start()}>Add your first budget item</button>{!incomes.length&&<div className="budget-first-run-income"><p>No income yet, so there’s nothing to split.</p><button type="button" className="secondary-button" onClick={openIncome}>Add income</button></div>}</div>
  const planEmpty=!items.length&&!planDestination&&firstRun?firstRunEmpty:!items.length&&!planDestination?<div className="budget-v3-empty"><p>{resolved.sourceMonth||resolved.importedBaseline?'This budget has no items yet.':'There is no budget for this month yet.'}</p><button className="primary-button" onClick={()=>start()}>Add item</button></div>:!matchingItems.length?<p className="budget-v3-empty">{planDestination&&!destinationItems.length?`No items go to ${planDestinationLabel} for ${monthLabel(month)}.`:searchMode?`No items match “${query.trim()}” within the current filters.`:'No items match this destination and owner/category filter.'}</p>:null
- return <><PageFrame afterHeading={titlebar} title="Monthly budget" headingClass="route-heading visually-hidden" className={`monthly-budget-page budget-view-${mobileBudgetView}${scopedPlan?' scoped-plan':''}`} contentWidth="wide" pageControls={mobilePresentation&&showPlanFilters&&!scopedPlan?undefined:budgetHeader} afterSummary={peopleSummary} summary={<>{mobileBudgetView==='plan'&&<AllocationMeter className="budget-desktop-summary" availablePence={available} plannedPence={total} basis={basisDetail} onEditIncome={openIncome}/>}<MobileBudgetSummary view={mobileBudgetView} available={available} availableBasis={availableBasis==='all from salary'?undefined:availableBasis} planned={total} allocated={transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0)} hasItems={items.length>0} incomplete={!instructions||instructions.incomplete} onDetails={()=>setInfoDialog('transfers')} person={transferPersonChoice}/></>}>
+ return <><PageFrame afterHeading={titlebar} title="Monthly budget" headingClass="route-heading visually-hidden" className={`monthly-budget-page budget-view-${mobileBudgetView}${scopedPlan?' scoped-plan':''}`} contentWidth="wide" pageControls={mobilePresentation&&showPlanFilters&&!scopedPlan?undefined:budgetHeader} afterSummary={peopleSummary} summary={mobileBudgetView==='plan'?<div ref={meterRef}><AllocationMeter label="Plan summary" compact={mobilePresentation} availablePence={available} plannedPence={total} basis={basisDetail} onEditIncome={openIncome}/></div>:<MobileBudgetSummary allocated={transfers.accounts.reduce((sum,account)=>sum+account.amountPence,0)} hasItems={items.length>0} incomplete={!instructions||instructions.incomplete} onDetails={()=>setInfoDialog('transfers')} person={transferPersonChoice}/>}>
  <section className="budget-v3-workspace" id="budget-plan-panel" aria-label="Budget planning">{mobileBudgetView==='plan'&&planItemId&&!items.some(item=>item.id===planItemId)&&<p role="status">That budget item is no longer available for {monthLabel(month)}.</p>}{mobileBudgetView==='plan'&&planDestination&&<div ref={planDestinationHeading} className="budget-v3-destination-filter" role="region" aria-label="Plan destination filter" tabIndex={-1}><strong>Showing {matchingItems.length} {matchingItems.length===1?'item':'items'} for {planDestinationLabel} · {monthLabel(month)}</strong><span>Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</span><div className="budget-v3-destination-actions">{onReturnToTransfers&&<button type="button" onClick={onReturnToTransfers}>{hasTransfersOrigin?'Back to Transfers':'View Transfers'}</button>}{onClearPlanDestination&&<button type="button" onClick={onClearPlanDestination}>Clear destination filter</button>}</div></div>}
  {showPlanFilters&&<div className="budget-v3-scroll-tools">{scopedPlan?<details className="budget-v3-scoped-filters"><summary>Search and filter{query||ownerFilter!=='All'||categoryFilter!=='All'?' · active':''}</summary>{planFilters}</details>:planFilters}</div>}
  {searchMode&&<p className="budget-v3-search-count" role="status">{matchingItems.length} matching {matchingItems.length===1?'item':'items'} · Matching total {pounds(matchingItems.reduce((sum,item)=>sum+item.amountPence,0))}</p>}
@@ -149,9 +170,12 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  {(batchMessage||inlineFeedback||savedImpact?.month===month)&&<div className="budget-save-result"><button type="button" className="budget-save-dismiss" aria-label="Dismiss save result" onClick={()=>{setBatchMessage('');setInlineSavedItem(null);setSavedImpact(null)}}>×</button>{batchMessage&&<div className="budget-v3-save-status" role="status">{saveStatus==='Not saved'?'Budget could not be saved. Check save status.':saveStatus==='Saving…'||saveStatus==='Unsaved changes'?'Saving budget item…':batchMessage}</div>}{inlineFeedback&&<div className="budget-v3-save-status" role={saveStatus==='Not saved'?'alert':'status'}>{inlineFeedback}</div>}{savedImpact?.month===month&&(saveStatus==='Saved'||!saveStatus)&&onViewAffectedTransfers&&<button type="button" className="secondary-button budget-view-affected" onClick={()=>onViewAffectedTransfers(savedImpact)}>View affected transfers</button>}</div>}</section>
  </PageFrame>
  {confirm&&<ConfirmDialog title={confirm.title} confirmLabel={confirm.confirmLabel} danger returnFocusTo={confirm.returnFocusTo} onCancel={()=>setConfirm(null)} onConfirm={()=>{confirm.onConfirm();setConfirm(null)}}>{confirm.body}</ConfirmDialog>}
- {infoDialog&&<BudgetInfoDialog title={infoDialog==='month'?'Month & income':'Transfers summary details'} onClose={()=>setInfoDialog(null)}>
+ {inHeader&&createPortal(<div className="mobile-header-page">{monthControl}{mobileOptions}</div>,headerSlot)}
+ {mobileBudgetView==='plan'&&mobilePresentation&&meterOffscreen&&<AllocationMeterMini availablePence={available} plannedPence={total}/>}
+ {infoDialog&&<BudgetInfoDialog title={infoDialog==='month'?'Budget and account':'Transfers summary details'} onClose={()=>setInfoDialog(null)}>
   {infoDialog==='month'?<>
    <div className="budget-month-actions"><button type="button" className="secondary-button" onClick={()=>{optionsHandoff.current=true;setInfoDialog(null);openIncome()}}>Edit income</button><button type="button" className="secondary-button" onClick={()=>{optionsHandoff.current=true;setInfoDialog(null);setManagement(true)}}>Manage accounts, pots &amp; categories</button>{revertLabel&&<button type="button" className="text-button budget-remove-action" onClick={()=>{removeDate();setInfoDialog(null)}}>{revertLabel}</button>}</div>
+   <div className="budget-account-status"><AccountStatusPanel status={status} warning={warning} email={email} onSignOut={onSignOut} onBeforeSignOut={()=>setInfoDialog(null)}/></div>
   </>:<>
    <p>Each account’s funding already includes its moves.</p>
   </>}
