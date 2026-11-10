@@ -1,4 +1,4 @@
-export type PlannerView = 'household' | 'budget'
+export type PlannerView = 'home' | 'household' | 'budget'
 export type BudgetView = 'plan' | 'transfers'
 export type PlanDestination = { kind: 'account' | 'direct' | 'pot'; id: string }
 /** Where "See items" in the payday steps was opened from, so Back to Transfers lands on the same account. */
@@ -45,7 +45,8 @@ export function parseNavigation(search: string): NavigationState {
   const requested = params.get('budgetView')
   const budgetView: BudgetView = requested === 'transfers' || requested === 'plan' ? requested : lastBudgetView()
   return {
-    view: params.get('view') === 'household' ? 'household' : 'budget',
+    // Opening the app lands on Home; a link that names a screen (or a Plan/Transfers view) goes straight there.
+    view: params.get('view') === 'household' ? 'household' : params.get('view') === 'budget' || params.has('budgetView') ? 'budget' : 'home',
     budgetView,
     month: validMonth(params.get('month')) ? params.get('month')! : currentMonth(),
     planDestination: budgetView === 'plan' ? parsePlanDestination(params.get('planDestination')) : null,
@@ -54,7 +55,7 @@ export function parseNavigation(search: string): NavigationState {
 
 const LAST_BUDGET_VIEW_KEY = 'north.budgetView'
 
-/** A cold open with no view in the URL returns to the Plan/Transfers view used last on this device. */
+/** Plan or Transfers, when a link opens the budget without saying which: the one used last on this device. */
 function lastBudgetView(): BudgetView {
   try { return window.localStorage.getItem(LAST_BUDGET_VIEW_KEY) === 'transfers' ? 'transfers' : 'plan' } catch { return 'plan' }
 }

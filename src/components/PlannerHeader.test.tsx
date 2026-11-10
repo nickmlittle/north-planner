@@ -39,13 +39,13 @@ it('shows no status mark when saved, but the sheet still says Saved', () => {
   expect(within(screen.getByRole('dialog', { name: 'Account and save status' })).getByText('Saved')).toBeInTheDocument()
 })
 
-it('offers the same Plan, Transfers and Household destinations in the desktop sidebar as on the phone', () => {
+it('offers the same Home, Plan, Transfers and Household destinations in the desktop sidebar as on the phone', () => {
   const selectBudgetView = vi.fn(), selectView = vi.fn()
   render(<PlannerHeader currentView="budget" budgetView="transfers" setupComplete onSelectView={selectView} onSelectBudgetView={selectBudgetView} />)
   const sidebar = within(screen.getByRole('navigation', { name: 'Main navigation' }))
   const phone = within(screen.getByRole('navigation', { name: 'Mobile navigation' }))
   const labels = sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))
-  expect(labels).toEqual(['Plan', 'Transfers', 'Household'])
+  expect(labels).toEqual(['Home', 'Plan', 'Transfers', 'Household'])
   expect(phone.getAllByRole('button').map(button => button.textContent)).toEqual(labels)
   expect(sidebar.getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
   expect(sidebar.getByRole('button', { name: 'Plan' })).not.toHaveAttribute('aria-current')

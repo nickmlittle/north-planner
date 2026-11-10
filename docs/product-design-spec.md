@@ -52,11 +52,15 @@ The defined spacing variables are 8, 16, 24 and 32 px; existing screens also use
 
 ### Navigation and layout
 
-Desktop uses a collapsible pine sidebar with the same three destinations as the phone's bottom nav: Plan, Transfers and Household. Plan and Transfers are separate screens at every width, so a link means the same screen on any device. On desktop, both share the month, summary and page controls; below them, Plan shows the item table and Transfers shows people and the destination comparison, each at full width. Its viewport-oriented shell gives the page body or bounded workspace regions control of scrolling, with sticky context where useful. Page titles and essential controls belong in the shared page frame; modal content must scroll independently.
+Desktop uses a collapsible pine sidebar with the same four destinations as the phone's bottom nav: Home, Plan, Transfers and Household. Opening the app lands on Home; a link that names a screen (or Plan/Transfers) goes straight there, and a budget link without a view returns to the one used last on the device. Plan and Transfers are separate screens at every width, so a link means the same screen on any device. On desktop, both share the month, summary and page controls; below them, Plan shows the item table and Transfers shows people and the destination comparison, each at full width. Its viewport-oriented shell gives the page body or bounded workspace regions control of scrolling, with sticky context where useful. Page titles and essential controls belong in the shared page frame; modal content must scroll independently.
 
-Mobile uses a compact page heading and labeled bottom navigation for Plan, Transfers and Household. Plan and Transfers share the selected month. The account/save-status control opens a utility sheet; it shows a status mark only when there is something to know (saving, unsaved, a version to choose, or a failure), never for Saved. A save failure also appears visibly on the page. Editing flows take priority over persistent navigation. The mobile layout applies at widths up to 767 px and also to short, coarse-pointer landscape screens covered by the existing media query. Other component-specific breakpoints exist; do not assume one breakpoint governs every layout.
+Mobile uses a compact page heading and labeled bottom navigation for Home, Plan, Transfers and Household. Plan and Transfers share the selected month. The account/save-status control opens a utility sheet; it shows a status mark only when there is something to know (saving, unsaved, a version to choose, or a failure), never for Saved. A save failure also appears visibly on the page. Editing flows take priority over persistent navigation. The mobile layout applies at widths up to 767 px and also to short, coarse-pointer landscape screens covered by the existing media query. Other component-specific breakpoints exist; do not assume one breakpoint governs every layout.
 
 **Direction:** Keep the primary content reachable above safe areas and persistent controls, allow page scrolling on short screens, and avoid horizontal overflow or clipping at narrow widths and increased text sizes. Preserve logical focus and browser Back/Forward behavior when changing navigation.
+
+### Home
+
+Home is this month at a glance: “This month” over the month as its title, then the per-person summary from Plan (“November plan”), with “Review Immy's items” (Plan filtered to that person's accounts) and Open Plan. Desktop adds Open Transfers and Open Plan beside the title.
 
 ### Plan
 
