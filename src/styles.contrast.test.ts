@@ -35,4 +35,5 @@ describe('text contrast (WCAG AA, 4.5:1)', () => {
   it('white on pine-strong (primary hover)', () => expect(contrast(token('white'), token('pine-strong'))).toBeGreaterThanOrEqual(4.5))
   it('white on danger (destructive buttons)', () => expect(contrast(token('white'), token('danger'))).toBeGreaterThanOrEqual(4.5))
   it('cream on pine (sidebar)', () => expect(contrast(token('cream'), token('pine'))).toBeGreaterThanOrEqual(4.5))
+  it('on-pine-muted on pine (phone nav labels, header note)', () => expect(contrast(token('on-pine-muted'), token('pine'))).toBeGreaterThanOrEqual(4.5))
 })

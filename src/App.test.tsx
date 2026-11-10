@@ -79,7 +79,7 @@ it('keeps the sidebar controls and routes between Household, Plan and Transfers'
   await completeSetup()
   fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
   expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
-  expect(screen.getAllByText('north.')).toHaveLength(1)
+  expect(within(screen.getByRole('complementary', { name: 'Application navigation' })).getAllByText('north.')).toHaveLength(1)
   const nav = screen.getByRole('navigation', { name: 'Main navigation' })
   fireEvent.click(within(nav).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
