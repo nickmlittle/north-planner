@@ -27,14 +27,28 @@ it('puts items whose category has gone in one Uncategorised group', () => {
   expect(groups.map(group => [group.name, group.items.length])).toEqual([['Uncategorised', 2]])
 })
 
-it('bands by destination in Transfers order: each account, its direct items, then its pots in budget order', () => {
+it('bands by destination in Transfers order: each account, then Direct and its pots in budget order as a second level', () => {
   const accountOrder = ['joint', 'saving', 'ada', 'ben']
   const { groups } = groupPlanItems(items, all, labels, 'destination', accountOrder)
-  expect(groups.map(group => group.name)).toEqual(['Monzo Joint', 'Bills · Monzo Joint', 'Holidays · Monzo Joint', 'Emergency · Monzo Joint Savings', 'Spending · Starling Ada', 'Spending · Nationwide Ben'])
+  expect(groups.map(group => group.name)).toEqual(['Monzo Joint', 'Monzo Joint Savings', 'Starling Ada', 'Nationwide Ben'])
   expect(groups[0]!.key).toBe('destination:account:joint')
-  expect(groups[1]!.key).toBe('destination:pot:bills')
   expect(groups.flatMap(group => group.items)).toHaveLength(items.length)
-  expect(groups.find(group => group.key === 'destination:pot:bills')!.items.every(item => item.destination.kind === 'pot' && item.destination.potId === 'bills')).toBe(true)
+  expect(groups[0]!.subgroups.map(subgroup => subgroup.name)).toEqual(['Direct', 'Bills pot', 'Holidays pot'])
+  expect(groups[0]!.subgroups.flatMap(subgroup => subgroup.items)).toHaveLength(groups[0]!.items.length)
+  expect(groups[0]!.subgroups[1]!.items.every(item => item.destination.kind === 'pot' && item.destination.potId === 'bills')).toBe(true)
+  // An account whose items all go one way lists them directly.
+  expect(groups.filter(group => new Set(group.items.map(item => item.destination.kind === 'pot' ? item.destination.potId : 'direct')).size === 1).every(group => group.subgroups.length === 0)).toBe(true)
+})
+
+it('splits a category by whose account the money goes to, Joint first, skipping categories with one owner', () => {
+  const { groups } = groupPlanItems(items, all, labels, 'category', [], ['Joint', 'Ada', 'Ben', 'Needs owner'])
+  for (const group of groups) {
+    const owners = [...new Set(group.items.map(item => labels.ownerGroup(item)))]
+    if (owners.length < 2) { expect(group.subgroups).toEqual([]); continue }
+    expect(group.subgroups.map(subgroup => subgroup.name)).toEqual(['Joint', 'Ada', 'Ben', 'Needs owner'].filter(owner => owners.includes(owner)).map(owner => owner === 'Joint' ? 'Joint accounts' : owner === 'Needs owner' ? 'Accounts needing an owner' : `${owner}’s accounts`))
+    expect(group.subgroups.flatMap(subgroup => subgroup.items)).toHaveLength(group.items.length)
+  }
+  expect(groups.some(group => group.subgroups.length > 1)).toBe(true)
 })
 
 it('applies search, Owner and Category together, and returns nothing when none match', () => {

@@ -163,7 +163,7 @@ it('switches between Category and Destination bands, remembers the choice, and k
   expect(screen.getByRole('table', { name: 'Budget items by destination' })).toBeInTheDocument()
   expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent('Destination')
   expect(bandNames('destination')).toHaveLength(2)
-  expect(within(screen.getByRole('region', { name: 'Budget items' })).getByText('2 destinations · 5 items')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'Budget items' })).getByText('2 accounts · 5 items')).toBeInTheDocument()
   expect(itemNames()).toEqual([])
   fireEvent.click(document.querySelector<HTMLButtonElement>('tr[data-budget-group="destination"] th button')!)
   expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema'])
@@ -183,4 +183,15 @@ it('hides the grouping switch while searching', () => {
   fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
   expect(screen.queryByRole('group', { name: 'Group items by' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Expand all' })).not.toBeInTheDocument()
+})
+
+it('splits an open category by whose account each item goes to, with subtotals and shares', () => {
+  desktop()
+  render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" mobileBudgetView="plan"/>)
+  fireEvent.click(screen.getByRole('button', { name: /^Bills,/ }))
+  const rows = [...document.querySelectorAll('.plan-card tbody tr')].map(row => row.classList.contains('plan-subgroup') ? `# ${row.textContent}` : row.classList.contains('budget-v3-item') ? `${row.querySelector('.budget-v3-item-name')!.textContent}${row.classList.contains('is-nested') ? ' (nested)' : ''}` : null).filter(Boolean)
+  expect(rows).toEqual(['# Joint accounts40.0%£2.00', 'Rent (nested)', 'Gas (nested)', '# Ada’s accounts20.0%£1.00', 'Phone (nested)'])
+  // Searching lists matches directly, without the second level.
+  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  expect(document.querySelector('.plan-subgroup')).toBeNull()
 })
