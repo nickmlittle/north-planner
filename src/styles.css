@@ -1026,6 +1026,15 @@ small, footer { color: var(--muted) }
   .transfer-progress strong{color:var(--pine);font-weight:800}
   .transfer-progress-track{display:block;height:8px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
   .transfer-progress-track>span{display:block;height:100%;background:var(--pine);transition:width .3s ease}
+  .transfer-progress-changed{margin:var(--space-2) 0 0;color:var(--status-review);font-size:var(--text-sm);font-weight:700}
+  .transfer-over-warning{display:flex;gap:var(--space-2);margin-top:var(--space-3);padding:var(--space-3);border:1px solid var(--status-error-line);border-radius:var(--radius-md);background:var(--status-error-bg);color:var(--status-error)}
+  .transfer-over-warning svg{flex:none;width:18px;height:18px;margin-top:2px}
+  .transfer-over-warning p{margin:0;color:var(--charcoal);font-size:var(--text-sm);line-height:1.45}
+  .transfer-over-warning .text-button{min-height:32px;padding:0;color:var(--status-error);font-weight:800}
+  .payday-tick.is-changed .payday-tick-dot{border-color:var(--status-review);background:var(--status-review-bg);color:var(--status-review)}
+  .payday-tick.is-changed .payday-tick-dot svg{stroke-width:2.4}
+  .payday-step-changed{margin:0;color:var(--status-review);font-size:var(--text-sm);font-weight:700;line-height:1.4}
+  .payday-step.is-changed button.payday-step-amount{background:var(--status-review-bg);color:var(--status-review)}
   .transfer-done-banner{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);background:var(--pine);color:var(--cream)}
   .transfer-done-banner>span:last-child{display:grid}
   .transfer-done-banner strong{font-size:var(--text-md)}

@@ -1312,3 +1312,33 @@ it('ticks steps off, counts progress, and says when a person is up to date',()=>
   expect(ticks[1]).toHaveAttribute('aria-pressed','false')
   expect(summary).toHaveTextContent('1 of 2 done')
 })
+
+it('shows a step whose amount changed since it was ticked, copies the difference, and accepts it',()=>{
+  const initial=personSwitchDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.ticks={[month]:{'immy:fund:a2':{amountPence:400,at:'2026-11-01T09:00:00.000Z'}}}
+  const writeText=vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
+  render(<SeededHarness initial={initial} view="transfers"/>)
+  fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
+  const summary=screen.getByRole('region',{name:'Transfers summary'}),overview=screen.getByRole('region',{name:'Steps by person'})
+  expect(overview).toHaveTextContent('Changed since ticked: you sent £4.00, it’s now £5.00. Send £1.00 more.')
+  expect(summary).toHaveTextContent('0 of 2 done1 changed since ticked · send £1.00 more')
+  fireEvent.click(within(overview).getByRole('button',{name:'Copy £1.00'}))
+  expect(writeText).toHaveBeenCalledWith('1.00')
+  fireEvent.click(within(overview).getByRole('button',{name:/: mark the change done$/}))
+  expect(overview).not.toHaveTextContent('Changed since ticked')
+  expect(summary).toHaveTextContent('1 of 2 done')
+  Reflect.deleteProperty(navigator,'clipboard')
+})
+
+it('warns on Transfers when someone’s steps add up to more than they have available',()=>{
+  const initial=personSwitchDocument()
+  initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:400000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:2000,changes:{}}]
+  render(<SeededHarness initial={initial} view="transfers"/>)
+  fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
+  const summary=screen.getByRole('region',{name:'Transfers summary'})
+  expect(summary).toHaveTextContent('Immy’s steps add up to £25.00, which is £5.00 more than Immy’s £20.00 available.')
+  expect(within(summary).getByRole('button',{name:'See it on Plan'})).toBeInTheDocument()
+  fireEvent.click(within(summary).getByRole('button',{name:'Nick'}))
+  expect(summary).not.toHaveTextContent('more than')
+})
