@@ -28,6 +28,8 @@
   --status-review-bg: #fff3db;
   --status-error: #a54232;
   --status-error-bg: #fbf0ed;
+  /* The lighter stripe of a meter's hatched "over" end. */
+  --status-error-hatch: #c4705f;
   --status-error-line: #deafa2;
   --danger: #963c34;
   --scrim: #12241c66;
@@ -330,14 +332,15 @@ small, footer { color: var(--muted) }
   .mobile-app-header.is-collapsed .budget-v3-month>button .budget-v3-month-caret{width:16px;height:16px}
   .monthly-budget-page .budget-page-titlebar .budget-v3-date-context{min-height:0}
   /* The slim meter docks above the bottom nav, so the table's sticky headings keep the top. */
-  .allocation-meter-mini{position:fixed;z-index:70;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:flex;align-items:center;gap:var(--space-3);height:36px;padding:0 max(var(--page-gutter-right),env(safe-area-inset-right,0px)) 0 max(var(--page-gutter-left),env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--card);color:var(--pine);font-size:var(--text-md);font-weight:700;font-variant-numeric:tabular-nums}
+  .allocation-meter-mini{position:fixed;z-index:70;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom,0px));box-sizing:border-box;display:flex;align-items:center;gap:var(--space-3);height:44px;padding:0 max(var(--page-gutter-right),env(safe-area-inset-right,0px)) 0 max(var(--page-gutter-left),env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--card);color:var(--pine);font-size:var(--text-md);font-weight:800;font-variant-numeric:tabular-nums;box-shadow:var(--shadow-pop)}
   .allocation-meter-mini.is-deficit{color:var(--status-error)}
   .allocation-meter-mini.is-balanced{color:var(--charcoal)}
   .allocation-meter-mini-balance{flex:none;white-space:nowrap}
-  .allocation-meter-mini-track{flex:1;height:4px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
-  .allocation-meter-mini-fill{display:block;height:100%;border-radius:var(--radius-pill);background:currentColor}
-  .planner-app-content:has(.allocation-meter-mini){padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
-  .planner-app-shell:has(.allocation-meter-mini) .budget-v3-inline-row form{scroll-margin-bottom:calc(108px + env(safe-area-inset-bottom,0px))}
+  .allocation-meter-mini-track{display:flex;flex:1;height:5px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
+  .allocation-meter-mini-people{display:grid;gap:2px;width:120px;margin-left:auto}
+  .allocation-meter-mini-person{display:flex;align-items:center;gap:var(--space-2);color:var(--muted);font-size:var(--text-sm);font-weight:800;line-height:1.1}
+  .planner-app-content:has(.allocation-meter-mini){padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+  .planner-app-shell:has(.allocation-meter-mini) .budget-v3-inline-row form{scroll-margin-bottom:calc(116px + env(safe-area-inset-bottom,0px))}
   .planner-app-shell:has([aria-modal=true]) .allocation-meter-mini,.planner-app-shell:has(.budget-v3-overlay) .allocation-meter-mini{display:none}
 
   .page-frame>.page-frame-heading{display:none}
@@ -765,29 +768,56 @@ small, footer { color: var(--muted) }
 .allocation-meter{display:grid;gap:var(--space-3);padding:var(--space-5) var(--space-5) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card);color:var(--charcoal)}
 .allocation-meter-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--space-1) var(--space-5)}
 .allocation-meter-head p{margin:0}
+.allocation-meter-eyebrow{flex-basis:100%;color:var(--muted);font-size:var(--text-sm);font-weight:700}
 .allocation-meter-balance{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-2);color:var(--pine)}
 .allocation-meter-balance strong{font-size:var(--text-display-fluid);font-weight:750;letter-spacing:-.8px;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .allocation-meter-balance span{font-size:var(--text-xl);font-weight:600}
 .allocation-meter.is-deficit .allocation-meter-balance{color:var(--status-error)}
 .allocation-meter.is-balanced .allocation-meter-balance{color:var(--charcoal)}
 .allocation-meter-share{color:var(--muted);font-size:var(--text-md)}
-.allocation-meter-track{height:10px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
-.allocation-meter-fill{height:100%;border-radius:var(--radius-pill);background:var(--pine);transition:width .3s ease}
-.allocation-meter.is-deficit .allocation-meter-fill{background:var(--status-error)}
+.allocation-meter-hint{margin:0;color:var(--muted);font-size:var(--text-md);line-height:1.45}
+.allocation-meter-track{display:flex;height:10px;border-radius:var(--radius-pill);background:var(--soft-fern);overflow:hidden}
+.allocation-meter-fill{display:block;flex:none;height:100%;background:var(--pine);transition:width .3s ease}
+.allocation-meter-over{display:block;flex:none;height:100%;background:repeating-linear-gradient(135deg,var(--status-error) 0 5px,var(--status-error-hatch) 5px 8px)}
 .allocation-meter-detail{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);margin:0;font-size:var(--text-md);line-height:1.5}
 .allocation-meter-detail strong{color:var(--pine);font-variant-numeric:tabular-nums}
-.allocation-meter-edit{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin:-10px -8px -10px -4px;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
+.allocation-meter-edit{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:44px;height:44px;margin:-10px -8px -10px -4px;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);font:800 var(--text-md) var(--font-family);cursor:pointer}
 .allocation-meter-edit:hover{background:var(--soft-fern)}
 .allocation-meter-edit svg{width:16px;height:16px}
-.allocation-meter-edit:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+.allocation-meter-edit:focus-visible,.allocation-meter-review:focus-visible{outline:2px solid var(--pine);outline-offset:-2px}
+.allocation-meter-review{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;margin:-10px 0;padding:0 var(--space-1);border:0;border-radius:var(--radius-md);background:transparent;color:var(--link);font:800 var(--text-md) var(--font-family);cursor:pointer}
+.allocation-meter-review:hover{background:var(--soft-fern)}
+.allocation-meter-review svg{width:16px;height:16px}
 .allocation-meter-basis{color:var(--muted);font-size:var(--text-sm)}
+/* Two or more adults: the worst figure on the left, a bar per person on the right, actions underneath. */
+.allocation-meter.is-split{grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:var(--space-2) var(--space-6);padding:var(--space-5) var(--space-5) var(--space-3)}
+.allocation-meter.is-split .allocation-meter-head{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:var(--space-1)}
+.allocation-meter.is-split .allocation-meter-balance strong{font-size:var(--text-2xl);font-weight:800;letter-spacing:-.4px;line-height:1.2;white-space:normal}
+.allocation-meter-people{display:grid;margin:0;padding:0;list-style:none}
+.allocation-meter-person{display:grid;grid-template-columns:56px minmax(0,1fr) 150px;align-items:center;gap:2px var(--space-3);padding:var(--space-2) 0 var(--space-1)}
+.allocation-meter-name{font-size:var(--text-md);font-weight:800}
+.allocation-meter-person-balance{color:var(--pine);font-size:var(--text-md);font-weight:800;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.allocation-meter-person.is-over .allocation-meter-person-balance{color:var(--status-error)}
+.allocation-meter-person-detail{grid-column:2 / 4;color:var(--muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.allocation-meter-household{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:baseline;gap:0 var(--space-3);margin:var(--space-2) 0 0;padding-top:var(--space-2);border-top:1px solid var(--line);font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.allocation-meter-household>strong:last-child{text-align:right}
+.allocation-meter-household-detail{color:var(--muted);font-size:var(--text-sm)}
+.allocation-meter.is-split .allocation-meter-detail{grid-column:1 / -1;gap:var(--space-1) var(--space-5);padding-top:var(--space-1);border-top:1px solid var(--line)}
+.allocation-meter.is-split .allocation-meter-edit{margin:0;padding:0 var(--space-1)}
+.allocation-meter.is-split .allocation-meter-review{margin:0}
 .allocation-meter.is-compact{gap:var(--space-2);padding:var(--space-3) var(--space-4) var(--space-2)}
 .allocation-meter.is-compact .allocation-meter-balance strong{font-size:var(--text-2xl);letter-spacing:-.5px}
 .allocation-meter.is-compact .allocation-meter-balance span{font-size:var(--text-lg)}
 .allocation-meter.is-compact .allocation-meter-track{height:8px}
 .allocation-meter.is-compact .allocation-meter-detail{font-size:var(--text-sm)}
-.budget-account-status{margin-top:var(--space-4);padding-top:var(--space-1);border-top:1px solid var(--line)}
-.budget-account-status .mobile-utility-status{margin:var(--space-3) 0}
+.allocation-meter.is-split.is-compact{grid-template-columns:minmax(0,1fr);gap:var(--space-1);padding:var(--space-4) var(--space-4) var(--space-1)}
+.allocation-meter.is-split.is-compact .allocation-meter-balance strong{font-size:var(--text-xl);letter-spacing:-.2px}
+.allocation-meter.is-split.is-compact .allocation-meter-person{grid-template-columns:48px minmax(0,1fr) auto;gap:2px var(--space-2)}
+.allocation-meter.is-split.is-compact .allocation-meter-household{grid-template-columns:auto minmax(0,1fr) auto;gap:0 var(--space-2)}
+.allocation-meter.is-split.is-compact .allocation-meter-household-detail{visibility:hidden;white-space:nowrap;overflow:hidden}
+.allocation-meter.is-split.is-compact .allocation-meter-hint{margin:var(--space-1) 0 var(--space-2);font-size:var(--text-sm)}
+.allocation-meter.is-split.is-compact .allocation-meter-detail{justify-content:space-between;font-size:var(--text-md)}
+@media(max-width:1099px){.allocation-meter.is-split:not(.is-compact){grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.allocation-meter-fill{transition:none}}
 /* ⋯: the budget's less frequent actions. */
 .budget-options-menu{position:relative}
@@ -949,7 +979,11 @@ small, footer { color: var(--muted) }
   .monthly-budget-page.budget-view-plan .budget-v3-controls{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:var(--space-2);margin-bottom:var(--space-2)}
   .monthly-budget-page.budget-view-plan .budget-v3-search-field{grid-column:1/-1}
   .monthly-budget-page.budget-view-plan .budget-v3-filter{gap:2px;font-size:var(--text-sm)}
-  .monthly-budget-page .budget-v3-controls.is-compact{display:flex;flex-direction:row;align-items:center;gap:var(--space-2)}
+  .monthly-budget-page .budget-v3-controls.is-compact{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+  .budget-filter-chips{display:flex;flex-wrap:wrap;flex-basis:100%;gap:var(--space-2)}
+  .budget-filter-chip{display:inline-flex;align-items:center;gap:var(--space-1);min-height:36px;margin:0;padding:0 var(--space-2) 0 var(--space-3);border:0;border-radius:var(--radius-pill);background:var(--pine);color:var(--white);font:700 var(--text-sm) var(--font-family);cursor:pointer}
+  .budget-filter-chip svg{width:16px;height:16px}
+  .budget-filter-chip:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
   .monthly-budget-page .budget-v3-controls.is-compact .budget-v3-search-field{flex:1;min-width:0;align-items:center}
   .budget-filter-button{display:inline-flex;align-items:center;gap:var(--space-1);flex:none;min-height:44px;margin:0;padding:var(--space-2) var(--space-3)}
   .budget-filter-button svg{width:16px;height:16px}
