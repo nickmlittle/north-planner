@@ -270,13 +270,13 @@ it('lists each person’s payday steps in order, with pot moves under their acco
   expect(within(transfers).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£25.00 · 2 to fund · 1 move','Immy£20.00 · 1 to fund'])
   const nick=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nick)).toEqual([
-    '1Fund Monzo Nick£20.00See 3 items',
-    '2Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
-    '3Fund Nationwide Immy£5.00See 1 item',
+    'Fund Monzo Nick£20.00See 3 items',
+    'Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
+    'Fund Nationwide Immy£5.00See 1 item',
   ])
   expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-pot-move')
   // Immy pays into Nick's account; Nick moves her share on, so she has no pot step there.
-  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['1Fund Monzo Nick£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
+  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Fund Monzo Nick£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
   expect(transfers).not.toHaveTextContent('Direct item')
   expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Funding£45.00All items funded')
   expect(document.querySelector('.budget-v3-transfer-table')).toHaveTextContent('Direct to account')
@@ -304,7 +304,7 @@ it('asks once whose transfers to show, then remembers the choice on this device'
   expect(summary).toHaveTextContent('Who’s moving money on this phone?')
   expect(summary).toHaveTextContent('Funding£45.00')
   const choice=within(summary).getByRole('group',{name:'Whose transfers'})
-  expect(within(choice).getAllByRole('button').map(button=>button.textContent)).toEqual(['Nick','Immy','Both'])
+  expect(within(choice).getAllByRole('button').map(button=>button.textContent)).toEqual(['Nick0/2','Immy0/2','Both'])
   expect(within(choice).getAllByRole('button').every(button=>button.getAttribute('aria-pressed')==='false')).toBe(true)
   // Unchosen, the list shows everyone's steps.
   expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£20.00 · 1 to fund · 1 move','Immy£25.00 · 2 to fund'])
@@ -318,8 +318,8 @@ it('asks once whose transfers to show, then remembers the choice on this device'
   // The hero names the person, so the list needs no heading of its own.
   expect(within(overview).queryAllByRole('heading',{level:3})).toHaveLength(0)
   expect(stepTexts(overview)).toEqual([
-    '1Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending',
-    '2Fund Nationwide Immy£5.00',
+    'Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending',
+    'Fund Nationwide Immy£5.00',
   ])
   unmount()
   render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
@@ -329,7 +329,7 @@ it('asks once whose transfers to show, then remembers the choice on this device'
   fireEvent.click(within(again).getByRole('button',{name:'Nick'}))
   expect(again).toHaveTextContent('Nick’s funding£20.00')
   expect(again).toHaveTextContent('1 to fund · 1 move')
-  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('2Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy')
+  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy')
   fireEvent.click(within(again).getByRole('button',{name:'Both'}))
   expect(window.localStorage.getItem('north.transferPerson')).toBe('both')
   expect(again).toHaveTextContent('Funding£45.00')
@@ -391,7 +391,7 @@ it('leaves people with nothing to move out of the steps',()=>{
   render(<SeededHarness initial={initial} view="transfers"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£5.00 · 1 to fund'])
-  expect(stepTexts(overview)).toEqual(['1Fund Monzo Nick£5.00'])
+  expect(stepTexts(overview)).toEqual(['Fund Monzo Nick£5.00'])
   expect(overview).not.toHaveTextContent('Immy')
   expect(overview).not.toHaveTextContent('Sam')
   // Without a Plan route there is nowhere for "See items" to go.
@@ -478,7 +478,7 @@ it('keeps a large destination to one funding step and one pot step',()=>{
   initial.budget.snapshots[month]={items:Array.from({length:23},(_,index)=>({id:`item-${index}`,name:`Budget item ${index+1}`,categoryId:'bills',destination:{kind:'pot' as const,potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly' as const,funding:'equal' as const}))}
   render(<SeededHarness initial={initial} view="transfers" onSeeTransferItems={vi.fn()}/>)
   const nick=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nick)).toEqual(['1Fund Monzo Nick£115.00See 23 items','2Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
+  expect(stepTexts(nick)).toEqual(['Fund Monzo Nick£115.00See 23 items','Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
   expect(nick).not.toHaveTextContent('Budget item 1')
 })
 
@@ -987,7 +987,7 @@ it('preserves month, search and owner when switching views',()=>{
   filterBy('Owner','Nick')
   rerender(<SeededHarness initial={initial} view="transfers"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nickSteps)).toEqual(['1Fund Monzo Nick£5.00','2Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
+  expect(stepTexts(nickSteps)).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
   const row=within(nickSteps).getAllByRole('listitem')[0]
   const trigger=screen.getByRole('button',{name:'Transfers summary details'})
   trigger.focus();fireEvent.click(trigger)
@@ -1172,10 +1172,10 @@ it('explains the owner-handled pot movement without changing contribution attrib
   initial.budget.snapshots['2026-12'] = { items: [{ id: 'personal-pot', name: 'Personal pot funding', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 10001, amountPence: 10001, frequency: 'monthly', funding: 'fixed', contributions: [{ personId: 'nick', amountPence: 3000 }, { personId: 'immy', amountPence: 7001 }] }] }
   render(<MonthRulesHarness initial={initial} view="transfers"/>)
   // Immy funds £70.01 of Nick's account, but Nick (the owner) makes the whole pot move.
-  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['1Fund Monzo Nick£70.01Nick moves it into Spending'])
+  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['Fund Monzo Nick£70.01Nick moves it into Spending'])
   expect(stepTexts(screen.getByRole('region', { name: 'Nick steps' }))).toEqual([
-    '1Fund Monzo Nick£30.00',
-    '2Move to Spending from Monzo Nick£100.01Includes £70.01 from Immy',
+    'Fund Monzo Nick£30.00',
+    'Move to Spending from Monzo Nick£100.01Includes £70.01 from Immy',
   ])
   // Funding still reconciles to the account total; the pot move is not added on top.
   expect(document.querySelector('.budget-v3-transfer-table tfoot')).toHaveTextContent('£100.01')
@@ -1288,4 +1288,27 @@ it('leads with whoever is over and reviews their items',()=>{
   expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('Nick is £2,500.00 over')
   fireEvent.click(within(summary).getByRole('button',{name:'Review Nick’s items'}))
   expect(screen.getByRole('button',{name:/^Remove filter: /})).toBeInTheDocument()
+})
+
+it('ticks steps off, counts progress, and says when a person is up to date',()=>{
+  render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  const summary=screen.getByRole('region',{name:'Transfers summary'})
+  fireEvent.click(within(summary).getByRole('button',{name:'Immy'}))
+  expect(summary).toHaveTextContent('Ticked off0 of 2 done')
+  const overview=screen.getByRole('region',{name:'Steps by person'})
+  const ticks=within(overview).getAllByRole('button',{name:/ done$/})
+  expect(ticks).toHaveLength(2)
+  // Copying never ticks.
+  fireEvent.click(within(overview).getAllByRole('button',{name:/^Copy /})[0]!)
+  expect(ticks[0]).toHaveAttribute('aria-pressed','false')
+  fireEvent.click(ticks[0]!)
+  expect(ticks[0]).toHaveAttribute('aria-pressed','true')
+  expect(summary).toHaveTextContent('1 of 2 done')
+  expect(within(summary).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy1/2')
+  fireEvent.click(ticks[1]!)
+  expect(within(summary).getByRole('status')).toHaveTextContent(/^Immy is up to date for \w+All 2 steps ticked\.$/)
+  expect(within(summary).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy✓')
+  fireEvent.click(ticks[1]!)
+  expect(ticks[1]).toHaveAttribute('aria-pressed','false')
+  expect(summary).toHaveTextContent('1 of 2 done')
 })

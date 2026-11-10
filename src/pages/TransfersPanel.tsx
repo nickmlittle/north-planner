@@ -29,10 +29,12 @@ type Props = {
   stepsReturn?: StepsReturn | null
   onSeeItems?: (accountId: string) => void
   onEditIncome: () => void
+  month: string
+  onTick?: (key: string, amountPence: number | null) => void
 }
 
 /** People & transfers: each person's plan, the destination table (desktop) and the payday steps (phone). */
-export function TransfersPanel({ document, transfers, accounts, instructions, unfundedItems, labels, plans, personSelection, view, mobilePresentation, affectedTransfers, stepsReturn, onSeeItems, onEditIncome }: Props) {
+export function TransfersPanel({ document, transfers, accounts, instructions, unfundedItems, labels, plans, personSelection, view, mobilePresentation, affectedTransfers, stepsReturn, onSeeItems, onEditIncome, month, onTick }: Props) {
   const adults = document.household.adults
   const potName = (potId: string) => document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot'
   const itemCounts = new Map(accounts.map(account => [account.accountId, account.items.length]))
@@ -71,7 +73,7 @@ export function TransfersPanel({ document, transfers, accounts, instructions, un
       {unfundedItems.length === 0 && instructions && <AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Funding by account</h3>{instructions?.incomplete && <span className="budget-desktop-only">* Needs review</span>}</div>
       <TransferTable accounts={accounts} people={transfers.people} adults={adults} labels={labels} potName={potName} affectedAccounts={affectedAccounts} incomplete={instructions?.incomplete}/>
       {accounts.some(account => account.hasPots) && <p className="budget-v3-transfer-rounding">Each account’s funding already includes its moves.</p>}
-      <PaydaySteps plans={plans} selection={personSelection} labels={labels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeItems} affectedAccounts={affectedAccounts}/>
+      <PaydaySteps plans={plans} selection={personSelection} labels={labels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeItems} affectedAccounts={affectedAccounts} ticks={document.ticks?.[month]} onTick={onTick}/>
     </>}
   </section>
 }

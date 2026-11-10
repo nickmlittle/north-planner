@@ -14,7 +14,7 @@
 
 The UI uses four words for these: **Available**, **Planned**, **Funding** (contributions and account funding requirements) and **Move** (pot movements). See the [glossary](product-design-spec.md#glossary).
 
-Periods and inheritance follow the [recurring monthly budget contract](recurring-monthly-budget-rules.md). Instructions are derived from the selected month's resolved items, income and shared destinations. They are not stored payments or frozen historical records.
+Periods and inheritance follow the [recurring monthly budget contract](recurring-monthly-budget-rules.md). Instructions are derived from the selected month's resolved items, income and shared destinations. They are not stored payments or frozen historical records; ticks (below) record what people say they did, without changing them.
 
 ## Contribution calculations
 
@@ -58,6 +58,18 @@ Keep the following distinct:
 Any unresolved item or missing pot owner puts its entire account into `needs-review`. Keep its calculated breakdown visible, but withhold every step for that account from the actionable list. Unaffected accounts remain available. Existing comparison views label affected accounts and show review guidance; their funding total is a comparison of calculated contributions, not a claim that every instruction is ready.
 
 Invalid document references or an invalid calendar-month argument fail explicitly rather than silently producing an empty instruction set. The UI marks unavailable instructions and keeps the existing comparison fallback. A valid empty budget returns no steps and no issues.
+
+## Ticking off steps
+
+Agreed with Nick on 10 November 2026 (Immy's feedback). People tick each payday step once they have made it; when everything is ticked the household is up to date for the month.
+
+- **Per month, per step.** A tick belongs to one month and one step: a person funding an account (`person:fund:account`) or a person's pot move (`person:move:pot`). It stores the amount it was ticked at and when. Ticks live in the budget document (`ticks`), so they sync like the rest of the budget.
+- **Shared by the household for now.** Any signed-in device can tick any person's step. Once shared login links an account to an adult, ticks become per person.
+- **Done** means ticked at today's amount. **Changed** means ticked at a different amount: the step stays ticked, shows the difference (more to send, or less needed) and is not counted as done until it is ticked again, which records the new amount.
+- **Steps that disappear** (an item removed, an account no longer funded) lose their tick silently. Withheld steps (needs review) can't be ticked.
+- **Up to date** means every step for every person is done.
+- **Ticks never change the plan** or any amount. They are a record of what people did, not a payment ledger; the app doesn't verify them against a bank. Copying an amount never ticks a step.
+- **A new month starts with nothing ticked.** Past months keep their ticks.
 
 ## Agreed worked examples
 
