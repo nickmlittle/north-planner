@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeftRight, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
+import { ArrowLeftRight, House, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
 import { AccountStatusPanel } from './AccountStatusPanel'
 import { saveStatusLabel, statusMark } from './saveStatus'
 import type { BudgetView, PlannerView } from '../state/navigation'
@@ -19,6 +19,8 @@ export interface PlannerHeaderProps {
   onSelectView: (view: PlannerView) => void
   onSelectBudgetView: (view: BudgetView) => void
   setupComplete: boolean
+  /** Home's title on phones: the month it summarises ("November 2026"), under "This month". */
+  homeTitle?: string
 }
 
 function AnimatedSidebarText({ text }: { text: string }) {
@@ -66,7 +68,7 @@ function UtilitySheet({ status, warning, email, onSignOut, onClose }: { status: 
 }
 
 
-export function PlannerHeader({ currentView, budgetView, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView, onSelectBudgetView, setupComplete }: PlannerHeaderProps) {
+export function PlannerHeader({ currentView, budgetView, warning = '', saveStatus = 'Saved', email, onSignOut, onSelectView, onSelectBudgetView, setupComplete, homeTitle }: PlannerHeaderProps) {
   const [accountOpen, setAccountOpen] = useState(false)
   const [warningOpen, setWarningOpen] = useState(false)
   const [utilityOpen, setUtilityOpen] = useState(false)
@@ -104,9 +106,10 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
   const status = saveStatusLabel(saveStatus, warning)
   // Saved is the quiet default: only show a status when there is something to know.
   const statusIcon = status === 'Saved' ? null : <span aria-hidden="true">{statusMark(status)}</span>
-  const selected = currentView === 'household' ? 'household' : budgetView
-  const pageTitle = selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : 'Household'
+  const selected = currentView === 'budget' ? budgetView : currentView
+  const pageTitle = selected === 'home' ? homeTitle ?? 'Home' : selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : 'Household'
   const destinations = [
+    { id: 'home', label: 'Home', Icon: House, action: () => onSelectView('home') },
     { id: 'plan', label: 'Plan', Icon: Wallet, action: () => onSelectBudgetView('plan') },
     { id: 'transfers', label: 'Transfers', Icon: ArrowLeftRight, action: () => onSelectBudgetView('transfers') },
     { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household') },
@@ -114,8 +117,9 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
   return <>
     {/* Pine, from under the status bar. Once its rows scroll away, the bar alone stays pinned to the top; the header keeps its height so nothing jumps. */}
     <header ref={headerRef} className={`mobile-app-header${collapsedHeight === null ? '' : ' is-collapsed'}`} style={collapsedHeight === null ? undefined : { height: collapsedHeight }}>
-      <div className="mobile-header-bar">
+      <div className={`mobile-header-bar${selected === 'home' ? ' has-eyebrow' : ''}`}>
         <span className="mobile-header-brand" aria-hidden="true">north.</span>
+        {selected === 'home' && <p className="mobile-header-eyebrow">This month</p>}
         <h1>{pageTitle}</h1>
         {/* Plan and Transfers put their month, ⋯ and budget note here; the title then stays for screen readers only. */}
         <div id="mobile-header-page-slot" className="mobile-header-slot" />

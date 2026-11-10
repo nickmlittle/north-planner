@@ -32,3 +32,12 @@ it('round-trips a selected-month destination filter and clears it outside Plan',
   expect(window.location.search).not.toContain('planDestination')
   expect(parseNavigation('?budgetView=plan&planDestination=unknown%3A123').planDestination).toBeNull()
 })
+
+it('opens on Home unless the link names a screen', () => {
+  expect(parseNavigation('').view).toBe('home')
+  expect(parseNavigation('?month=2026-11').view).toBe('home')
+  expect(parseNavigation('?view=home').view).toBe('home')
+  expect(parseNavigation('?budgetView=transfers').view).toBe('budget')
+  expect(parseNavigation('?view=budget&budgetView=plan').view).toBe('budget')
+  expect(parseNavigation('?view=household').view).toBe('household')
+})

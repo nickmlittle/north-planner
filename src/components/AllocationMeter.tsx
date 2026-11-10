@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { ChevronRight, Pencil } from 'lucide-react'
 import { formatGBP } from '../formatting/money'
 import { balanceText, meterSummary, type MeterPerson } from './meterSummary'
@@ -26,7 +27,7 @@ function Track({ availablePence, plannedPence, className = 'allocation-meter-tra
  * The Plan's answer first. With two or more adults: the worst figure as the headline, one bar per person, and the household on its own line.
  * With one adult: the household balance and one bar. `onReview` opens the items of whoever is furthest over; the pencil edits income.
  */
-export function AllocationMeter({ availablePence, plannedPence, people = [], basis, onEditIncome, onReview, eyebrow, compact = false, className = '', label = 'Plan summary' }: {
+export function AllocationMeter({ availablePence, plannedPence, people = [], basis, onEditIncome, onReview, eyebrow, actions, compact = false, className = '', label = 'Plan summary' }: {
   availablePence: number
   plannedPence: number
   people?: readonly MeterPerson[]
@@ -36,6 +37,8 @@ export function AllocationMeter({ availablePence, plannedPence, people = [], bas
   onReview?: (personId: string) => void
   /** A small line above the headline, e.g. "November plan" on Home. */
   eyebrow?: string
+  /** More links in the action row, e.g. "Open Plan" on Home. */
+  actions?: ReactNode
   compact?: boolean
   className?: string
   label?: string
@@ -69,6 +72,7 @@ export function AllocationMeter({ availablePence, plannedPence, people = [], bas
       {!summary.split && <span><strong>{pounds(plannedPence)}</strong> planned of <strong>{pounds(availablePence)}</strong> available</span>}
       {onEditIncome && <button type="button" className="allocation-meter-edit" aria-label="Edit income" title="Edit income" onClick={onEditIncome}><Pencil aria-hidden="true"/>{summary.split && <span>Edit income</span>}</button>}
       {!compact && basis && <span className="allocation-meter-basis">({basis})</span>}
+      {actions}
     </p>
   </section>
 }

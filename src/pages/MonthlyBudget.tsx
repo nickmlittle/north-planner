@@ -35,7 +35,7 @@ import { formatGBP } from '../formatting/money'
 import type { PlanDestination, StepsReturn } from '../state/navigation'
 import { MOBILE_QUERY } from '../breakpoints'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onOpenPlan?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string; warning?: string; email?: string; onSignOut?: () => void }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onOpenPlan?: () => void; reviewPersonId?: string; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string; warning?: string; email?: string; onSignOut?: () => void }
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 const monthLabel = formatMonth
@@ -43,7 +43,7 @@ const subscribeNothing = () => () => {}
 const findHeaderSlot = () => window.document.getElementById('mobile-header-page-slot')
 const pounds = (pence: number) => formatGBP(pence / 100)
 
-export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onOpenPlan,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId,warning='',email,onSignOut}:Props) {
+export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onOpenPlan,reviewPersonId,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId,warning='',email,onSignOut}:Props) {
  const mobilePresentation=useSyncExternalStore(subscribeMobile,getMobile,()=>false)
  const [localMonth,setLocalMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const month=sharedMonth??localMonth
@@ -142,6 +142,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const meterPeople=transfers.people.map(row=>({personId:row.personId,name:adults.find(person=>person.id===row.personId)?.name??'Person',availablePence:row.availablePence,plannedPence:row.plannedPence}))
  // "Review Immy's items": the Plan filtered to the accounts that person owns, with every group holding them open.
  const reviewPerson=(personId:string)=>{const name=adults.find(person=>person.id===personId)?.name;if(!name)return;setOwnerFilter(name);setCategoryFilter('All');if(query)updateSearch('');const {groups}=groupPlanItems(destinationItems,{query:'',owner:name,category:'All'},labels,grouping,transferAccounts.map(account=>account.accountId),ownerOrder);setOpenGroups(open=>({...open,...Object.fromEntries(groups.map(group=>[group.key,true]))}))}
+ // Arriving from Home's "Review Immy's items": apply it once per visit.
+ const [appliedReview,setAppliedReview]=useState<string|undefined>()
+ if(reviewPersonId&&reviewPersonId!==appliedReview){setAppliedReview(reviewPersonId);reviewPerson(reviewPersonId)}
  const searchMode=!!query.trim()
  const {groups:planGroups,matching:matchingItems}=groupPlanItems(destinationItems,{query,owner:ownerFilter,category:categoryFilter},labels,grouping,transferAccounts.map(account=>account.accountId),ownerOrder)
  const scopedPlan=mobilePresentation&&mobileBudgetView==='plan'&&!!planDestination

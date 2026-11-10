@@ -231,18 +231,25 @@ it('resumes setup at the first unfinished step and saves no income when pay is s
   expect(screen.getByRole('button', { name: 'Add income' })).toBeVisible()
 })
 
-it('reopens on the Plan or Transfers view used last on this device', async () => {
+it('opens on Home, while a budget link without a view returns to the one used last on this device', async () => {
   const saved = newBudgetDocument()
   saved.household = { name: 'Home', adults: [{ id: 'a', name: 'Alex' }] }
   saved.workflow.setupComplete = true
   localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
   const first = render(<App />)
-  fireEvent.click(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Transfers' }))
+  const nav = () => within(screen.getByRole('navigation', { name: 'Mobile navigation' }))
+  expect(nav().getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  expect(await screen.findByRole('region', { name: 'Plan summary' })).toBeInTheDocument()
+  fireEvent.click(nav().getByRole('button', { name: 'Transfers' }))
   expect(window.location.search).toContain('budgetView=transfers')
   first.unmount()
   window.history.replaceState(null, '', '/')
   render(<App />)
-  expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
+  expect(nav().getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  cleanup()
+  window.history.replaceState(null, '', '/?view=budget')
+  render(<App />)
+  expect(nav().getByRole('button', { name: 'Transfers' })).toHaveAttribute('aria-current', 'page')
 })
 
 it('stays quiet when saved and removes the mobile drawer', async () => {
@@ -260,6 +267,9 @@ it('returns from an old settings URL to Budget through browser navigation', asyn
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Household' }))
   expect(screen.getByRole('heading', { name: 'Your household' })).toBeVisible()
   window.history.replaceState(null, '', '/?view=settings&settings=tax')
+  fireEvent(window, new PopStateEvent('popstate'))
+  expect(within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  window.history.replaceState(null, '', '/?view=budget&budgetView=plan')
   fireEvent(window, new PopStateEvent('popstate'))
   expect(await screen.findByRole('heading', { name: 'Monthly budget' })).toBeVisible()
 })
@@ -420,4 +430,26 @@ it('shows the step list for an old destination detail link', async () => {
   // The retired parameter goes on the next navigation.
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Plan' }))
   expect(window.location.search).not.toContain('transferAccount')
+})
+
+it('leads Home with whoever is over and reviews their items on Plan', async () => {
+  const saved = newBudgetDocument()
+  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  saved.household = { name: 'Home', adults: [{ id: 'a', name: 'Alex' }, { id: 'b', name: 'Bea' }] }
+  saved.workflow.setupComplete = true
+  saved.budget.categories = [{ id: 'bills', name: 'Bills' }]
+  saved.budget.accounts = [{ id: 'bea', name: 'Current', provider: 'Monzo', ownerPersonIds: ['b'] }]
+  saved.budget.incomeSources = [{ id: 'ia', personId: 'a', name: 'Job', type: 'employment', baseAmountPence: 100000, changes: {} }, { id: 'ib', personId: 'b', name: 'Job', type: 'employment', baseAmountPence: 10000, changes: {} }]
+  saved.budget.snapshots[month] = { items: [{ id: 'gym', name: 'Gym', categoryId: 'bills', destination: { kind: 'account', accountId: 'bea' }, entryAmountPence: 14000, amountPence: 14000, frequency: 'monthly', funding: 'single', singleFunderId: 'b' }] }
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  render(<App />)
+  const summary = await screen.findByRole('region', { name: 'Plan summary' })
+  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('Bea is £40.00 over')
+  fireEvent.click(within(summary).getByRole('button', { name: 'Review Bea’s items' }))
+  expect(window.location.search).toContain('budgetView=plan')
+  expect(await screen.findByRole('button', { name: 'Remove filter: Bea’s accounts' })).toBeInTheDocument()
+  window.history.back()
+  await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page'))
+  fireEvent.click(within(await screen.findByRole('region', { name: 'Plan summary' })).getByRole('button', { name: 'Open Plan' }))
+  expect(window.location.search).toContain('budgetView=plan')
 })
