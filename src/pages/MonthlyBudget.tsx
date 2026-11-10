@@ -8,7 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PLAN_FILTER_MIN_ITEMS } from './planListConfig'
 import { BudgetManagement } from './BudgetManagement'
 import { BudgetItemEditor } from './BudgetItemEditor'
-import { BudgetInfoDialog, MobileBudgetSummary } from './MobileBudgetViews'
+import { BudgetInfoDialog, MobileBudgetSummary, type TransferPersonChoice } from './MobileBudgetViews'
 import { TransfersPanel } from './TransfersPanel'
 import { MonthControl } from './MonthControl'
 import { IncomeDialog } from './IncomeDialog'
@@ -35,7 +35,7 @@ import { formatGBP } from '../formatting/money'
 import type { PlanDestination, StepsReturn } from '../state/navigation'
 import { MOBILE_QUERY } from '../breakpoints'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string; warning?: string; email?: string; onSignOut?: () => void }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; saveStatus?: string; accountBacked?: boolean; mobileBudgetView?: 'transfers' | 'plan'; month?: string; onMonthChange?: (month: string) => void; onSeeTransferItems?: (accountId: string) => void; planDestination?: PlanDestination | null; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; onOpenPlan?: () => void; onViewAffectedTransfers?: (impact: BudgetImpact) => void; affectedTransfers?: BudgetImpact | null; hasTransfersOrigin?: boolean; stepsReturn?: StepsReturn | null; planItemId?: string; warning?: string; email?: string; onSignOut?: () => void }
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 const monthLabel = formatMonth
@@ -43,7 +43,7 @@ const subscribeNothing = () => () => {}
 const findHeaderSlot = () => window.document.getElementById('mobile-header-page-slot')
 const pounds = (pence: number) => formatGBP(pence / 100)
 
-export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId,warning='',email,onSignOut}:Props) {
+export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:sharedMobileBudgetView,month:sharedMonth,onMonthChange,onSeeTransferItems,planDestination,onClearPlanDestination,onReturnToTransfers,onOpenPlan,onViewAffectedTransfers,affectedTransfers,hasTransfersOrigin,stepsReturn,planItemId,warning='',email,onSignOut}:Props) {
  const mobilePresentation=useSyncExternalStore(subscribeMobile,getMobile,()=>false)
  const [localMonth,setLocalMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const month=sharedMonth??localMonth
@@ -103,8 +103,12 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const chooseTransferPerson=(value:string)=>{rememberTransferPerson(value);setStoredTransferPerson(value)}
  const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
  const selectedPersonPlan=transferPerson&&transferPerson!=='both'?personPlans.people.find(plan=>plan.personId===transferPerson):undefined
- const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length,progress:Object.fromEntries(personPlans.people.map(plan=>[plan.personId,personProgress(plan,document.ticks?.[month])])),monthName:formatMonth(month).split(' ')[0]}
+ const transferPersonChoice:TransferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length,progress:Object.fromEntries(personPlans.people.map(plan=>[plan.personId,personProgress(plan,document.ticks?.[month])])),monthName:formatMonth(month).split(' ')[0]}
  const tickStep=(key:string,amountPence:number|null)=>setDocument(current=>setStepTick(current,month,key,amountPence))
+ // Someone shown on Transfers whose steps add up to more than they have available; the furthest over first.
+ const overPerson=[...transfers.people].filter(row=>(transferPerson==='both'||!transferPerson||row.personId===transferPerson)&&row.plannedPence>row.availablePence).sort((a,b)=>(b.plannedPence-b.availablePence)-(a.plannedPence-a.availablePence))[0]
+ const overName=overPerson&&(adults.find(person=>person.id===overPerson.personId)?.name??'Person')
+ if(overPerson&&adults.length>1)transferPersonChoice.overBy={text:`${overName}’s steps add up to ${pounds(overPerson.plannedPence)}, which is ${pounds(overPerson.plannedPence-overPerson.availablePence)} more than ${overName}’s ${pounds(overPerson.availablePence)} available.`,onReview:()=>{reviewPerson(overPerson.personId);onOpenPlan?.()}}
  const start=(item?:BudgetItem,template?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditorTemplate(template);setEditorSession(session=>session+1);setEditor(true)}
  const duplicate=(item:BudgetItem)=>start(undefined,item)
  const saveBatch=(batch:BudgetItemBatch)=>{

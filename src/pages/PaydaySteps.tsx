@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, RefreshCw } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
@@ -66,13 +66,26 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     clearTimeout(clearCopied.current)
     clearCopied.current = setTimeout(() => setCopied(''), 2500)
   }
-  const amount = (pence: number) => <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void copy(pence)}>{pounds(pence)}</button>
+  /** The amount copies. Changed since ticked, it shows and copies only the difference ("+£50.00"). */
+  const amount = (key: string, pence: number) => {
+    const status = stepStatus(ticks, key, pence)
+    const shown = status.state === 'changed' ? Math.abs(status.differencePence) : pence
+    const text = status.state === 'changed' ? `${status.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)
+    return <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(shown)}`} onClick={() => void copy(shown)}>{text}</button>
+  }
+  /** What changed after the tick, and what to do about it. */
+  const changedNote = (key: string, pence: number) => {
+    const status = stepStatus(ticks, key, pence)
+    if (status.state !== 'changed') return null
+    return <p className="payday-step-changed">Changed since ticked: you sent {pounds(status.tickedPence!)}, it’s now {pounds(pence)}. {status.differencePence > 0 ? `Send ${pounds(status.differencePence)} more.` : `${pounds(-status.differencePence)} less is needed.`}</p>
+  }
   /** The tick: a 44px circle, separate from the amount so copying never ticks. */
   const tick = (key: string, label: string, pence: number) => {
     const status = stepStatus(ticks, key, pence)
     const done = status.state === 'done'
-    return <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={done} aria-label={`${label} done`} disabled={!onTick} onClick={() => onTick?.(key, done ? null : pence)}>
-      <span className="payday-tick-dot" aria-hidden="true">{done && <Check/>}</span>
+    // Changed: the circle accepts the new amount (records it), so the step is done again.
+    return <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={done} aria-label={status.state === 'changed' ? `${label}: mark the change done` : `${label} done`} disabled={!onTick} onClick={() => onTick?.(key, done ? null : pence)}>
+      <span className="payday-tick-dot" aria-hidden="true">{done && <Check/>}{status.state === 'changed' && <RefreshCw/>}</span>
     </button>
   }
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
@@ -84,7 +97,8 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
       const fund = row.fundingPence > 0 ? [<li key={`${row.accountId}:fund`} className={`payday-step is-fund is-${stepStatus(ticks, fundKey, row.fundingPence).state}`} data-payday-account={row.accountId}>
         {tick(fundKey, `Fund ${account}`, row.fundingPence)}
         <div className="payday-step-body">
-          <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span>{amount(row.fundingPence)}</p>
+          <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span>{amount(fundKey, row.fundingPence)}</p>
+          {changedNote(fundKey, row.fundingPence)}
           {row.movedOnBy.map(other => <p key={other.personId} className="payday-step-caption">{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</p>)}
           {affected(row.accountId)}
           {seeItems(row.accountId)}
@@ -96,7 +110,8 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
         return <li key={`${row.accountId}:${move.potId}`} className={`payday-step is-pot-move is-${stepStatus(ticks, moveKey, move.amountPence).state}`} data-payday-account={row.accountId}>
           {tick(moveKey, `Move to ${potName(move.potId)}`, move.amountPence)}
           <div className="payday-step-body">
-            <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span>{amount(move.amountPence)}</p>
+            <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span>{amount(moveKey, move.amountPence)}</p>
+            {changedNote(moveKey, move.amountPence)}
             {move.fromOthers.length > 0 && <p className="payday-step-caption">Includes {others(move.fromOthers)}</p>}
             {first && affected(row.accountId)}
             {first && seeItems(row.accountId)}
