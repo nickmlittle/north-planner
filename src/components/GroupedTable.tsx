@@ -101,7 +101,9 @@ export function GroupedTable({ columns, groups, renderStickyGroup, focusFallback
         const keys: string[] = []
         if (rect.bottom > top && rect.top < bottom) {
           const rows = Array.from(wrap.querySelectorAll<HTMLElement>('[data-group-level]'))
-          let line = top + headerHeight
+          // Page-scrolled tables stick below whatever the page pins to the top (the phone header bar).
+        const pinned = bounded ? 0 : parseFloat(getComputedStyle(wrap).getPropertyValue('--page-sticky-top')) || 0
+        let line = top + pinned + headerHeight
           const maxLevel = groups.reduce((max, group) => Math.max(max, group.level), -1)
           for (let level = 0; level <= maxLevel; level++) {
             let current: HTMLElement | undefined

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { PlannerHeader } from './PlannerHeader'
 
 afterEach(cleanup)
@@ -53,4 +53,38 @@ it('offers the same Plan, Transfers and Household destinations in the desktop si
   expect(selectBudgetView).toHaveBeenCalledWith('plan')
   fireEvent.click(sidebar.getByRole('button', { name: 'Household' }))
   expect(selectView).toHaveBeenCalledWith('household')
+})
+
+it('pins only the header bar once its rows scroll away, keeping the header’s height so the page does not jump', () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
+  vi.stubGlobal('cancelAnimationFrame', () => {})
+  const scrollY = vi.spyOn(window, 'scrollY', 'get').mockReturnValue(0)
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(180)
+  try {
+    render(<PlannerHeader currentView="household" budgetView="plan" setupComplete onSelectView={() => {}} onSelectBudgetView={() => {}} />)
+    const header = document.querySelector<HTMLElement>('.mobile-app-header')!
+    expect(header).not.toHaveClass('is-collapsed')
+    // jsdom has no stylesheet, so the bar's safe-area padding reads as 0 and the pinned bar is one 48px row.
+    scrollY.mockReturnValue(140)
+    act(() => { window.dispatchEvent(new Event('scroll')) })
+    expect(header).toHaveClass('is-collapsed')
+    expect(header.style.height).toBe('180px')
+    scrollY.mockReturnValue(120)
+    act(() => { window.dispatchEvent(new Event('scroll')) })
+    expect(header).not.toHaveClass('is-collapsed')
+    expect(header.style.height).toBe('')
+  } finally {
+    height.mockRestore()
+    scrollY.mockRestore()
+    vi.unstubAllGlobals()
+  }
+})
+
+it('marks the current page in the phone nav with the icon pill', () => {
+  render(<PlannerHeader currentView="budget" budgetView="transfers" setupComplete onSelectView={() => {}} onSelectBudgetView={() => {}} />)
+  const nav = screen.getByRole('navigation', { name: 'Mobile navigation' })
+  const current = within(nav).getByRole('button', { name: 'Transfers' })
+  expect(current).toHaveAttribute('aria-current', 'page')
+  expect(current.querySelector('.mobile-nav-icon')).toHaveAttribute('aria-hidden', 'true')
+  expect(within(nav).getByRole('button', { name: 'Plan' })).not.toHaveAttribute('aria-current')
 })

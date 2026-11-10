@@ -4,6 +4,10 @@ import { ArrowLeftRight, Menu, UserRound, UserRoundGroup, Wallet, X } from 'luci
 import { AccountStatusPanel } from './AccountStatusPanel'
 import { saveStatusLabel, statusMark } from './saveStatus'
 import type { BudgetView, PlannerView } from '../state/navigation'
+import { MOBILE_QUERY } from '../breakpoints'
+
+/** The pinned bar's row under the safe area, in px; styles.css draws it as --page-bar-row. */
+const MOBILE_BAR_ROW = 48
 
 export interface PlannerHeaderProps {
   currentView: PlannerView
@@ -67,6 +71,36 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
   const [warningOpen, setWarningOpen] = useState(false)
   const [utilityOpen, setUtilityOpen] = useState(false)
   const [desktopExpanded, setDesktopExpanded] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
+  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null)
+  const frozenHeight = useRef<number | null>(null)
+  useEffect(() => {
+    const header = headerRef.current
+    const bar = header?.firstElementChild as HTMLElement | null | undefined
+    if (!header || !bar) return
+    let frame = 0
+    const update = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const phone = !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
+        const height = frozenHeight.current ?? header.offsetHeight
+        // The pinned bar is the safe area plus one row; it takes over once the rows above that line have scrolled under it.
+        const pinnedHeight = parseFloat(getComputedStyle(bar).paddingTop) + MOBILE_BAR_ROW
+        const collapse = phone && height > 0 && window.scrollY > height - pinnedHeight
+        if (collapse === (frozenHeight.current !== null)) return
+        frozenHeight.current = collapse ? header.offsetHeight : null
+        setCollapsedHeight(frozenHeight.current)
+      })
+    }
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [currentView, budgetView])
   const status = saveStatusLabel(saveStatus, warning)
   // Saved is the quiet default: only show a status when there is something to know.
   const statusIcon = status === 'Saved' ? null : <span aria-hidden="true">{statusMark(status)}</span>
@@ -78,10 +112,19 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
     { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household') },
   ] as const
   return <>
-    <header className="mobile-app-header"><h1>{pageTitle}</h1>{/* Plan and Transfers put their month and ⋯ here; the title then stays for screen readers only. */}<div id="mobile-header-page-slot" className="mobile-header-slot" /><button type="button" className="mobile-utility-trigger" aria-label="Account and save status" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={18} aria-hidden="true" /></button></header>
+    {/* Pine, from under the status bar. Once its rows scroll away, the bar alone stays pinned to the top; the header keeps its height so nothing jumps. */}
+    <header ref={headerRef} className={`mobile-app-header${collapsedHeight === null ? '' : ' is-collapsed'}`} style={collapsedHeight === null ? undefined : { height: collapsedHeight }}>
+      <div className="mobile-header-bar">
+        <span className="mobile-header-brand" aria-hidden="true">north.</span>
+        <h1>{pageTitle}</h1>
+        {/* Plan and Transfers put their month, ⋯ and budget note here; the title then stays for screen readers only. */}
+        <div id="mobile-header-page-slot" className="mobile-header-slot" />
+        <button type="button" className="mobile-utility-trigger" aria-label="Account and save status" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={20} aria-hidden="true" /></button>
+      </div>
+    </header>
     {status === 'Save failed' && <p className="mobile-save-alert" role="alert">Save failed. Open account and save status for details.</p>}
     {/* Until setup is done there is nowhere else to go, so no greyed-out promises. */}
-    {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(({ id, label, Icon, action }) => <button key={id} type="button" aria-current={selected === id ? 'page' : undefined} onClick={action}><Icon size={22} strokeWidth={2} aria-hidden="true" /><span>{label}</span></button>)}</nav>}
+    {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(({ id, label, Icon, action }) => <button key={id} type="button" aria-current={selected === id ? 'page' : undefined} onClick={action}><span className="mobile-nav-icon" aria-hidden="true"><Icon size={22} strokeWidth={2} /></span><span>{label}</span></button>)}</nav>}
     <aside className={`planner-sidebar is-compact${desktopExpanded ? ' desktop-expanded' : ''}`} aria-label="Application navigation">
       <div className="sidebar-rail">
         <div className="desktop-sidebar-header"><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={() => setDesktopExpanded(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button><span className="desktop-sidebar-brand" aria-hidden="true"><AnimatedSidebarText text="north." /></span></div>
