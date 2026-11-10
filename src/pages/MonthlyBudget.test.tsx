@@ -68,7 +68,7 @@ it('keeps mobile Plan headings and funding context in a semantic two-column tabl
   expect(screen.queryByLabelText('More actions for Apple TV')).not.toBeInTheDocument()
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
-it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Type'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getAllByText('Income details')[0]!);expect(screen.getAllByText('Other income').some(node=>node.closest('div')?.textContent?.includes('£400.00'))).toBe(true);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
+it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Type'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getByRole('button',{name:'Edit income'}));expect(screen.getAllByText(/Parents/).length).toBeGreaterThan(0);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.plan-group')).not.toBeInTheDocument()})
 it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));filterBy('Owner','Immy');expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
 it('starts groups closed and keeps the open ones across filters, months and remounts',()=>{
@@ -1341,4 +1341,19 @@ it('warns on Transfers when someone’s steps add up to more than they have avai
   expect(within(summary).getByRole('button',{name:'See it on Plan'})).toBeInTheDocument()
   fireEvent.click(within(summary).getByRole('button',{name:'Nick'}))
   expect(summary).not.toHaveTextContent('more than')
+})
+
+it('shows everyone’s steps side by side on desktop, with progress, account bands and an up-to-date banner',()=>{
+  vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
+  render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  const overview=screen.getByRole('region',{name:'Steps by person'})
+  const nick=within(overview).getByRole('region',{name:'Nick steps'}),immy=within(overview).getByRole('region',{name:'Immy steps'})
+  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick0 of 2 done')
+  expect(nick).toHaveTextContent('£20.00 from £4,000.00 available · 1 to fund · 1 move')
+  expect(nick.querySelector('.payday-account-band')).toHaveTextContent('Monzo NickNick’s account')
+  expect(overview).toHaveTextContent('Click an amount to copy it for your banking app.')
+  for(const tick of within(overview).getAllByRole('button',{name:/ done$/}))fireEvent.click(tick)
+  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick2 of 2 done')
+  expect(immy).toHaveTextContent('Immy is up to date for')
+  expect(overview).toHaveTextContent('You’re both up to date for')
 })

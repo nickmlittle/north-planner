@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronRight, RefreshCw } from 'lucide-react'
+import { Check, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
@@ -36,13 +36,22 @@ type Props = {
   ticks?: Readonly<Record<string, StepTick>>
   /** Tick a step at its amount, or untick it (null). */
   onTick?: (key: string, amountPence: number | null) => void
+  /** Desktop: everyone's steps side by side, each column headed by its progress, with account bands. */
+  desktop?: boolean
+  /** Desktop column headings: what each person has available. */
+  availableByPerson?: ReadonlyMap<string, number>
+  /** "Joint · you each move your share", "Ada’s account". */
+  accountOwnerLabel?: (accountId: string) => string
+  /** "November", for "Ada is up to date for November". */
+  monthName?: string
+  onReview?: (personId: string) => void
 }
 
 /**
  * Payday, in order: fund an account, then move money out of it into its pots, indented beneath it.
  * Each step has a circle to tick once the money has moved; the amount copies. The hero counts them as "N to fund · N moves".
  */
-export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts, ticks, onTick }: Props) {
+export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts, ticks, onTick, desktop = false, availableByPerson, accountOwnerLabel, monthName = 'this month', onReview }: Props) {
   const name = (personId: string) => adults.find(adult => adult.id === personId)?.name ?? 'Person'
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const chosen = selection && selection !== 'both' ? selection : null
@@ -118,17 +127,34 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
           </div>
         </li>
       })
-      return [...fund, ...moves]
+      const band = desktop ? [<li key={`${row.accountId}:band`} className="payday-account-band" aria-hidden="true"><span>{account}</span>{accountOwnerLabel && <span>{accountOwnerLabel(row.accountId)}</span>}</li>] : []
+      return [...band, ...fund, ...moves]
     })
   }
 
-  return <div className="payday" role="region" aria-label="Steps by person">
+  /** A desktop column's heading: name, progress, what it adds up to, and anything to act on. */
+  const personHead = (plan: PersonTransferPlan) => {
+    const progress = personProgress(plan, ticks), who = name(plan.personId), available = availableByPerson?.get(plan.personId)
+    const over = available !== undefined && plan.fundingPence > available
+    return <header className="payday-person-head">
+      <h3><span>{who}</span><span className="payday-person-count">{progress.done} of {progress.total} done</span></h3>
+      <span className="transfer-progress-track" aria-hidden="true"><span style={{ width: `${progress.total ? progress.done / progress.total * 100 : 0}%` }}/></span>
+      <p className="payday-person-sub">{pounds(plan.fundingPence)}{available !== undefined ? ` from ${pounds(available)} available` : ''} · {stepSummary(plan)}</p>
+      {progress.complete && <p className="payday-person-done"><Check aria-hidden="true"/>{who} is up to date for {monthName}</p>}
+      {progress.changed > 0 && <p className="transfer-progress-changed">{progress.changed} changed since ticked · {progress.differencePence >= 0 ? `send ${pounds(progress.differencePence)} more` : `${pounds(-progress.differencePence)} less needed`}</p>}
+      {over && <div className="transfer-over-warning"><TriangleAlert aria-hidden="true"/><p>{who}’s steps add up to {pounds(plan.fundingPence)}, which is {pounds(plan.fundingPence - available!)} more than {who}’s {pounds(available!)} available. {onReview && <button type="button" className="text-button" onClick={() => onReview(plan.personId)}>See it on Plan</button>}</p></div>}
+    </header>
+  }
+  const everyoneDone = shown.length > 0 && shown.every(plan => personProgress(plan, ticks).complete)
+
+  return <div className={`payday${desktop ? ' is-desktop' : ''}`} role="region" aria-label="Steps by person">
     <p className="payday-copied" role="status">{copied}</p>
-    {!hintSeen && shown.some(plan => !personProgress(plan, ticks).complete) && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
+    {desktop && everyoneDone && <div className="transfer-done-banner payday-all-done" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>{shown.length === 2 ? 'You’re both' : 'Everyone is'} up to date for {monthName}</strong><span>Every payday step is ticked. Changes to the plan will show here as top-ups.</span></span></div>}
+    {!hintSeen && shown.length > 0 && !everyoneDone && <p className="payday-copy-hint">{desktop ? 'Click' : 'Tap'} an amount to copy it for your banking app.</p>}
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
-      {!chosen && <h3 className="payday-person-heading"><span>{name(plan.personId)}</span><span>{pounds(plan.fundingPence)} · {stepSummary(plan)}</span></h3>}
+      {desktop ? personHead(plan) : !chosen && <h3 className="payday-person-heading"><span>{name(plan.personId)}</span><span>{pounds(plan.fundingPence)} · {stepSummary(plan)}</span></h3>}
       <ol className="payday-steps">{steps(plan)}</ol>
     </section>)}
     {plans.needsReview.length > 0 && <section className="payday-review" aria-label="Needs review">
