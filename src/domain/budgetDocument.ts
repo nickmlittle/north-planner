@@ -1,3 +1,4 @@
+import { validTransferTicks, type TransferTicks } from './transferTicks'
 import { defaultMonthlyBudget, validDestination, validMonthlyBudget, type BudgetDestination, type BudgetItem, type BudgetSnapshot, type IncomePolicyValue, type MonthlyBudget } from './monthlyBudget'
 
 export interface BudgetPerson { id: string; name: string }
@@ -6,6 +7,8 @@ export interface BudgetDocument {
   household: { name: string; adults: BudgetPerson[] }
   workflow: { setupComplete: boolean }
   budget: MonthlyBudget
+  /** Payday steps ticked off, by month. Optional: a document without any is valid, and older versions keep it untouched. */
+  ticks?: TransferTicks
 }
 
 interface V2Line { id: string; category?: string; categoryId?: string; ownerName?: string; name: string; entryAmountPence: number; frequency: 'monthly' | 'annually'; amountPence: number; potId: string; funding: 'proportional' | 'equal' | 'custom' | 'single'; singleFunderId?: string; customShares?: Record<string, number> }
@@ -42,6 +45,7 @@ export function decodeBudgetDocument(raw: unknown): BudgetDocument | null {
   if (budget.incomeSources.some(source => !people.has(source.personId)) || budget.incomePolicies.some(policy => !people.has(policy.personId))) return null
   if (Object.values(budget.snapshots).some(snapshot => !validateItems(snapshot.items)) || (budget.importedBaseline && !validateItems(budget.importedBaseline))) return null
   if (budget.incomePolicies.some(policy => [policy.base, ...Object.values(policy.changes)].some(rule => rule.surplusDestination && !validDestination(rule.surplusDestination, budget)))) return null
+  if (value.ticks !== undefined && !validTransferTicks(value.ticks)) return null
   return value as BudgetDocument
 }
 

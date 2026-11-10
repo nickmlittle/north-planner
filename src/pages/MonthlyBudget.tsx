@@ -20,6 +20,7 @@ import { readOpenPlanGroups, readPlanGrouping, rememberOpenPlanGroups, rememberP
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { ImpactPreview } from '../components/ImpactPreview'
 import { AllocationMeter, AllocationMeterMini } from '../components/AllocationMeter'
+import { personProgress, setStepTick } from '../domain/transferTicks'
 import { AccountStatusPanel } from '../components/AccountStatusPanel'
 import { saveStatusLabel, statusMark } from '../components/saveStatus'
 import { createPortal } from 'react-dom'
@@ -102,7 +103,8 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const chooseTransferPerson=(value:string)=>{rememberTransferPerson(value);setStoredTransferPerson(value)}
  const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
  const selectedPersonPlan=transferPerson&&transferPerson!=='both'?personPlans.people.find(plan=>plan.personId===transferPerson):undefined
- const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length}
+ const transferPersonChoice={adults,selection:transferPerson,onSelect:chooseTransferPerson,plan:selectedPersonPlan&&{name:adults.find(person=>person.id===selectedPersonPlan.personId)?.name??'Person',fundingPence:selectedPersonPlan.fundingPence,fundCount:selectedPersonPlan.fundCount,moveCount:selectedPersonPlan.moveCount},reviewCount:personPlans.needsReview.length,progress:Object.fromEntries(personPlans.people.map(plan=>[plan.personId,personProgress(plan,document.ticks?.[month])])),monthName:formatMonth(month).split(' ')[0]}
+ const tickStep=(key:string,amountPence:number|null)=>setDocument(current=>setStepTick(current,month,key,amountPence))
  const start=(item?:BudgetItem,template?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditorTemplate(template);setEditorSession(session=>session+1);setEditor(true)}
  const duplicate=(item:BudgetItem)=>start(undefined,item)
  const saveBatch=(batch:BudgetItemBatch)=>{
@@ -173,7 +175,7 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  // On phones the header carries the month, ⋯ and the budget note, so the page has no title bar.
  const titlebar=inHeader?null:<div className="budget-page-titlebar"><div className="budget-v3-date-selector">{!inHeader&&monthControl}<div className="budget-v3-date-context">{budgetDateNote}{mobilePresentation&&!inHeader&&mobileOptions}</div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={budgetOptions}/>{mobileBudgetView==='plan'&&<button type="button" className="primary-button" onClick={()=>start()}><Plus aria-hidden="true"/>Add item</button>}</div></div>
  const budgetHeader=<div className="budget-mobile-plan-heading"><button type="button" className="primary-button" onClick={()=>start()}>Add item</button></div>
- const peopleSummary=<TransfersPanel document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={shortLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
+ const peopleSummary=<TransfersPanel month={month} onTick={tickStep} document={document} transfers={transfers} accounts={transferAccounts} instructions={instructions} unfundedItems={unfundedItems} labels={shortLabels} plans={personPlans} personSelection={transferPerson} view={mobileBudgetView} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome}/>
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const planFilters=<PlanFilters query={query} onQueryChange={updateSearch} onSearchStart={captureBrowseScroll} inputRef={searchRef} owner={ownerFilter} onOwnerChange={setOwnerFilter} ownerOrder={ownerOrder} category={categoryFilter} onCategoryChange={setCategoryFilter} categories={document.budget.categories} compact={mobilePresentation} onAdd={mobilePresentation&&mobileBudgetView==='plan'&&!scopedPlan?()=>start():undefined}/>
  const firstRun=!Object.keys(document.budget.snapshots).length&&document.budget.importedBaseline===undefined

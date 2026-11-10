@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { Check, ChevronRight } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 import { stepSummary } from './budgetLabels'
+import { fundStepKey, moveStepKey, personProgress, stepStatus, type StepTick } from '../domain/transferTicks'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
@@ -31,13 +32,17 @@ type Props = {
   /** Absent when there is nowhere to show items (no Plan route). */
   onSeeItems?: (accountId: string) => void
   affectedAccounts?: readonly string[]
+  /** This month's ticks. */
+  ticks?: Readonly<Record<string, StepTick>>
+  /** Tick a step at its amount, or untick it (null). */
+  onTick?: (key: string, amountPence: number | null) => void
 }
 
 /**
  * Payday, in order: fund an account, then move money out of it into its pots, indented beneath it.
- * Numbered in order; the hero counts them as "N to fund · N moves". Planned amounts only; nothing is ticked off.
+ * Each step has a circle to tick once the money has moved; the amount copies. The hero counts them as "N to fund · N moves".
  */
-export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts }: Props) {
+export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts, ticks, onTick }: Props) {
   const name = (personId: string) => adults.find(adult => adult.id === personId)?.name ?? 'Person'
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const chosen = selection && selection !== 'both' ? selection : null
@@ -62,14 +67,22 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     clearCopied.current = setTimeout(() => setCopied(''), 2500)
   }
   const amount = (pence: number) => <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void copy(pence)}>{pounds(pence)}</button>
+  /** The tick: a 44px circle, separate from the amount so copying never ticks. */
+  const tick = (key: string, label: string, pence: number) => {
+    const status = stepStatus(ticks, key, pence)
+    const done = status.state === 'done'
+    return <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={done} aria-label={`${label} done`} disabled={!onTick} onClick={() => onTick?.(key, done ? null : pence)}>
+      <span className="payday-tick-dot" aria-hidden="true">{done && <Check/>}</span>
+    </button>
+  }
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
 
   const steps = (plan: PersonTransferPlan) => {
-    let number = 0
     return plan.rows.flatMap((row: PersonTransferRow) => {
       const account = label(row.accountId)
-      const fund = row.fundingPence > 0 ? [<li key={`${row.accountId}:fund`} className="payday-step is-fund" data-payday-account={row.accountId}>
-        <span className="payday-step-number" aria-hidden="true">{++number}</span>
+      const fundKey = fundStepKey(plan.personId, row.accountId)
+      const fund = row.fundingPence > 0 ? [<li key={`${row.accountId}:fund`} className={`payday-step is-fund is-${stepStatus(ticks, fundKey, row.fundingPence).state}`} data-payday-account={row.accountId}>
+        {tick(fundKey, `Fund ${account}`, row.fundingPence)}
         <div className="payday-step-body">
           <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span>{amount(row.fundingPence)}</p>
           {row.movedOnBy.map(other => <p key={other.personId} className="payday-step-caption">{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</p>)}
@@ -79,8 +92,9 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
       </li>] : []
       const moves = row.potMoves.map((move, index) => {
         const first = !fund.length && index === 0
-        return <li key={`${row.accountId}:${move.potId}`} className="payday-step is-pot-move" data-payday-account={row.accountId}>
-          <span className="payday-step-number" aria-hidden="true">{++number}</span>
+        const moveKey = moveStepKey(plan.personId, move.potId)
+        return <li key={`${row.accountId}:${move.potId}`} className={`payday-step is-pot-move is-${stepStatus(ticks, moveKey, move.amountPence).state}`} data-payday-account={row.accountId}>
+          {tick(moveKey, `Move to ${potName(move.potId)}`, move.amountPence)}
           <div className="payday-step-body">
             <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span>{amount(move.amountPence)}</p>
             {move.fromOthers.length > 0 && <p className="payday-step-caption">Includes {others(move.fromOthers)}</p>}
@@ -95,7 +109,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
 
   return <div className="payday" role="region" aria-label="Steps by person">
     <p className="payday-copied" role="status">{copied}</p>
-    {!hintSeen && shown.length > 0 && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
+    {!hintSeen && shown.some(plan => !personProgress(plan, ticks).complete) && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>

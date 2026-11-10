@@ -289,7 +289,7 @@ it('opens an account’s items in Plan from its step and comes back to that step
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
   const alex = await screen.findByRole('region', { name: 'Alex steps' })
-  expect(within(alex).getAllByRole('listitem').map(step => step.textContent)).toEqual(['1Fund Monzo Alex£50.00See 1 item'])
+  expect(within(alex).getAllByRole('listitem').map(step => step.textContent)).toEqual(['Fund Monzo Alex£50.00See 1 item'])
   const seeItems = within(alex).getByRole('button', { name: 'See 1 item for Monzo Alex' })
   const originalLength = window.history.length
   fireEvent.click(seeItems)
