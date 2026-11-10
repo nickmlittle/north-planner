@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Copy } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
@@ -8,6 +8,10 @@ import { stepSummary } from './budgetLabels'
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
 const plural = (count: number, word: string) => `${count} ${count === 1 ? word : `${word}s`}`
+const COPY_HINT_KEY = 'north.copyHint.seen'
+/** The "tap an amount" hint shows until the first copy on this device. */
+function copyHintSeen() { try { return window.localStorage.getItem(COPY_HINT_KEY) === '1' } catch { return false } }
+function rememberCopyHint() { try { window.localStorage.setItem(COPY_HINT_KEY, '1') } catch { /* Per-device convenience only. */ } }
 
 /** Why an account's steps are withheld, and what to do about it. */
 function reviewReasonText(reason: NeedsReviewReason) {
@@ -46,16 +50,18 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   }
   // Tap an amount to copy it for the banking app: the plain number ("2215.45"), with a short confirmation.
   const [copied, setCopied] = useState('')
+  const [hintSeen, setHintSeen] = useState(copyHintSeen)
   const clearCopied = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(clearCopied.current), [])
   const copy = async (pence: number) => {
     let message = `Copied ${pounds(pence)}`
     try { await navigator.clipboard.writeText((pence / 100).toFixed(2)) } catch { message = 'Couldn’t copy' }
     setCopied(message)
+    if (!hintSeen) { rememberCopyHint(); setHintSeen(true) }
     clearTimeout(clearCopied.current)
     clearCopied.current = setTimeout(() => setCopied(''), 2500)
   }
-  const amount = (pence: number) => <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void copy(pence)}>{pounds(pence)}<Copy aria-hidden="true"/></button>
+  const amount = (pence: number) => <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void copy(pence)}>{pounds(pence)}</button>
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
 
   const steps = (plan: PersonTransferPlan) => {
@@ -89,6 +95,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
 
   return <div className="payday" role="region" aria-label="Steps by person">
     <p className="payday-copied" role="status">{copied}</p>
+    {!hintSeen && shown.length > 0 && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
