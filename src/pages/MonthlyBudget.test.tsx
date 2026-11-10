@@ -904,7 +904,7 @@ it.each([
   const summary=screen.getByRole('region',{name:'Plan summary'})
   expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent(text)
   expect(summary).toHaveTextContent(`£10.00 planned of £${(income/100).toFixed(2)} available`)
-  expect(within(summary).getByRole('meter',{name:'Planned'})).toBeInTheDocument()
+  expect(within(summary).getByRole('meter',{name:'Nick: planned'})).toBeInTheDocument()
   // Phones keep the card short: no share and no basis; the pencil still edits income.
   expect(summary).not.toHaveTextContent('% planned')
   expect(summary).not.toHaveTextContent('salary')
@@ -1273,8 +1273,19 @@ it('moves the month and ⋯ into the app header on phones, and docks a slim mete
     act(() => report?.([{ isIntersecting: false, boundingClientRect: { bottom: -10 } as DOMRect }]))
     const mini = document.querySelector('.allocation-meter-mini')!
     expect(mini).toHaveAttribute('aria-hidden', 'true')
-    expect(mini).toHaveTextContent(/^£[\d,.]+ (left|over)$|^Balanced$/)
+    expect(mini.querySelector('.allocation-meter-mini-balance')).toHaveTextContent(/^£[\d,.]+ (left|over)$|^Balanced$|^\w+ £[\d,.]+ over$/)
     act(() => report?.([{ isIntersecting: true, boundingClientRect: { bottom: 200 } as DOMRect }]))
     expect(document.querySelector('.allocation-meter-mini')).toBeNull()
   } finally { slot.remove() }
+})
+
+it('leads with whoever is over and reviews their items',()=>{
+  const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+  initial.budget.incomeSources=[{id:'nick-job',personId:'nick',name:'Job',type:'employment',baseAmountPence:300000,changes:{}},{id:'other-job',personId:initial.household.adults[1]!.id,name:'Job',type:'employment',baseAmountPence:100000,changes:{}}]
+  initial.budget.snapshots[month]={items:[{id:'bill',name:'Bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:150000,amountPence:150000,frequency:'monthly',funding:'single',singleFunderId:'nick'},{id:'treat',name:'Treats',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:400000,amountPence:400000,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
+  render(<SeededHarness initial={initial}/>)
+  const summary=screen.getByRole('region',{name:'Plan summary'})
+  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('Nick is £2,500.00 over')
+  fireEvent.click(within(summary).getByRole('button',{name:'Review Nick’s items'}))
+  expect(screen.getByRole('button',{name:/^Remove filter: /})).toBeInTheDocument()
 })

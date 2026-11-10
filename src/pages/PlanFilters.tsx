@@ -1,5 +1,5 @@
 import { useRef, useState, type RefObject } from 'react'
-import { Plus, SlidersHorizontal } from 'lucide-react'
+import { Plus, SlidersHorizontal, X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { ModalDialog } from '../components/ModalDialog'
 
@@ -19,6 +19,9 @@ type Props = {
   compact?: boolean
   onAdd?: () => void
 }
+
+/** The Owner filter reads as whose accounts it keeps: "Immy’s accounts", "Joint accounts". */
+const ownerChipLabel = (owner: string) => owner === 'Joint' ? 'Joint accounts' : owner === 'Needs owner' ? 'Accounts needing an owner' : `${owner}’s accounts`
 
 /** Search plus Owner and Category above the Plan table: chips on desktop, one Filter button on phones. */
 export function PlanFilters({ query, onQueryChange, onSearchStart, inputRef, owner, onOwnerChange, ownerOrder, category, onCategoryChange, categories, compact = false, onAdd }: Props) {
@@ -46,6 +49,10 @@ export function PlanFilters({ query, onQueryChange, onSearchStart, inputRef, own
     {compact ? <>
       <button ref={filterButton} type="button" className={`secondary-button budget-filter-button${activeCount ? ' is-active' : ''}`} aria-haspopup="dialog" aria-expanded={sheetOpen} onClick={() => setSheetOpen(true)}><SlidersHorizontal aria-hidden="true"/>{activeCount ? `Filter · ${activeCount}` : 'Filter'}</button>
       {onAdd && <button type="button" className="primary-button budget-add-button" aria-label="Add item" title="Add item" onClick={onAdd}><Plus aria-hidden="true"/></button>}
+      {activeCount > 0 && <div className="budget-filter-chips" aria-label="Active filters" role="group">
+        {owner !== 'All' && <button type="button" className="budget-filter-chip" aria-label={`Remove filter: ${ownerChipLabel(owner)}`} onClick={() => onOwnerChange('All')}>{ownerChipLabel(owner)}<X aria-hidden="true"/></button>}
+        {category !== 'All' && <button type="button" className="budget-filter-chip" aria-label={`Remove filter: ${categories.find(row => row.id === category)?.name ?? 'Category'}`} onClick={() => onCategoryChange('All')}>{categories.find(row => row.id === category)?.name ?? 'Category'}<X aria-hidden="true"/></button>}
+      </div>}
       {sheetOpen && <ModalDialog title="Filter" className="budget-filter-sheet" onClose={() => setSheetOpen(false)} returnFocusTo={() => filterButton.current}>
         <div className="budget-filter-sheet-fields">{selects}</div>
         <div className="budget-filter-sheet-actions">
