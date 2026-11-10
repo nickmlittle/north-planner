@@ -6,7 +6,8 @@ import type { BudgetItem } from '../domain/monthlyBudget'
 import type { PersonTransferPlans, TransferAccount } from '../domain/personTransfers'
 import type { TransferInstructions } from '../domain/transferInstructions'
 import type { StepsReturn } from '../state/navigation'
-import { balanceLabel, formatGBP } from '../formatting/money'
+import { formatGBP } from '../formatting/money'
+import { formatMonth } from '../formatting/month'
 import { AccountFundingNote } from './TransferCalculationNotes'
 import { PaydaySteps } from './PaydaySteps'
 import { TransferTable } from './TransferTable'
@@ -31,10 +32,12 @@ type Props = {
   onEditIncome: () => void
   month: string
   onTick?: (key: string, amountPence: number | null) => void
+  /** Plan filtered to a person's accounts, from "See it on Plan". */
+  onReviewPerson?: (personId: string) => void
 }
 
 /** People & transfers: each person's plan, the destination table (desktop) and the payday steps (phone). */
-export function TransfersPanel({ document, transfers, accounts, instructions, unfundedItems, labels, plans, personSelection, view, mobilePresentation, affectedTransfers, stepsReturn, onSeeItems, onEditIncome, month, onTick }: Props) {
+export function TransfersPanel({ document, transfers, accounts, instructions, unfundedItems, labels, plans, personSelection, view, mobilePresentation, affectedTransfers, stepsReturn, onSeeItems, onEditIncome, month, onTick, onReviewPerson }: Props) {
   const adults = document.household.adults
   const potName = (potId: string) => document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot'
   const itemCounts = new Map(accounts.map(account => [account.accountId, account.items.length]))
@@ -59,21 +62,22 @@ export function TransfersPanel({ document, transfers, accounts, instructions, un
     ;[...window.document.querySelectorAll<HTMLElement>('.payday [data-payday-account]')].find(step => ids.includes(step.dataset.paydayAccount ?? ''))?.scrollIntoView?.({ block: 'center' })
   }, [affectedKey, affectedTransfers])
 
+  const ownerLabel = (accountId: string) => {
+    const owners = document.budget.accounts.find(account => account.id === accountId)?.ownerPersonIds ?? []
+    return owners.length > 1 ? 'Joint · you each move your share' : owners.length ? `${adults.find(adult => adult.id === owners[0])?.name ?? 'Person'}’s account` : 'Needs an owner'
+  }
+  const steps = (desktop: boolean) => <PaydaySteps plans={plans} selection={desktop ? 'both' : personSelection} labels={labels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeItems} affectedAccounts={affectedAccounts} ticks={document.ticks?.[month]} onTick={onTick}
+    desktop={desktop} availableByPerson={new Map(transfers.people.map(person => [person.personId, person.availablePence]))} accountOwnerLabel={ownerLabel} monthName={formatMonth(month).split(' ')[0]} onReview={onReviewPerson}/>
   return <section className="budget-v3-transfers budget-v3-people-summary" id="budget-transfers-panel" aria-label="Funding">
     {affectedTransfers && view === 'transfers' && <div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account => <p key={account.accountId}>{labels.get(account.accountId) ?? 'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
-    <div className="budget-v3-desktop-people"><h2>Funding</h2>
-      <div className="budget-v3-person-grid">{transfers.people.map(person => <article key={person.personId}>
-        <h4>{adults.find(adult => adult.id === person.personId)?.name ?? 'Person'}</h4>
-        <dl className="budget-v3-person-metrics"><div><dt>Available</dt><dd>{pounds(person.availablePence)}</dd></div><div><dt>Funding</dt><dd>{pounds(person.plannedPence)}</dd></div><div className={person.remainingPence < 0 ? 'is-negative' : ''}><dt>Balance</dt><dd>{balanceLabel(person.remainingPence)}</dd></div></dl>
-        <details className="budget-v3-income-details"><summary>Income details</summary><dl><div><dt>Salary</dt><dd>{pounds(person.employmentPence)}</dd></div><div><dt>Other income</dt><dd>{pounds(person.additionalPence)}</dd></div></dl></details>
-      </article>)}</div></div>
+    {!mobilePresentation && accounts.length > 0 && <div className="budget-v3-desktop-people"><h2 className="visually-hidden">Payday steps</h2>{steps(true)}</div>}
     {unfundedItems.length > 0 && <div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length === 1 ? 'item' : 'items'} can’t be funded yet.</strong> <button type="button" onClick={onEditIncome}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item => <li key={item.id}>{item.name}</li>)}</ul></details></div>}
     {!instructions && <p className="budget-v3-transfer-warning" role="alert">Can’t work out funding. Check the plan before moving money.</p>}
     {accounts.length === 0 ? <div className="budget-v3-transfer-empty"><h3>Nothing to fund yet</h3></div> : <>
       {unfundedItems.length === 0 && instructions && <AccountFundingNote/>}<div className="budget-v3-transfer-heading"><h3>Funding by account</h3>{instructions?.incomplete && <span className="budget-desktop-only">* Needs review</span>}</div>
       <TransferTable accounts={accounts} people={transfers.people} adults={adults} labels={labels} potName={potName} affectedAccounts={affectedAccounts} incomplete={instructions?.incomplete}/>
       {accounts.some(account => account.hasPots) && <p className="budget-v3-transfer-rounding">Each account’s funding already includes its moves.</p>}
-      <PaydaySteps plans={plans} selection={personSelection} labels={labels} itemCounts={itemCounts} adults={adults} potName={potName} onSeeItems={onSeeItems} affectedAccounts={affectedAccounts} ticks={document.ticks?.[month]} onTick={onTick}/>
+      {mobilePresentation && steps(false)}
     </>}
   </section>
 }
