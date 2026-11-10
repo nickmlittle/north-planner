@@ -8,7 +8,7 @@ import { GroupedTable, GroupedTableBandRow, GroupedTableDisclosure, type Grouped
 import { ImpactPreview } from '../components/ImpactPreview'
 import { formatGBP } from '../formatting/money'
 import type { PlanDestination } from '../state/navigation'
-import type { PlanGroup, PlanGrouping, PlanItemLabels } from './planRows'
+import type { PlanGroup, PlanGrouping, PlanItemLabels, PlanSubgroup } from './planRows'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const withAmount = (document: BudgetDocument, month: string, itemId: string, pence: number) => ({ ...document, budget: updateBudgetAtMonth(document.budget, month, old => old.map(row => row.id === itemId ? { ...row, entryAmountPence: pence, amountPence: pence } : row)) })
@@ -146,13 +146,24 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     </div>
   }
 
-  const itemRows = (item: BudgetItem) => {
+  /** The second level inside an open group: whose account, or Direct / a pot. A heading with its subtotal, not another disclosure. */
+  const subgroupRow = (subgroup: PlanSubgroup) => {
+    const total = sumOf(subgroup.items)
+    return <tr key={subgroup.key} className="plan-subgroup">
+      <th scope="rowgroup" colSpan={1}><span className="plan-subgroup-name">{subgroup.name}</span></th>
+      {desktop && <td className="plan-share-cell"><span className="plan-share">{percent(shareOf(total))}</span></td>}
+      <td className="plan-amount-cell">{pounds(total)}</td>
+      {desktop && <td className="plan-actions-cell"/>}
+    </tr>
+  }
+
+  const itemRows = (item: BudgetItem, nested = false) => {
     const editing = inlineId === item.id
     const impact = editing ? quickImpact(item) : undefined
     const category = labels.categoryName(item) ?? 'Uncategorised'
     // Destination bands, or a pot or direct-to-account view, already name the destination, so the line says the category instead.
     const sameDestination = !searchMode && (grouping === 'destination' || (!!planDestination && planDestination.kind !== 'account'))
-    return <Fragment key={item.id}><tr className="budget-v3-item" onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
+    return <Fragment key={item.id}><tr className={`budget-v3-item${nested ? ' is-nested' : ''}`} onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
       <th scope="row">
         <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
         <span className="budget-v3-item-meta"><span className="visually-hidden">Funding: </span>{labels.fundingLabel(item)}<span aria-hidden="true"> · </span>{sameDestination
@@ -160,7 +171,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
           : <><span className="visually-hidden">Destination: </span>{labels.destinationLabel(item)}</>}</span>
         {searchMode && <span className="budget-v3-result-context">{labels.ownerGroup(item)} · {category}</span>}
       </th>
-      {desktop && <td className="plan-share-cell"/>}
+      {desktop && <td className="plan-share-cell">{!searchMode && <span className="plan-share">{percent(shareOf(item.amountPence))}</span>}</td>}
       <td className="plan-amount-cell">{editing
         ? <span className="budget-v3-inline-cell budget-money-field"><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-describedby={`inline-scope-${item.id}${formError ? ` inline-error-${item.id}` : ''}`} className="budget-v3-inline-amount" autoFocus inputMode="decimal" value={inlineValue} onChange={event => { setInlineValue(event.target.value); setFormError('') }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}/></span>
         : item.frequency === 'monthly' && item.funding !== 'fixed'
@@ -189,7 +200,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     <div className="plan-card-header">
       <div className="plan-card-heading">
         <h2 id="plan-card-title">Budget items<span className="plan-card-count" aria-hidden="true"> · {shown.length}</span></h2>
-        <p className="plan-card-summary">{banded ? `${groups.length} ${grouping === 'destination' ? groups.length === 1 ? 'destination' : 'destinations' : groups.length === 1 ? 'category' : 'categories'} · ` : ''}{itemCount(shown.length)}</p>
+        <p className="plan-card-summary">{banded ? `${groups.length} ${grouping === 'destination' ? groups.length === 1 ? 'account' : 'accounts' : groups.length === 1 ? 'category' : 'categories'} · ` : ''}{itemCount(shown.length)}</p>
       </div>
       {!searchMode && <div className="plan-grouping" role="group" aria-label="Group items by">
         {(['category', 'destination'] as const).map(value => <button key={value} type="button" aria-pressed={grouping === value} onClick={() => { if (grouping !== value) onGroupingChange(value) }}>{value === 'category' ? 'Category' : 'Destination'}</button>)}
@@ -210,7 +221,9 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
       {groups.map(group => <Fragment key={group.key}>
         {banded && <GroupedTableBandRow group={{ key: group.key, level: 0 }} colSpan={desktop ? 1 : colSpan} className={`plan-group${isOpen(group.key) ? ' is-open' : ''}`} dataGroup={grouping}
           cells={desktop ? groupFigures(group, 'td') : undefined} onClick={() => toggleGroup(group)}>{groupButton(group)}</GroupedTableBandRow>}
-        {isOpen(group.key) && group.items.map(itemRows)}
+        {isOpen(group.key) && (banded && group.subgroups.length
+          ? group.subgroups.map(subgroup => <Fragment key={subgroup.key}>{subgroupRow(subgroup)}{subgroup.items.map(item => itemRows(item, true))}</Fragment>)
+          : group.items.map(item => itemRows(item)))}
       </Fragment>)}
     </GroupedTable>
   </section>

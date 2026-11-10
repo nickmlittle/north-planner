@@ -135,9 +135,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,mobileBudgetView:
  const ownerOrder=planOwnerOrder(adults)
  const meterPeople=transfers.people.map(row=>({personId:row.personId,name:adults.find(person=>person.id===row.personId)?.name??'Person',availablePence:row.availablePence,plannedPence:row.plannedPence}))
  // "Review Immy's items": the Plan filtered to the accounts that person owns, with every group holding them open.
- const reviewPerson=(personId:string)=>{const name=adults.find(person=>person.id===personId)?.name;if(!name)return;setOwnerFilter(name);setCategoryFilter('All');if(query)updateSearch('');const {groups}=groupPlanItems(destinationItems,{query:'',owner:name,category:'All'},labels,grouping,transferAccounts.map(account=>account.accountId));setOpenGroups(open=>({...open,...Object.fromEntries(groups.map(group=>[group.key,true]))}))}
+ const reviewPerson=(personId:string)=>{const name=adults.find(person=>person.id===personId)?.name;if(!name)return;setOwnerFilter(name);setCategoryFilter('All');if(query)updateSearch('');const {groups}=groupPlanItems(destinationItems,{query:'',owner:name,category:'All'},labels,grouping,transferAccounts.map(account=>account.accountId),ownerOrder);setOpenGroups(open=>({...open,...Object.fromEntries(groups.map(group=>[group.key,true]))}))}
  const searchMode=!!query.trim()
- const {groups:planGroups,matching:matchingItems}=groupPlanItems(destinationItems,{query,owner:ownerFilter,category:categoryFilter},labels,grouping,transferAccounts.map(account=>account.accountId))
+ const {groups:planGroups,matching:matchingItems}=groupPlanItems(destinationItems,{query,owner:ownerFilter,category:categoryFilter},labels,grouping,transferAccounts.map(account=>account.accountId),ownerOrder)
  const scopedPlan=mobilePresentation&&mobileBudgetView==='plan'&&!!planDestination
  const searchRef=useRef<HTMLInputElement>(null)
  const planDestinationSignature=mobileBudgetView==='plan'&&planDestination?`${month}:${planDestination.kind}:${planDestination.id}`:null
