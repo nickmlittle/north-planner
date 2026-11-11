@@ -1,7 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
 import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
-import { settleIntoKey, settleOutKey } from './cardStatements'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -195,51 +194,7 @@ export function leftByDestination(document: Pick<BudgetDocument, 'budget' | 'car
 
 export const potName = (pots: readonly BudgetPot[], destination: BudgetDestination) => destination.kind === 'pot' ? pots.find(pot => pot.id === destination.potId)?.name : undefined
 
-// ——— Carry-over pots (§6.6) ———
-
-export type WaitingShare = { statementKey: string; closeDate: string; pence: number }
-export type PotFree = {
-  checked?: { pence: number; at: string }
-  /** Payday Move ticks into the pot made after the check. */
-  movedInPence: number
-  /** Settle-up "Out of <pot>" ticks made after the check (net of "Into <pot>"). */
-  outPence: number
-  /** Card spend on the pot whose statement hasn't been settled out of it yet, per statement. */
-  waiting: WaitingShare[]
-  /** checked + moved in − out − waiting; absent until the balance has been checked. */
-  freePence?: number
-}
-
-/**
- * What's free in a carry-over pot: the balance last checked against the bank, plus payday moves into it since,
- * minus settle-ups out of it since, minus card spend on it that hasn't been settled yet.
- */
-export function potFree(document: Pick<BudgetDocument, 'card' | 'ticks'>, potId: string): PotFree {
-  const tracker = cardTracker(document)
-  const checked = tracker.pots[potId]?.checkedBalance
-  const after = (at: string) => !checked || at > checked.at
-  let movedInPence = 0
-  for (const steps of Object.values(document.ticks ?? {})) for (const [key, tick] of Object.entries(steps)) if (key.endsWith(`:move:${potId}`) && checked && after(tick.at)) movedInPence += tick.amountPence
-  const shares = new Map<string, number>()
-  for (const transaction of tracker.transactions) for (const line of transaction.sort?.lines ?? []) if (line.destination.kind === 'pot' && line.destination.potId === potId) shares.set(transaction.statementKey, (shares.get(transaction.statementKey) ?? 0) + line.amountPence)
-  let outPence = 0
-  const waiting: WaitingShare[] = []
-  for (const [statementKey, share] of [...shares].sort(([a], [b]) => a.localeCompare(b))) {
-    const ticks = tracker.statements[statementKey]?.ticks
-    const out = ticks?.[settleOutKey(potId)], into = ticks?.[settleIntoKey(potId)]
-    const settled = (out?.amountPence ?? 0) - (into?.amountPence ?? 0)
-    if (checked) outPence += (out && after(out.at) ? out.amountPence : 0) - (into && after(into.at) ? into.amountPence : 0)
-    if (share - settled !== 0) waiting.push({ statementKey, closeDate: statementKey.slice(statementKey.lastIndexOf(':') + 1), pence: share - settled })
-  }
-  const waitingPence = waiting.reduce((sum, row) => sum + row.pence, 0)
-  return { ...checked ? { checked, freePence: checked.pence + movedInPence - outPence - waitingPence } : {}, movedInPence, outPence, waiting }
-}
-
-/** "Check against Monzo": record what's in the pot now. */
-export function checkPotBalance<T extends Pick<BudgetDocument, 'card'>>(document: T, potId: string, pence: number, now: Date): T {
-  const tracker = cardTracker(document)
-  return { ...document, card: { ...tracker, pots: { ...tracker.pots, [potId]: { ...tracker.pots[potId], checkedBalance: { pence, at: now.toISOString() } } } } }
-}
+// ——— Carry-over pots (§6.6): balances and what's free are in potBalances.ts ———
 
 /** The annual costs a carry-over pot saves for: the month's Plan items to it that are entered yearly. */
 export function annualCosts(document: Pick<BudgetDocument, 'budget'>, potId: string, month: string) {

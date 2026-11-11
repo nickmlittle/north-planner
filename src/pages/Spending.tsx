@@ -23,6 +23,7 @@ import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, pounds, signedPounds, transactionMeta } from './spendingFormat'
 import { movedByTransaction, moveState, potPhrase, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
 import { MoveToPotSheet } from './MoveToPotSheet'
+import { CheckBalancesSheet } from './CheckBalancesSheet'
 
 type Props = {
   document: BudgetDocument
@@ -91,6 +92,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const [message, setMessageText] = useState('')
   const [undoId, setUndoId] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
+  const [checkingBalances, setCheckingBalances] = useState(false)
   const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
   const tabRefs = useRef<Partial<Record<SpendingView, HTMLButtonElement | null>>>({})
   const toSort = transactionsToSort(tracker)
@@ -175,7 +177,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   </>
 
   return <PageFrame className="spending-page" title="Spending" contentWidth="wide" summary={summary}>
-    <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button></>}</p>
+    <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}</p>
     {setAsidePot && pending.length > 0 && <div className="move-callout">
       <PiggyBank aria-hidden="true"/>
       <p><strong>{pendingPence < 0 ? `${pounds(-pendingPence)} to come back out of ${potPhrase(setAsidePot.name)}` : pendingPence ? `${pounds(pendingPence)} to move to ${potPhrase(setAsidePot.name)}` : `${potPhrase(setAsidePot.name).replace(/^t/, 'T')} needs updating`}</strong><span>{plural(pending.length, 'transaction')} sorted since the last move</span></p>
@@ -190,7 +192,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
         ? closing ? <CloseMonth document={document} setDocument={setDocument} month={month} today={today} onBack={() => onOpenClose(false)} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>
-        : potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} onOpenClose={() => onOpenClose(true)} headingExtra={headingExtra}/>
+        : potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} onOpenClose={() => onOpenClose(true)} onCheckBalances={() => setCheckingBalances(true)} headingExtra={headingExtra}/>
         : active === 'statements' ? <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>
         : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
@@ -200,6 +202,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}
+    {checkingBalances && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setCheckingBalances(false)} onSaved={text => { setCheckingBalances(false); setMessage(text) }}/>}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}
   </PageFrame>
 }

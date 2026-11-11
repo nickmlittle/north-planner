@@ -1,8 +1,9 @@
 import type { BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
-import { monthSpending, potFree, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
+import { monthSpending, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { toMove } from './setAside'
+import { potBalance } from './potBalances'
 import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
 import { moneyArrives } from './workingDays'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
@@ -133,7 +134,7 @@ export function closeMonthPlan(document: Pick<BudgetDocument, 'budget' | 'card' 
     const flagged = total > limitPence && (kept === undefined || total > kept)
     return { potId: potId(row), leftPence: left, plannedPence: row.plannedPence, builtUpPence: total, ...flagged ? { flag: { limitPence, movePence: total - row.plannedPence } } : {} }
   }).filter(row => row.leftPence > 0)
-  const carryOver = figures.rows.filter(row => row.carriesOver && row.destination.kind === 'pot').map(row => { const free = potFree(document, potId(row)); return { potId: potId(row), ...free.freePence !== undefined ? { freePence: free.freePence, checkedAt: free.checked!.at } : {} } })
+  const carryOver = figures.rows.filter(row => row.carriesOver && row.destination.kind === 'pot').map(row => { const free = potBalance(document, potId(row)); return { potId: potId(row), ...free.freePence !== undefined ? { freePence: free.freePence, checkedAt: free.checked!.at } : {} } })
   const spentNow = spentByDestination(monthTransactions(tracker, month))
   const changedSinceClosed = record?.closedSpent ? [...new Set([...Object.keys(record.closedSpent), ...spentNow.keys()])].flatMap(key => {
     const closedPence = record.closedSpent![key] ?? 0, nowPence = spentNow.get(key)?.pence ?? 0

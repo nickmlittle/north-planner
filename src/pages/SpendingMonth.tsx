@@ -1,7 +1,9 @@
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { ArrowLeft, ChevronRight, TriangleAlert } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { annualCosts, checkPotBalance, cumulativeByDay, destinationTransactions, monthSpending, potFree, type DestinationSpending, type MonthSpending } from '../domain/cardSpending'
+import { annualCosts, cumulativeByDay, destinationTransactions, monthSpending, type DestinationSpending, type MonthSpending } from '../domain/cardSpending'
+import { checkPotBalance, potBalance, setAsideStatements, type BalanceFlow, type PotBalance } from '../domain/potBalances'
+import { potPhrase, usesSetAside } from '../domain/setAside'
 import { ModalDialog } from '../components/ModalDialog'
 import { closeMonthPlan, monthStage, type MonthStatus } from '../domain/monthStages'
 import { cardTracker, daysBetween, localDate, parsePence, parseStatementKey, shiftMonth, type CardTransaction } from '../domain/cardTracker'
@@ -10,15 +12,15 @@ import { formatGBPWhole } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
 import { MonthControl } from './MonthControl'
-import { dayOf, pounds, signedPounds, transactionMeta } from './spendingFormat'
+import { dayOf, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 const whole = (pence: number) => formatGBPWhole(Math.round(pence / 100))
 
 /** The status line under a pot: pace, what's left or over, and anything taken by last month. */
-function statusText(row: DestinationSpending, month: MonthSpending, free?: number | null): string {
-  const taken = row.takenPence ? ` · ${pounds(row.takenPence)} taken by ${monthName(shiftMonth(month.month, -1))}` : ''
-  if (row.status === 'one-offs') return ''
+function statusText(row: DestinationSpending, month: MonthSpending, free?: number | null, inBank?: string): string {
+  const taken = `${row.takenPence ? ` · ${pounds(row.takenPence)} taken by ${monthName(shiftMonth(month.month, -1))}` : ''}${inBank ? ` · ${inBank}` : ''}`
+  if (row.status === 'one-offs') return inBank?.replace(/^./, letter => letter.toUpperCase()) ?? ''
   if (row.carriesOver) return free === undefined ? 'Carries over' : free === null ? 'Check the balance to see what’s free' : `${pounds(free)} free in the pot`
   if (row.status === 'over') return `${pounds(-row.leftPence)} over${month.when === 'current' ? ` · covered when ${monthName(month.month)} closes` : ''}${taken}`
   if (row.status === 'ahead') return `${whole(row.aheadPence!)} ahead of pace · ${pounds(row.leftPence)} left${taken}`
@@ -51,10 +53,16 @@ function Bar({ row, month }: { row: DestinationSpending; month: MonthSpending })
   </span>
 }
 
-type PanelProps = { document: BudgetDocument; month: string; today: string; onMonthChange: (month: string) => void; onOpenPot: (potId: string) => void; onOpenClose?: () => void; headingExtra?: ReactNode }
+type PanelProps = { document: BudgetDocument; month: string; today: string; onMonthChange: (month: string) => void; onOpenPot: (potId: string) => void; onOpenClose?: () => void; onCheckBalances?: () => void; headingExtra?: ReactNode }
+
+/** "Monzo", from the pot's account; "the bank" when it has no provider. */
+function bankOf(document: BudgetDocument, potId: string) {
+  const pot = document.budget.pots.find(row => row.id === potId)
+  return document.budget.accounts.find(account => account.id === pot?.accountId)?.provider?.trim() || 'the bank'
+}
 
 /** This month: planned vs spent for each pot, grouped like Plan, with pace for steady pots (board 4, screen 1). */
-export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPot, onOpenClose, headingExtra }: PanelProps) {
+export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPot, onOpenClose, onCheckBalances, headingExtra }: PanelProps) {
   const stage = monthStage(document, month, today)
   const closePlan = stage.stage !== 'in-progress' && stage.closedAt ? closeMonthPlan(document, month, today) : null
   const figures = monthSpending(document, month, today)
@@ -66,6 +74,8 @@ export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPo
     ...document.household.adults.map(person => ({ key: person.id, label: person.name })),
     { key: 'accounts', label: 'Accounts' },
   ].map(group => ({ ...group, rows: figures.rows.filter(row => row.group === group.key) })).filter(group => group.rows.length)
+  const setAsidePot = document.budget.pots.find(pot => pot.id === cardTracker(document).cards.find(card => card.setAside)?.setAside?.potId)
+  const setAsideBalance = setAsidePot ? potBalance(document, setAsidePot.id) : undefined
   const facts = [
     figures.needsCare ? `${figures.needsCare} ${figures.needsCare === 1 ? 'pot needs' : 'pots need'} care` : figures.when === 'current' && figures.rows.length ? 'All on track' : '',
     figures.when === 'current' ? `${figures.daysLeft} ${figures.daysLeft === 1 ? 'day' : 'days'} left` : '',
@@ -81,13 +91,19 @@ export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPo
       <p className="spending-eyebrow">{figures.when === 'current' ? `Spent on ${cardName} so far` : figures.when === 'past' ? `Spent on ${cardName}` : 'Nothing spent yet'}</p>
       <p className="spending-big">{pounds(figures.spentPence)} <small>of {pounds(figures.plannedPence)} planned</small></p>
       {facts.length > 0 && <p className="spending-facts">{facts.join(' · ')}</p>}
+      {(setAsidePot || onCheckBalances) && <div className="spending-balances-line">
+        {setAsidePot && <button type="button" className="text-button" onClick={() => onOpenPot(setAsidePot.id)}>{setAsideBalance?.balancePence !== undefined ? `${setAsidePot.name} pot: ${signedPounds(setAsideBalance.balancePence)}` : `${setAsidePot.name} pot`}</button>}
+        {onCheckBalances && <button type="button" className="secondary-button" onClick={onCheckBalances}>Check balances</button>}
+      </div>}
     </div>
     {!groups.length ? <p className="spending-none">Nothing spent in {monthName(month)} yet.</p>
       : <div className="spending-month-groups">{groups.map(group => <section key={group.key} className="spending-month-group" aria-labelledby={`spending-group-${group.key}`}>
         <h3 id={`spending-group-${group.key}`} className="spending-group-heading">{group.label}</h3>
         <ul>{group.rows.map(row => {
-          const free = row.carriesOver && row.destination.kind === 'pot' ? potFree(document, row.destination.potId).freePence ?? null : undefined
-          const amount = amountText(row), status = statusText(row, figures, free)
+          const balance = row.destination.kind === 'pot' ? potBalance(document, row.destination.potId) : undefined
+          const free = row.carriesOver && balance ? balance.freePence ?? null : undefined
+          const inBank = !row.carriesOver && balance?.balancePence !== undefined && row.destination.kind === 'pot' ? `${signedPounds(balance.balancePence)} in ${bankOf(document, row.destination.potId)}` : undefined
+          const amount = amountText(row), status = statusText(row, figures, free, inBank)
           const body = <>
             <span className="spending-pot-top"><span className="spending-pot-name">{potName(row.destination)}{row.carriesOver && <span className="spending-pot-kind"> · carries over</span>}</span><span className="spending-pot-amount"><b>{amount.strong}</b>{amount.rest}</span></span>
             <Bar row={row} month={figures}/>
@@ -147,32 +163,78 @@ function CheckBalance({ potName, bank, onSave, onClose }: { potName: string; ban
   </ModalDialog>
 }
 
+/** What moved money in or out of a pot, for its sums: "Moved in on payday since". */
+function flowLabel(flow: BalanceFlow, document: BudgetDocument, setAside: boolean): string {
+  const card = cardTracker(document).cards.find(row => row.setAside) ?? cardTracker(document).cards[0]
+  const pot = document.budget.pots.find(row => row.id === card?.setAside?.potId)
+  return {
+    payday: 'Moved in on payday', covers: 'Overspend covers', 'built-up': 'Built-up money moved out', settled: 'Settled up',
+    'set-aside': setAside ? 'Moved in from pots' : `Moved to ${potPhrase(pot?.name ?? 'Amex')}`, paid: `Paid to ${card?.name ?? 'the card'}`,
+  }[flow]
+}
+
+/** The balance worked out: last checked, every move since, then what's still waiting to move off it. */
+function BalanceSums({ document, balance, bank }: { document: BudgetDocument; balance: PotBalance; bank: string }) {
+  const tracker = cardTracker(document)
+  const waitingLabel = (statementKey: string, closeDate: string) => {
+    const card = tracker.cards.find(row => row.id === parseStatementKey(statementKey)?.cardId)
+    return `${usesSetAside(card, statementKey) ? 'Still to move' : 'Waiting to settle'} · ${statementName(closeDate)}`
+  }
+  return <dl className="carry-over-sums">
+    {balance.checked ? <div><dt>In {bank} · checked {dayOf(balance.checked.at)}</dt><dd>{signedPounds(balance.checked.pence)}</dd></div> : <div><dt>Not checked yet</dt><dd>—</dd></div>}
+    {balance.since.map(row => <div key={row.flow}><dt>{flowLabel(row.flow, document, balance.setAside)} since</dt><dd>{row.pence > 0 ? '+' : ''}{signedPounds(row.pence)}</dd></div>)}
+    {balance.balancePence !== undefined && balance.since.length > 0 && balance.waiting.length > 0 && <div className="is-subtotal"><dt>In {bank} now</dt><dd>{signedPounds(balance.balancePence)}</dd></div>}
+    {balance.waiting.map(row => <div key={row.statementKey}><dt>{waitingLabel(row.statementKey, row.closeDate)}</dt><dd>{signedPounds(-row.pence)}</dd></div>)}
+    {balance.freePence !== undefined && balance.waiting.length > 0 && <div className="is-total"><dt>Free</dt><dd>{signedPounds(balance.freePence)}</dd></div>}
+    {balance.balancePence !== undefined && !balance.waiting.length && balance.since.length > 0 && <div className="is-total"><dt>In {bank} now</dt><dd>{signedPounds(balance.balancePence)}</dd></div>}
+  </dl>
+}
+
+/** A pot's balance in the bank, worked out, with "Check against Monzo" (board 4, screen 3; every pot since the Amex pot). */
+function PotBalanceSection({ document, setDocument, potId, headline }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; headline: 'free' | 'balance' }) {
+  const pot = document.budget.pots.find(row => row.id === potId)!
+  const bank = bankOf(document, potId)
+  const balance = potBalance(document, potId)
+  const [checking, setChecking] = useState(false)
+  const big = headline === 'free' ? balance.freePence : balance.balancePence
+  return <section className="spending-month-summary carry-over" aria-labelledby={`pot-balance-${potId}`}>
+    <p className="spending-eyebrow" id={`pot-balance-${potId}`}>{headline === 'free' ? 'Free in the pot' : `In ${bank} now`}</p>
+    <p className="spending-big">{big === undefined ? '—' : signedPounds(big)}{headline === 'balance' && balance.freePence !== undefined && balance.waiting.length > 0 && <small> · {signedPounds(balance.freePence)} free</small>}</p>
+    <BalanceSums document={document} balance={balance} bank={bank}/>
+    <button type="button" className="secondary-button carry-over-check" onClick={() => setChecking(true)}>Check against {bank}</button>
+    {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}
+  </section>
+}
+
 /** A carry-over pot: what's free, how that's worked out, the balance check and the annual costs it saves for (board 4, screen 3). */
 function CarryOver({ document, setDocument, potId, month }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string }) {
-  const pot = document.budget.pots.find(row => row.id === potId)!
-  const bank = document.budget.accounts.find(account => account.id === pot.accountId)?.provider?.trim() || 'the bank'
-  const free = potFree(document, potId)
   const costs = annualCosts(document, potId, month)
-  const [checking, setChecking] = useState(false)
   return <>
-    <section className="spending-month-summary carry-over" aria-labelledby="carry-over-free">
-      <p className="spending-eyebrow" id="carry-over-free">Free in the pot</p>
-      <p className="spending-big">{free.freePence === undefined ? '—' : signedPounds(free.freePence)}</p>
-      <dl className="carry-over-sums">
-        {free.checked ? <div><dt>In the pot · checked {dayOf(free.checked.at)}</dt><dd>{pounds(free.checked.pence)}</dd></div> : <div><dt>Not checked yet</dt><dd>—</dd></div>}
-        {free.movedInPence > 0 && <div><dt>Moved in since</dt><dd>+{pounds(free.movedInPence)}</dd></div>}
-        {free.outPence !== 0 && <div><dt>Out of {pot.name} since</dt><dd>{signedPounds(-free.outPence)}</dd></div>}
-        {free.waiting.map(row => <div key={row.statementKey}><dt>Waiting to settle · {monthName(row.closeDate.slice(0, 7))} statement</dt><dd>{signedPounds(-row.pence)}</dd></div>)}
-        {free.freePence !== undefined && <div className="is-total"><dt>Free</dt><dd>{signedPounds(free.freePence)}</dd></div>}
-      </dl>
-      <button type="button" className="secondary-button carry-over-check" onClick={() => setChecking(true)}>Check against {bank}</button>
-    </section>
+    <PotBalanceSection document={document} setDocument={setDocument} potId={potId} headline="free"/>
     {costs.length > 0 && <section className="spending-month-summary" aria-labelledby="carry-over-costs">
       <p className="spending-eyebrow" id="carry-over-costs">Annual costs from the Plan</p>
       <dl className="carry-over-sums">{costs.map(cost => <div key={cost.id}><dt>{cost.name}</dt><dd>{pounds(cost.yearlyPence)} a year</dd></div>)}</dl>
     </section>}
-    {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}
   </>
+}
+
+/** The Amex pot: what's in it, and for each statement paid from it what it costs and what's still to move. */
+function SetAsidePot({ document, setDocument, potId, onBack, month }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; onBack: () => void; month: string }) {
+  const pot = document.budget.pots.find(row => row.id === potId)!
+  const card = cardTracker(document).cards.find(row => row.setAside?.potId === potId)!
+  const statements = setAsideStatements(document, card.id).filter(row => row.paidPence !== row.totalPence || row.totalPence === 0 && row.movedPence !== 0)
+  return <div className="pot-detail">
+    <button type="button" className="text-button spending-back" onClick={onBack}><ArrowLeft aria-hidden="true"/>Back to {monthName(month)}</button>
+    <div className="spending-section-heading"><h2 id="spending-pot-title">{pot.name}</h2><span>Pays {card.name}</span></div>
+    <PotBalanceSection document={document} setDocument={setDocument} potId={potId} headline="balance"/>
+    <section className="spending-month-summary" aria-labelledby="set-aside-statements">
+      <p className="spending-eyebrow" id="set-aside-statements">Statements it pays</p>
+      {statements.length ? <dl className="carry-over-sums set-aside-statements">{statements.map(row => <div key={row.statementKey}>
+        <dt><strong>{statementName(row.closeDate)}</strong><span>{signedPounds(row.movedPence)} moved in{row.toMovePence ? ` · ${signedPounds(row.toMovePence)} still to move` : ' · all moved'}{row.paidPence ? ` · paid ${pounds(row.paidPence)}` : ''}</span></dt>
+        <dd>{signedPounds(row.totalPence)}</dd>
+      </div>)}</dl> : <p className="spending-facts">Nothing to pay from {potPhrase(pot.name)} yet.</p>}
+    </section>
+  </div>
 }
 
 type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void }
@@ -187,6 +249,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const owners = document.budget.accounts.find(account => account.id === pot?.accountId)?.ownerPersonIds ?? []
   const ownerLabel = owners.length > 1 ? 'Joint' : document.household.adults.find(person => person.id === owners[0])?.name ?? 'Pot'
   if (!pot) return <p className="spending-none">That pot no longer exists. <button type="button" className="text-button" onClick={onBack}>Back to {monthName(month)}</button></p>
+  if (cardTracker(document).cards.some(card => card.setAside?.potId === potId)) return <SetAsidePot document={document} setDocument={setDocument} potId={potId} month={month} onBack={onBack}/>
   const steady = row?.pace === 'steady' && !row.carriesOver && row.plannedPence > 0
   const daysLeft = figures.daysLeft
   const allowance = row && figures.when === 'current' && row.leftPence > 0 && daysLeft > 0 ? row.leftPence / daysLeft : undefined
@@ -199,7 +262,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
     <div className="spending-section-heading"><h2 id="spending-pot-title">{pot.name}</h2><span>{ownerLabel} · {row?.carriesOver ? 'carries over' : 'monthly'}</span></div>
     <p className="spending-facts">{formatMonth(month)}{figures.when === 'current' ? ` · day ${figures.day} of ${figures.daysInMonth}` : ''}</p>
     {row?.carriesOver || !row && document.card?.pots[potId]?.carriesOver ? <CarryOver document={document} setDocument={setDocument} potId={potId} month={month}/>
-      : !row ? <p className="spending-none">Nothing planned or spent in {monthName(month)}.</p> : <>
+      : !row ? <><p className="spending-none">Nothing planned or spent in {monthName(month)}.</p><PotBalanceSection document={document} setDocument={setDocument} potId={potId} headline="balance"/></> : <>
       <section className="spending-month-summary" aria-labelledby="spending-pot-left">
         <p className="spending-eyebrow" id="spending-pot-left">{row.carriesOver ? `Spent from ${pot.name} in ${monthName(month)}` : row.leftPence < 0 ? 'Over this month' : 'Left this month'}</p>
         <p className="spending-big">{row.carriesOver ? pounds(row.spentPence) : pounds(Math.abs(row.leftPence))}{!row.carriesOver && row.leftPence >= 0 && figures.when === 'current' && <small> for {daysLeft} {daysLeft === 1 ? 'day' : 'days'}</small>}</p>
@@ -207,6 +270,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
         {!row.carriesOver && !(steady && figures.when === 'current' && row.leftPence >= 0) && <p className={`spending-pot-status is-${row.status}`}>{statusText(row, figures)}</p>}
         {steady && figures.when !== 'future' && <PaceChart document={document} month={month} row={row} figures={figures} label={chartLabel}/>}
       </section>
+      <PotBalanceSection document={document} setDocument={setDocument} potId={potId} headline="balance"/>
       {row.status === 'ahead' && row.runsOut && <p className="spending-callout"><TriangleAlert aria-hidden="true"/>At this rate {pot.name} runs out around {dayDate(row.runsOut)}, {daysBetween(row.runsOut, `${month}-${String(figures.daysInMonth).padStart(2, '0')}`)} days before the month ends.</p>}
     </>}
     <section aria-labelledby="spending-pot-transactions">
