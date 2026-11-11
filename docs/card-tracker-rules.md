@@ -9,6 +9,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Part | PR | Code |
 | --- | --- | --- |
 | Data model, validation, statement and date helpers, Household → Cards | 1 | `src/domain/cardTracker.ts`, `src/pages/CardSettings.tsx` |
+| XLSX reader, Amex import, rule matching, synthetic fixtures | 2 | `src/domain/xlsx.ts`, `src/domain/amexImport.ts`, `src/domain/cardSorting.ts`, `scripts/amex-fixture.mjs` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -54,6 +55,23 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 - For close day *d*, a statement's window runs from the previous close date + 1 to the close date (`statementWindow`). `closeDateFor(date, d)` gives the close date whose window holds a date. Only manual entries use the window; imports use the export's period.
 - The due date is the close date + `dueDaysAfterClose` (`dueDate`): the 24 Nov 2026 statement is due 19 Dec 2026.
 - Date helpers work on `YYYY-MM-DD` strings in UTC, so a time zone never shifts a day. "Today" is the device's local date.
+
+## Bringing in the Excel export
+
+`importAmexWorkbook(document, cardId, bytes, fileName, now)` reads the workbook and brings it in. It is pure apart from reading the bytes; `now` is the import time.
+
+1. **Read the workbook** with the dependency-free reader in `xlsx.ts`: the ZIP central directory, stored or deflated entries (inflated by `DecompressionStream('deflate-raw')`), the workbook and its relationships to find sheets by name, shared strings (rich-text runs joined, phonetic runs skipped) and cells of type `s`, `inlineStr`, `str`, `n` and `b`, parsed with `DOMParser`.
+2. **Check the layout:** both `Transaction Details` and `Transaction Summary` exist, and a row holds the 13 columns in order (row 7 in real exports). Otherwise nothing is imported and the message is "This doesn't look like an Amex Excel export. Download the Excel version of your transactions." A CSV, another spreadsheet or random bytes all get this message.
+3. **Read the period** from B1 (`… / Oct 25, 2026 to Nov 24, 2026`, English month abbreviations). The statement is `cardId:<period end>`. Read Previous Balance, Payments & Credits, Charges and Total Balance from the summary sheet. A missing figure, an unreadable period, or a row whose date or amount can't be read stops the import with a message naming it.
+4. **Map each row:** the date (text `DD/MM/YYYY`, or an Excel date serial), pence (`Math.round(value * 100)` for numeric cells), the kind (§4.5: a negative `PAYMENT RECEIVED…`, or a negative blank-category `…PAYMENT…`, is a payment; other negatives are refunds; positives are purchases, fees and interest included), the card ending (without its minus) → person, the Reference, and the statement. A row dated before the period still goes on the export's statement, and counts in the month of its date.
+5. **Check the summary** over every row in the file, new or not: positives must equal Charges and negatives Payments & Credits. A mismatch is a warning, not a failure, with the amounts missing. The summary is stored on the statement.
+6. **Deduplicate** by Reference; without one, by `date|pence|normalised description|card ending`. Re-importing a file adds nothing; an overlapping export adds only its new rows.
+7. **Apply the rules** to new purchases and refunds (never payments): the first rule, in list order, whose text appears in the normalised description, on its card if it names one. A split rule divides the amount by percent into pennies that add up (floor each share, spare pennies by largest remainder, earlier parts first).
+8. **Record** an `ImportRecord` (the last 50 are kept). The result gives the counts for the Bring in sheet: rows, already here, new, sorted by rules, to sort, payments, the summary check and the latest date.
+9. **Unknown card endings** are still imported, with no person, and listed so the screen can ask whose card it is. A period that doesn't end on the card's closing day is flagged so the setting can be updated.
+10. **A final export:** an import taken after the period's close that matches the summary sets the statement's `finalImportAt` (it is then *complete*, §6.7).
+
+`scripts/amex-fixture.mjs` writes `docs/fixtures/amex-export-sample.xlsx` (15 fictitious rows: a payment, a refund, a row dated the day before the period, a newline in Extended Details, two card endings, a matching summary) and `amex-export-mismatch.xlsx` (Charges £12.34 higher). Tests use only these and workbooks built by `xlsx.testing.ts`. Never put a real export, or anything from one, in the repo.
 
 ## Text
 
