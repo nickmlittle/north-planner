@@ -1609,3 +1609,35 @@ div.spending-pot{padding-right:var(--space-4)}
   .settle-up{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
   .settle-up>.payday-copied,.settle-up>.payday-copy-hint{grid-column:1/-1}
 }
+
+/* The Amex pot: what's left to move, the Move sheet, and moved tags */
+.move-callout{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-3);margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface-subtle);color:var(--pine)}
+.move-callout>svg{width:22px;height:22px}
+.move-callout p{display:grid;gap:2px;margin:0}
+.move-callout p span{color:var(--muted);font-size:var(--text-sm)}
+.move-callout button{min-height:44px}
+@media(max-width:640px){.move-callout{grid-template-columns:auto minmax(0,1fr)}.move-callout button{grid-column:1/-1;width:100%}}
+.move-sheet{width:min(560px,calc(100% - 32px))}
+.move-sheet .budget-info-content{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
+.move-summary{display:grid;gap:var(--space-1)}
+.move-summary .spending-big,.move-summary .spending-eyebrow{margin:0}
+.move-steps{display:grid;gap:var(--space-2)}
+.move-steps .payday-person-heading{display:flex;justify-content:space-between;gap:var(--space-2);margin:0;padding:0;color:var(--muted);font-size:var(--text-sm);font-weight:700}
+.move-steps ol{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card);overflow:hidden}
+.move-steps .payday-copy-hint{padding:0}
+.move-step{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);min-height:44px;padding:var(--space-1) var(--space-3)}
+.move-step+.move-step{border-top:1px solid var(--line)}
+.move-step.is-pot-move{background:var(--surface-subtle)}
+.move-step-label{min-width:0;color:var(--pine);font-weight:650;overflow-wrap:anywhere}
+.move-step .payday-step-amount{min-height:36px;padding:0 var(--space-2);border:0;border-radius:var(--radius-sm);background:var(--card);font-size:var(--text-md);cursor:pointer}
+.move-step .payday-step-amount:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+.move-transactions{display:grid;gap:var(--space-2);margin:0;padding:0;border:0}
+.move-transactions legend{padding:0;margin-bottom:var(--space-1);color:var(--pine);font-weight:700}
+.move-hint{margin:0;color:var(--muted);font-size:var(--text-sm)}
+.move-transactions ul{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden}
+.move-transactions li+li{border-top:1px solid var(--line)}
+.move-transaction{display:grid;grid-template-columns:24px minmax(0,1fr);gap:var(--space-2);align-items:start;padding:var(--space-2) var(--space-3);cursor:pointer}
+.move-transaction input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--pine)}
+.move-transaction-body{display:grid;gap:2px;min-width:0}
+.spending-tag.is-changed{background:var(--status-review-bg);color:var(--status-review)}
+.spending-row-where .spending-tag+.spending-tag{margin-left:var(--space-1)}
