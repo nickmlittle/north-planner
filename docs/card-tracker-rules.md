@@ -15,6 +15,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Splits: by amount, half each, funding share, receipt items | 5 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
 | Refund matching, refund of a split, linked rows, payments listed apart | 6 | `src/domain/cardRefunds.ts`, `src/pages/SortSheet.tsx` |
 | This month: planned vs spent, pace, pot detail and chart, pot settings | 7 | `src/domain/cardSpending.ts`, `src/pages/SpendingMonth.tsx`, `BudgetManagement.tsx` |
+| Carry-over pots: Free, Check against the bank, annual costs | 8 | `potFree`, `checkPotBalance`, `annualCosts` in `cardSpending.ts`; `src/domain/cardStatements.ts` (settle keys) |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -125,6 +126,21 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 - **Pot settings** (`potSettings`, `savePotSettings`): pace defaults to steady, or none for a carry-over pot or a pot in a savings, ISA or pension account; build-up limit defaults to 2× the monthly Planned. Edited in Manage → Pots.
 - **Pot detail**: what's left and for how many days, about £X a day (Left ÷ days left) against the average so far (Spent ÷ day), the cumulative chart (`cumulativeByDay`) against the planned pace, and the pot's transactions in the month (`destinationTransactions`), each split showing only its line for this pot.
 - **Sort sheet**: `leftByDestination` gives "£X left" for every planned pot that doesn't carry over, in the transaction's month.
+
+## Carry-over pots (D9, §6.6)
+
+```
+free = checked balance
+     + payday Move ticks into the pot made after the check
+     − settle-up "Out of <pot>" ticks made after the check (net of "Into <pot>")
+     − card spend on the pot not yet settled
+```
+
+- **Not yet settled**, per statement: the pot's share of that statement (its split lines, by `statementKey`) minus what its settle-up tick moved (`settle:out:<potId>`, less `settle:into:<potId>`). A late refund after settling leaves a negative amount waiting (money to come back). Each statement with something waiting is listed by name ("Waiting to settle · October statement").
+- **Moves** are payday ticks whose key ends `:move:<potId>`, in any month, made after the check.
+- With no checked balance there's no figure: "Check the balance to see what's free". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
+- **Annual costs** (`annualCosts`) are the month's Plan items to the pot entered yearly, shown as "£612.00 a year".
+- Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's free.
 
 ## Payments
 

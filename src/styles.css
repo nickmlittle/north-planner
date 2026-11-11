@@ -1491,3 +1491,13 @@ div.spending-pot{padding-right:var(--space-4)}
 .pot-chart-legend i{display:inline-block;width:14px;height:3px;border-radius:var(--radius-sm);background:var(--pine)}
 .pot-chart-legend i.is-plan{background:var(--line-strong)}
 .spending-month-control{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
+.spending-pot-kind{color:var(--muted);font-size:var(--text-sm);font-weight:600}
+.carry-over-sums{display:grid;margin:var(--space-2) calc(var(--space-5) * -1) 0;border-top:1px solid var(--line)}
+.carry-over-sums>div{display:flex;justify-content:space-between;gap:var(--space-3);padding:var(--space-2) var(--space-5);border-bottom:1px solid var(--line)}
+.carry-over-sums dt{color:var(--muted)}
+.carry-over-sums dd{flex:none;margin:0;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.carry-over-sums>.is-total{background:var(--surface-band)}
+.carry-over-sums>.is-total dt,.carry-over-sums>.is-total dd{color:var(--pine);font-weight:700}
+.carry-over-check{justify-self:start;min-height:44px;margin:var(--space-2) 0 0}
+.check-balance-sheet .budget-info-content{padding-top:var(--space-3)}
+@media(max-width:640px){.carry-over-sums{margin-inline:calc(var(--space-4) * -1)}.carry-over-sums>div{padding-inline:var(--space-4)}.carry-over-check{width:100%}}
