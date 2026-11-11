@@ -10,6 +10,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | --- | --- | --- |
 | Data model, validation, statement and date helpers, Household → Cards | 1 | `src/domain/cardTracker.ts`, `src/pages/CardSettings.tsx` |
 | XLSX reader, Amex import, rule matching, synthetic fixtures | 2 | `src/domain/xlsx.ts`, `src/domain/amexImport.ts`, `src/domain/cardSorting.ts`, `scripts/amex-fixture.mjs` |
+| Spending tab, Bring in, To sort, manual entry, baseline card data | 3 | `src/pages/Spending.tsx`, `BringInSheet.tsx`, `ManualEntrySheet.tsx`, `src/state/navigation.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -72,6 +73,18 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 10. **A final export:** an import taken after the period's close that matches the summary sets the statement's `finalImportAt` (it is then *complete*, §6.7).
 
 `scripts/amex-fixture.mjs` writes `docs/fixtures/amex-export-sample.xlsx` (15 fictitious rows: a payment, a refund, a row dated the day before the period, a newline in Extended Details, two card endings, a matching summary) and `amex-export-mismatch.xlsx` (Charges £12.34 higher). Tests use only these and workbooks built by `xlsx.testing.ts`. Never put a real export, or anything from one, in the repo.
+
+## Adding by hand
+
+`addManualTransaction` adds a transaction with id `manual:<uuid>`: a date, description, amount (a refund is negative) and card ending. Its statement comes from the date window (`statementFor`), its merchant is the whole typed description (typed text has no Amex padding), and the rules apply as on import.
+
+## To sort
+
+`transactionsToSort` is every purchase and refund with no sort, newest first (by date, then the order they came in). Payments are never listed. "Last brought in" is the latest `ImportRecord`'s time (`lastImport`), so a future feed that records imports updates it the same way.
+
+## Baseline fixture
+
+`scripts/baseline-fixture.mjs` gives the baseline household an Amex (closes on the 24th, due 25 days later, paid from Monzo Joint), Ada's card ending 41001 and Ben's 41009, four rules, and 27 transactions from 2 Oct to 8 Nov 2026 on the 24 Oct and 24 Nov statements, including a row dated 24 Oct on the November statement, a refund, a payment and four to sort. Bills carries over. Groceries has its own joint pot so it can be paced.
 
 ## Text
 

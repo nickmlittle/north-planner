@@ -43,8 +43,11 @@ it('lets the owner of a personal account make every pot move, and splits joint p
   expect(ben.rows.find(row => row.accountId === starling)).toMatchObject({ fundingPence: 43670, potMoves: [] })
   const joint = accountNamed(document, 'Monzo', 'Current account')
   const bills = potNamed(document, joint, 'Bills')
-  expect(ada.rows.find(row => row.accountId === joint)?.potMoves.find(move => move.potId === bills)?.amountPence).toBe(68236)
-  expect(ben.rows.find(row => row.accountId === joint)?.potMoves.find(move => move.potId === bills)?.amountPence).toBe(60869)
+  // Groceries (£325.47, split equally) has its own joint pot, so Bills holds the rest.
+  const groceries = potNamed(document, joint, 'Groceries')
+  expect(ada.rows.find(row => row.accountId === joint)?.potMoves.find(move => move.potId === bills)?.amountPence).toBe(51962)
+  expect(ben.rows.find(row => row.accountId === joint)?.potMoves.find(move => move.potId === bills)?.amountPence).toBe(44596)
+  expect([ada, ben].map(plan => plan.rows.find(row => row.accountId === joint)?.potMoves.find(move => move.potId === groceries)?.amountPence)).toEqual([16274, 16273])
 })
 
 it('says who else moves money on: an owner moves everything, including what others funded', () => {

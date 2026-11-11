@@ -60,6 +60,11 @@
         "accountId": "joint"
       },
       {
+        "id": "groceries",
+        "name": "Groceries",
+        "accountId": "joint"
+      },
+      {
         "id": "holidays",
         "name": "Holidays",
         "accountId": "joint"
@@ -118,7 +123,7 @@
             "frequency": "monthly",
             "destination": {
               "kind": "pot",
-              "potId": "bills"
+              "potId": "groceries"
             },
             "funding": "equal"
           },
@@ -717,7 +722,7 @@
             "frequency": "monthly",
             "destination": {
               "kind": "pot",
-              "potId": "bills"
+              "potId": "groceries"
             },
             "funding": "equal"
           },
@@ -1325,5 +1330,806 @@
       }
     ],
     "incomePolicies": []
+  },
+  "card": {
+    "cards": [
+      {
+        "id": "amex",
+        "name": "Amex",
+        "closeDay": 24,
+        "dueDaysAfterClose": 25,
+        "payFromAccountId": "joint",
+        "cardholders": [
+          {
+            "suffix": "41001",
+            "personId": "ada"
+          },
+          {
+            "suffix": "41009",
+            "personId": "ben"
+          }
+        ]
+      }
+    ],
+    "transactions": [
+      {
+        "id": "AT268000000000000000001",
+        "cardId": "amex",
+        "date": "2026-10-02",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 6420,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 6420,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000002",
+        "cardId": "amex",
+        "date": "2026-10-03",
+        "description": "CORNER CAFE 0042 BRISTOL",
+        "merchant": "CORNER CAFE",
+        "amountPence": 980,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 980,
+              "destination": {
+                "kind": "pot",
+                "potId": "ben-spend"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000003",
+        "cardId": "amex",
+        "date": "2026-10-05",
+        "description": "STREAMFLIX LONDON",
+        "merchant": "STREAMFLIX",
+        "amountPence": 1999,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1999,
+              "destination": {
+                "kind": "pot",
+                "potId": "bills"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-stream",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000004",
+        "cardId": "amex",
+        "date": "2026-10-06",
+        "description": "FUEL STOP 118 READING",
+        "merchant": "FUEL STOP",
+        "amountPence": 6140,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 6140,
+              "destination": {
+                "kind": "pot",
+                "potId": "ben-spend"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-fuel",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000005",
+        "cardId": "amex",
+        "date": "2026-10-08",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 5875,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 5875,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000006",
+        "cardId": "amex",
+        "date": "2026-10-10",
+        "description": "BOOK NOOK YORK",
+        "merchant": "BOOK NOOK",
+        "amountPence": 1499,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1499,
+              "destination": {
+                "kind": "pot",
+                "potId": "ada-spend"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000007",
+        "cardId": "amex",
+        "date": "2026-10-12",
+        "description": "MARKET HALL DELI BATH",
+        "merchant": "MARKET HALL DELI",
+        "amountPence": 4210,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 4210,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-deli",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000008",
+        "cardId": "amex",
+        "date": "2026-10-14",
+        "description": "SEASIDE INN WHITBY",
+        "merchant": "SEASIDE INN",
+        "amountPence": 18000,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 18000,
+              "destination": {
+                "kind": "pot",
+                "potId": "holidays"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000009",
+        "cardId": "amex",
+        "date": "2026-10-16",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 7135,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 7135,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000010",
+        "cardId": "amex",
+        "date": "2026-10-18",
+        "description": "HOMEWARE HUT LEEDS",
+        "merchant": "HOMEWARE HUT",
+        "amountPence": 4500,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 4500,
+              "destination": {
+                "kind": "account",
+                "accountId": "joint"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000011",
+        "cardId": "amex",
+        "date": "2026-10-20",
+        "description": "CORNER CAFE 0042 BRISTOL",
+        "merchant": "CORNER CAFE",
+        "amountPence": 1240,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1240,
+              "destination": {
+                "kind": "pot",
+                "potId": "ada-spend"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000012",
+        "cardId": "amex",
+        "date": "2026-10-22",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 6690,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-10-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-10-27T08:00:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 6690,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-10-27T08:00:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000013",
+        "cardId": "amex",
+        "date": "2026-10-24",
+        "description": "MARKET HALL DELI BATH",
+        "merchant": "MARKET HALL DELI",
+        "amountPence": 2715,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 2715,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-deli",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000014",
+        "cardId": "amex",
+        "date": "2026-10-26",
+        "description": "FUEL STOP 118 READING",
+        "merchant": "FUEL STOP",
+        "amountPence": 5510,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 5510,
+              "destination": {
+                "kind": "pot",
+                "potId": "ben-spend"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-fuel",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000015",
+        "cardId": "amex",
+        "date": "2026-10-28",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 8360,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 8360,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000016",
+        "cardId": "amex",
+        "date": "2026-10-30",
+        "description": "PHONE CO ONLINE",
+        "merchant": "PHONE CO",
+        "amountPence": 1500,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1500,
+              "destination": {
+                "kind": "pot",
+                "potId": "bills"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000017",
+        "cardId": "amex",
+        "date": "2026-11-01",
+        "description": "MARKET HALL DELI BATH",
+        "merchant": "MARKET HALL DELI",
+        "amountPence": 7490,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 7490,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-deli",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000018",
+        "cardId": "amex",
+        "date": "2026-11-02",
+        "description": "HOMEWARE HUT LEEDS",
+        "merchant": "HOMEWARE HUT",
+        "amountPence": 8997,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z"
+      },
+      {
+        "id": "AT268000000000000000019",
+        "cardId": "amex",
+        "date": "2026-11-03",
+        "description": "BOOK NOOK YORK",
+        "merchant": "BOOK NOOK",
+        "amountPence": 1250,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1250,
+              "destination": {
+                "kind": "pot",
+                "potId": "ada-spend"
+              }
+            }
+          ],
+          "by": "person",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000020",
+        "cardId": "amex",
+        "date": "2026-11-04",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 4460,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 4460,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000021",
+        "cardId": "amex",
+        "date": "2026-11-05",
+        "description": "HOMEWARE HUT LEEDS",
+        "merchant": "HOMEWARE HUT",
+        "amountPence": -2499,
+        "kind": "refund",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z"
+      },
+      {
+        "id": "AT268000000000000000022",
+        "cardId": "amex",
+        "date": "2026-11-05",
+        "description": "STREAMFLIX LONDON",
+        "merchant": "STREAMFLIX",
+        "amountPence": 1999,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 1999,
+              "destination": {
+                "kind": "pot",
+                "potId": "bills"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-stream",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000023",
+        "cardId": "amex",
+        "date": "2026-11-06",
+        "description": "FUEL STOP 118 READING",
+        "merchant": "FUEL STOP",
+        "amountPence": 5820,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 5820,
+              "destination": {
+                "kind": "pot",
+                "potId": "ben-spend"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-fuel",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000024",
+        "cardId": "amex",
+        "date": "2026-11-07",
+        "description": "CORNER CAFE 0042 BRISTOL",
+        "merchant": "CORNER CAFE",
+        "amountPence": 1800,
+        "kind": "purchase",
+        "cardSuffix": "41009",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ben",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z"
+      },
+      {
+        "id": "AT268000000000000000025",
+        "cardId": "amex",
+        "date": "2026-11-08",
+        "description": "PAYMENT RECEIVED - THANK YOU",
+        "merchant": "PAYMENT RECEIVED - THANK YOU",
+        "amountPence": -35000,
+        "kind": "payment",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "importedAt": "2026-11-09T19:30:00.000Z"
+      },
+      {
+        "id": "AT268000000000000000026",
+        "cardId": "amex",
+        "date": "2026-11-08",
+        "description": "GREEN GROCER LONDON",
+        "merchant": "GREEN GROCER",
+        "amountPence": 6240,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z",
+        "sort": {
+          "lines": [
+            {
+              "amountPence": 6240,
+              "destination": {
+                "kind": "pot",
+                "potId": "groceries"
+              }
+            }
+          ],
+          "by": "rule",
+          "ruleId": "rule-grocer",
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      },
+      {
+        "id": "AT268000000000000000027",
+        "cardId": "amex",
+        "date": "2026-11-08",
+        "description": "TRAIN TICKETS ONLINE",
+        "merchant": "TRAIN TICKETS",
+        "amountPence": 11281,
+        "kind": "purchase",
+        "cardSuffix": "41001",
+        "statementKey": "amex:2026-11-24",
+        "personId": "ada",
+        "amexCategory": "General Purchases",
+        "importedAt": "2026-11-09T19:30:00.000Z"
+      }
+    ],
+    "rules": [
+      {
+        "id": "rule-grocer",
+        "contains": "GREEN GROCER",
+        "destination": {
+          "kind": "pot",
+          "potId": "groceries"
+        },
+        "createdAt": "2026-10-01T09:00:00.000Z"
+      },
+      {
+        "id": "rule-deli",
+        "contains": "MARKET HALL",
+        "destination": {
+          "kind": "pot",
+          "potId": "groceries"
+        },
+        "createdAt": "2026-10-01T09:00:00.000Z"
+      },
+      {
+        "id": "rule-stream",
+        "contains": "STREAMFLIX",
+        "destination": {
+          "kind": "pot",
+          "potId": "bills"
+        },
+        "createdAt": "2026-10-01T09:00:00.000Z"
+      },
+      {
+        "id": "rule-fuel",
+        "contains": "FUEL STOP",
+        "cardSuffix": "41009",
+        "destination": {
+          "kind": "pot",
+          "potId": "ben-spend"
+        },
+        "createdAt": "2026-10-01T09:00:00.000Z"
+      }
+    ],
+    "statements": {
+      "amex:2026-10-24": {
+        "cardId": "amex",
+        "closeDate": "2026-10-24",
+        "amexSummary": {
+          "previousPence": 42000,
+          "paymentsAndCreditsPence": 0,
+          "chargesPence": 64688,
+          "totalPence": 106688,
+          "at": "2026-10-27T08:00:00.000Z"
+        },
+        "finalImportAt": "2026-10-27T08:00:00.000Z"
+      },
+      "amex:2026-11-24": {
+        "cardId": "amex",
+        "closeDate": "2026-11-24",
+        "amexSummary": {
+          "previousPence": 0,
+          "paymentsAndCreditsPence": -37499,
+          "chargesPence": 67422,
+          "totalPence": 29923,
+          "at": "2026-11-09T19:30:00.000Z"
+        }
+      }
+    },
+    "months": {},
+    "pots": {
+      "bills": {
+        "carriesOver": true,
+        "pace": "none"
+      },
+      "emergency": {
+        "pace": "none"
+      }
+    },
+    "imports": [
+      {
+        "at": "2026-10-27T08:00:00.000Z",
+        "cardId": "amex",
+        "fileName": "activity.xlsx",
+        "statementKey": "amex:2026-10-24",
+        "rows": 12,
+        "added": 12,
+        "skipped": 0,
+        "sortedByRules": 7,
+        "latestDate": "2026-10-22",
+        "matchesSummary": true
+      },
+      {
+        "at": "2026-11-09T19:30:00.000Z",
+        "cardId": "amex",
+        "fileName": "activity (1).xlsx",
+        "statementKey": "amex:2026-11-24",
+        "rows": 15,
+        "added": 15,
+        "skipped": 0,
+        "sortedByRules": 8,
+        "latestDate": "2026-11-08",
+        "matchesSummary": true
+      }
+    ]
   }
 }

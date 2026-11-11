@@ -230,3 +230,17 @@ describe('rules and splits', () => {
     expect(splitByPercent(1, [50, 50])).toEqual([1, 0])
   })
 })
+
+describe('adding by hand', () => {
+  it('uses the date window for the statement, the ending for the person, and the rules', async () => {
+    const { addManualTransaction } = await import('./amexImport')
+    const start = household()
+    start.card!.rules = [{ id: 'grocer', contains: 'GREEN', destination: { kind: 'pot', potId: 'groceries' }, createdAt: '' }]
+    const document = addManualTransaction(start, { cardId: 'amex', date: '2026-11-25', description: 'Green  grocer', amountPence: 1234, suffix: '-41009' }, midPeriod, 'manual:one')
+    expect(document.card!.transactions).toEqual([{ id: 'manual:one', cardId: 'amex', date: '2026-11-25', description: 'Green grocer', merchant: 'GREEN GROCER', amountPence: 1234, kind: 'purchase', cardSuffix: '41009', statementKey: 'amex:2026-12-24', personId: 'ben', importedAt: '2026-11-09T12:00:00.000Z', sort: { lines: [{ amountPence: 1234, destination: { kind: 'pot', potId: 'groceries' } }], by: 'rule', ruleId: 'grocer', at: '2026-11-09T12:00:00.000Z' } }])
+    const refund = addManualTransaction(document, { cardId: 'amex', date: '2026-11-24', description: 'Shop', amountPence: -500, suffix: '41001' }, midPeriod, 'manual:two')
+    expect(refund.card!.transactions[1]).toMatchObject({ kind: 'refund', statementKey: 'amex:2026-11-24', personId: 'ada' })
+    expect(decodeBudgetDocument(JSON.parse(JSON.stringify(refund)))).toEqual(refund)
+    expect(() => addManualTransaction(document, { cardId: 'amex', date: '2026-11-31', description: 'Shop', amountPence: 5, suffix: '41001' }, midPeriod)).toThrow(AmexImportError)
+  })
+})

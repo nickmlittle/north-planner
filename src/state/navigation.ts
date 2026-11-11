@@ -1,4 +1,6 @@
-export type PlannerView = 'home' | 'household' | 'budget'
+export type PlannerView = 'home' | 'household' | 'budget' | 'spending'
+/** The Spending tab's sections (plan §7). Ones not built yet fall back to To sort. */
+export type SpendingView = 'sort' | 'month' | 'statements' | 'rules'
 export type BudgetView = 'plan' | 'transfers'
 export type PlanDestination = { kind: 'account' | 'direct' | 'pot'; id: string }
 /** Where "See items" in the payday steps was opened from, so Back to Transfers lands on the same account. */
@@ -20,7 +22,9 @@ export function hasLiveTransfersOrigin(destination: PlanDestination | null): boo
   const current = parseNavigation(window.location.search)
   return !!origin && !!destination && liveTransfersOrigins.has(origin.key) && origin.month === current.month && origin.destination.kind === destination.kind && origin.destination.id === destination.id
 }
-export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null }
+export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null; spendingView: SpendingView }
+const spendingViews: readonly SpendingView[] = ['sort', 'month', 'statements', 'rules']
+const isSpendingView = (value: string | null): value is SpendingView => spendingViews.includes(value as SpendingView)
 
 function parsePlanDestination(raw: string | null): PlanDestination | null {
   if (!raw) return null
@@ -46,10 +50,11 @@ export function parseNavigation(search: string): NavigationState {
   const budgetView: BudgetView = requested === 'transfers' || requested === 'plan' ? requested : lastBudgetView()
   return {
     // Opening the app lands on Home; a link that names a screen (or a Plan/Transfers view) goes straight there.
-    view: params.get('view') === 'household' ? 'household' : params.get('view') === 'budget' || params.has('budgetView') ? 'budget' : 'home',
+    view: params.get('view') === 'household' ? 'household' : params.get('view') === 'spending' || params.has('spendingView') ? 'spending' : params.get('view') === 'budget' || params.has('budgetView') ? 'budget' : 'home',
     budgetView,
     month: validMonth(params.get('month')) ? params.get('month')! : currentMonth(),
     planDestination: budgetView === 'plan' ? parsePlanDestination(params.get('planDestination')) : null,
+    spendingView: isSpendingView(params.get('spendingView')) ? params.get('spendingView') as SpendingView : 'sort',
   }
 }
 
@@ -72,6 +77,8 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   url.searchParams.set('view', state.view)
   if (state.view === 'budget') url.searchParams.set('budgetView', state.budgetView)
   else url.searchParams.delete('budgetView')
+  if (state.view === 'spending') url.searchParams.set('spendingView', state.spendingView)
+  else url.searchParams.delete('spendingView')
   if (next.month !== undefined || url.searchParams.has('month')) url.searchParams.set('month', state.month)
   else url.searchParams.delete('month')
   // The destination detail screen is gone; old links simply land on the step list.

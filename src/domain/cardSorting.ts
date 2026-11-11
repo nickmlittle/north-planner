@@ -1,4 +1,4 @@
-import { normaliseDescription, type CardTransaction, type SortRule, type SplitLine, type TransactionSort } from './cardTracker'
+import { normaliseDescription, type CardTracker, type CardTransaction, type SortRule, type SplitLine, type TransactionSort } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 
 /** The first rule, in list order, whose text appears in the normalised description (and whose card matches, if it names one). */
@@ -43,3 +43,17 @@ export function ruleSort(rule: SortRule, amountPence: number, at: string): Trans
 export function singleSort(destination: BudgetDestination, amountPence: number, at: string): TransactionSort {
   return { lines: [{ amountPence, destination }], by: 'person', at }
 }
+
+/** Newest first: by date, then the order they came in. */
+export function byNewest(a: CardTransaction, b: CardTransaction, order: ReadonlyMap<string, number>): number {
+  return b.date.localeCompare(a.date) || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
+}
+
+/** Purchases and refunds with no pot or account yet, newest first. Payments are never sorted. */
+export function transactionsToSort(tracker: Pick<CardTracker, 'transactions'>): CardTransaction[] {
+  const order = new Map(tracker.transactions.map((row, index) => [row.id, index]))
+  return tracker.transactions.filter(row => row.kind !== 'payment' && !row.sort).sort((a, b) => byNewest(a, b, order))
+}
+
+/** The latest import, for "Last brought in Mon 9 Nov". */
+export const lastImport = (tracker: Pick<CardTracker, 'imports'>, cardId?: string) => [...tracker.imports].reverse().find(row => !cardId || row.cardId === cardId)
