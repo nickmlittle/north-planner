@@ -4,6 +4,7 @@ import {
   type AmexSummary, type CardTransaction, type ImportRecord, type TransactionKind,
 } from './cardTracker'
 import { matchRule, ruleSort } from './cardSorting'
+import { matchRefundOnImport } from './cardRefunds'
 import { excelSerialDate, readXlsx, XlsxError, type XlsxCell, type XlsxSheets } from './xlsx'
 
 /** The Amex Excel export (plan §4): two sheets, a 6-row header, then a 13-column table. */
@@ -143,7 +144,7 @@ export function importAmexExport(document: BudgetDocument, cardId: string, parse
   const existing = new Set(tracker.transactions.map(row => row.id))
   const seen = new Set<string>()
   const added: CardTransaction[] = []
-  let alreadyHere = 0, sortedByRules = 0
+  let alreadyHere = 0
   for (const row of parsed.rows) {
     const id = rowId(row)
     if (existing.has(id) || seen.has(id)) { alreadyHere++; continue }
@@ -156,9 +157,19 @@ export function importAmexExport(document: BudgetDocument, cardId: string, parse
       ...(personId ? { personId } : {}), ...(row.category ? { amexCategory: row.category } : {}),
     }
     const rule = kind === 'payment' ? undefined : matchRule(tracker.rules, transaction)
-    if (rule) { transaction.sort = ruleSort(rule, transaction.amountPence, at); sortedByRules++ }
+    if (rule) transaction.sort = ruleSort(rule, transaction.amountPence, at)
     added.push(transaction)
   }
+  // Refunds first try a refund match (§6.4), against everything including this file's purchases
+  // (a file lists newest first, so a refund comes before its purchase). A match wins over the rules.
+  for (const [index, row] of added.entries()) {
+    if (row.kind !== 'refund') continue
+    const unsorted = { ...row }
+    delete unsorted.sort
+    const matched = matchRefundOnImport({ transactions: [...tracker.transactions, ...added] }, unsorted, at)
+    if (matched.refundOf) added[index] = matched
+  }
+  const sortedByRules = added.filter(row => row.sort).length
   const summary = checkSummary(parsed)
   const final = localDate(now) > parsed.period.to && summary.matches
   const latestDate = parsed.rows.reduce((latest, row) => row.date > latest ? row.date : latest, '')
