@@ -2210,10 +2210,26 @@
     "pots": {
       "bills": {
         "carriesOver": true,
-        "pace": "none"
+        "pace": "none",
+        "checkedBalance": {
+          "pence": 124000,
+          "at": "2026-10-31T10:00:00.000Z"
+        }
       },
       "emergency": {
         "pace": "none"
+      },
+      "groceries": {
+        "checkedBalance": {
+          "pence": 84000,
+          "at": "2026-10-31T10:00:00.000Z"
+        }
+      },
+      "amex-pot": {
+        "checkedBalance": {
+          "pence": 0,
+          "at": "2026-10-31T10:00:00.000Z"
+        }
       }
     },
     "imports": [

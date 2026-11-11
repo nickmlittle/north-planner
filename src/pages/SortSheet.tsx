@@ -4,6 +4,7 @@ import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, defaultRuleText, destinationKey, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
 import { leftByDestination } from '../domain/cardSpending'
+import { potBalance } from '../domain/potBalances'
 import { addRule, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
 import { refundPlan, refundPurchase, sortRefund, type RefundChoice } from '../domain/cardRefunds'
 import { formatMonth } from '../formatting/month'
@@ -33,7 +34,13 @@ const SHOWN = 6
 export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date() }: Props) {
   // What's left in each planned pot in the transaction's month, so the choice shows its consequence.
   const left = leftByDestination(document, transaction.date.slice(0, 7))
-  const leftText = (destination: BudgetDestination) => { const pence = left.get(destinationKey(destination)); return pence === undefined ? '' : pence < 0 ? `${pounds(-pence)} over` : `${pounds(pence)} left` }
+  // Carry-over pots have no "left": once their balance is checked, show what's free in them instead.
+  const leftText = (destination: BudgetDestination) => {
+    const pence = left.get(destinationKey(destination))
+    if (pence !== undefined) return pence < 0 ? `${pounds(-pence)} over` : `${pounds(pence)} left`
+    const free = destination.kind === 'pot' && document.card?.pots[destination.potId]?.carriesOver ? potBalance(document, destination.potId).freePence : undefined
+    return free === undefined ? '' : `${signedPounds(free)} free`
+  }
   const id = useId()
   const name = destinationNamer(document)
   const tracker = cardTracker(document)

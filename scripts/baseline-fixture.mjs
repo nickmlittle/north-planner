@@ -120,7 +120,11 @@ const card = {
     'amex:2026-11-24': { cardId: 'amex', closeDate: '2026-11-24', amexSummary: summaryFor('2026-11-24') },
   },
   months: {},
-  pots: { bills: { carriesOver: true, pace: 'none' }, emergency: { pace: 'none' } },
+  // Balances checked against the bank on 31 Oct, after November's money went in.
+  pots: {
+    bills: { carriesOver: true, pace: 'none', checkedBalance: { pence: 124000, at: '2026-10-31T10:00:00.000Z' } }, emergency: { pace: 'none' },
+    groceries: { checkedBalance: { pence: 84000, at: '2026-10-31T10:00:00.000Z' } }, 'amex-pot': { checkedBalance: { pence: 0, at: '2026-10-31T10:00:00.000Z' } },
+  },
   imports: [
     { at: octImport, cardId: 'amex', fileName: 'activity.xlsx', statementKey: 'amex:2026-10-24', rows: count('2026-10-24'), added: count('2026-10-24'), skipped: 0, sortedByRules: byRules('2026-10-24'), latestDate: '2026-10-22', matchesSummary: true },
     { at: novImport, cardId: 'amex', fileName: 'activity (1).xlsx', statementKey: 'amex:2026-11-24', rows: count('2026-11-24'), added: count('2026-11-24'), skipped: 0, sortedByRules: byRules('2026-11-24'), latestDate: '2026-11-08', matchesSummary: true },

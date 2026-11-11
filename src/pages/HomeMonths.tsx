@@ -4,10 +4,11 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, firstDayOf, parseStatementKey } from '../domain/cardTracker'
 import { closeMonthPlan, homeMonths, type HomeMonth, type HomeTask } from '../domain/monthStages'
 import { potPhrase } from '../domain/setAside'
+import { potBalance } from '../domain/potBalances'
 import { formatMonth } from '../formatting/month'
 import type { SpendingView } from '../state/navigation'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
-import { dayOf, pounds, statementName } from './spendingFormat'
+import { dayOf, pounds, signedPounds, statementName } from './spendingFormat'
 
 export type SpendingTarget = { view: SpendingView; month?: string; potId?: string; statementKey?: string; close?: boolean }
 type Props = { document: BudgetDocument; today: string; onOpenSpending: (target: SpendingTarget) => void; onOpenTransfers: (month: string) => void }
@@ -43,7 +44,8 @@ export function HomeMonths({ document, today, onOpenSpending, onOpenTransfers }:
       const pot = document.budget.pots.find(row => row.id === cardTracker(document).cards.find(item => item.id === task.cardId)?.setAside?.potId)
       const phrase = potPhrase(pot?.name ?? card.name)
       const amount = task.amountPence ?? 0
-      return <Row key={task.key} icon={<PiggyBank/>} title={amount < 0 ? `Move ${pounds(-amount)} back out of ${phrase}` : amount ? `Move ${pounds(amount)} to ${phrase}` : `Update ${phrase}`} sub={`${plural(task.count ?? 0, 'transaction')} sorted since the last move`} onSelect={() => onOpenSpending({ view: 'sort' })}/>
+      const balance = pot ? potBalance(document, pot.id).balancePence : undefined
+      return <Row key={task.key} icon={<PiggyBank/>} title={amount < 0 ? `Move ${pounds(-amount)} back out of ${phrase}` : amount ? `Move ${pounds(amount)} to ${phrase}` : `Update ${phrase}`} sub={`${plural(task.count ?? 0, 'transaction')} sorted since the last move${balance !== undefined ? ` · ${pot!.name} pot has ${signedPounds(balance)}` : ''}`} onSelect={() => onOpenSpending({ view: 'sort' })}/>
     }
     if (task.kind === 'sorted') return <Row key={task.key} icon={<CreditCard/>} done={task.done} title="All transactions in and sorted" onSelect={() => onOpenSpending({ view: 'sort' })}/>
     if (task.kind === 'close') return <Row key={task.key} icon={<CalendarDays/>} done={task.done} title={`Close ${monthName(task.month)}`} sub={task.done ? 'Closed' : closeSub(document, task.month, today)} onSelect={() => onOpenSpending({ view: 'month', month: task.month, close: true })}/>

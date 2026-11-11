@@ -22,6 +22,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Desktop: keyboard sorting table, side panel, settle up in columns | 12 | `src/pages/SortTable.tsx`, `SpendingSide.tsx` |
 | Amex pot 1: set-aside pot setting, moves, what's left to move and its steps | A1 | `src/domain/setAside.ts`, `shareSteps` in `cardStatements.ts`, `src/pages/CardSettings.tsx` |
 | Amex pot 2: Move sheet, Spending callout, Undo, moved tags, Home task | A2 | `src/pages/MoveToPotSheet.tsx`, `Spending.tsx`, `HomeMonths.tsx`, `homeMonths` in `monthStages.ts` |
+| Amex pot 3: every pot's balance worked out, Check balances, the Amex pot's page | A3 | `src/domain/potBalances.ts`, `src/pages/CheckBalancesSheet.tsx`, `SpendingMonth.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -142,6 +143,7 @@ free = checked balance
      − card spend on the pot not yet settled
 ```
 
+- (Since A3 this is `potBalance` in `potBalances.ts`, which also counts covers, built-up moves and moves to the Amex pot; see "The Amex pot".)
 - **Not yet settled**, per statement: the pot's share of that statement (its split lines, by `statementKey`) minus what its settle-up tick moved (`settle:out:<potId>`, less `settle:into:<potId>`). A late refund after settling leaves a negative amount waiting (money to come back). Each statement with something waiting is listed by name ("Waiting to settle · October statement").
 - **Moves** are payday ticks whose key ends `:move:<potId>`, in any month, made after the check.
 - With no checked balance there's no figure: "Check the balance to see what's free". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
@@ -231,6 +233,10 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **To move** (`toMove`): sorted purchases and refunds on statements paid from the pot whose lines differ from what has moved (`pendingLines`), newest first. Unsorted transactions wait until they're sorted; payments never move. A transaction re-sorted or split after moving is **Changed since moved** (`moveState`) and moves only the difference: "Out of Eating out £20.00, Into Groceries £20.00".
 - **The steps** (`moveSteps`) are settle-up's (`shareSteps`) with the pot's account as the hub: for each account, Out of each pot (Into one whose refunds outweigh its spend), then Send to the pot's account (or it sends the difference back); spend sorted to the pot's account itself is already in its main balance. The last step is Into the pot with the total (Out of it when refunds outweigh spend). Lines sorted to the pot itself need no step.
 - **Moved** (`recordMove`) records what's still to move for the ticked transactions at that moment. Transactions with nothing to move are skipped.
+- **Every pot's balance** (`potBalance`, replacing PR 8's `potFree`) = the balance last checked against the bank + every move North knows about since (`potFlows`): payday Move ticks in, Close month covers in or out (ticked, not next-month ones), built-up money moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot; into the Amex pot, less lines sorted to it), and paying the card from the Amex pot (its Pay tick on a statement paid from the pot). With no check there's no balance. **Waiting** (`waitingShares`) is each statement's card spend on the pot less its settle-up ticks and what has moved to the Amex pot ("Still to move · November statement", or "Waiting to settle" on a statement that settles once); **Free** = balance − waiting. The Amex pot waits on nothing.
+- **Where balances show:** This month adds "£289.75 in Monzo" to each monthly pot's line (carry-over pots keep "£X free in the pot"), and its summary links to the Amex pot and opens **Check balances**. Pot detail has "In Monzo now" with its sums and "Check against Monzo" for every pot. The sort sheet shows "£X free" for a checked carry-over pot. Home's move task adds what the Amex pot has.
+- **Check balances** (`checkPotBalances`): every pot by account, North's figure and when it was checked, and a box for what the bank shows; it says "Matches" or "£5.40 less than North worked out". "Same as North" fills in North's figure. Blank pots keep their last check.
+- **The Amex pot's page** (pot detail for the set-aside pot): its balance, and each statement it pays (`setAsideStatements`): the total, what's moved in, what's still to move (sorted or not) and what's been paid.
 - **On screen:** while anything is left to move, Spending shows "£140.59 to move to the Amex pot · 3 transactions sorted since the last move" on every section, and Home's current month has the task "Move £140.59 to the Amex pot". The **Move sheet** lists the moves to make per account (tap an amount to copy it), then "What it covers": every transaction to move, all ticked, a re-sort tagged "Changed since moved" with its change. Unticking one takes it out of the moves and leaves it for next time. **Moved £X** records it; the message offers **Undo**. All transactions tags each row on a pot statement **Moved** or **Changed since moved**.
 
 ## Words on screen

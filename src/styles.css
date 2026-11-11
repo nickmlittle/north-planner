@@ -1641,3 +1641,22 @@ div.spending-pot{padding-right:var(--space-4)}
 .move-transaction-body{display:grid;gap:2px;min-width:0}
 .spending-tag.is-changed{background:var(--status-review-bg);color:var(--status-review)}
 .spending-row-where .spending-tag+.spending-tag{margin-left:var(--space-1)}
+.carry-over-sums>.is-subtotal dt,.carry-over-sums>.is-subtotal dd{color:var(--charcoal);font-weight:700}
+.set-aside-statements dt{display:grid;gap:2px;color:var(--charcoal)}
+.set-aside-statements dt span{color:var(--muted);font-size:var(--text-sm)}
+.spending-balances-line{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-2);margin-top:var(--space-2)}
+.spending-balances-line .secondary-button{min-height:44px}
+.check-balances{display:grid;gap:var(--space-4)}
+.check-balances-account{display:grid;gap:var(--space-2);margin:0;padding:0;border:0}
+.check-balances-account legend{padding:0;margin-bottom:var(--space-1);color:var(--pine);font-weight:700}
+.check-balances-account ul{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden}
+.check-balances-row{display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:2px var(--space-3);align-items:center;padding:var(--space-2) var(--space-3)}
+.check-balances-row+.check-balances-row{border-top:1px solid var(--line)}
+.check-balances-label{display:grid;gap:2px;min-width:0}
+.check-balances-label span{color:var(--muted);font-size:var(--text-sm)}
+.check-balances-row input{min-height:44px;width:100%;padding:0 var(--space-2);border:1px solid var(--line-strong,var(--line));border-radius:var(--radius-sm);background:var(--card);color:var(--charcoal);font:600 var(--text-md) var(--font-family);text-align:right;font-variant-numeric:tabular-nums}
+.check-balances-row input[aria-invalid=true]{border-color:var(--status-error)}
+.check-balances-note{grid-column:1/-1;color:var(--status-ok);font-size:var(--text-sm);font-weight:600}
+.check-balances-note:empty{display:none}
+.check-balances-note.is-different{color:var(--status-review)}
+.check-balances-same{grid-column:2;justify-self:end;font-size:var(--text-sm)}

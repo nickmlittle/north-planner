@@ -143,7 +143,8 @@ describe('pot detail', () => {
 
 describe('carry-over pots', () => {
   async function bills() {
-    const { potFree, checkPotBalance, annualCosts } = await import('./cardSpending')
+    const { annualCosts } = await import('./cardSpending')
+    const { potBalance, checkPotBalance } = await import('./potBalances')
     const document = household()
     document.budget.snapshots['2026-10']!.items.push({ id: 'car-ins', name: 'Car insurance', categoryId: 'c', entryAmountPence: 61200, amountPence: 5100, frequency: 'annually', destination: pot('bills'), funding: 'equal' })
     document.card!.transactions = [
@@ -156,28 +157,28 @@ describe('carry-over pots', () => {
       'amex:2026-09-24': { cardId: 'amex', closeDate: '2026-09-24', ticks: { 'settle:out:bills': { amountPence: 5000, at: '2026-10-01T09:00:00Z' } } },
       'amex:2026-10-24': { cardId: 'amex', closeDate: '2026-10-24' },
     }
-    return { document, potFree, checkPotBalance, annualCosts }
+    return { document, potBalance, checkPotBalance, annualCosts }
   }
 
   it('has no figure until the balance has been checked, but knows what’s waiting to settle', async () => {
-    const { document, potFree } = await bills()
-    expect(potFree(document, 'bills')).toEqual({ movedInPence: 0, outPence: 0, waiting: [
+    const { document, potBalance } = await bills()
+    expect(potBalance(document, 'bills')).toEqual({ potId: 'bills', since: [], setAside: false, waitingPence: 11898, waiting: [
       { statementKey: 'amex:2026-10-24', closeDate: '2026-10-24', pence: 8600 },
       { statementKey: 'amex:2026-11-24', closeDate: '2026-11-24', pence: 3298 },
     ] })
   })
 
-  it('works out Free: checked + moved in since − out since − waiting to settle', async () => {
-    const { document, potFree, checkPotBalance } = await bills()
+  it('works out Free: checked + moved in since − out since − waiting to move', async () => {
+    const { document, potBalance, checkPotBalance } = await bills()
     let checked = checkPotBalance(document, 'bills', 124000, new Date('2026-11-09T12:00:00Z'))
     checked = { ...checked, ticks: { '2026-11': { 'ada:move:bills': { amountPence: 7500, at: '2026-11-10T09:00:00Z' }, 'ben:move:bills': { amountPence: 7500, at: '2026-11-01T09:00:00Z' }, 'ada:move:groceries': { amountPence: 100, at: '2026-11-10T09:00:00Z' } } } }
-    expect(potFree(checked, 'bills')).toMatchObject({ checked: { pence: 124000 }, movedInPence: 7500, outPence: 0, freePence: 124000 + 7500 - 8600 - 3298 })
+    expect(potBalance(checked, 'bills')).toMatchObject({ checked: { pence: 124000 }, since: [{ flow: 'payday', pence: 7500 }], freePence: 124000 + 7500 - 8600 - 3298 })
     // Settling October out of Bills after the check: it leaves the pot, and stops waiting.
     checked.card!.statements['amex:2026-10-24'] = { cardId: 'amex', closeDate: '2026-10-24', ticks: { 'settle:out:bills': { amountPence: 8600, at: '2026-11-25T09:00:00Z' } } }
-    expect(potFree(checked, 'bills')).toMatchObject({ outPence: 8600, waiting: [{ closeDate: '2026-11-24', pence: 3298 }], freePence: 124000 + 7500 - 8600 - 3298 })
+    expect(potBalance(checked, 'bills')).toMatchObject({ since: [{ flow: 'payday', pence: 7500 }, { flow: 'settled', pence: -8600 }], waiting: [{ closeDate: '2026-11-24', pence: 3298 }], freePence: 124000 + 7500 - 8600 - 3298 })
     // A late refund after settling shows as a negative wait (money to come back).
     checked.card!.transactions.push(tx('2026-10-20', [[pot('bills'), -600]], { statementKey: 'amex:2026-10-24' }))
-    expect(potFree(checked, 'bills').waiting[0]).toEqual({ statementKey: 'amex:2026-10-24', closeDate: '2026-10-24', pence: -600 })
+    expect(potBalance(checked, 'bills').waiting[0]).toEqual({ statementKey: 'amex:2026-10-24', closeDate: '2026-10-24', pence: -600 })
   })
 
   it('lists the pot’s annual costs from the Plan', async () => {

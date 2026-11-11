@@ -480,7 +480,7 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   fireEvent.change(within(dialog).getByLabelText('What’s in Bills now?'), { target: { value: '1,240' } })
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save balance' }))
   expect(saved!.card!.pots.bills!.checkedBalance).toEqual({ pence: 124000, at: expect.any(String) })
-  expect(sums()[0]).toMatch(/^In the pot · checked .+£1,240.00$/)
+  expect(sums()[0]).toMatch(/^In Monzo · checked .+£1,240.00$/)
   expect(sums()).toContain('Free£1,134.01')
   fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
   expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. £1,134.01 free in the pot' })).toBeInTheDocument()
@@ -739,6 +739,32 @@ describe('the Amex pot', () => {
     expect(screen.getByRole('button', { name: /^FUEL STOP/ })).not.toHaveAccessibleName(/moved/)
     // October is before the pot: no tag.
     expect(screen.getByRole('button', { name: /^OLD SHOP/ })).not.toHaveAccessibleName(/moved/)
+  })
+
+  it('works out each pot’s balance, checks them all at once, and shows the Amex pot', () => {
+    const document = withPot()
+    document.card!.pots = { groceries: { checkedBalance: { pence: 50000, at: '2026-11-01T00:00:00.000Z' } } }
+    document.card!.moves = [{ id: 'm1', cardId: 'amex', at: '2026-11-05T09:00:00.000Z', transactions: [{ transactionId: 'grocer', lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'groceries' } }] }] }]
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={document} startView="month" onChange={next => { saved = next }}/>)
+    expect(screen.getByRole('button', { name: /^Groceries: £44.60 spent\. £455.40 in Monzo$/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Check balances' }))
+    const dialog = screen.getByRole('dialog', { name: 'Check balances' })
+    const groceries = within(dialog).getByLabelText(/^Groceries/)
+    expect(groceries).toHaveAccessibleName(/North: £455.40 · checked/)
+    fireEvent.change(groceries, { target: { value: '455.40' } })
+    expect(within(dialog).getByText('Matches')).toBeInTheDocument()
+    fireEvent.change(groceries, { target: { value: '450' } })
+    expect(within(dialog).getByText('£5.40 less than North worked out')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save 1 balance' }))
+    expect(saved!.card!.pots.groceries!.checkedBalance!.pence).toBe(45000)
+    expect(screen.getByRole('status')).toHaveTextContent('1 balance checked.')
+    // The Amex pot: what each statement it pays costs, and what's still to move.
+    fireEvent.click(screen.getByRole('button', { name: 'Amex pot' }))
+    expect(screen.getByRole('heading', { name: 'Amex' })).toBeInTheDocument()
+    expect(screen.getByText('November statement')).toBeInTheDocument()
+    expect(screen.getByText('£44.60 moved in · £76.20 still to move')).toBeInTheDocument()
+    expect(screen.getByText('£120.80')).toBeInTheDocument()
   })
 
   it('shows nothing to move without a set-aside pot', () => {
