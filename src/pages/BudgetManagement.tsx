@@ -4,12 +4,13 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import type { BudgetAccount, BudgetCategory, BudgetPot } from '../domain/monthlyBudget'
 import { accountTypeLabel, isAccountTypeId } from '../domain/accountTypes'
 import { createPotsForAccounts, planPotCreation } from '../domain/bulkPots'
+import { potSettings, savePotSettings } from '../domain/cardSpending'
 import { AccountFields, type AccountFieldsValue } from './AccountFields'
 import { accountOptionLabels, accountOwnerGroups, accountOwnerLabel, sortPotsForManage } from './budgetLabels'
 
 type Kind = 'account' | 'pot' | 'category'
 type Draft = ({ kind: 'account'; id: string | null } & AccountFieldsValue)
-  | { kind: 'pot'; id: string; name: string; accountId: string }
+  | { kind: 'pot'; id: string; name: string; accountId: string; carriesOver: boolean; pace: boolean; buildUpLimit: string }
   | { kind: 'bulk-pot'; id: null; name: string; accountIds: string[] }
   | { kind: 'category'; id: string | null; name: string }
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; onClose: () => void }
@@ -20,7 +21,7 @@ const tabs: Array<{ kind: Kind; label: string; count: (document: BudgetDocument)
   { kind: 'category', label: 'Categories', count: document => document.budget.categories.length },
 ]
 
-function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategory): Draft {
+function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategory, document?: BudgetDocument): Draft {
   if (kind === 'account') {
     const account = record as BudgetAccount | undefined
     const type = accountTypeLabel(account?.accountTypeId)
@@ -28,7 +29,9 @@ function draftFor(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategor
   }
   if (kind === 'pot') {
     const pot = record as BudgetPot | undefined
-    return pot ? { kind, id: pot.id, name: pot.name, accountId: pot.accountId } : { kind: 'bulk-pot', id: null, name: '', accountIds: [] }
+    if (!pot) return { kind: 'bulk-pot', id: null, name: '', accountIds: [] }
+    const settings = document ? potSettings(document, pot.id) : { carriesOver: false, pace: 'steady', buildUpLimit: 2 }
+    return { kind, id: pot.id, name: pot.name, accountId: pot.accountId, carriesOver: settings.carriesOver, pace: settings.pace === 'steady', buildUpLimit: String(settings.buildUpLimit) }
   }
   return { kind, id: record?.id ?? null, name: record?.name ?? '' }
 }
@@ -71,7 +74,7 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
   }
   function begin(kind: Kind, record?: BudgetAccount | BudgetPot | BudgetCategory) {
     if (!canLeave()) return
-    const next = draftFor(kind, record)
+    const next = draftFor(kind, record, document)
     if (draft?.kind === next.kind && draft.id === next.id) { clearDraft(); return }
     setDraft(next); setOriginal(JSON.stringify(next)); setError(''); setStatus(''); setTab(kind)
   }
@@ -104,7 +107,10 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
       if (draft.kind === 'pot') {
         const account = accounts.find(account => account.id === draft.accountId)
         if (!account) { setError('Choose an account for this pot.'); return }
-        setDocument(current => ({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === draft.id ? { ...row, name, accountId: draft.accountId } : row) } }))
+        // Carry-over pots aren't flagged for building up, so their limit isn't asked for.
+        const typed = Number(draft.buildUpLimit), limit = draft.carriesOver ? potSettings(document, draft.id).buildUpLimit : typed
+        if (!draft.carriesOver && (!draft.buildUpLimit.trim() || !Number.isFinite(typed) || typed <= 0)) { setError('Enter how many months’ worth can build up, like 2.'); return }
+        setDocument(current => savePotSettings({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === draft.id ? { ...row, name, accountId: draft.accountId } : row) } }, draft.id, { carriesOver: draft.carriesOver, pace: draft.pace ? 'steady' : 'none', buildUpLimit: limit }))
       } else {
         if (categories.some(category => category.id !== draft.id && category.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) { setError('A category with this name already exists.'); return }
         const category = { id: draft.id ?? crypto.randomUUID(), name }
@@ -120,7 +126,12 @@ export function BudgetManagement({ document, setDocument, onClose }: Props) {
     return <form className="budget-manage-form" aria-label={`${recordId ? 'Edit' : 'Add'} ${kind}`} onSubmit={save}>
       {draft.kind === 'account' ? <AccountFields value={draft} adults={adults} onChange={value => setDraft({ ...draft, ...value })}/>
         : <label>{kind === 'pot' ? 'Pot name' : 'Category name'}<input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })}/></label>}
-      {draft.kind === 'pot' && <><label>Parent account<select value={draft.accountId} onChange={event => setDraft({ ...draft, accountId: event.target.value })}><option value="">Choose an account</option>{groups.flatMap(group => group.accounts).map(account => <option key={account.id} value={account.id}>{optionLabels.get(account.id)}</option>)}</select></label>{draft.accountId !== pots.find(pot => pot.id === recordId)?.accountId && <p className="budget-manage-note">Updates funding for this pot’s items in every month.</p>}</>}
+      {draft.kind === 'pot' && <><label>Parent account<select value={draft.accountId} onChange={event => setDraft({ ...draft, accountId: event.target.value })}><option value="">Choose an account</option>{groups.flatMap(group => group.accounts).map(account => <option key={account.id} value={account.id}>{optionLabels.get(account.id)}</option>)}</select></label>{draft.accountId !== pots.find(pot => pot.id === recordId)?.accountId && <p className="budget-manage-note">Updates funding for this pot’s items in every month.</p>}
+        <fieldset className="budget-pot-spending"><legend>Spending</legend>
+          <label className="budget-pot-check"><input type="checkbox" checked={draft.carriesOver} onChange={event => setDraft({ ...draft, carriesOver: event.target.checked, pace: event.target.checked ? false : draft.pace })}/>Carries over from month to month</label>
+          <label className="budget-pot-check"><input type="checkbox" checked={draft.pace} disabled={draft.carriesOver} onChange={event => setDraft({ ...draft, pace: event.target.checked })}/>Show pace (for steady spending like groceries)</label>
+          {!draft.carriesOver && <label>Flag a build-up over (months’ worth)<input inputMode="decimal" value={draft.buildUpLimit} onChange={event => setDraft({ ...draft, buildUpLimit: event.target.value })}/></label>}
+        </fieldset></>}
       {draft.kind === 'bulk-pot' && preview && <>
         <button type="button" className="text-button" onClick={() => setDraft({ ...draft, accountIds: draft.accountIds.length === accounts.length ? [] : accounts.map(account => account.id) })}>{draft.accountIds.length === accounts.length ? 'Clear all accounts' : 'Select all accounts'}</button>
         {groups.map(group => {

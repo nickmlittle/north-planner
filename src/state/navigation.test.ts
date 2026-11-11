@@ -6,10 +6,10 @@ afterEach(() => window.history.replaceState(null, '', '/'))
 
 it('parses direct, legacy and invalid navigation URLs', () => {
   expect(parseNavigation('?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')).toEqual({
-    view: 'budget', budgetView: 'transfers', month: '2026-02', planDestination: null, spendingView: 'sort',
+    view: 'budget', budgetView: 'transfers', month: '2026-02', planDestination: null, spendingView: 'sort', spendingPot: null,
   })
   expect(parseNavigation('?view=dashboard&budgetView=unknown&month=2026-13')).toEqual({
-    view: 'budget', budgetView: 'plan', month: currentMonth(), planDestination: null, spendingView: 'sort',
+    view: 'budget', budgetView: 'plan', month: currentMonth(), planDestination: null, spendingView: 'sort', spendingPot: null,
   })
   expect(parseNavigation('?view=budget').budgetView).toBe('plan')
 })
@@ -53,4 +53,14 @@ it('opens Spending and keeps its section in the link', () => {
   expect(window.location.search).not.toContain('budgetView')
   navigateTo({ view: 'budget', budgetView: 'transfers' })
   expect(window.location.search).not.toContain('spendingView')
+})
+
+it('keeps a pot open on This month, and drops it elsewhere', () => {
+  expect(parseNavigation('?view=spending&spendingView=month&spendingPot=groceries').spendingPot).toBe('groceries')
+  expect(parseNavigation('?view=spending&spendingView=sort&spendingPot=groceries').spendingPot).toBeNull()
+  window.history.replaceState(null, '', '/?view=spending&spendingView=month')
+  navigateTo({ spendingPot: 'groceries' })
+  expect(window.location.search).toContain('spendingPot=groceries')
+  navigateTo({ spendingView: 'sort' })
+  expect(window.location.search).not.toContain('spendingPot')
 })

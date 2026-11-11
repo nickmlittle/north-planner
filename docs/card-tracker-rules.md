@@ -14,6 +14,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Sort sheet, suggestions, rules, Sorted by rules, All transactions | 4 | `src/domain/cardSorting.ts`, `src/pages/SortSheet.tsx`, `RulesPanel.tsx` |
 | Splits: by amount, half each, funding share, receipt items | 5 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
 | Refund matching, refund of a split, linked rows, payments listed apart | 6 | `src/domain/cardRefunds.ts`, `src/pages/SortSheet.tsx` |
+| This month: planned vs spent, pace, pot detail and chart, pot settings | 7 | `src/domain/cardSpending.ts`, `src/pages/SpendingMonth.tsx`, `BudgetManagement.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -109,6 +110,21 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 - **On import** (`matchRefundOnImport`): a clear match sorts the refund straight back with `by: 'rule'` and no `ruleId` (so it shows under Sorted by rules, tagged Refund, for checking) and sets `refundOf` (with `lineIndex` for an exact split line). An unclear match only sets `refundOf` and leaves the refund to sort.
 - **By hand** (`sortRefund`): choosing a line, spreading, or any other pot or account sorts the refund and sets `refundOf`. The refund counts in the month of its own date, and lowers its pot's share of the statement it's on.
 - Rows link both ways: "Refund of COSTCO £186.40 · 24 Oct" on the refund, "Refunded −£14.99 · 6 Nov" on the purchase (`refundsOf`).
+
+## Month figures (§6.5)
+
+`monthSpending(document, month, today)` works out each destination's figures for a calendar month. The screens never recompute them.
+
+- **Planned**: the month's resolved items (`resolveBudget`) for that pot, monthly amounts. Accounts have no Planned on this screen: direct items (rent, childcare) aren't card spending.
+- **Spent**: the split lines of purchases and refunds *dated in the month* (D2), whatever statement they're on. Refunds are negative. Unsorted transactions and payments don't count.
+- **Taken**: the previous month's next-month covers for the pot (R1). **Left** = Planned − Spent − Taken.
+- **Pace** (steady pots in the current month only): day = today's day of the month; expected = Planned × day ÷ days in month. **Ahead of pace** when (Spent + Taken) − expected ≥ max(£10, 10% of Planned). **Over** when Left < 0 (in any month). **Runs out** when the daily average would reach Planned before the month's last day; the screens show it only when ahead. The thresholds are constants in `cardSpending.ts`.
+- **Needs care** = over or ahead. "Sorted to" is the latest transaction date brought in.
+- **Status**: over, ahead, on track, left (no pace, or a past month), or one-offs (accounts, and pots with no plan). Carry-over pots show what was spent this month (Free comes with PR 8).
+- **Which rows show**: paced pots with a plan (even at £0 spent), and any pot or account with spending or a cover taken. Rows are grouped Joint, each adult (a pot belongs to its account's single owner), then Accounts; carry-over pots last in a group, then A–Z. The month's Planned total is the shown pots' Planned; Spent is every row's.
+- **Pot settings** (`potSettings`, `savePotSettings`): pace defaults to steady, or none for a carry-over pot or a pot in a savings, ISA or pension account; build-up limit defaults to 2× the monthly Planned. Edited in Manage → Pots.
+- **Pot detail**: what's left and for how many days, about £X a day (Left ÷ days left) against the average so far (Spent ÷ day), the cumulative chart (`cumulativeByDay`) against the planned pace, and the pot's transactions in the month (`destinationTransactions`), each split showing only its line for this pot.
+- **Sort sheet**: `leftByDestination` gives "£X left" for every planned pot that doesn't carry over, in the transaction's month.
 
 ## Payments
 

@@ -260,3 +260,31 @@ it('closes from the × with the same unsaved-edit guard as Done', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Close' }))
   expect(result.onClose).toHaveBeenCalledTimes(1)
 })
+
+it('edits a pot’s spending settings: carries over, pace and the build-up limit', async () => {
+  const { decodeBudgetDocument, newBudgetDocument } = await import('../domain/budgetDocument')
+  const { potSettings } = await import('../domain/cardSpending')
+  const { useState } = await import('react')
+  const start = newBudgetDocument()
+  start.household = { name: 'Home', adults: [{ id: 'ada', name: 'Ada' }] }
+  start.budget.accounts = [{ id: 'joint', name: 'Current account', provider: 'Monzo', ownerPersonIds: ['ada'], accountTypeId: 'current-account' }]
+  start.budget.pots = [{ id: 'bills', name: 'Bills', accountId: 'joint' }]
+  let saved = start
+  function Harness() {
+    const [document, setDocument] = useState(start)
+    return <BudgetManagement document={document} setDocument={update => setDocument(current => { saved = typeof update === 'function' ? update(current) : update; return saved })} onClose={() => {}}/>
+  }
+  render(<Harness/>)
+  fireEvent.click(screen.getByRole('tab', { name: /Pots/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Bills/ }))
+  const form = screen.getByRole('form', { name: 'Edit pot' })
+  expect(within(form).getByLabelText('Show pace (for steady spending like groceries)')).toBeChecked()
+  fireEvent.change(within(form).getByLabelText('Flag a build-up over (months’ worth)'), { target: { value: '0' } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Save pot' }))
+  expect(within(form).getByRole('alert')).toHaveTextContent('Enter how many months’ worth can build up, like 2.')
+  fireEvent.click(within(form).getByLabelText('Carries over from month to month'))
+  expect(within(form).getByLabelText('Show pace (for steady spending like groceries)')).toBeDisabled()
+  fireEvent.click(within(form).getByRole('button', { name: 'Save pot' }))
+  expect(potSettings(saved, 'bills')).toEqual({ carriesOver: true, pace: 'none', buildUpLimit: 2 })
+  expect(decodeBudgetDocument(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+})

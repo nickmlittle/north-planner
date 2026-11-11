@@ -2,7 +2,8 @@ import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, defaultRuleText, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, defaultRuleText, destinationKey, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
+import { leftByDestination } from '../domain/cardSpending'
 import { addRule, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
 import { refundPlan, refundPurchase, sortRefund, type RefundChoice } from '../domain/cardRefunds'
 import { formatMonth } from '../formatting/month'
@@ -21,6 +22,8 @@ type Props = {
   /** "Split across pots": open the split editor instead. */
   onSplit?: () => void
   now?: () => Date
+  /** For "£X left" against this month's plan. */
+  today?: string
 }
 
 /** How many suggestions show before "All pots and accounts". */
@@ -28,6 +31,9 @@ const SHOWN = 6
 
 /** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
 export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date() }: Props) {
+  // What's left in each planned pot in the transaction's month, so the choice shows its consequence.
+  const left = leftByDestination(document, transaction.date.slice(0, 7))
+  const leftText = (destination: BudgetDestination) => { const pence = left.get(destinationKey(destination)); return pence === undefined ? '' : pence < 0 ? `${pounds(-pence)} over` : `${pounds(pence)} left` }
   const id = useId()
   const name = destinationNamer(document)
   const tracker = cardTracker(document)
@@ -74,6 +80,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
     const selected = sameDestination(destination, current)
     return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected} onClick={() => place(destination)}>
       <span className="sort-option-text"><span className="sort-option-name">{name(destination)}</span>{sub && <span className="sort-option-sub">{sub}</span>}</span>
+      {leftText(destination) && <span className="sort-option-left">{leftText(destination)}</span>}
       {selected && <Check aria-hidden="true"/>}
     </button></li>
   }
