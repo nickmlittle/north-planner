@@ -60,7 +60,7 @@ Mobile uses a compact page heading and labeled bottom navigation for Home, Plan,
 
 ### Home
 
-Home is this month at a glance: “This month” over the month as its title, then the per-person summary from Plan (“November plan”), with “Review Immy's items” (Plan filtered to that person's accounts) and Open Plan. Desktop adds Open Transfers and Open Plan beside the title.
+Home is this month at a glance: “This month” over the month as its title, then the per-person summary from Plan (“November plan”), with “Review Immy's items” (Plan filtered to that person's accounts) and Open Plan. Desktop adds Open Transfers and Open Plan beside the title. Below the summary, a pine “You're up to date for November” banner appears once every payday step is ticked. **To do** has one card per adult (side by side on desktop): an “£X over this month” warning that opens their items on Plan (a heads-up, not counted), and Payday transfers (“4 to fund · 4 moves · 3 of 8 done” with a bar, “1 changed since ticked · send £50.00 more”, or struck through when all ticked), which opens Transfers on that person. Accounts that need review add an “Either of you” card. **Coming up** names what's new in the month's budget, or which month's budget it uses, and any income change.
 
 ### Plan
 
