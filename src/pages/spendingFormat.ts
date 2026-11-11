@@ -2,6 +2,8 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate, type CardTransaction } from '../domain/cardTracker'
 import { formatGBP } from '../formatting/money'
 import { dayDate } from './cardLabels'
+import type { StatementSummary } from '../domain/cardStatements'
+import { formatMonth } from '../formatting/month'
 
 export const pounds = (pence: number) => formatGBP(pence / 100)
 /** "£62.40", or "−£24.99" for a refund. */
@@ -19,3 +21,18 @@ export const transactionMeta = (document: Pick<BudgetDocument, 'household'>, tra
 
 /** "Mon 9 Nov" for an ISO time, on the device's calendar. */
 export const dayOf = (iso: string) => dayDate(localDate(new Date(iso)))
+
+const monthName = (month: string) => formatMonth(month).split(' ')[0]!
+/** Statements are named by the month they close in: the 25 Oct – 24 Nov statement is November's. */
+export const statementName = (closeDate: string) => `${monthName(closeDate.slice(0, 7))} statement`
+
+/** Where a statement is: open, waiting for something, ready, part ticked, or settled. */
+export function statementStatus(summary: StatementSummary): { text: string; tone: 'open' | 'todo' | 'ready' | 'done' } {
+  if (summary.settled) return { text: `Settled${summary.record?.settledAt ? ` ${dayOf(summary.record.settledAt)}` : ''}`, tone: 'done' }
+  if (summary.open) return { text: `Open · closes ${dayDate(summary.closeDate)}`, tone: 'open' }
+  if (summary.toSort) return { text: `${summary.toSort} to sort`, tone: 'todo' }
+  if (!summary.complete) return { text: 'Needs the final export', tone: 'todo' }
+  if (summary.done) return { text: `${summary.done} of ${summary.steps} done`, tone: 'ready' }
+  return { text: `Ready to settle · due ${dayDate(summary.dueDate)}`, tone: 'ready' }
+}
+

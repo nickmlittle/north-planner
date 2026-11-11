@@ -33,7 +33,8 @@ function Harness({ initial, onChange = () => {}, startView = 'sort', today = '20
   const [view, setView] = useState<SpendingView>(startView)
   const [month, setMonth] = useState(today.slice(0, 7))
   const [pot, setPot] = useState<string | null>(null)
-  return <Spending document={document} view={view} onSelectView={next => { setView(next); setPot(null) }} onOpenHousehold={() => {}} month={month} onMonthChange={setMonth} potId={pot} onOpenPot={setPot} today={today} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  const [statement, setStatement] = useState<string | null>(null)
+  return <Spending document={document} view={view} onSelectView={next => { setView(next); setPot(null); setStatement(null) }} onOpenHousehold={() => {}} month={month} onMonthChange={setMonth} potId={pot} onOpenPot={setPot} statementKey={statement} onOpenStatement={setStatement} today={today} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
 }
 
 it('asks for a card before anything else', () => {
@@ -482,4 +483,84 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   expect(sums()).toContain('Free£1,134.01')
   fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
   expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. £1,134.01 free in the pot' })).toBeInTheDocument()
+})
+
+function statementHousehold(): BudgetDocument {
+  const document = monthHousehold()
+  document.card!.transactions = document.card!.transactions.filter(row => row.id !== 'u1' && row.id !== 'g7')
+  document.card!.transactions.push(
+    tx('oct', '2026-10-20', 'GREEN GROCER', 4000, { statementKey: 'amex:2026-10-24', sort: { lines: [{ amountPence: 4000, destination: { kind: 'pot', potId: 'groceries' } }], by: 'person', at: 'x' } }),
+    tx('pay', '2026-11-08', 'PAYMENT RECEIVED - THANK YOU', -4000, { kind: 'payment' }),
+  )
+  document.card!.statements = {
+    'amex:2026-10-24': { cardId: 'amex', closeDate: '2026-10-24', finalImportAt: '2026-10-27T08:00:00Z', amexSummary: { previousPence: 0, paymentsAndCreditsPence: 0, chargesPence: 4000, totalPence: 4000, at: 'x' } },
+  }
+  return document
+}
+
+it('lists statements newest first with where each one is', () => {
+  render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30"/>)
+  expect(screen.getAllByRole('button', { name: /statement/ }).map(row => row.textContent)).toEqual([
+    'November statement£737.91 25 Oct – 24 Nov · due Sat 19 DecNeeds the final export',
+    'October statement£40.0025 Sep – 24 Oct · due Wed 18 NovReady to settle · due Wed 18 Nov',
+  ].map(text => text.replace('£737.91 ', '£737.91')))
+})
+
+it('shows a statement’s checks, months and shares, and settles up step by step', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
+  expect(screen.getByRole('heading', { name: 'November statement' })).toBeInTheDocument()
+  expect(screen.getByText('To pay Amex').nextElementSibling).toHaveTextContent('£737.91')
+  expect(screen.getByText('All 10 transactions sorted')).toBeInTheDocument()
+  expect(screen.getByText('No summary from Amex yet')).toBeInTheDocument()
+  expect(screen.getByText('Amex shows a payment of £40.00 on 8 Nov')).toBeInTheDocument()
+  expect([...window.document.querySelectorAll('.statement-months > div')].map(row => row.textContent)).toEqual(['Counts in October£10.00', 'Counts in November£727.91'])
+  expect(within(screen.getByRole('region', { name: 'Ada' })).getByText('Treats · Ada').nextElementSibling).toHaveTextContent('£212.50')
+  expect(within(screen.getByRole('region', { name: 'Joint' })).getByText('One-offs, already in Joint').nextElementSibling).toHaveTextContent('£112.81')
+  // Not complete yet: bring in the final export, or settle without it.
+  expect(screen.queryByRole('button', { name: 'Settle up' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Settle without the final export' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))
+  expect(screen.getByRole('heading', { name: 'Settle up · November statement' })).toBeInTheDocument()
+  expect(screen.getByText('0 of 5 done')).toBeInTheDocument()
+  const ada = within(screen.getByRole('region', { name: 'Ada steps' }))
+  expect(ada.getAllByRole('listitem').map(item => item.querySelector('.payday-step-main')?.textContent)).toEqual(['Out of Treats£212.50', 'Send to Joint£212.50'])
+  const joint = within(screen.getByRole('region', { name: 'Joint steps' }))
+  expect(joint.getAllByRole('listitem').map(item => item.querySelector('.payday-step-main')?.textContent)).toEqual(['Out of Eating out£64.00', 'Out of Groceries£348.60'])
+  const pay = within(screen.getByRole('region', { name: 'Pay Amex' }))
+  expect(pay.getByText('Pay Amex from Joint').nextElementSibling).toHaveTextContent('£737.91')
+  expect(pay.getByText('Includes £112.81 of one-offs already in Joint')).toBeInTheDocument()
+  fireEvent.click(ada.getByRole('button', { name: 'Out of Treats done' }))
+  expect(saved!.card!.statements['amex:2026-11-24']!.ticks!['settle:out:treats']).toMatchObject({ amountPence: 21250 })
+  expect(screen.getByText('1 of 5 done')).toBeInTheDocument()
+  for (const name of ['Send to Joint done', 'Out of Eating out done', 'Out of Groceries done', 'Pay Amex from Joint done']) fireEvent.click(screen.getByRole('button', { name }))
+  expect(screen.getByText('The November statement is settled')).toBeInTheDocument()
+  expect(saved!.card!.statements['amex:2026-11-24']!.settledAt).toEqual(expect.any(String))
+})
+
+it('says what a statement is waiting for before it can be settled', () => {
+  const document = statementHousehold()
+  document.card!.transactions.push(tx('late', '2026-11-20', 'NEW SHOP', 500))
+  render(<Harness initial={document} startView="statements" today="2026-11-20"/>)
+  fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
+  expect(screen.getByText('You can settle up once it closes on Tue 24 Nov.')).toBeInTheDocument()
+  expect(screen.getByText('1 to sort')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Sort them' }))
+  expect(screen.getByRole('heading', { name: 'To sort' })).toBeInTheDocument()
+})
+
+it('offers to tick Pay when Amex shows a matching payment', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^October statement/ }))
+  expect(screen.getByText('Matches Amex’s summary')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Tick Pay Amex' })).not.toBeInTheDocument()
+  cleanup()
+  const document = statementHousehold()
+  document.card!.transactions.find(row => row.id === 'pay')!.statementKey = 'amex:2026-10-24'
+  render(<Harness initial={document} startView="statements" today="2026-11-30" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^October statement/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Tick Pay Amex' }))
+  expect(saved!.card!.statements['amex:2026-10-24']!.ticks!['settle:pay']).toMatchObject({ amountPence: 4000 })
 })
