@@ -1,6 +1,6 @@
 export type PlannerView = 'home' | 'household' | 'budget' | 'spending'
 /** The Spending tab's sections (plan §7). Ones not built yet fall back to To sort. */
-export type SpendingView = 'sort' | 'month' | 'statements' | 'rules'
+export type SpendingView = 'sort' | 'all' | 'month' | 'statements' | 'rules'
 export type BudgetView = 'plan' | 'transfers'
 export type PlanDestination = { kind: 'account' | 'direct' | 'pot'; id: string }
 /** Where "See items" in the payday steps was opened from, so Back to Transfers lands on the same account. */
@@ -23,7 +23,7 @@ export function hasLiveTransfersOrigin(destination: PlanDestination | null): boo
   return !!origin && !!destination && liveTransfersOrigins.has(origin.key) && origin.month === current.month && origin.destination.kind === destination.kind && origin.destination.id === destination.id
 }
 export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null; spendingView: SpendingView }
-const spendingViews: readonly SpendingView[] = ['sort', 'month', 'statements', 'rules']
+const spendingViews: readonly SpendingView[] = ['sort', 'all', 'month', 'statements', 'rules']
 const isSpendingView = (value: string | null): value is SpendingView => spendingViews.includes(value as SpendingView)
 
 function parsePlanDestination(raw: string | null): PlanDestination | null {

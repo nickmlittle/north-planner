@@ -191,7 +191,7 @@ export type ManualEntry = { cardId: string; date: string; description: string; a
  * A transaction added by hand (plan §6.2): anything missed after a statement closed, since the export only
  * covers the current period. Its statement comes from the date window. Rules apply as they do on import.
  */
-export function addManualTransaction(document: BudgetDocument, entry: ManualEntry, now: Date, id = `manual:${crypto.randomUUID()}`): BudgetDocument {
+export function addManualTransaction(document: BudgetDocument, entry: ManualEntry, now: Date, id: string = `manual:${crypto.randomUUID()}`): BudgetDocument {
   const tracker = cardTracker(document)
   const card = tracker.cards.find(row => row.id === entry.cardId)
   if (!card) throw new AmexImportError('Add the card in Household first.')
