@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, CreditCard, FileSpreadsheet, Plus } from 'lu
 import { MOBILE_QUERY } from '../breakpoints'
 import { PageFrame } from '../components/PageFrame'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, localDate, type CardTransaction } from '../domain/cardTracker'
 import { allTransactions, checkRuleSorts, lastImport, sortDestination, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
 import type { SpendingView } from '../state/navigation'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
@@ -14,6 +14,7 @@ import { ManualEntrySheet } from './ManualEntrySheet'
 import { RulesPanel } from './RulesPanel'
 import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
+import { PotDetail, ThisMonthPanel } from './SpendingMonth'
 import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
 
@@ -23,6 +24,14 @@ type Props = {
   view: SpendingView
   onSelectView: (view: SpendingView) => void
   onOpenHousehold: () => void
+  /** The month This month shows (the app's selected month). */
+  month: string
+  onMonthChange: (month: string) => void
+  /** A pot's detail on This month. */
+  potId?: string | null
+  onOpenPot: (potId: string | null) => void
+  /** Today, for pace; tests pass a fixed one. */
+  today?: string
 }
 
 type Section = { id: SpendingView; label: string; count?: number; desktopOnly?: boolean }
@@ -58,7 +67,7 @@ export function TransactionRow({ document, transaction, where, tag, action, onSe
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
-export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -72,6 +81,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const byRules = uncheckedRuleSorts(tracker)
   const sections: Section[] = [
     { id: 'sort', label: 'To sort', count: toSort.length },
+    { id: 'month', label: 'This month' },
     { id: 'all', label: 'All transactions', desktopOnly: true },
     { id: 'rules', label: 'Rules', count: tracker.rules.length, desktopOnly: true },
   ]
@@ -143,9 +153,11 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     </div>}
     {compact && more.some(section => section.id === active) && <button type="button" className="text-button spending-back" onClick={() => onSelectView('sort')}>Back to To sort</button>}
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
-      {active === 'sort' ? sortPanel : active === 'all' ? allPanel : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
+      {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
+        ? potId ? <PotDetail document={document} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} headingExtra={headingExtra}/>
+        : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
-    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
+    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}

@@ -28,17 +28,19 @@ const tx = (id: string, date: string, description: string, amountPence: number, 
   id, cardId: 'amex', date, description, merchant: description, amountPence, kind: amountPence < 0 ? 'refund' : 'purchase', cardSuffix: '41001', statementKey: 'amex:2026-11-24', personId: 'ada', importedAt: '2026-11-09T10:00:00Z', ...overrides,
 })
 
-function Harness({ initial, onChange = () => {} }: { initial: BudgetDocument; onChange?: (document: BudgetDocument) => void }) {
+function Harness({ initial, onChange = () => {}, startView = 'sort', today = '2026-11-12' }: { initial: BudgetDocument; onChange?: (document: BudgetDocument) => void; startView?: SpendingView; today?: string }) {
   const [document, setDocument] = useState(initial)
-  const [view, setView] = useState<SpendingView>('sort')
-  return <Spending document={document} view={view} onSelectView={setView} onOpenHousehold={() => {}} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  const [view, setView] = useState<SpendingView>(startView)
+  const [month, setMonth] = useState(today.slice(0, 7))
+  const [pot, setPot] = useState<string | null>(null)
+  return <Spending document={document} view={view} onSelectView={next => { setView(next); setPot(null) }} onOpenHousehold={() => {}} month={month} onMonthChange={setMonth} potId={pot} onOpenPot={setPot} today={today} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
 }
 
 it('asks for a card before anything else', () => {
   const document = household()
   delete document.card
   const onOpenHousehold = vi.fn()
-  render(<Spending document={document} setDocument={() => {}} view="sort" onSelectView={() => {}} onOpenHousehold={onOpenHousehold}/>)
+  render(<Spending document={document} setDocument={() => {}} view="sort" onSelectView={() => {}} onOpenHousehold={onOpenHousehold} month="2026-11" onMonthChange={() => {}} onOpenPot={() => {}}/>)
   expect(screen.getByRole('heading', { name: 'Add your card first' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Set up a card' }))
   expect(onOpenHousehold).toHaveBeenCalled()
@@ -396,4 +398,61 @@ it('lists payments to Amex apart, and never as something to sort', () => {
   const section = screen.getByRole('region', { name: 'Payments to Amex' })
   expect(within(section).getByText('PAYMENT RECEIVED - THANK YOU')).toBeInTheDocument()
   expect(within(section).queryByRole('button')).not.toBeInTheDocument()
+})
+
+function monthHousehold(): BudgetDocument {
+  const document = splitHousehold()
+  document.budget.categories = [{ id: 'c', name: 'Spending' }]
+  const item = (id: string, potId: string, pence: number) => ({ id, name: id, categoryId: 'c', entryAmountPence: pence, amountPence: pence, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId }, funding: 'equal' as const })
+  document.budget.snapshots['2026-11'] = { items: [item('g', 'groceries', 52000), item('e', 'eating', 15000), item('t', 'treats', 20000)] }
+  const sorted = (potId: string, pence: number) => ({ lines: [{ amountPence: pence, destination: { kind: 'pot' as const, potId } }], by: 'person' as const, at: 'x' })
+  document.card!.transactions = [
+    tx('g1', '2026-11-01', 'MARKET HALL DELI', 7490, { sort: sorted('groceries', 7490) }), tx('g2', '2026-11-03', 'GREEN GROCER', 8835, { sort: sorted('groceries', 8835) }),
+    tx('g3', '2026-11-05', 'GREEN GROCER', 4460, { sort: sorted('groceries', 4460) }), tx('g4', '2026-11-07', 'GREEN GROCER', 4120, { sort: sorted('groceries', 4120) }),
+    tx('g5', '2026-11-08', 'GREEN GROCER', 2715, { sort: sorted('groceries', 2715) }), tx('g6', '2026-11-10', 'GREEN GROCER', 6240, { sort: sorted('groceries', 6240) }),
+    tx('g0', '2026-10-30', 'GREEN GROCER', 1000, { sort: sorted('groceries', 1000), statementKey: 'amex:2026-11-24' }),
+    tx('g7', '2026-11-26', 'GREEN GROCER', 1, { sort: sorted('groceries', 1), statementKey: 'amex:2026-12-24' }),
+    tx('e1', '2026-11-06', 'CORNER CAFE', 6400, { sort: sorted('eating', 6400) }),
+    tx('t1', '2026-11-04', 'BOOK NOOK', 21250, { sort: sorted('treats', 21250) }),
+    tx('j1', '2026-11-09', 'TRAIN TICKETS', 11281, { sort: { lines: [{ amountPence: 11281, destination: { kind: 'account', accountId: 'joint' } }], by: 'person', at: 'x' } }),
+    tx('u1', '2026-11-09', 'UNSORTED', 900),
+  ]
+  return document
+}
+
+it('shows planned vs spent for each pot this month, grouped like Plan, with pace', () => {
+  render(<Harness initial={monthHousehold()} startView="month"/>)
+  expect(screen.getByRole('tab', { name: 'This month', selected: true })).toBeInTheDocument()
+  expect(screen.getByText('Spent on Amex so far')).toBeInTheDocument()
+  expect(screen.getByText('of £870.00 planned').parentElement).toHaveTextContent('£727.92 of £870.00 planned')
+  expect(screen.getByText('2 pots need care · 18 days left · sorted to 26 Nov')).toBeInTheDocument()
+  expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['Joint', 'Ada', 'Accounts'])
+  expect(screen.getByRole('button', { name: 'Groceries: £338.61 of £520.00. £131 ahead of pace · £181.39 left' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Eating out: £64.00 of £150.00. On track · £86.00 left' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Treats: £212.50 of £200.00. £12.50 over · covered when November closes' })).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'Accounts' })).getByText('one-offs').parentElement).toHaveTextContent('£112.81 one-offs')
+})
+
+it('opens a steady pot: what’s left a day, the pace chart, when it runs out, and its transactions', () => {
+  render(<Harness initial={monthHousehold()} startView="month"/>)
+  fireEvent.click(screen.getByRole('button', { name: /^Groceries:/ }))
+  expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
+  expect(screen.getByText('November 2026 · day 12 of 30')).toBeInTheDocument()
+  expect(screen.getByText('for 18 days').parentElement).toHaveTextContent('£181.39 for 18 days')
+  expect(screen.getByText('About £10 a day. You’ve averaged £28.')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Groceries spending so far against the plan: £338.61 spent by day 12, against £208.00 at the planned pace, of £520.00 planned. Runs out around Thu 19 Nov.' })).toBeInTheDocument()
+  expect(screen.getByText('At this rate Groceries runs out around Thu 19 Nov, 11 days before the month ends.')).toBeInTheDocument()
+  const rows = within(screen.getByRole('region', { name: 'Transactions' })).getAllByRole('listitem')
+  expect(rows[0]).toHaveTextContent('GREEN GROCER£0.01Thu 26 Nov · Ada ··41001 · on December statement')
+  expect(rows).toHaveLength(7)
+  fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
+  expect(screen.getByText('Spent on Amex so far')).toBeInTheDocument()
+})
+
+it('shows what’s left in each pot when sorting', () => {
+  render(<Harness initial={monthHousehold()}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^UNSORTED/ }))
+  const options = within(within(screen.getByRole('dialog')).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')
+  expect(options.map(option => option.textContent)).toContain('Eating out · JointJoint£86.00 left')
+  expect(options.map(option => option.textContent)).toContain('Treats · AdaSuggested · Ada’s card£12.50 over')
 })
