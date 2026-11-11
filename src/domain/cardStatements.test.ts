@@ -112,3 +112,48 @@ describe('statement state', () => {
     expect(statementKeys(document.card!)).toEqual(['amex:2026-12-24', KEY, 'amex:2026-10-24'])
   })
 })
+
+describe('settling up from the Amex pot', () => {
+  function withPot() {
+    const document = household()
+    document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
+    document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-11-24' }
+    return document
+  }
+
+  it('moves the rest into the pot, then pays the card from it', async () => {
+    const { recordMove } = await import('./setAside')
+    let document = withPot()
+    const plan = settleSteps(document, KEY)!
+    expect(plan.accounts).toEqual([])
+    expect(plan.setAside).toEqual({ potId: 'amex-pot', toMovePence: 127875, toMove: 8 })
+    expect(plan.pay).toMatchObject({ kind: 'pay', accountId: 'joint', potId: 'amex-pot', amountPence: 127875 })
+    expect(allSettleSteps(plan).map(step => step.key)).toEqual(['settle:move', 'settle:pay'])
+    document = settleWithoutFinal(document, KEY, new Date('2026-11-26T09:00:00Z'))
+    document = setSettleTick(document, KEY, 'settle:pay', 127875, new Date('2026-12-01T09:00:00Z'))
+    expect(statementSummary(document, KEY, '2026-12-01')).toMatchObject({ done: 1, steps: 2, settled: false })
+    document = recordMove(document, 'amex', document.card!.transactions.map(row => row.id), new Date('2026-12-02T09:00:00Z'), 'm1')
+    expect(statementSummary(document, KEY, '2026-12-02')).toMatchObject({ done: 2, steps: 2, settled: true })
+  })
+
+  it('statements before the pot keep settling once', () => {
+    const document = withPot()
+    document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-12-24' }
+    expect(settleSteps(document, KEY)!.setAside).toBeUndefined()
+    expect(settleSteps(document, KEY)!.accounts).toHaveLength(3)
+  })
+})
+
+it('records when a move into the Amex pot finishes settling a statement', async () => {
+  const { recordMove } = await import('./setAside')
+  const { refreshSettled } = await import('./cardStatements')
+  let document = household()
+  document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
+  document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-11-24' }
+  document = settleWithoutFinal(document, KEY, new Date('2026-11-26T09:00:00Z'))
+  document = setSettleTick(document, KEY, 'settle:pay', 127875, new Date('2026-12-01T09:00:00Z'))
+  expect(document.card!.statements[KEY]!.settledAt).toBeUndefined()
+  const moved = new Date('2026-12-02T09:00:00Z')
+  document = refreshSettled(recordMove(document, 'amex', document.card!.transactions.map(row => row.id), moved, 'm1'), KEY, moved)
+  expect(document.card!.statements[KEY]!.settledAt).toBe(moved.toISOString())
+})
