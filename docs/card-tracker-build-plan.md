@@ -27,7 +27,7 @@ Agreed with Nick, 11 Nov 2026. Don't change these without asking.
 
 | # | Decision |
 |---|---|
-| D1 | **Budget month = calendar month** (1st to last day). Pay that arrives at the end of a month (Immy on the 28th or the weekday before, Nick around the 30th) is **next month's money**. Christmas early pay is January's money, so no month ever stretches. |
+| D1 | **Budget month = calendar month** (1st to last day). Pay that arrives at the end of a month (Immy on the 28th, or the last working day before it; Nick on the 28th, or the next working day after it) is **next month's money**. Christmas early pay is January's money, so no month ever stretches. |
 | D2 | **A transaction counts in the month of its date**, whatever statement it's on. Statements and months are two views of the same transactions. |
 | D3 | **Everything is sorted.** Every purchase or refund goes to a pot or an account (a one-off can go to "Joint account"). Card payments to Amex are not sorted (§4.3). |
 | D4 | **Splits.** One transaction can be split into lines by amount, half each, the 60/40 funding share, or receipt items (typed in, with no photo capture). Each line goes to a pot or account. Lines must add up to the transaction. |
@@ -143,7 +143,7 @@ export interface CardAccount {
   id: string
   name: string                                   // "Amex"
   closeDay: number                               // 1–28: the statement closes on this day; 24 for this Amex (25th–24th)
-  dueDaysAfterClose: number                      // the payment is due this many days after closing
+  dueDaysAfterClose: number                      // the payment is due this many days after closing; 25 for this Amex. Required when creating a card
   payFromAccountId: string                       // Joint Monzo: where pot shares collect and the bill is paid from
   bufferDestination?: BudgetDestination          // the default source for overspend covers; default: the pay-from account's main balance
   cardholders: Array<{ suffix: string; personId: string }>   // Account # suffix → adult
@@ -216,11 +216,15 @@ export interface ImportRecord { at: string; cardId: string; fileName: string; st
 
 ### 5.2 Settings
 
-The card's settings go in Household (a "Cards" section): the name, closing day (default 24), days until due, the account it's paid from (default: the joint account), the buffer (default: the pay-from account's main balance), and which person each card suffix belongs to. The first import that meets an unknown suffix asks "Whose card ends 9xxxx?". If an export's period doesn't end on the closing day, warn and offer to update the setting.
+The card's settings go in Household (a "Cards" section). **Creating a card asks for the closing day and the days until payment is due, and both are required** (this Amex: 24 and 25, so the 24 Nov statement is due 19 Dec). The other settings: the name, the account it's paid from (default: the joint account), the buffer (default: the pay-from account's main balance), and which person each card suffix belongs to. The first import that meets an unknown suffix asks "Whose card ends 9xxxx?". If an export's period doesn't end on the closing day, warn and offer to update the setting.
 
 Each pot gets pace, carries over, and the build-up limit, edited wherever pots are managed (`BudgetManagement`).
 
-PR 11 adds an optional **payday** to each employment income source, as `paydayDay` plus "or the weekday before". Home uses it for "December's money arrives Fri 27 Nov".
+PR 11 adds an optional **payday** to each employment income source: `payday?: { day: number; ifNotWorkingDay: 'previous' | 'next' }`. Immy is `{ day: 28, ifNotWorkingDay: 'previous' }` and Nick is `{ day: 28, ifNotWorkingDay: 'next' }`. Home uses it for "December's money arrives Fri 27 Nov · Mon 30 Nov".
+
+- **Working days** exclude weekends and **bank holidays in England and Wales**. Compute them in a pure helper, with no network: New Year's Day, Good Friday and Easter Monday (from Easter), the early May, spring and summer bank holidays, Christmas Day and Boxing Day, with substitute days. Allow one-off additions such as coronation-style holidays.
+- **Example:** 28 Dec 2026 is the Boxing Day substitute holiday, so Immy is paid Thu 24 Dec and Nick on Tue 29 Dec.
+- **Edge case:** with "next working day", February's pay can land in March, e.g. 28 Feb 2026 is a Saturday, so Nick's pay arrives Mon 2 Mar. It is still March's money. The month just shows as funding until it arrives.
 
 ### 5.3 Size
 
@@ -295,7 +299,10 @@ The annual costs listed under the pot come from Plan items with that destination
 ### 6.7 Statements
 
 - **Which statement a transaction is on comes from `statementKey`**, set from the export's period at import, not from its date (§4.1). Manual entries use the date window: for close day *d*, from (the previous close date + 1) to the close date. Window helpers are also used for the open statement, the next close date and the due date: due date = close date + `dueDaysAfterClose`.
-- **Open**: today ≤ close date. **Ready to settle**: closed, and every purchase and refund in it is sorted. **Settled**: every settle-up step is done.
+- **Open**: today ≤ close date.
+- **Complete**: an export of that period taken after the close date has been brought in and matches Amex's summary. Amex can export past periods, so this is always possible. Without it, allow an override: "Settle without the final export".
+- **Ready to settle**: closed, complete, and every purchase and refund in it is sorted.
+- **Settled**: every settle-up step is done.
 - **The total** = Σ purchases and refunds with that `statementKey`. Payments are excluded. Show any payment rows separately (§4.5). When `amexSummary` exists, show whether North's rows match Amex's Charges and Payments & Credits.
 
 ### 6.8 Settle-up steps (`settleSteps(document, statementKey)`)
@@ -358,7 +365,7 @@ Keep today's Home (#121–#122): the per-person summary, the to-do list and Comi
 - **Current month card** (first): the stage chip ("In progress · 18 days left") and health chips ("Funded", "Sorted to 10 Nov", "2 pots need care"), then "£X of £Y spent", needs-care rows that open the pot, and "Bring in Amex transactions · last done Mon 9 Nov" once the last import is 3 or more days old. The existing per-person summary and per-person payday to-dos sit inside this card.
 - **Previous month card** while it's closing or to settle: a checklist (All transactions in and sorted, Close <Month>, Settle the <Month> statement by <due>).
 - **Next month card**: "December · money arrives Fri 27 Nov · Mon 30 Nov". It becomes a funding checklist once any of its payday steps is ticked. If one is ticked more than 3 days before the earliest expected payday, show "January's money has arrived early. It's for January."
-- **Last chance**: on the day before and the day of a statement's close, if there's been no import since 3 days before the close: "Last bring-in before the statement closes <day>".
+- **Final export:** Amex can export past periods, so nothing is lost when a statement closes. After the close date, Home asks once for the final export: "Bring in the final October statement". This makes the statement *complete* (§6.7). There is no urgent last-chance task. Show a gentle "Statement closes tomorrow" in the current month card the day before the close.
 - **Settled months** become a one-line "October · settled Mon 23 Nov", then drop off once the next month settles.
 - **Later:** health dots in the 4×3 month picker (settled, closing or to settle, in progress, not started).
 
@@ -381,7 +388,7 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 **PR 1 · `card/1-model`: data model, settings and rules doc**
 - `src/domain/cardTracker.ts`: the §5.1 types, `validCardTracker`, `normaliseDescription`, `merchantKey`, the statement window helpers (`statementFor(date, card)`, `dueDate`), `monthOf(date)`, and a pence parser.
 - Wire `card` into `decodeBudgetDocument`: optional, and invalid makes the document invalid. Add a test that old documents still load.
-- Household → "Cards" section: add or edit a card (name, closing day (default 24), days to due, pay-from account (default the joint account), buffer (default the pay-from account's main balance), cardholder suffixes). Ask Nick how many days after the 24th payment is due.
+- Household → "Cards" section: add or edit a card. **Creating a card requires the closing day and the days until due**, with no silent defaults; Nick will enter 24 and 25. The other settings: the name, pay-from account (default the joint account), buffer (default the pay-from account's main balance), and cardholder suffixes.
 - Docs: create `docs/card-tracker-rules.md` from §2, §3 and §6 here, link it from the README, and add the glossary rows (§3).
 - Done when: a document with a card round-trips through save and load; invalid shapes are rejected; the settings save.
 
@@ -449,8 +456,8 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 - `src/domain/monthStages.ts` (§6.9) and the close rules (§6.10): the Close <Month> screen, cover pickers and cover steps, leftovers, built up, the build-up flag with Move or Keep, carry-over pots, and the household Close button. Re-sorting after close shows "Changed since closed".
 
 **PR 11 · `card/11-home-months`: Home month cards**
-- §7.1 in full: the current, previous and next month cards, health chips, needs-care rows, bring-in and last-chance tasks, the settled one-liner, and the early-pay message.
-- Add the optional `paydayDay` (plus "or the weekday before") to employment income sources, edited in the income dialog.
+- §7.1 in full: the current, previous and next month cards, health chips, needs-care rows, the bring-in and final-export tasks, the settled one-liner, and the early-pay message.
+- Add the optional `payday` (day plus previous or next working day, §5.2) to employment income sources, edited in the income dialog, and the England and Wales working-day helper with tests: weekends, Easter-based holidays, substitute days, and the 2026 Christmas example.
 - Keep the existing Home tests passing and update them for the new structure.
 
 ### Series E: Desktop and extras
@@ -465,22 +472,18 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 
 | Stage | Now | Later |
 |---|---|---|
-| Bring in | Excel export upload; manual entry for anything missed | A daily feed, e.g. Open Banking. The Bring in button and the last-chance task disappear, and Home says "3 new to sort". |
+| Bring in | Excel export upload; manual entry for anything missed | A daily feed, e.g. Open Banking. The Bring in button and the final-export task disappear, and Home says "3 new to sort". |
 | Sort | Rules plus suggestions | The same, with better suggestions. |
 | Balances | Checked by hand for carry-over pots | Pulled daily from the banks. "Checked Mon 9 Nov" becomes "Updated today". |
 | Settle | Ticked by hand | Still by hand. A payment row in the feed offers the Pay tick. |
 
 To keep that possible, every computed figure comes from the stored transactions and settings, never from the screen's state. "Last brought in" comes from `imports`. Nothing assumes a human did the import.
 
-## 10. Questions to ask Nick before the PR that needs them
+## 10. Questions answered
 
-Answered on 11 Nov 2026:
-- Statements run from the 25th to the 24th.
-- The bill is always paid from Joint Monzo.
-- The buffer is Joint Monzo's main balance.
+All answered by Nick on 11 Nov 2026. Nothing blocks the build.
+- Statements run from the 25th to the 24th, and payment is due **25 days** after the close. Both are required when a card is created.
+- The bill is always paid from Joint Monzo, and the buffer is Joint Monzo's main balance.
 - North requires the Excel export.
-
-Still open:
-1. **(PR 1)** How many days after the 24th is payment due? This is the `dueDaysAfterClose` default.
-2. **(PR 11)** The exact payday rules, e.g. "28th, or the last weekday before" for Immy, and Nick's.
-3. **(PR 3, nice to have)** Can Amex online export a *past* statement period as Excel? If it can, the last-chance bring-in becomes a gentle reminder rather than a must.
+- **Paydays:** Immy on the 28th or the last working day before it; Nick on the 28th or the next working day after it.
+- **Amex can export past periods**, so a statement is completed from its final export (§6.7). There's no last-chance pressure.
