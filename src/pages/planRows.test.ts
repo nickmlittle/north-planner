@@ -33,7 +33,7 @@ it('bands by destination in Transfers order: each account, then Direct and its p
   expect(groups.map(group => group.name)).toEqual(['Monzo Joint', 'Monzo Joint Savings', 'Starling Ada', 'Nationwide Ben'])
   expect(groups[0]!.key).toBe('destination:account:joint')
   expect(groups.flatMap(group => group.items)).toHaveLength(items.length)
-  expect(groups[0]!.subgroups.map(subgroup => subgroup.name)).toEqual(['Direct', 'Bills pot', 'Holidays pot'])
+  expect(groups[0]!.subgroups.map(subgroup => subgroup.name)).toEqual(['Direct', 'Bills pot', 'Groceries pot', 'Holidays pot'])
   expect(groups[0]!.subgroups.flatMap(subgroup => subgroup.items)).toHaveLength(groups[0]!.items.length)
   expect(groups[0]!.subgroups[1]!.items.every(item => item.destination.kind === 'pot' && item.destination.potId === 'bills')).toBe(true)
   // An account whose items all go one way lists them directly.

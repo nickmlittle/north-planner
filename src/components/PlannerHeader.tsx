@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeftRight, House, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
+import { ArrowLeftRight, CreditCard, House, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
 import { AccountStatusPanel } from './AccountStatusPanel'
 import { saveStatusLabel, statusMark } from './saveStatus'
 import type { BudgetView, PlannerView } from '../state/navigation'
@@ -107,10 +107,11 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
   // Saved is the quiet default: only show a status when there is something to know.
   const statusIcon = status === 'Saved' ? null : <span aria-hidden="true">{statusMark(status)}</span>
   const selected = currentView === 'budget' ? budgetView : currentView
-  const pageTitle = selected === 'home' ? homeTitle ?? 'Home' : selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : 'Household'
+  const pageTitle = selected === 'home' ? homeTitle ?? 'Home' : selected === 'plan' ? 'Plan' : selected === 'transfers' ? 'Transfers' : selected === 'spending' ? 'Spending' : 'Household'
   const destinations = [
     { id: 'home', label: 'Home', Icon: House, action: () => onSelectView('home') },
     { id: 'plan', label: 'Plan', Icon: Wallet, action: () => onSelectBudgetView('plan') },
+    { id: 'spending', label: 'Spending', Icon: CreditCard, action: () => onSelectView('spending') },
     { id: 'transfers', label: 'Transfers', Icon: ArrowLeftRight, action: () => onSelectBudgetView('transfers') },
     { id: 'household', label: 'Household', Icon: UserRoundGroup, action: () => onSelectView('household') },
   ] as const
@@ -132,7 +133,7 @@ export function PlannerHeader({ currentView, budgetView, warning = '', saveStatu
     <aside className={`planner-sidebar is-compact${desktopExpanded ? ' desktop-expanded' : ''}`} aria-label="Application navigation">
       <div className="sidebar-rail">
         <div className="desktop-sidebar-header"><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={() => setDesktopExpanded(value => !value)}><Menu size={24} strokeWidth={2} aria-hidden="true" /></button><span className="desktop-sidebar-brand" aria-hidden="true"><AnimatedSidebarText text="north." /></span></div>
-        {/* The same three destinations as the phone, so a Plan or Transfers link means one screen everywhere. */}
+        {/* The same destinations as the phone, so a Plan, Spending or Transfers link means one screen everywhere. */}
         <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">{destinations.filter(destination => setupComplete || destination.id === 'household').map(({ id, label, Icon, action }) => <button key={id} type="button" className="sidebar-link" aria-current={selected === id ? 'page' : undefined} aria-label={label} title={label} onClick={action}><span className="sidebar-icon" aria-hidden="true"><Icon size={24} strokeWidth={2} /></span><span className="sidebar-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={label} /></span></button>)}</nav>
         <div className="sidebar-rail-utility">
           {warning && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status">{warning}</div>}</div>}

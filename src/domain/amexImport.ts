@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
 import {
-  cardTracker, collapseWhitespace, localDate, MAX_IMPORTS, merchantKey, normaliseDescription, normaliseSuffix, parsePence, penceFromAmount, personForSuffix, statementKey, validIsoDate,
+  cardTracker, collapseWhitespace, localDate, MAX_IMPORTS, merchantKey, normaliseDescription, normaliseSuffix, parsePence, penceFromAmount, personForSuffix, statementFor, statementKey, validIsoDate,
   type AmexSummary, type CardTransaction, type ImportRecord, type TransactionKind,
 } from './cardTracker'
 import { matchRule, ruleSort } from './cardSorting'
@@ -183,4 +183,29 @@ export function importAmexExport(document: BudgetDocument, cardId: string, parse
 /** Reads an Excel export and brings it in: `importAmexWorkbook(document, cardId, bytes, fileName, now)` (plan §6.2). */
 export async function importAmexWorkbook(document: BudgetDocument, cardId: string, bytes: ArrayBuffer | Uint8Array, fileName: string, now: Date) {
   return importAmexExport(document, cardId, await readAmexExport(bytes), fileName, now)
+}
+
+export type ManualEntry = { cardId: string; date: string; description: string; amountPence: number; suffix: string }
+
+/**
+ * A transaction added by hand (plan §6.2): anything missed after a statement closed, since the export only
+ * covers the current period. Its statement comes from the date window. Rules apply as they do on import.
+ */
+export function addManualTransaction(document: BudgetDocument, entry: ManualEntry, now: Date, id = `manual:${crypto.randomUUID()}`): BudgetDocument {
+  const tracker = cardTracker(document)
+  const card = tracker.cards.find(row => row.id === entry.cardId)
+  if (!card) throw new AmexImportError('Add the card in Household first.')
+  if (!validIsoDate(entry.date) || !entry.description.trim() || !Number.isSafeInteger(entry.amountPence) || entry.amountPence === 0) throw new AmexImportError('Enter a date, a description and an amount.')
+  const suffix = normaliseSuffix(entry.suffix)
+  const personId = personForSuffix(card, suffix)
+  const at = now.toISOString()
+  const transaction: CardTransaction = {
+    // Typed text has no Amex padding, so the whole description is the merchant.
+    id, cardId: card.id, date: entry.date, description: collapseWhitespace(entry.description), merchant: merchantKey(collapseWhitespace(entry.description)),
+    amountPence: entry.amountPence, kind: entry.amountPence < 0 ? 'refund' : 'purchase', cardSuffix: suffix, statementKey: statementFor(entry.date, card), importedAt: at,
+    ...(personId ? { personId } : {}),
+  }
+  const rule = matchRule(tracker.rules, transaction)
+  if (rule) transaction.sort = ruleSort(rule, transaction.amountPence, at)
+  return { ...document, card: { ...tracker, transactions: [...tracker.transactions, transaction] } }
 }

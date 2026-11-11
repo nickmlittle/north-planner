@@ -15,6 +15,7 @@ import { hasLiveTransfersOrigin, markStepsOrigin, navigateTo, parseNavigation, s
 
 const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })))
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
+const Spending = lazy(() => import('./pages/Spending').then(module => ({ default: module.Spending })))
 
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
 function getLocationSearch() { return window.location.search }
@@ -57,6 +58,8 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
       ? <SetupWizard document={document} setDocument={setDocument} month={navigation.month} onFinish={() => navigateTo({ view: 'budget', budgetView: 'plan' })} />
       : view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />
+      : view === 'spending'
+      ? <Suspense fallback={<p className="budget-loading" role="status">Loading…</p>}><Spending document={document} setDocument={setDocument} view={navigation.spendingView} onSelectView={spendingView => navigateTo({ view: 'spending', spendingView })} onOpenHousehold={() => navigateTo({ view: 'household' })}/></Suspense>
       : view === 'home'
       ? <Suspense fallback={<p className="budget-loading" role="status">Loading…</p>}><Home document={document} month={navigation.month} onOpenPlan={() => navigateTo({ view: 'budget', budgetView: 'plan', planDestination: null })} onOpenTransfers={() => navigateTo({ view: 'budget', budgetView: 'transfers', planDestination: null })} onReviewPerson={reviewPersonOnPlan}/></Suspense>
       : <Suspense fallback={<p className="budget-loading" role="status">Loading budget…</p>}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} warning={error} email={email} onSignOut={onSignOut} accountBacked={!!onSignOut} mobileBudgetView={navigation.budgetView} month={navigation.month} onMonthChange={month => navigateTo({ month })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={navigation.budgetView === 'transfers' ? stepsReturnFromState() : null} onReturnToTransfers={returnToTransfers} onOpenPlan={() => navigateTo({ view: 'budget', budgetView: 'plan', planDestination: null })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={navigation.budgetView === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined} /></Suspense>}
