@@ -16,6 +16,7 @@ import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
 import { PotDetail, ThisMonthPanel } from './SpendingMonth'
 import { StatementsPanel } from './StatementsPanel'
+import { CloseMonth } from './CloseMonth'
 import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
 
@@ -34,6 +35,9 @@ type Props = {
   /** A statement's detail on Statements. */
   statementKey?: string | null
   onOpenStatement?: (key: string | null) => void
+  /** Close <Month> for the selected month. */
+  closing?: boolean
+  onOpenClose?: (open: boolean) => void
   /** Today, for pace; tests pass a fixed one. */
   today?: string
 }
@@ -71,7 +75,7 @@ export function TransactionRow({ document, transaction, where, tag, action, onSe
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
-export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, statementKey = null, onOpenStatement = () => {}, closing = false, onOpenClose = () => {}, today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -159,7 +163,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     {compact && more.some(section => section.id === active) && <button type="button" className="text-button spending-back" onClick={() => onSelectView('sort')}>Back to To sort</button>}
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
-        ? potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} headingExtra={headingExtra}/>
+        ? closing ? <CloseMonth document={document} setDocument={setDocument} month={month} today={today} onBack={() => onOpenClose(false)} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>
+        : potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} onOpenClose={() => onOpenClose(true)} headingExtra={headingExtra}/>
         : active === 'statements' ? <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>
         : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>

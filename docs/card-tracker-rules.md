@@ -17,6 +17,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | This month: planned vs spent, pace, pot detail and chart, pot settings | 7 | `src/domain/cardSpending.ts`, `src/pages/SpendingMonth.tsx`, `BudgetManagement.tsx` |
 | Carry-over pots: Free, Check against the bank, annual costs | 8 | `potFree`, `checkPotBalance`, `annualCosts` in `cardSpending.ts`; `src/domain/cardStatements.ts` (settle keys) |
 | Statements, statement detail, settle up | 9 | `src/domain/cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
+| Month stages, Close <Month>, covers, leftovers and the build-up flag | 10 | `src/domain/monthStages.ts`, `src/pages/CloseMonth.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -142,6 +143,31 @@ free = checked balance
 - With no checked balance there's no figure: "Check the balance to see what's free". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
 - **Annual costs** (`annualCosts`) are the month's Plan items to the pot entered yearly, shown as "£612.00 a year".
 - Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's free.
+
+## Month stages (§6.9)
+
+`monthStage(document, month, today)`:
+
+| Stage | When |
+| --- | --- |
+| upcoming | The month hasn't started and none of its payday steps are ticked. |
+| funding | Before the month, some but not all of its payday steps done. |
+| funded | Before the month, every payday step done. During the month, "Funded" (or "Funding · 3 of 8") shows as a chip. |
+| in-progress | Today is in the month. |
+| closing | The month has ended and isn't closed. |
+| to-settle | Closed, but a statement holding any of its purchases or refunds isn't settled. |
+| settled | Closed, and all those statements are settled. |
+
+Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks for the whole household, exactly as Transfers and Home do.
+
+## Closing a month (D7, D8, D11, R1, §6.10)
+
+- **Can close** (`closeMonthPlan`'s readiness) once the month has ended, every purchase and refund dated in it is sorted, and the latest import is at least 3 days after the month's last day (`LATE_POSTING_DAYS`), or "All <Month> transactions are in" was pressed (`markAllIn`).
+- **Overspends**: every monthly pot (not carry-over) with Left below 0. Each is covered by its whole overspend from the buffer by default, or from another monthly pot with money left that month (most left first), or from next month's funding for the pot. A chosen source is stored at once (`setCover`) so its step can be ticked before Close; changing the source drops the step's tick.
+- **Cover steps** (`cover:<potId>`), ticked like any step (`setCoverTick`): from an account, "Move £35.00 from Joint Monzo into Eating out"; from a pot, "Out of Treats £35.00, then move into Eating out". A next-month cover moves no money; next month's pot shows "£35.00 taken by October" and has that much less left.
+- **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each monthly pot with a plan.
+- **Built up** (`builtUp`) = Σ leftovers of closed months − Σ moved out. The close screen shows it including this month. A pot is flagged when built up > its limit × this month's Planned, unless "Keep it" recorded at least that much (`keptBuildUpPence`). "Move £X…" suggests keeping one month's worth and records what was moved (`moveBuiltUp`); the money itself moves in the bank.
+- **Close** (`closeMonth`), one button for the household, records `closedAt`, the covers, the leftovers and what each destination had spent (`closedSpent`). A later re-sort or late transaction in the month shows "Changed since closed" with Close again, which records them afresh.
 
 ## Payments
 

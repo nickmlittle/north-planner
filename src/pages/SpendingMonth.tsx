@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronRight, TriangleAlert } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { annualCosts, checkPotBalance, cumulativeByDay, destinationTransactions, monthSpending, potFree, type DestinationSpending, type MonthSpending } from '../domain/cardSpending'
 import { ModalDialog } from '../components/ModalDialog'
+import { closeMonthPlan, monthStage, type MonthStatus } from '../domain/monthStages'
 import { cardTracker, daysBetween, localDate, parsePence, parseStatementKey, shiftMonth, type CardTransaction } from '../domain/cardTracker'
 import { budgetDateMarkers, incomeDateMarkers, type BudgetDestination } from '../domain/monthlyBudget'
 import { formatGBPWhole } from '../formatting/money'
@@ -25,6 +26,15 @@ function statusText(row: DestinationSpending, month: MonthSpending, free?: numbe
   return `${pounds(row.leftPence)} left${taken}`
 }
 
+/** "In progress · 18 days left", "Closing", "To settle", "Settled". */
+function stageLabel(stage: MonthStatus, figures: MonthSpending): string {
+  if (stage.stage === 'in-progress') return `In progress · ${figures.daysLeft} ${figures.daysLeft === 1 ? 'day' : 'days'} left`
+  if (stage.stage === 'closing') return 'Closing'
+  if (stage.stage === 'to-settle') return `To settle${stage.closedAt ? ` · closed ${dayOf(stage.closedAt)}` : ''}`
+  if (stage.stage === 'settled') return 'Settled'
+  return stage.stage === 'funded' ? 'Funded' : stage.stage === 'funding' ? `Funding · ${stage.funding.done} of ${stage.funding.total}` : 'Not started'
+}
+
 /** "£338.60 of £520.00", "£41.97 this month", "£112.81 one-offs". */
 function amountText(row: DestinationSpending): { strong: string; rest: string } {
   if (row.status === 'one-offs') return { strong: signedPounds(row.spentPence), rest: row.destination.kind === 'account' ? ' one-offs' : ' spent' }
@@ -41,10 +51,12 @@ function Bar({ row, month }: { row: DestinationSpending; month: MonthSpending })
   </span>
 }
 
-type PanelProps = { document: BudgetDocument; month: string; today: string; onMonthChange: (month: string) => void; onOpenPot: (potId: string) => void; headingExtra?: ReactNode }
+type PanelProps = { document: BudgetDocument; month: string; today: string; onMonthChange: (month: string) => void; onOpenPot: (potId: string) => void; onOpenClose?: () => void; headingExtra?: ReactNode }
 
 /** This month: planned vs spent for each pot, grouped like Plan, with pace for steady pots (board 4, screen 1). */
-export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPot, headingExtra }: PanelProps) {
+export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPot, onOpenClose, headingExtra }: PanelProps) {
+  const stage = monthStage(document, month, today)
+  const closePlan = stage.stage !== 'in-progress' && stage.closedAt ? closeMonthPlan(document, month, today) : null
   const figures = monthSpending(document, month, today)
   const name = destinationNamer(document)
   const cardName = cardTracker(document).cards.map(card => card.name).join(' and ') || 'the card'
@@ -62,7 +74,10 @@ export function ThisMonthPanel({ document, month, today, onMonthChange, onOpenPo
 
   return <>
     <div className="spending-month-control"><h2 id="spending-month-title" className="visually-hidden">{formatMonth(month)}</h2><MonthControl month={month} onChange={onMonthChange} budgetMarkers={budgetDateMarkers(document.budget)} incomeMarkers={incomeDateMarkers(document.budget)}/>{headingExtra}</div>
+    {stage.stage === 'closing' && onOpenClose && <div className="spending-callout is-action"><TriangleAlert aria-hidden="true"/><div><p>{monthName(month)} has ended. Cover any overspends and note what's left, then close it.</p><button type="button" className="primary-button" onClick={onOpenClose}>Close {monthName(month)}</button></div></div>}
+    {closePlan && closePlan.changedSinceClosed.length > 0 && onOpenClose && <div className="spending-callout is-action"><TriangleAlert aria-hidden="true"/><div><p>Changed since closed: {closePlan.changedSinceClosed.map(row => `${name(row.destination)} ${pounds(row.closedPence)} → ${pounds(row.nowPence)}`).join(', ')}.</p><button type="button" className="secondary-button" onClick={onOpenClose}>Close again</button></div></div>}
     <div className="spending-month-summary">
+      <p className="spending-stage"><span className={`spending-chip is-${stage.stage}`}>{stageLabel(stage, figures)}</span>{stage.stage === 'in-progress' && stage.funding.total > 0 && <span className="spending-chip">{stage.funding.done === stage.funding.total ? 'Funded' : `Funding · ${stage.funding.done} of ${stage.funding.total}`}</span>}</p>
       <p className="spending-eyebrow">{figures.when === 'current' ? `Spent on ${cardName} so far` : figures.when === 'past' ? `Spent on ${cardName}` : 'Nothing spent yet'}</p>
       <p className="spending-big">{pounds(figures.spentPence)} <small>of {pounds(figures.plannedPence)} planned</small></p>
       {facts.length > 0 && <p className="spending-facts">{facts.join(' · ')}</p>}

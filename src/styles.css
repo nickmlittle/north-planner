@@ -1533,3 +1533,25 @@ div.spending-pot{padding-right:var(--space-4)}
 .statement-heading p{margin:2px 0 0}
 .settle-account .payday-person-heading{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);border-bottom:1px solid var(--line);color:var(--charcoal);font-size:var(--text-lg);font-weight:700}
 .settle-account .payday-person-heading span:last-child{color:var(--muted);font-size:var(--text-sm);font-weight:600}
+.spending-stage{display:flex;flex-wrap:wrap;gap:var(--space-1);margin:0 0 var(--space-1)}
+.spending-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:700}
+.spending-chip.is-in-progress{background:var(--pine);color:var(--cream)}
+.spending-chip.is-closing,.spending-chip.is-to-settle{background:var(--status-review-bg);color:var(--status-review)}
+.spending-callout.is-action>div{display:grid;gap:var(--space-2)}
+.spending-callout.is-action p{margin:0}
+.spending-callout.is-action button{justify-self:start;min-height:44px;margin:0}
+.close-month{display:grid;gap:var(--space-3)}
+.close-month .spending-back{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;margin:0;justify-self:start}
+.close-month .spending-back svg{width:18px;height:18px}
+.close-cover{display:grid;gap:var(--space-2);padding:var(--space-3) 0;border-top:1px solid var(--line)}
+.close-cover-head{display:flex;justify-content:space-between;gap:var(--space-3);margin:0}
+.close-cover-step{border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden}
+.close-cover-step .payday-step{border-top:0}
+.close-cover-step .payday-step-label{font-size:var(--text-md)}
+.close-left dd{display:grid;grid-template-columns:repeat(2,minmax(84px,auto));gap:var(--space-3);text-align:right}
+.close-left-head dt,.close-left-head dd{color:var(--muted);font-size:var(--text-sm);font-weight:700}
+.close-flag>div{display:grid;gap:var(--space-2)}
+.close-flag p{margin:0}
+.close-flag-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.close-flag-actions .secondary-button{min-height:44px;margin:0}
+@media(max-width:640px){.close-left>div{flex-wrap:wrap}.close-left dd{gap:var(--space-2);margin-left:auto}.spending-tabs button{padding:var(--space-1);font-size:var(--text-sm);white-space:nowrap}}
