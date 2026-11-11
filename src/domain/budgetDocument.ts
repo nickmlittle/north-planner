@@ -1,4 +1,5 @@
 import { validTransferTicks, type TransferTicks } from './transferTicks'
+import { validCardTracker, type CardTracker } from './cardTracker'
 import { defaultMonthlyBudget, validDestination, validMonthlyBudget, type BudgetDestination, type BudgetItem, type BudgetSnapshot, type IncomePolicyValue, type MonthlyBudget } from './monthlyBudget'
 
 export interface BudgetPerson { id: string; name: string }
@@ -9,6 +10,8 @@ export interface BudgetDocument {
   budget: MonthlyBudget
   /** Payday steps ticked off, by month. Optional: a document without any is valid, and older versions keep it untouched. */
   ticks?: TransferTicks
+  /** The card tracker (Spending). Optional like `ticks`: older documents stay valid, with no version bump. */
+  card?: CardTracker
 }
 
 interface V2Line { id: string; category?: string; categoryId?: string; ownerName?: string; name: string; entryAmountPence: number; frequency: 'monthly' | 'annually'; amountPence: number; potId: string; funding: 'proportional' | 'equal' | 'custom' | 'single'; singleFunderId?: string; customShares?: Record<string, number> }
@@ -46,6 +49,7 @@ export function decodeBudgetDocument(raw: unknown): BudgetDocument | null {
   if (Object.values(budget.snapshots).some(snapshot => !validateItems(snapshot.items)) || (budget.importedBaseline && !validateItems(budget.importedBaseline))) return null
   if (budget.incomePolicies.some(policy => [policy.base, ...Object.values(policy.changes)].some(rule => rule.surplusDestination && !validDestination(rule.surplusDestination, budget)))) return null
   if (value.ticks !== undefined && !validTransferTicks(value.ticks)) return null
+  if (value.card !== undefined && !validCardTracker(value.card, budget, people)) return null
   return value as BudgetDocument
 }
 
@@ -187,6 +191,7 @@ export function renameAdult(document: BudgetDocument, id: string, name: string):
 
 export function removeAdult(document: BudgetDocument, id: string): BudgetDocument {
   const used = document.budget.accounts.some(account => account.ownerPersonIds.includes(id)) || document.budget.incomeSources.some(source => source.personId === id) || document.budget.incomePolicies.some(policy => policy.personId === id) || allItems(document.budget).some(item => item.singleFunderId === id || item.customShares?.[id] !== undefined || item.contributions?.some(row => row.personId === id))
+    || !!document.card?.cards.some(card => card.cardholders.some(row => row.personId === id)) || !!document.card?.transactions.some(row => row.personId === id)
   if (used) return document
   return { ...document, household: { ...document.household, adults: document.household.adults.filter(person => person.id !== id) } }
 }

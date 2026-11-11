@@ -1259,3 +1259,26 @@ button.payday-step-amount:focus-visible{outline:2px solid var(--pine);outline-of
   .budget-v3-table .plan-subgroup>th:first-child{padding-left:var(--space-6)}
   .budget-v3-table .budget-v3-item.is-nested>th:first-child{padding-left:calc(var(--space-6) + var(--space-4))}
 }
+/* Card tracker: Household → Cards */
+.card-settings .text-button{justify-self:start}
+.card-settings-list{display:grid;gap:var(--space-3);margin:0 0 var(--space-4);padding:0;list-style:none}
+.card-settings-list>li{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--surface-field)}
+.card-settings-summary{display:grid;flex:1 1 280px;gap:var(--space-1);color:var(--muted);font-size:var(--text-sm)}
+.card-settings-summary strong{color:var(--charcoal);font-size:var(--text-lg);font-weight:600}
+.card-settings-list .card-settings-form{flex-basis:100%}
+.card-settings-form{display:grid;gap:var(--space-4);padding-top:var(--space-2)}
+.card-settings-form .setup-field{display:grid;align-content:start;gap:var(--space-2);max-width:520px;color:var(--pine);font-size:var(--text-md);font-weight:600}
+.card-settings-form input,.card-settings-form select{width:100%;min-height:44px;background:var(--surface-field);color:var(--charcoal)}
+.card-settings-days{display:grid;grid-template-columns:repeat(2,minmax(0,240px));gap:var(--space-4)}
+.card-settings-preview{margin:0;color:var(--muted);font-size:var(--text-sm)}
+.card-settings-error{font-size:var(--text-sm);font-weight:500}
+.card-settings-holders{display:grid;gap:var(--space-3);margin:0;padding:0;border:0}
+.card-settings-holders legend{margin-bottom:var(--space-2);color:var(--pine);font-size:var(--text-md);font-weight:600}
+.card-settings-holder{display:grid;grid-template-columns:minmax(0,160px) minmax(0,200px) 44px;align-items:start;gap:var(--space-3)}.card-settings-holder .card-settings-remove{align-self:end}
+.card-settings-remove{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--line);border-radius:var(--radius-md);background:transparent;color:var(--muted)}
+.card-settings-remove svg{width:18px;height:18px}
+.card-settings-actions{display:flex;gap:var(--space-3)}
+.card-settings .secondary-button{gap:var(--space-2)}.card-settings .secondary-button svg{width:18px;height:18px}
+@media(max-width:640px){.card-settings-days{grid-template-columns:minmax(0,1fr)}.card-settings-holder{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px}.card-settings-actions{flex-direction:column-reverse}.card-settings-list>li .secondary-button{width:100%}}
+.card-settings-field{display:grid;gap:var(--space-1)}
+.card-settings-form select,.card-settings-form button{margin:0}

@@ -1,6 +1,6 @@
 # North Planner: product, brand and interface specification
 
-**Audience:** future developers, designers and coding agents. **Updated:** 9 November 2026.
+**Audience:** future developers, designers and coding agents. **Updated:** 11 November 2026.
 
 This is the shared direction for new work and a description of the current interface. The financial contracts in [recurring and monthly budget rules](recurring-monthly-budget-rules.md) and [transfer calculation rules](transfer-calculation-rules.md) govern the detailed behavior. When changing behavior, update the relevant contract and this guide together. Where this guide says **Direction**, it describes a goal for future work, not a claim that every existing screen meets it.
 
@@ -76,6 +76,12 @@ Desktop Transfers puts everyone's payday steps side by side: one card per person
 
 Zero and unresolved allocations are different states. Do not imply that a missing calculation is a completed zero. Show warnings and the route to fix missing input near the affected information. Transfers show planned funding and movements, ticked off by hand; not payment execution or automatic-payment detection.
 
+### Spending
+
+The card tracker, built in the `card/` PR series from the [build plan](card-tracker-build-plan.md); behaviour is in [card-tracker-rules](card-tracker-rules.md).
+
+**Cards (Household).** Below Adults, a Cards section lists each card (“Closes on the 24th · due 25 days later · paid from Monzo Joint”, and whose card ends in what) with Edit, and “Add a card”. The form asks for the name (Amex), the statement closing day and the days until payment is due, both required with no defaults, and previews the result (“Statements run from the 25th to the 24th. The 24 Nov statement is due 19 Dec.”). Paid from defaults to the joint account and the buffer to its main balance. “Whose card is whose” maps each card ending to an adult. Without any accounts it asks for one on the Plan first.
+
 ### Controls, overlays and feedback
 
 Use a filled pine primary button for the main action, outlined secondary buttons for alternatives, and restrained text actions for lower-priority operations. Form controls need persistent labels, clear validation, and visible focus. Tables and grouped lists should expose their hierarchy and totals rather than rely on color alone. Use disclosures for secondary detail without hiding critical warnings.
@@ -99,9 +105,25 @@ These four words are the only names for these concepts in the UI. `src/copy.voca
 | **Available** | Income for the month, for the household or for one person. | Available income, available money |
 | **Planned** | The total of the month's items. The balance against Available reads “£X left”, “£X over” or “Balanced”. | Planned budget, Budget balance, remaining, left to allocate, shortfall |
 | **Funding** / **Fund** | What one person pays into one account, including its pots. A fixed-rule item has **Fixed amounts**, and its remainder is “unassigned”. | Funding total, contributions, allocations, Transfers by destination |
-| **Move** | Money moved from an account into one of its pots. It is already inside the account's funding. | Pot movements as an extra amount, “Ada moves” for a funding total |
+| **Move** | Money moved from an account into one of its pots. It is already inside the account's funding. Money leaving a pot is “Out of <pot>”, and account to account is “Send to <account>”. | Pot movements as an extra amount, “Ada moves” for a funding total |
 
 “Transfers” is only the name of the screen.
+
+The card tracker (Spending) adds these words. Its rules are in [card-tracker-rules](card-tracker-rules.md).
+
+| Word | Means | Not |
+| --- | --- | --- |
+| **Spending** | The tab where card spending is brought in, sorted, tracked and settled. | Card tracker, Transactions |
+| **Spent** | Card spend sorted to a pot or account in a month: “£338.60 of £520.00 spent”. | Used, actual |
+| **Left** | Planned minus Spent for a pot: “£181.40 left”. Negative is “£12.50 over”. | Remaining, balance |
+| **Bring in** | Import the Amex Excel export: “Bring in transactions”, “Last brought in Mon 9 Nov”. | Upload, sync |
+| **Sort** / **To sort** / **Sorted** | Give a transaction a pot or account. “Sorted by rules”. | Assign, categorise |
+| **Split** | A transaction with more than one line. | |
+| **Pace** | “On track”, “£131 ahead of pace”, “Runs out around Thu 19 Nov”. | Burn rate |
+| **Close <Month>** | The month-end step: cover overspends, note leftovers. | Finalise, lock |
+| **Settle up** | Paying a statement. Steps: “Out of Treats”, “Send to Joint Monzo”, “Pay Amex”. | Pay off |
+| **Built up** | The leftover total in a monthly pot. | Surplus, savings |
+| **Free** | A carry-over pot's balance minus card spend not yet settled. | Available (that is income) |
 
 ## Review checklist for future changes
 

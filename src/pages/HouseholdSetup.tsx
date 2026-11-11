@@ -4,6 +4,7 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import { householdReady } from '../domain/budgetDocument'
 import { PageFrame } from '../components/PageFrame'
 import { AdultsFields } from './AdultsFields'
+import { CardSettings } from './CardSettings'
 
 /** The Household page after setup: the name and adults on one screen. First-run setup is `SetupWizard`. */
 export function HouseholdSetup({ document, setDocument, onContinue }: {
@@ -22,6 +23,7 @@ export function HouseholdSetup({ document, setDocument, onContinue }: {
       <h2>Adults</h2>
       <AdultsFields document={document} setDocument={setDocument} attempted={attempted} />
     </section>
+    {document.workflow.setupComplete && <CardSettings document={document} setDocument={setDocument}/>}
     {attempted && !ready && <p role="alert" className="input-error">Enter a household name and at least one adult name.</p>}
     <button type="button" className="primary-button" onClick={() => { setAttempted(true); if (ready) onContinue() }}>Continue to Plan</button>
   </PageFrame>
