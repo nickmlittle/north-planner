@@ -1572,3 +1572,40 @@ div.spending-pot{padding-right:var(--space-4)}
 .home-month-settled{display:flex;align-items:center;gap:var(--space-2);margin:0;padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);background:var(--surface-band);color:var(--pine)}
 .home-month-settled svg{width:18px;height:18px}
 .home-month>header{margin:0;padding:0;border:0;background:transparent}
+.spending-layout{display:grid;gap:var(--space-4)}
+.spending-side{display:grid;align-content:start;gap:var(--space-3)}
+.spending-side-card{display:grid;gap:var(--space-2);padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
+.spending-side-card .spending-big{font-size:var(--text-xl)}
+.spending-side-card .primary-button,.spending-side-card .secondary-button{justify-self:start;min-height:44px;margin:0}
+.spending-side-pots{display:grid;gap:var(--space-1);margin:0;padding:0;list-style:none}
+.spending-side-pots li{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2)}
+.spending-side-pots .text-button{min-height:32px;padding:0;text-align:left;font-weight:600}
+.spending-side-pots .spending-pot-status{flex:none}
+.spending-side .statement-status{margin:0}
+.sort-table-wrap{display:grid;gap:var(--space-2);overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
+.sort-table{width:100%;border-collapse:collapse;font-size:var(--text-md)}
+.sort-table th{padding:var(--space-2);border-bottom:1px solid var(--line);color:var(--muted);font-size:var(--text-sm);font-weight:700;text-align:left;white-space:nowrap}
+.sort-table td{padding:var(--space-2);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.sort-table td:first-child{white-space:nowrap}
+.sort-table .is-amount{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sort-table td.is-amount{font-weight:700}
+.sort-table td.is-credit{color:var(--link)}
+.sort-table-row:focus{outline:none}
+.sort-table-row:focus-within{background:var(--surface-band)}.sort-table-row:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.sort-table-merchant{display:block;font-weight:600}
+.sort-table-note{display:block;color:var(--link);font-size:var(--text-sm)}
+.sort-table select{width:100%;min-width:150px;min-height:40px;margin:0}
+.sort-table-always{display:grid;place-items:center;width:44px;height:44px}
+.sort-table-always input{width:20px;height:20px;margin:0}
+.sort-table-actions{display:flex;align-items:center;gap:var(--space-1)}
+.sort-table-actions .secondary-button{min-height:40px;margin:0;padding:var(--space-1) var(--space-3)}
+.sort-table-keys{margin:0;padding:var(--space-1) var(--space-3) var(--space-3);color:var(--muted);font-size:var(--text-sm)}
+.sort-table-keys kbd{display:inline-block;min-width:18px;margin:0 2px;padding:0 var(--space-1);border:1px solid var(--line-strong);border-radius:var(--radius-sm);background:var(--surface-field);color:var(--charcoal);font:600 var(--text-sm) var(--font-family);text-align:center}
+@media(min-width:1100px){
+  .spending-page .page-frame-summary,.spending-page .page-frame-body{max-width:1320px}
+  .spending-page .spending-panel,.spending-page .spending-nav{max-width:900px}
+  .spending-page .spending-layout.has-side{grid-template-columns:minmax(0,1fr) 300px;align-items:start}
+  .spending-page .spending-layout.has-side .spending-panel{max-width:none}
+  .spending-page .spending-nav{max-width:none}
+  .settle-up{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
+  .settle-up>.payday-copied,.settle-up>.payday-copy-hint{grid-column:1/-1}
+}

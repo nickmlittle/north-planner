@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { useState } from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { emptyCardTracker, type CardTransaction } from '../domain/cardTracker'
@@ -636,4 +636,57 @@ it('shows a change after closing, and closes again', () => {
   expect(saved!.card!.months['2026-10']!.closedSpent!['pot:groceries']).toBe(51180)
   document = saved!
   expect(document.card!.months['2026-10']!.leftovers).toEqual({ groceries: 820, car: 4500, treats: 20000 })
+})
+
+describe('on desktop', () => {
+  const desktop = () => vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('sorts from the keyboard: arrows move, Enter places the suggestion, A makes a rule, S splits, / chooses a pot', async () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+    expect(screen.getByRole('tab', { name: /All transactions/ })).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'To sort' })
+    expect(table).toHaveAccessibleDescription('↑↓ move between rows · / choose a pot · Enter place it · A Always · S split')
+    const rows = () => within(table).getAllByRole('row').slice(1)
+    expect(rows().map(row => row.getAttribute('aria-label'))).toEqual(['TRAIN TICKETS ONLINE, £9.00, Mon 9 Nov', 'TRAIN TICKETS ONLINE, £112.81, Sun 8 Nov'])
+    expect(within(rows()[0]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveDisplayValue('Treats · Ada (suggested)')
+    rows()[0]!.focus()
+    fireEvent.keyDown(rows()[0]!, { key: 'ArrowDown' })
+    expect(rows()[1]).toHaveFocus()
+    fireEvent.keyDown(rows()[1]!, { key: '/' })
+    expect(within(rows()[1]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveFocus()
+    fireEvent.change(within(rows()[1]!).getByLabelText('Pot for TRAIN TICKETS ONLINE'), { target: { value: 'pot:eating' } })
+    fireEvent.keyDown(within(rows()[1]!).getByLabelText('Pot for TRAIN TICKETS ONLINE'), { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort?.lines[0]?.destination).toEqual({ kind: 'pot', potId: 'eating' })
+    expect(screen.getByRole('status')).toHaveTextContent('Sorted TRAIN TICKETS ONLINE to Eating out · Joint.')
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    expect(rows()).toHaveLength(1)
+    expect(rows()[0]).toHaveFocus()
+    fireEvent.keyDown(rows()[0]!, { key: 'a' })
+    expect(within(rows()[0]!).getByRole('checkbox')).toBeChecked()
+    fireEvent.keyDown(rows()[0]!, { key: 'Enter' })
+    // The merchant went to Eating out a moment ago, so that's now the suggestion.
+    expect(saved!.card!.rules.at(-1)).toMatchObject({ contains: 'TRAIN', destination: { kind: 'pot', potId: 'eating' } })
+    expect(screen.getByText('Everything is sorted.')).toBeInTheDocument()
+  })
+
+  it('opens the split editor with S', () => {
+    desktop()
+    render(<Harness initial={sortingHousehold()}/>)
+    const row = within(screen.getByRole('table', { name: 'To sort' })).getAllByRole('row')[1]!
+    fireEvent.keyDown(row, { key: 's' })
+    expect(screen.getByRole('dialog', { name: 'Split TRAIN TICKETS ONLINE' })).toBeInTheDocument()
+  })
+
+  it('keeps the month and the statement to settle beside the list', () => {
+    desktop()
+    render(<Harness initial={statementHousehold()} today="2026-11-30"/>)
+    const side = screen.getByRole('complementary', { name: 'November 2026 and the current statement' })
+    expect(within(side).getByText('November so far').nextElementSibling).toHaveTextContent('£727.91 of £870.00')
+    expect(within(side).getByText('October statement').nextElementSibling).toHaveTextContent('£40.00 due Wed 18 Nov')
+    fireEvent.click(within(side).getByRole('button', { name: 'Open statement' }))
+    expect(screen.getByRole('heading', { name: 'October statement' })).toBeInTheDocument()
+  })
 })

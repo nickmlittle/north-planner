@@ -1,6 +1,6 @@
 # Card tracker (Spending): design and PR build plan
 
-Status: agreed design, being built (see [card-tracker-rules](card-tracker-rules.md) for what has shipped). Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins. In particular, the canvas uses illustrative statement dates (3rd–2nd). The real Amex statements run from the 25th to the 24th (§4).
+Status: built, 11 November 2026, in #126–#137 (`card/1`–`card/12`). [card-tracker-rules](card-tracker-rules.md) is the contract for what shipped; §8a lists where the build differs from this plan. Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins. In particular, the canvas uses illustrative statement dates (3rd–2nd). The real Amex statements run from the 25th to the 24th (§4).
 
 - **Design canvas** (wireframes; private to the owner): https://claude.ai/artifact/9x86swd2UHgJcRKBNZKYA6, section "Card tracker (Amex)", boards 1–7. The older "Card tracker sketch" board at the top is superseded.
 - **Related rules:** [transfer-calculation-rules](transfer-calculation-rules.md) (ticks, Move, Funding), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (calendar months, snapshots), [product-design-spec](product-design-spec.md) (layout, language, glossary).
@@ -473,6 +473,22 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 - Every earlier PR must already *work* at 1440 wide; this PR makes it efficient.
 
 **Optional, later:** a split-rule UI (D13), month-picker health dots (§7.1), and automation (§9).
+
+## 8a. As built: differences from this plan
+
+Each was recorded in its PR's "Design conformance" section. None changes a decision (D1–D16, R1).
+
+- **Model (PR 1):** `CardTransaction.merchant` stores `merchantKey` of the raw description, because the stored description is whitespace-collapsed (§5.1a). Extra optional fields: `TransactionSort.checkedAt`, `StatementRecord.finalImportAt` / `settleWithoutFinalAt`, `MonthRecord.allInAt` / `closedSpent`, `PotTracking.keptBuildUpPence`. Cards have no delete. Days until due accept 1–60.
+- **Import (PR 2, 6):** the header row is found by its exact 13 columns rather than fixed at row 7. An unreadable row, period or summary figure stops the whole import with a message. Refund matching runs as a second pass so a refund can match a purchase in the same file; an import-matched refund is stored `by: 'rule'` without a rule id (shown under Sorted by rules, tagged Refund). "Same card" for refunds means the same card ending.
+- **Navigation (PR 3–10):** `spendingView` also has `all` (All transactions); `spendingPot`, `spendingStatement` and `spendingClose` open a pot, a statement and Close <Month>. Sections appear as they ship; on phones All transactions and Rules sit under ⋯.
+- **Sorting (PR 4–5):** "Always" sits above the suggestions so it can be ticked before the one tap; a new rule also sorts anything still waiting that it matches. Six suggestions show before "All pots and accounts". The funding-share button names the actual share ("62/38"). A split with an account reads "Split · 3 ways".
+- **This month (PR 7):** accounts show only what was spent ("one-offs"), never Planned. Rows: paced pots with a plan, plus anything with spending. "Runs out" shows only when a pot is ahead of pace.
+- **Carry-over (PR 8):** annual costs list their yearly amount only; Plan items have no due month.
+- **Statements (PR 9):** a statement is named by the month it closes in ("November statement" for 25 Oct – 24 Nov). Settle up opens once a statement is ready (or part ticked).
+- **Closing (PR 10):** a cover's source is stored when chosen so its step can be ticked before Close. "Move £X…" suggests leaving one month's Planned.
+- **Home (PR 11):** the per-person summary stays at the top and To do stays its own section; the month cards sit between them.
+- **Desktop (PR 12):** each row's pot starts at its suggestion, so Enter places it in one key; the side panel shows on To sort and All transactions.
+- **Not built (later):** a split-rule UI (D13), health dots in the month picker (§7.1), automation (§9).
 
 ## 9. Automation later (D14)
 
