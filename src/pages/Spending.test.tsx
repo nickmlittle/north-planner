@@ -34,7 +34,8 @@ function Harness({ initial, onChange = () => {}, startView = 'sort', today = '20
   const [month, setMonth] = useState(today.slice(0, 7))
   const [pot, setPot] = useState<string | null>(null)
   const [statement, setStatement] = useState<string | null>(null)
-  return <Spending document={document} view={view} onSelectView={next => { setView(next); setPot(null); setStatement(null) }} onOpenHousehold={() => {}} month={month} onMonthChange={setMonth} potId={pot} onOpenPot={setPot} statementKey={statement} onOpenStatement={setStatement} today={today} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  const [closing, setClosing] = useState(false)
+  return <Spending document={document} view={view} closing={closing} onOpenClose={setClosing} onSelectView={next => { setView(next); setPot(null); setStatement(null); setClosing(false) }} onOpenHousehold={() => {}} month={month} onMonthChange={next => { setMonth(next); setClosing(false) }} potId={pot} onOpenPot={setPot} statementKey={statement} onOpenStatement={setStatement} today={today} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
 }
 
 it('asks for a card before anything else', () => {
@@ -563,4 +564,76 @@ it('offers to tick Pay when Amex shows a matching payment', () => {
   fireEvent.click(screen.getByRole('button', { name: /^October statement/ }))
   fireEvent.click(screen.getByRole('button', { name: 'Tick Pay Amex' }))
   expect(saved!.card!.statements['amex:2026-10-24']!.ticks!['settle:pay']).toMatchObject({ amountPence: 4000 })
+})
+
+function closingHousehold(): BudgetDocument {
+  const document = monthHousehold()
+  document.budget.pots.push({ id: 'car', name: 'Car', accountId: 'joint' })
+  document.budget.snapshots['2026-10'] = { items: [...document.budget.snapshots['2026-11']!.items, { id: 'c', name: 'c', categoryId: 'c', entryAmountPence: 8000, amountPence: 8000, frequency: 'monthly', destination: { kind: 'pot', potId: 'car' }, funding: 'equal' }] }
+  const sorted = (potId: string, pence: number) => ({ lines: [{ amountPence: pence, destination: { kind: 'pot' as const, potId } }], by: 'person' as const, at: 'x' })
+  document.card!.transactions = [
+    tx('o1', '2026-10-05', 'GREEN GROCER', 51180, { statementKey: 'amex:2026-10-24', sort: sorted('groceries', 51180) }),
+    tx('o2', '2026-10-10', 'CORNER CAFE', 18500, { statementKey: 'amex:2026-10-24', sort: sorted('eating', 18500) }),
+    tx('o3', '2026-10-12', 'GARAGE', 3500, { statementKey: 'amex:2026-10-24', sort: sorted('car', 3500) }),
+  ]
+  document.card!.months = { '2026-07': { closedAt: 'x', leftovers: { car: 4500 } }, '2026-08': { closedAt: 'x', leftovers: { car: 4500 } }, '2026-09': { closedAt: 'x', leftovers: { car: 4500 } } }
+  document.card!.imports = [{ at: '2026-11-04T08:00:00.000Z', cardId: 'amex', fileName: 'a.xlsx', statementKey: 'amex:2026-11-24', rows: 1, added: 1, skipped: 0, sortedByRules: 0, latestDate: '2026-11-02', matchesSummary: true }]
+  return document
+}
+
+it('closes a month: covers the overspend, ticks the cover, sees leftovers and the build-up, then closes', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={closingHousehold()} startView="month" today="2026-11-04" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+  expect(screen.getByText('Closing')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
+  expect(screen.getByRole('heading', { name: 'Close October' })).toBeInTheDocument()
+  expect(screen.getByText('1 Oct – 31 Oct · all transactions in and sorted')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Over plan · 1' })).toBeInTheDocument()
+  const coverFrom = screen.getByLabelText('Covered from')
+  expect(coverFrom).toHaveDisplayValue('Joint')
+  expect([...(coverFrom as HTMLSelectElement).options].map(option => option.text)).toEqual(['Joint', 'Treats · Ada · £200.00 left', 'Car · Joint · £45.00 left', 'Groceries · Joint · £8.20 left', 'November’s Eating out (moves no money)'])
+  fireEvent.click(screen.getByRole('button', { name: 'Move £35.00 from Joint into Eating out done' }))
+  expect(saved!.card!.months['2026-10']!.coverTicks!['cover:eating']).toMatchObject({ amountPence: 3500 })
+  expect([...window.document.querySelectorAll('.close-left > div')].map(row => row.textContent)).toEqual(['PotLeftBuilt up', 'Car · Joint£45.00£180.00', 'Groceries · Joint£8.20£8.20', 'Treats · Ada£200.00£200.00'])
+  expect(screen.getByText('Car has built up £180.00, more than £160.00 (2× its £80.00 monthly plan). Move some?')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Move £100.00…' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Record the move' }))
+  expect(saved!.card!.pots.car!.movedOut).toEqual([{ pence: 10000, at: expect.any(String) }])
+  expect(screen.queryByText(/Car has built up/)).not.toBeInTheDocument()
+  fireEvent.change(coverFrom, { target: { value: 'next-month' } })
+  expect(screen.getByText('Leaves Eating out £35.00 short in November.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
+  expect(saved!.card!.months['2026-10']).toMatchObject({ closedAt: expect.any(String), covers: [{ potId: 'eating', amountPence: 3500, source: { kind: 'next-month' } }], leftovers: { car: 4500, groceries: 820, treats: 20000 } })
+  expect(screen.getByText('October is closed')).toBeInTheDocument()
+  expect(decodeBudgetDocument(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+})
+
+it('waits for late postings before closing, unless all transactions are in', () => {
+  const document = closingHousehold()
+  document.card!.imports[0]!.at = '2026-11-02T08:00:00.000Z'
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} startView="month" today="2026-11-02" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
+  const close = screen.getAllByRole('button', { name: 'Close October' }).at(-1)!
+  expect(close).toBeDisabled()
+  expect(screen.getByText(/Late October transactions can take a few days to post/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'All October transactions are in' }))
+  expect(saved!.card!.months['2026-10']!.allInAt).toEqual(expect.any(String))
+  expect(screen.getAllByRole('button', { name: 'Close October' }).at(-1)).toBeEnabled()
+})
+
+it('shows a change after closing, and closes again', () => {
+  let document = closingHousehold()
+  document.card!.months['2026-10'] = { closedAt: '2026-11-04T09:00:00Z', closedSpent: { 'pot:groceries': 50000, 'pot:eating': 18500, 'pot:car': 3500 }, leftovers: { groceries: 2000, car: 4500 }, covers: [] }
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} startView="month" today="2026-11-06" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
+  expect(screen.getByText('Changed since closed: Groceries · Joint £500.00 → £511.80.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Close again' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Close October again' }))
+  expect(saved!.card!.months['2026-10']!.closedSpent!['pot:groceries']).toBe(51180)
+  document = saved!
+  expect(document.card!.months['2026-10']!.leftovers).toEqual({ groceries: 820, car: 4500, treats: 20000 })
 })

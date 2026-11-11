@@ -6,10 +6,10 @@ afterEach(() => window.history.replaceState(null, '', '/'))
 
 it('parses direct, legacy and invalid navigation URLs', () => {
   expect(parseNavigation('?view=budget&budgetView=transfers&month=2026-02&transferAccount=account-1')).toEqual({
-    view: 'budget', budgetView: 'transfers', month: '2026-02', planDestination: null, spendingView: 'sort', spendingPot: null, spendingStatement: null,
+    view: 'budget', budgetView: 'transfers', month: '2026-02', planDestination: null, spendingView: 'sort', spendingPot: null, spendingStatement: null, spendingClose: false,
   })
   expect(parseNavigation('?view=dashboard&budgetView=unknown&month=2026-13')).toEqual({
-    view: 'budget', budgetView: 'plan', month: currentMonth(), planDestination: null, spendingView: 'sort', spendingPot: null, spendingStatement: null,
+    view: 'budget', budgetView: 'plan', month: currentMonth(), planDestination: null, spendingView: 'sort', spendingPot: null, spendingStatement: null, spendingClose: false,
   })
   expect(parseNavigation('?view=budget').budgetView).toBe('plan')
 })
@@ -72,4 +72,13 @@ it('keeps a statement open on Statements', () => {
   expect(parseNavigation(window.location.search).spendingStatement).toBe('amex:2026-11-24')
   navigateTo({ spendingView: 'month' })
   expect(window.location.search).not.toContain('spendingStatement')
+})
+
+it('opens Close <Month> on This month', () => {
+  expect(parseNavigation('?view=spending&spendingView=month&month=2026-10&spendingClose=1')).toMatchObject({ spendingClose: true, month: '2026-10' })
+  window.history.replaceState(null, '', '/?view=spending&spendingView=month&month=2026-10')
+  navigateTo({ spendingClose: true })
+  expect(window.location.search).toContain('spendingClose=1')
+  navigateTo({ spendingClose: false })
+  expect(window.location.search).not.toContain('spendingClose')
 })

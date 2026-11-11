@@ -23,7 +23,7 @@ export function hasLiveTransfersOrigin(destination: PlanDestination | null): boo
   return !!origin && !!destination && liveTransfersOrigins.has(origin.key) && origin.month === current.month && origin.destination.kind === destination.kind && origin.destination.id === destination.id
 }
 /** `spendingPot`: a pot's detail on This month (its id). `spendingStatement`: a statement's detail (its key). */
-export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null; spendingView: SpendingView; spendingPot: string | null; spendingStatement: string | null }
+export type NavigationState = { view: PlannerView; budgetView: BudgetView; month: string; planDestination: PlanDestination | null; spendingView: SpendingView; spendingPot: string | null; spendingStatement: string | null; spendingClose: boolean }
 const spendingViews: readonly SpendingView[] = ['sort', 'all', 'month', 'statements', 'rules']
 const isSpendingView = (value: string | null): value is SpendingView => spendingViews.includes(value as SpendingView)
 
@@ -58,6 +58,7 @@ export function parseNavigation(search: string): NavigationState {
     spendingView: isSpendingView(params.get('spendingView')) ? params.get('spendingView') as SpendingView : 'sort',
     spendingPot: params.get('spendingView') === 'month' && params.get('spendingPot') ? params.get('spendingPot') : null,
     spendingStatement: params.get('spendingView') === 'statements' && params.get('spendingStatement') ? params.get('spendingStatement') : null,
+    spendingClose: params.get('spendingView') === 'month' && params.get('spendingClose') === '1',
   }
 }
 
@@ -86,6 +87,8 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   else url.searchParams.delete('spendingPot')
   if (state.view === 'spending' && state.spendingView === 'statements' && state.spendingStatement) url.searchParams.set('spendingStatement', state.spendingStatement)
   else url.searchParams.delete('spendingStatement')
+  if (state.view === 'spending' && state.spendingView === 'month' && state.spendingClose) url.searchParams.set('spendingClose', '1')
+  else url.searchParams.delete('spendingClose')
   if (next.month !== undefined || url.searchParams.has('month')) url.searchParams.set('month', state.month)
   else url.searchParams.delete('month')
   // The destination detail screen is gone; old links simply land on the step list.
