@@ -21,6 +21,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Home month cards, paydays, England and Wales working days | 11 | `homeMonths` in `monthStages.ts`, `src/domain/workingDays.ts`, `src/pages/HomeMonths.tsx`, `IncomeDialog.tsx` |
 | Desktop: keyboard sorting table, side panel, settle up in columns | 12 | `src/pages/SortTable.tsx`, `SpendingSide.tsx` |
 | Amex pot 1: set-aside pot setting, moves, what's left to move and its steps | A1 | `src/domain/setAside.ts`, `shareSteps` in `cardStatements.ts`, `src/pages/CardSettings.tsx` |
+| Amex pot 2: Move sheet, Spending callout, Undo, moved tags, Home task | A2 | `src/pages/MoveToPotSheet.tsx`, `Spending.tsx`, `HomeMonths.tsx`, `homeMonths` in `monthStages.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -230,6 +231,7 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **To move** (`toMove`): sorted purchases and refunds on statements paid from the pot whose lines differ from what has moved (`pendingLines`), newest first. Unsorted transactions wait until they're sorted; payments never move. A transaction re-sorted or split after moving is **Changed since moved** (`moveState`) and moves only the difference: "Out of Eating out £20.00, Into Groceries £20.00".
 - **The steps** (`moveSteps`) are settle-up's (`shareSteps`) with the pot's account as the hub: for each account, Out of each pot (Into one whose refunds outweigh its spend), then Send to the pot's account (or it sends the difference back); spend sorted to the pot's account itself is already in its main balance. The last step is Into the pot with the total (Out of it when refunds outweigh spend). Lines sorted to the pot itself need no step.
 - **Moved** (`recordMove`) records what's still to move for the ticked transactions at that moment. Transactions with nothing to move are skipped.
+- **On screen:** while anything is left to move, Spending shows "£140.59 to move to the Amex pot · 3 transactions sorted since the last move" on every section, and Home's current month has the task "Move £140.59 to the Amex pot". The **Move sheet** lists the moves to make per account (tap an amount to copy it), then "What it covers": every transaction to move, all ticked, a re-sort tagged "Changed since moved" with its change. Unticking one takes it out of the moves and leaves it for next time. **Moved £X** records it; the message offers **Undo**. All transactions tags each row on a pot statement **Moved** or **Changed since moved**.
 
 ## Words on screen
 

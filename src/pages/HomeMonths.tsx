@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import { CalendarDays, Check, ChevronRight, CreditCard, FileSpreadsheet, TriangleAlert, Wallet } from 'lucide-react'
+import { CalendarDays, Check, ChevronRight, CreditCard, FileSpreadsheet, PiggyBank, TriangleAlert, Wallet } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, firstDayOf, parseStatementKey } from '../domain/cardTracker'
 import { closeMonthPlan, homeMonths, type HomeMonth, type HomeTask } from '../domain/monthStages'
+import { potPhrase } from '../domain/setAside'
 import { formatMonth } from '../formatting/month'
 import type { SpendingView } from '../state/navigation'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
@@ -38,6 +39,12 @@ export function HomeMonths({ document, today, onOpenSpending, onOpenTransfers }:
     if (task.kind === 'bring-in') return <Row key={task.key} icon={<FileSpreadsheet/>} title={`Bring in ${card.name} transactions`} sub={lastDone(cards)} onSelect={() => onOpenSpending({ view: 'sort' })}/>
     if (task.kind === 'closes-soon') return <Row key={task.key} icon={<CalendarDays/>} title="Statement closes tomorrow" sub={`${card.name} closes the ${statementName(statement!.closeDate)} on ${dayDate(statement!.closeDate)}`} onSelect={() => onOpenSpending({ view: 'sort' })}/>
     if (task.kind === 'final-export') return <Row key={task.key} icon={<FileSpreadsheet/>} title={`Bring in the final ${statementName(statement!.closeDate).replace(' statement', '')} statement`} sub="Amex can export past periods. This checks it’s all here." onSelect={() => onOpenSpending({ view: 'statements', statementKey: task.statementKey })}/>
+    if (task.kind === 'move') {
+      const pot = document.budget.pots.find(row => row.id === cardTracker(document).cards.find(item => item.id === task.cardId)?.setAside?.potId)
+      const phrase = potPhrase(pot?.name ?? card.name)
+      const amount = task.amountPence ?? 0
+      return <Row key={task.key} icon={<PiggyBank/>} title={amount < 0 ? `Move ${pounds(-amount)} back out of ${phrase}` : amount ? `Move ${pounds(amount)} to ${phrase}` : `Update ${phrase}`} sub={`${plural(task.count ?? 0, 'transaction')} sorted since the last move`} onSelect={() => onOpenSpending({ view: 'sort' })}/>
+    }
     if (task.kind === 'sorted') return <Row key={task.key} icon={<CreditCard/>} done={task.done} title="All transactions in and sorted" onSelect={() => onOpenSpending({ view: 'sort' })}/>
     if (task.kind === 'close') return <Row key={task.key} icon={<CalendarDays/>} done={task.done} title={`Close ${monthName(task.month)}`} sub={task.done ? 'Closed' : closeSub(document, task.month, today)} onSelect={() => onOpenSpending({ view: 'month', month: task.month, close: true })}/>
     if (task.kind === 'settle') return <Row key={task.key} icon={<Wallet/>} done={task.done} title={`Settle the ${statementName(statement!.closeDate)}`} sub={task.done ? 'Settled' : `${pounds(task.amountPence ?? 0)} by ${dayDate(task.dueDate!)}`} onSelect={() => onOpenSpending({ view: 'statements', statementKey: task.statementKey })}/>

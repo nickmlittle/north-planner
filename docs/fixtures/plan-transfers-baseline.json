@@ -83,6 +83,12 @@
         "id": "ben-spend",
         "name": "Spending",
         "accountId": "ben"
+      },
+      {
+        "id": "amex-pot",
+        "name": "Amex",
+        "accountId": "joint",
+        "kind": "credit-card"
       }
     ],
     "categories": [
@@ -1356,7 +1362,11 @@
             "suffix": "41009",
             "personId": "ben"
           }
-        ]
+        ],
+        "setAside": {
+          "potId": "amex-pot",
+          "fromCloseDate": "2026-11-24"
+        }
       }
     ],
     "transactions": [
@@ -2076,6 +2086,99 @@
           "potId": "ben-spend"
         },
         "createdAt": "2026-10-01T09:00:00.000Z"
+      }
+    ],
+    "moves": [
+      {
+        "id": "move-1",
+        "cardId": "amex",
+        "at": "2026-11-06T18:00:00.000Z",
+        "transactions": [
+          {
+            "transactionId": "AT268000000000000000013",
+            "lines": [
+              {
+                "amountPence": 2715,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "groceries"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000014",
+            "lines": [
+              {
+                "amountPence": 5510,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "ben-spend"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000015",
+            "lines": [
+              {
+                "amountPence": 8360,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "groceries"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000016",
+            "lines": [
+              {
+                "amountPence": 1500,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "bills"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000017",
+            "lines": [
+              {
+                "amountPence": 7490,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "groceries"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000019",
+            "lines": [
+              {
+                "amountPence": 1250,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "ada-spend"
+                }
+              }
+            ]
+          },
+          {
+            "transactionId": "AT268000000000000000020",
+            "lines": [
+              {
+                "amountPence": 4460,
+                "destination": {
+                  "kind": "pot",
+                  "potId": "groceries"
+                }
+              }
+            ]
+          }
+        ]
       }
     ],
     "statements": {

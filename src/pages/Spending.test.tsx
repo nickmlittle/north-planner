@@ -690,3 +690,61 @@ describe('on desktop', () => {
     expect(screen.getByRole('heading', { name: 'October statement' })).toBeInTheDocument()
   })
 })
+
+describe('the Amex pot', () => {
+  const sorted = (potId: string, amountPence: number) => ({ sort: { lines: [{ amountPence, destination: { kind: 'pot' as const, potId } }], by: 'person' as const, at: 'x' } })
+  function withPot(): BudgetDocument {
+    const document = household()
+    document.budget.accounts.push({ id: 'ben-own', name: 'Current', provider: 'Nationwide', ownerPersonIds: ['ben'] })
+    document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' }, { id: 'fuel', name: 'Fuel', accountId: 'ben-own' })
+    document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-11-24' }
+    document.card!.transactions = [
+      tx('old', '2026-10-20', 'OLD SHOP', 999, { statementKey: 'amex:2026-10-24', ...sorted('groceries', 999) }),
+      tx('grocer', '2026-11-04', 'GREEN GROCER', 4460, sorted('groceries', 4460)),
+      tx('fuel', '2026-11-06', 'FUEL STOP', 5820, { cardSuffix: '41009', personId: 'ben', ...sorted('fuel', 5820) }),
+      tx('todo', '2026-11-07', 'CORNER CAFE', 1800),
+    ]
+    return document
+  }
+
+  it('shows what is left to move, lists the moves, and records only what was ticked', () => {
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={withPot()} onChange={next => { saved = next }}/>)
+    expect(screen.getByText('£102.80 to move to the Amex pot')).toBeInTheDocument()
+    expect(screen.getByText('2 transactions sorted since the last move')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Move to the Amex pot' }))
+    const dialog = screen.getByRole('dialog', { name: 'Move to the Amex pot' })
+    const steps = within(dialog).getByRole('region', { name: 'Moves to make' })
+    expect(within(steps).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Fuel£58.20', 'Send to Joint£58.20', 'Out of Groceries£44.60', 'Into Amex£102.80'])
+    // Untick the fuel: it stays for next time, and the moves follow.
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /FUEL STOP/ }))
+    expect(within(steps).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Groceries£44.60', 'Into Amex£44.60'])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Moved £44.60' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Moved £44.60 to the Amex pot. Undo')
+    expect(saved!.card!.moves).toHaveLength(1)
+    expect(saved!.card!.moves![0]!.transactions.map(row => row.transactionId)).toEqual(['grocer'])
+    expect(decodeBudgetDocument(saved)).not.toBeNull()
+    expect(screen.getByText('£58.20 to move to the Amex pot')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(saved!.card!.moves).toBeUndefined()
+    expect(screen.getByText('£102.80 to move to the Amex pot')).toBeInTheDocument()
+  })
+
+  it('tags moved transactions in All transactions, and a re-sort as changed since moved', () => {
+    const document = withPot()
+    document.card!.moves = [{ id: 'm1', cardId: 'amex', at: '2026-11-07T09:00:00Z', transactions: [{ transactionId: 'grocer', lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'fuel' } }] }] }]
+    render(<Harness initial={document} startView="all"/>)
+    expect(screen.getByRole('button', { name: /^GREEN GROCER.*changed since moved/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^FUEL STOP/ })).not.toHaveAccessibleName(/moved/)
+    // October is before the pot: no tag.
+    expect(screen.getByRole('button', { name: /^OLD SHOP/ })).not.toHaveAccessibleName(/moved/)
+  })
+
+  it('shows nothing to move without a set-aside pot', () => {
+    const document = withPot()
+    delete document.card!.cards[0]!.setAside
+    render(<Harness initial={document}/>)
+    expect(screen.queryByRole('button', { name: 'Move to the Amex pot' })).not.toBeInTheDocument()
+  })
+})

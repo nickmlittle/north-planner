@@ -187,6 +187,16 @@ describe('Home month cards', () => {
     expect(next.role === 'next' && next.status.stage).toBe('funding')
   })
 
+  it('asks to move what was sorted since the last move to the Amex pot', async () => {
+    const { homeMonths } = await load()
+    const document = household()
+    document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
+    document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-11-24' }
+    const current = homeMonths(document, '2026-11-12').find(card => card.role === 'current')!
+    // Only the November statement's £40.00 of Bills; October settles the old way.
+    expect(current.tasks.find(task => task.kind === 'move')).toMatchObject({ cardId: 'amex', count: 1, amountPence: 4000, done: false })
+  })
+
   it('folds a settled month to one line until the month after it settles', async () => {
     const { homeMonths } = await load()
     let document = household()

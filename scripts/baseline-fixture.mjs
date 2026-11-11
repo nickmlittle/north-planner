@@ -23,6 +23,8 @@ const pots = [
   { id: 'emergency', name: 'Emergency', accountId: 'saving' },
   { id: 'ada-spend', name: 'Spending', accountId: 'ada' },
   { id: 'ben-spend', name: 'Spending', accountId: 'ben' },
+  // The Amex pot: money is set aside in it as transactions are sorted, and the bill is paid from it.
+  { id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' },
 ]
 const items = names.map((name, i) => {
   const amountPence = i === 0 ? 32547 : 4500 + i * 713
@@ -104,9 +106,15 @@ const summaryFor = close => {
 }
 const count = close => transactions.filter(row => row.statementKey === `amex:${close}`).length
 const byRules = close => transactions.filter(row => row.statementKey === `amex:${close}` && row.sort?.by === 'rule').length
+// From the November statement, money goes into the Amex pot as it's sorted. One move on 6 Nov covered the sorted
+// November-statement transactions up to 4 Nov; what's been sorted since is still to move.
+const moves = [{
+  id: 'move-1', cardId: 'amex', at: '2026-11-06T18:00:00.000Z',
+  transactions: transactions.filter(row => row.statementKey === 'amex:2026-11-24' && row.sort && row.date <= '2026-11-04').map(row => ({ transactionId: row.id, lines: row.sort.lines })),
+}]
 const card = {
-  cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [{ suffix: '41001', personId: 'ada' }, { suffix: '41009', personId: 'ben' }] }],
-  transactions, rules,
+  cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [{ suffix: '41001', personId: 'ada' }, { suffix: '41009', personId: 'ben' }], setAside: { potId: 'amex-pot', fromCloseDate: '2026-11-24' } }],
+  transactions, rules, moves,
   statements: {
     'amex:2026-10-24': { cardId: 'amex', closeDate: '2026-10-24', amexSummary: summaryFor('2026-10-24'), finalImportAt: octImport },
     'amex:2026-11-24': { cardId: 'amex', closeDate: '2026-11-24', amexSummary: summaryFor('2026-11-24') },

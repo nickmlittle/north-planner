@@ -1,5 +1,5 @@
 import { useRef, useState, useSyncExternalStore, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
-import { ChevronDown, ChevronRight, CreditCard, FileSpreadsheet, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, CreditCard, FileSpreadsheet, PiggyBank, Plus } from 'lucide-react'
 import { MOBILE_QUERY } from '../breakpoints'
 import { PageFrame } from '../components/PageFrame'
 import type { BudgetDocument } from '../domain/budgetDocument'
@@ -20,7 +20,9 @@ import { CloseMonth } from './CloseMonth'
 import { SortTable } from './SortTable'
 import { SpendingSide } from './SpendingSide'
 import { splitLabel } from '../domain/cardSplits'
-import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
+import { dayOf, plural, pounds, signedPounds, transactionMeta } from './spendingFormat'
+import { movedByTransaction, moveState, potPhrase, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
+import { MoveToPotSheet } from './MoveToPotSheet'
 
 type Props = {
   document: BudgetDocument
@@ -58,15 +60,16 @@ function transactionLink(document: BudgetDocument, transaction: CardTransaction)
 }
 
 /** One transaction: what, when, whose card, how much, and where it went. A button when it can be sorted. */
-export function TransactionRow({ document, transaction, where, tag, action, onSelect }: { document: BudgetDocument; transaction: CardTransaction; where?: string; tag?: string; action?: string; onSelect?: () => void }) {
+export function TransactionRow({ document, transaction, where, tag, moved, action, onSelect }: { document: BudgetDocument; transaction: CardTransaction; where?: string; tag?: string; moved?: MoveState; action?: string; onSelect?: () => void }) {
   // Read as one phrase: "TESCO, £62.40, Tue 10 Nov · Ada ··41001, Groceries · Monzo Joint, rule".
   const link = transactionLink(document, transaction)
-  const label = [transaction.description, signedPounds(transaction.amountPence), `${transactionMeta(document, transaction)}${transaction.kind === 'refund' ? ' · refund' : ''}`, link, where, tag?.toLowerCase(), action].filter(Boolean).join(', ')
+  const movedTag = moved === 'moved' ? 'Moved' : moved === 'changed' ? 'Changed since moved' : ''
+  const label = [transaction.description, signedPounds(transaction.amountPence), `${transactionMeta(document, transaction)}${transaction.kind === 'refund' ? ' · refund' : ''}`, link, where, tag?.toLowerCase(), movedTag.toLowerCase(), action].filter(Boolean).join(', ')
   const body = <>
     <span className="spending-row-main"><span className="spending-row-title">{transaction.description}</span><span className="spending-row-amount">{signedPounds(transaction.amountPence)}</span></span>
     <span className="spending-row-meta"><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span>
       {link && <span className="spending-row-link">{link}</span>}
-      {(where || action) && <span className="spending-row-where">{where}{tag && <span className="spending-tag">{tag}</span>}{action && <span className="spending-row-action">{action}</span>}</span>}</span>
+      {(where || action) && <span className="spending-row-where">{where}{tag && <span className="spending-tag">{tag}</span>}{movedTag && <span className={`spending-tag is-${moved}`}>{movedTag}</span>}{action && <span className="spending-row-action">{action}</span>}</span>}</span>
   </>
   const className = `spending-row${transaction.amountPence < 0 ? ' is-credit' : ''}`
   const row = onSelect ? <button type="button" className={className} data-transaction={transaction.id} aria-label={label} onClick={onSelect}>{body}</button> : <div className={className}>{body}</div>
@@ -85,7 +88,10 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const [sorting, setSorting] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessageText] = useState('')
+  const [undoId, setUndoId] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
+  const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
   const tabRefs = useRef<Partial<Record<SpendingView, HTMLButtonElement | null>>>({})
   const toSort = transactionsToSort(tracker)
   const byRules = uncheckedRuleSorts(tracker)
@@ -107,6 +113,16 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const sortedThrough = tracker.transactions.reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
   const sortingTransaction = tracker.transactions.find(row => row.id === sorting)
   const splittingTransaction = tracker.transactions.find(row => row.id === splitting)
+  // The set-aside pot (the Amex pot): what's sorted but not moved into it yet, and each row's state.
+  const setAsideCard = tracker.cards.find(card => card.setAside)
+  const setAsidePot = document.budget.pots.find(pot => pot.id === setAsideCard?.setAside?.potId)
+  const pending = setAsideCard ? toMove(document, setAsideCard.id) : []
+  const pendingPence = pending.reduce((sum, row) => sum + row.pence, 0)
+  const moves = movedByTransaction(tracker)
+  const movedOf = (transaction: CardTransaction): MoveState | undefined => {
+    const card = tracker.cards.find(row => row.id === transaction.cardId)
+    return transaction.kind !== 'payment' && usesSetAside(card, transaction.statementKey) ? moveState(transaction, moves.get(transaction.id)) : undefined
+  }
 
   if (!tracker.cards.length) return <PageFrame className="spending-page" title="Spending" contentWidth="narrow">
     <div className="spending-empty"><CreditCard aria-hidden="true"/><h2>Add your card first</h2><p>Set up the Amex in Household: when its statement closes and when it’s due. Then bring in its transactions here.</p><button type="button" className="primary-button" onClick={onOpenHousehold}>Set up a card</button></div>
@@ -150,7 +166,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const paid = payments(tracker)
   const allPanel = <>
     <div className="spending-section-heading"><h2 id="spending-all-title">All transactions</h2><span>{all.length ? plural(all.length, 'transaction') : ''}</span>{headingExtra}</div>
-    {all.length ? <ul className="spending-list">{all.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.sort?.by === 'rule' ? transaction.refundOf && !transaction.sort.ruleId ? 'Refund' : 'Rule' : undefined} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
+    {all.length ? <ul className="spending-list">{all.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.sort?.by === 'rule' ? transaction.refundOf && !transaction.sort.ruleId ? 'Refund' : 'Rule' : undefined} moved={movedOf(transaction)} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
       : <p className="spending-none">Nothing brought in yet.</p>}
     {paid.length > 0 && <section className="spending-payments" aria-labelledby="spending-payments-title">
       <div className="spending-section-heading"><h2 id="spending-payments-title">Payments to {tracker.cards[0]!.name}</h2><span>Never sorted</span></div>
@@ -159,7 +175,12 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   </>
 
   return <PageFrame className="spending-page" title="Spending" contentWidth="wide" summary={summary}>
-    <p className="budget-manage-message spending-message" role="status">{message}</p>
+    <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button></>}</p>
+    {setAsidePot && pending.length > 0 && <div className="move-callout">
+      <PiggyBank aria-hidden="true"/>
+      <p><strong>{pendingPence < 0 ? `${pounds(-pendingPence)} to come back out of ${potPhrase(setAsidePot.name)}` : pendingPence ? `${pounds(pendingPence)} to move to ${potPhrase(setAsidePot.name)}` : `${potPhrase(setAsidePot.name).replace(/^t/, 'T')} needs updating`}</strong><span>{plural(pending.length, 'transaction')} sorted since the last move</span></p>
+      <button type="button" className="secondary-button" onClick={() => setMoving(true)}>Move to {potPhrase(setAsidePot.name)}</button>
+    </div>}
     {!navInHeading && <div className="spending-nav">
       <div className="spending-tabs" role="tablist" aria-label="Spending" onKeyDown={onTabKey}>{tabs.map(section => <button key={section.id} ref={element => { tabRefs.current[section.id] = element }} type="button" role="tab" id={`spending-tab-${section.id}`} aria-selected={active === section.id} aria-controls="spending-panel" tabIndex={active === section.id || !tabs.some(tab => tab.id === active) && section.id === tabs[0]!.id ? 0 : -1} onClick={() => onSelectView(section.id)}>{section.label}{section.count ? ` · ${section.count}` : ''}</button>)}</div>
       {moreMenu}
@@ -178,6 +199,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
+    {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}
   </PageFrame>
 }
