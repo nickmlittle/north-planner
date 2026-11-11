@@ -2,7 +2,8 @@ import type { BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { monthSpending, potFree, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
-import { addDays, bufferOf, cardTracker, destinationKey, lastDayOf, monthOf, sameDestination, shiftMonth, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
+import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
+import { moneyArrives } from './workingDays'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { orderTransferAccounts, personTransferPlans } from './personTransfers'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
@@ -214,3 +215,79 @@ export const coverFromAccount = (source: CoverSource): source is Extract<BudgetD
 export const isNextMonth = (source: CoverSource): source is { kind: 'next-month' } => source.kind === 'next-month'
 export const sameSource = (a: CoverSource, b: CoverSource) => a.kind === 'next-month' ? b.kind === 'next-month' : b.kind !== 'next-month' && sameDestination(a, b)
 export const previousMonth = (month: string) => shiftMonth(month, -1)
+
+// ——— Home: one card per month that isn't finished (§7.1) ———
+
+export type HomeTask = { key: string; done: boolean; kind: 'sorted' | 'close' | 'settle' | 'bring-in' | 'final-export' | 'transfers' | 'closes-soon'; statementKey?: string; amountPence?: number; dueDate?: string; month: string }
+export type HomeMonth =
+  | { role: 'current'; month: string; status: MonthStatus; figures: MonthSpending; tasks: HomeTask[]; lastImportAt?: string }
+  | { role: 'previous'; month: string; status: MonthStatus; tasks: HomeTask[]; overspends: number; leftovers: number }
+  | { role: 'next'; month: string; status: MonthStatus; arrives: string[]; early: boolean; tasks: HomeTask[] }
+  | { role: 'settled'; month: string; settledAt?: string }
+
+/** When a month's money arrives: each employment source's payday, in the month before (D1). */
+export function moneyArrivesDates(document: Pick<BudgetDocument, 'budget' | 'household'>, month: string): string[] {
+  const adults = new Set(document.household.adults.map(person => person.id))
+  const dates = document.budget.incomeSources.filter(source => source.type === 'employment' && source.payday && adults.has(source.personId)).map(source => moneyArrives(month, source.payday!))
+  return [...new Set(dates)].sort()
+}
+
+/** Months with card activity or a record, before `current`. */
+const pastMonths = (tracker: Pick<CardTracker, 'transactions' | 'months'>, current: string) => [...new Set([...tracker.transactions.filter(row => row.kind !== 'payment').map(row => monthOf(row.date)), ...Object.keys(tracker.months)])].filter(month => month < current).sort()
+
+/**
+ * Home's month cards, oldest first: every past month that isn't settled (closing or to settle), the last settled
+ * month as a one-liner until the month after it settles, the current month, and next month.
+ */
+export function homeMonths(document: Pick<BudgetDocument, 'budget' | 'card' | 'household' | 'ticks'>, today: string): HomeMonth[] {
+  const tracker = cardTracker(document)
+  if (!tracker.cards.length) return []
+  const current = monthOf(today), next = shiftMonth(current, 1)
+  const cards: HomeMonth[] = []
+  const past = pastMonths(tracker, current).map(month => monthStage(document, month, today))
+  const settledMonths = past.filter(row => row.stage === 'settled')
+  const lastSettled = settledMonths.at(-1)
+  if (lastSettled) {
+    const after = past.find(row => row.month === shiftMonth(lastSettled.month, 1))
+    if (!after || after.stage !== 'settled') {
+      const times = lastSettled.statements.map(key => tracker.statements[key]?.settledAt).filter((at): at is string => !!at).sort()
+      cards.push({ role: 'settled', month: lastSettled.month, ...times.at(-1) ?? lastSettled.closedAt ? { settledAt: times.at(-1) ?? lastSettled.closedAt } : {} })
+    }
+  }
+  for (const status of past.filter(row => row.stage !== 'settled')) {
+    const plan = closeMonthPlan(document, status.month, today)!
+    const tasks: HomeTask[] = [
+      { key: `sorted:${status.month}`, kind: 'sorted', month: status.month, done: plan.readiness.toSort === 0 && (plan.readiness.postingsIn || plan.readiness.allIn) },
+      { key: `close:${status.month}`, kind: 'close', month: status.month, done: !!status.closedAt },
+      ...status.statements.map(key => { const summary = statementSummary(document, key, today)!; return { key: `settle:${key}`, kind: 'settle' as const, month: status.month, statementKey: key, amountPence: summary.totalPence, dueDate: summary.dueDate, done: summary.settled } }),
+    ]
+    cards.push({ role: 'previous', month: status.month, status, tasks, overspends: plan.overspends.length, leftovers: plan.leftovers.length })
+  }
+  const status = monthStage(document, current, today)
+  const figures = monthSpending(document, current, today)
+  const lastImportAt = [...tracker.imports].reverse()[0]?.at
+  const tasks: HomeTask[] = []
+  if (!lastImportAt || daysBetween(localDate(new Date(lastImportAt)), today) >= BRING_IN_AFTER_DAYS) tasks.push({ key: 'bring-in', kind: 'bring-in', month: current, done: false })
+  for (const card of tracker.cards) {
+    const close = closeDateFor(today, card.closeDay)
+    if (addDays(today, 1) === close) tasks.push({ key: `closes:${card.id}`, kind: 'closes-soon', month: current, done: false, statementKey: statementKey(card.id, close) })
+  }
+  // After a statement closes, ask once for its final export (§7.1).
+  for (const key of Object.keys(tracker.statements).concat(tracker.transactions.map(row => row.statementKey))) {
+    if (tasks.some(task => task.statementKey === key && task.kind === 'final-export')) continue
+    const summary = statementSummary(document, key, today)
+    if (summary && !summary.open && !summary.complete && !summary.settled) tasks.push({ key: `final:${key}`, kind: 'final-export', month: current, statementKey: key, done: false })
+  }
+  cards.push({ role: 'current', month: current, status, figures, tasks, ...lastImportAt ? { lastImportAt } : {} })
+  const nextStatus = monthStage(document, next, today)
+  const arrives = moneyArrivesDates(document, next)
+  const ticks = Object.values(document.ticks?.[next] ?? {})
+  const early = !!arrives[0] && ticks.some(tick => tick.at.slice(0, 10) < addDays(arrives[0]!, -EARLY_PAY_DAYS))
+  cards.push({ role: 'next', month: next, status: nextStatus, arrives, early, tasks: nextStatus.funding.done > 0 ? [{ key: `transfers:${next}`, kind: 'transfers', month: next, done: nextStatus.funding.done === nextStatus.funding.total }] : [] })
+  return cards
+}
+
+/** Home asks for a bring-in once the last one is this many days old. */
+export const BRING_IN_AFTER_DAYS = 3
+/** A payday step ticked this many days before the earliest payday is early pay ("January's money has arrived early"). */
+export const EARLY_PAY_DAYS = 3

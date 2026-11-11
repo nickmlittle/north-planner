@@ -18,6 +18,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Carry-over pots: Free, Check against the bank, annual costs | 8 | `potFree`, `checkPotBalance`, `annualCosts` in `cardSpending.ts`; `src/domain/cardStatements.ts` (settle keys) |
 | Statements, statement detail, settle up | 9 | `src/domain/cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
 | Month stages, Close <Month>, covers, leftovers and the build-up flag | 10 | `src/domain/monthStages.ts`, `src/pages/CloseMonth.tsx` |
+| Home month cards, paydays, England and Wales working days | 11 | `homeMonths` in `monthStages.ts`, `src/domain/workingDays.ts`, `src/pages/HomeMonths.tsx`, `IncomeDialog.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -168,6 +169,21 @@ Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks 
 - **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each monthly pot with a plan.
 - **Built up** (`builtUp`) = Σ leftovers of closed months − Σ moved out. The close screen shows it including this month. A pot is flagged when built up > its limit × this month's Planned, unless "Keep it" recorded at least that much (`keptBuildUpPence`). "Move £X…" suggests keeping one month's worth and records what was moved (`moveBuiltUp`); the money itself moves in the bank.
 - **Close** (`closeMonth`), one button for the household, records `closedAt`, the covers, the leftovers and what each destination had spent (`closedSpent`). A later re-sort or late transaction in the month shows "Changed since closed" with Close again, which records them afresh.
+
+## Home month cards (§7.1)
+
+`homeMonths(document, today)` gives Home one card per month that isn't finished, only once a card is set up:
+
+- **Current month**: its stage and funding, Sorted to, how many pots need care and a row for each (ahead: "runs out around …" when it would; over: "Covered when <Month> closes"), and tasks: bring in once the last import is 3 or more days old (`BRING_IN_AFTER_DAYS`), "Statement closes tomorrow" the day before a close, and "Bring in the final <Month> statement" for each closed statement that isn't complete or settled.
+- **Each past month not settled** (closing or to settle): All transactions in and sorted (done when nothing is to sort and the late postings are in, or "All … are in" was pressed), Close <Month> (done once closed), and Settle the <Month> statement for each statement holding its transactions (done once settled).
+- **Next month**: when its money arrives, from each adult's salary payday; once any of its payday steps is ticked, "Finish <Month>'s Transfers" (done when all are). If a step was ticked more than 3 days (`EARLY_PAY_DAYS`) before the earliest payday, its money has arrived early: it is still that month's money (D1).
+- **The last settled month** shows as one line, with the latest settle-up time of its statements, until the month after it is settled too.
+
+## Paydays and working days (§5.2)
+
+- An employment income source can have a **payday** (`{ day, ifNotWorkingDay: 'previous' | 'next' }`), edited in the income dialog ("Paid on day", "On a weekend or bank holiday"). It is shared by every month; an empty day removes it.
+- **Working days** (`workingDays.ts`) exclude weekends and bank holidays in England and Wales, worked out without a network: New Year's Day, Good Friday and Easter Monday (from Easter), the early May, spring and summer bank holidays, Christmas Day and Boxing Day with substitute days, plus known one-off changes (2020, 2022, 2023) and any extras passed in.
+- A payday is the rule's day in a month (or the month's last day), moved back or forward to a working day (`paydayIn`). A month's money arrives in the month before (`moneyArrives`): 28 Dec 2026 is the Boxing Day substitute, so January's money comes Thu 24 Dec (previous) and Tue 29 Dec (next). With "next working day" it can land in the month itself (28 Feb 2026 is a Saturday, so March's arrives Mon 2 Mar); it's still that month's money.
 
 ## Payments
 

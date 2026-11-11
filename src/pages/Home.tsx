@@ -13,6 +13,8 @@ import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { rememberTransferPerson } from '../state/transferPerson'
 import { accountOptionLabels, stepSummary } from './budgetLabels'
+import { HomeMonths, type SpendingTarget } from './HomeMonths'
+import { localDate } from '../domain/cardTracker'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const subscribeMobile = (callback: () => void) => { const query = window.matchMedia?.(MOBILE_QUERY); query?.addEventListener('change', callback); return () => query?.removeEventListener('change', callback) }
@@ -28,6 +30,11 @@ type Props = {
   onOpenTransfers: () => void
   /** Plan filtered to one person's accounts. */
   onReviewPerson: (personId: string) => void
+  /** The card tracker's month cards open Spending, and next month's Transfers. */
+  onOpenSpending?: (target: SpendingTarget) => void
+  onOpenTransfersMonth?: (month: string) => void
+  /** Today, for the month cards; tests pass a fixed one. */
+  today?: string
 }
 
 type Task = { key: string; title: string; sub: string; tone?: 'warn' | 'review' | 'done'; icon: 'transfers' | 'warn' | 'done'; progress?: number; counts: boolean; open: boolean; onSelect: () => void }
@@ -52,7 +59,7 @@ function ComingUpRow({ icon, title, sub, onSelect }: { icon: ReactNode; title: s
 }
 
 /** Where the app opens: this month at a glance, what each person has left to do, and what's new. */
-export function Home({ document, month, onOpenPlan, onOpenTransfers, onReviewPerson }: Props) {
+export function Home({ document, month, onOpenPlan, onOpenTransfers, onReviewPerson, onOpenSpending = () => {}, onOpenTransfersMonth = () => onOpenTransfers(), today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const adults = document.household.adults
   const adultIds = adults.map(person => person.id)
@@ -116,6 +123,7 @@ export function Home({ document, month, onOpenPlan, onOpenTransfers, onReviewPer
         actions={<button type="button" className="allocation-meter-review home-open-plan" onClick={onOpenPlan}>Open Plan<ChevronRight aria-hidden="true"/></button>}/>
       {upToDate && <div className="transfer-done-banner home-done-banner" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>You’re up to date for {monthName}</strong><span>Every payday step is ticked.</span></span></div>}
     </>}>
+    <HomeMonths document={document} today={today} onOpenSpending={onOpenSpending} onOpenTransfers={onOpenTransfersMonth}/>
     <section className="home-section" aria-labelledby="home-todo-title">
       <div className="home-section-heading"><h2 id="home-todo-title">To do</h2><span>{openCount ? `${openCount} left` : anySteps ? 'All done' : ''}</span></div>
       {!anySteps && !plans.needsReview.length && <p className="home-empty">Nothing to move in {monthName} yet. Add items on the Plan to see each person’s payday steps here.</p>}

@@ -35,6 +35,8 @@ export interface IncomeSource {
   changes: Record<string, number>
   liveOnPence?: number
   surplusDestination?: BudgetDestination
+  /** Employment only: when pay arrives (Home's "money arrives" dates). Shared by every month. */
+  payday?: { day: number; ifNotWorkingDay: 'previous' | 'next' }
 }
 export interface MonthlyBudget {
   accounts: BudgetAccount[]
@@ -136,7 +138,7 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
   if (b.importedBaseline !== undefined && !validItems(b.importedBaseline)) return false
   for (const [month, snapshot] of Object.entries(b.snapshots)) if (!validMonth(month) || !snapshot || typeof snapshot !== 'object' || !validItems(snapshot.items) || snapshot.imported !== undefined && typeof snapshot.imported !== 'boolean') return false
   if (!Array.isArray(b.incomePolicies) || b.incomePolicies.some(policy => !policy || typeof policy.personId !== 'string' || !validPolicyValue(policy.base) || !policy.changes || typeof policy.changes !== 'object' || Array.isArray(policy.changes) || Object.entries(policy.changes).some(([month, rule]) => !validMonth(month) || !validPolicyValue(rule)))) return false
-  if (!Array.isArray(b.incomeSources) || !ids(b.incomeSources) || b.incomeSources.some(source => typeof source.personId !== 'string' || typeof source.name !== 'string' || !source.name.trim() || !['employment', 'additional'].includes(source.type) || !Number.isSafeInteger(source.baseAmountPence) || source.baseAmountPence < 0 || source.baseEffectiveFrom !== undefined && !validMonth(source.baseEffectiveFrom) || !source.changes || typeof source.changes !== 'object' || Array.isArray(source.changes) || Object.entries(source.changes).some(([month, amount]) => !validMonth(month) || !Number.isSafeInteger(amount) || amount < 0) || source.liveOnPence !== undefined && (!Number.isSafeInteger(source.liveOnPence) || source.liveOnPence < 0) || source.surplusDestination !== undefined && !validDestination(source.surplusDestination, b))) return false
+  if (!Array.isArray(b.incomeSources) || !ids(b.incomeSources) || b.incomeSources.some(source => typeof source.personId !== 'string' || typeof source.name !== 'string' || !source.name.trim() || !['employment', 'additional'].includes(source.type) || !Number.isSafeInteger(source.baseAmountPence) || source.baseAmountPence < 0 || source.baseEffectiveFrom !== undefined && !validMonth(source.baseEffectiveFrom) || !source.changes || typeof source.changes !== 'object' || Array.isArray(source.changes) || Object.entries(source.changes).some(([month, amount]) => !validMonth(month) || !Number.isSafeInteger(amount) || amount < 0) || source.liveOnPence !== undefined && (!Number.isSafeInteger(source.liveOnPence) || source.liveOnPence < 0) || source.surplusDestination !== undefined && !validDestination(source.surplusDestination, b) || source.payday !== undefined && !(source.payday && typeof source.payday === 'object' && Number.isSafeInteger(source.payday.day) && source.payday.day >= 1 && source.payday.day <= 31 && ['previous', 'next'].includes(source.payday.ifNotWorkingDay)))) return false
   return true
 
   function validPolicyValue(value: unknown): value is IncomePolicyValue {
