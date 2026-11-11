@@ -11,6 +11,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Data model, validation, statement and date helpers, Household → Cards | 1 | `src/domain/cardTracker.ts`, `src/pages/CardSettings.tsx` |
 | XLSX reader, Amex import, rule matching, synthetic fixtures | 2 | `src/domain/xlsx.ts`, `src/domain/amexImport.ts`, `src/domain/cardSorting.ts`, `scripts/amex-fixture.mjs` |
 | Spending tab, Bring in, To sort, manual entry, baseline card data | 3 | `src/pages/Spending.tsx`, `BringInSheet.tsx`, `ManualEntrySheet.tsx`, `src/state/navigation.ts` |
+| Sort sheet, suggestions, rules, Sorted by rules, All transactions | 4 | `src/domain/cardSorting.ts`, `src/pages/SortSheet.tsx`, `RulesPanel.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -81,6 +82,15 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 ## To sort
 
 `transactionsToSort` is every purchase and refund with no sort, newest first (by date, then the order they came in). Payments are never listed. "Last brought in" is the latest `ImportRecord`'s time (`lastImport`), so a future feed that records imports updates it the same way.
+
+## Sorting and suggestions (§6.3)
+
+- **Suggestions** (`suggestions`), in order and without repeats: every destination the same merchant went to last time (the most recent sorted transaction with that `merchant`; each line of a split), the cardholder's own pots (pots in accounts owned by that person alone, A–Z), joint pots (accounts with more than one owner, A–Z), the joint account (the card's pay-from account's main balance), then the buffer if it's set to somewhere else. A card ending with no person gets no personal pots. The sheet shows the first six; "All pots and accounts" lists the rest.
+- **Sorting by hand** (`sortTransaction`) stores the lines with `by: 'person'`. The lines must add up to the transaction, and payments are never sorted. "Move back to To sort" removes the sort.
+- **Always** (`addRule`) adds a rule at the end of the list with the edited text (uppercased) and, optionally, the card ending, and sorts every transaction still to sort that it matches (`by: 'rule'`). The tapped transaction itself is sorted by hand.
+- **Changing a rule's sort**: when the sort sheet re-sorts a rule-sorted transaction with "Change the rule too", the rule's destination changes (`updateRule`) and the transaction becomes a sort by hand. Other transactions the rule sorted keep their sort.
+- **Sorted by rules** lists rule sorts with no `checkedAt`; "They all look right" sets it (`checkRuleSorts`).
+- **Rules** apply top to bottom; `moveRule` swaps neighbours, `updateRule` edits the text, card and destination, and `deleteRule` removes one. Editing or deleting a rule never changes past sorts. Split rules (D13) are shown read-only; their editing UI is later.
 
 ## Baseline fixture
 

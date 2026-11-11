@@ -58,9 +58,9 @@ it('lists what is left to sort, newest first, with card and person, and leaves p
   expect(screen.getByText('Last brought in Mon 9 Nov')).toBeInTheDocument()
   const list = screen.getByRole('list')
   expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual([
-    'TRAIN TICKETS ONLINE£112.81Sun 8 Nov · Ada ··41001',
-    'HOMEWARE HUT LEEDS−£24.99Thu 5 Nov · Ben ··41009 · refund',
-    'BOOK NOOK YORK£12.50Tue 3 Nov · Ada ··41001',
+    'TRAIN TICKETS ONLINE£112.81Sun 8 Nov · Ada ··41001Choose',
+    'HOMEWARE HUT LEEDS−£24.99Thu 5 Nov · Ben ··41009 · refundChoose',
+    'BOOK NOOK YORK£12.50Tue 3 Nov · Ada ··41001Choose',
   ])
   expect(screen.getByText('3 transactions')).toBeInTheDocument()
 })
@@ -156,4 +156,113 @@ it('adds a transaction by hand, on the statement its date falls in', () => {
   expect(screen.getByRole('status')).toHaveTextContent('Added Village market.')
   expect(saved?.card?.transactions[0]).toMatchObject({ id: expect.stringMatching(/^manual:/), date: '2026-11-25', description: 'Village market', amountPence: 840, kind: 'purchase', cardSuffix: '41009', personId: 'ben', statementKey: 'amex:2026-12-24' })
   expect(screen.getByText('Village market')).toBeInTheDocument()
+})
+
+function sortingHousehold(): BudgetDocument {
+  const document = household()
+  document.budget.accounts.push({ id: 'ada-own', name: 'Ada', provider: 'Starling', ownerPersonIds: ['ada'] })
+  document.budget.pots.push({ id: 'treats', name: 'Treats', accountId: 'ada-own' }, { id: 'eating', name: 'Eating out', accountId: 'joint' })
+  document.card!.transactions = [
+    tx('old', '2026-10-02', 'TRAIN TICKETS ONLINE', 2000, { merchant: 'TRAIN TICKETS ONLINE', sort: { lines: [{ amountPence: 2000, destination: { kind: 'pot', potId: 'treats' } }], by: 'person', at: 'x' } }),
+    tx('new', '2026-11-08', 'TRAIN TICKETS ONLINE', 11281, { merchant: 'TRAIN TICKETS ONLINE' }),
+    tx('again', '2026-11-09', 'TRAIN TICKETS ONLINE', 900, { merchant: 'TRAIN TICKETS ONLINE' }),
+    tx('grocer', '2026-11-07', 'GREEN GROCER LONDON', 4460, { merchant: 'GREEN GROCER', sort: { lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'groceries' } }], by: 'rule', ruleId: 'r-grocer', at: 'x' } }),
+  ]
+  document.card!.rules = [{ id: 'r-grocer', contains: 'GREEN GROCER', destination: { kind: 'pot', potId: 'groceries' }, createdAt: 'x' }]
+  return document
+}
+
+it('places a transaction with one tap on a suggestion', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getAllByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81/ })[0]!)
+  const dialog = screen.getByRole('dialog', { name: 'Sort TRAIN TICKETS ONLINE' })
+  const options = within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')
+  expect(options.map(option => option.textContent)).toEqual([
+    'Treats · AdaSuggested · Used last time',
+    'Eating out · JointJoint',
+    'Groceries · JointJoint',
+    'JointOne-offs',
+  ])
+  fireEvent.click(options[1]!)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort).toMatchObject({ lines: [{ amountPence: 11281, destination: { kind: 'pot', potId: 'eating' } }], by: 'person' })
+  expect(screen.getByRole('status')).toHaveTextContent('Sorted to Eating out · Joint.')
+  expect(saved!.card!.rules).toHaveLength(1)
+})
+
+it('makes a rule in place with Always, and it sorts the others from that merchant too', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getAllByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81/ })[0]!)
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(within(dialog).getByLabelText('Always put TRAIN TICKETS ONLINE in this pot'))
+  expect(within(dialog).getByLabelText('Matching text')).toHaveValue('TRAIN')
+  fireEvent.change(within(dialog).getByLabelText('Matching text'), { target: { value: 'train tickets' } })
+  fireEvent.click(within(dialog).getByLabelText('Only on Ada’s card'))
+  fireEvent.click(within(dialog).getByRole('button', { name: /^Treats · Ada/ }))
+  expect(saved!.card!.rules[1]).toMatchObject({ contains: 'TRAIN TICKETS', cardSuffix: '41001', destination: { kind: 'pot', potId: 'treats' } })
+  expect(saved!.card!.transactions.find(row => row.id === 'again')!.sort).toMatchObject({ by: 'rule', ruleId: saved!.card!.rules[1]!.id })
+  expect(screen.getByRole('status')).toHaveTextContent('Sorted to Treats · Ada. New rule for “TRAIN TICKETS”, which sorted 1 more.')
+  expect(screen.getByText('Everything is sorted.')).toBeInTheDocument()
+})
+
+it('checks rule sorts, and offers to change the rule when one is re-sorted', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+  expect(screen.getByRole('heading', { name: 'Sorted by rules · 1' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Check' }))
+  const row = screen.getByRole('button', { name: /GREEN GROCER LONDON/ })
+  expect(row).toHaveAccessibleName('GREEN GROCER LONDON, £44.60, Sat 7 Nov · Ada ··41001, Groceries · Joint, rule')
+  fireEvent.click(row)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('Sorted by your rule “GREEN GROCER”.')).toBeInTheDocument()
+  fireEvent.click(within(dialog).getByLabelText('Change the rule too'))
+  fireEvent.click(within(dialog).getByRole('button', { name: /^Eating out · Joint/ }))
+  expect(saved!.card!.rules[0]!.destination).toEqual({ kind: 'pot', potId: 'eating' })
+  expect(saved!.card!.transactions.find(row => row.id === 'grocer')!.sort?.by).toBe('person')
+  cleanup()
+  render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Check' }))
+  fireEvent.click(screen.getByRole('button', { name: 'They all look right' }))
+  expect(screen.queryByRole('heading', { name: /Sorted by rules/ })).not.toBeInTheDocument()
+  expect(saved!.card!.transactions.find(row => row.id === 'grocer')!.sort?.checkedAt).toEqual(expect.any(String))
+})
+
+it('lists all transactions under ⋯ on phones, where any can be sorted again or put back', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending sections' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  expect(screen.getByRole('heading', { name: 'All transactions' })).toBeInTheDocument()
+  const rows = screen.getAllByRole('button', { name: /TRAIN TICKETS ONLINE|GREEN GROCER/ })
+  expect(rows.map(row => row.querySelector('.spending-row-where')?.textContent)).toEqual(['To sort', 'To sort', 'Groceries · JointRule', 'Treats · Ada'])
+  fireEvent.click(rows[3]!)
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move back to To sort' }))
+  expect(saved!.card!.transactions.find(row => row.id === 'old')!.sort).toBeUndefined()
+  fireEvent.click(screen.getByRole('button', { name: 'Back to To sort' }))
+  expect(screen.getByRole('heading', { name: 'To sort' })).toBeInTheDocument()
+})
+
+it('edits, reorders and deletes rules', () => {
+  const document = sortingHousehold()
+  document.card!.rules.push({ id: 'r-cafe', contains: 'CORNER CAFE', cardSuffix: '41009', destination: { kind: 'pot', potId: 'eating' }, createdAt: 'x' })
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending sections' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Rules' }))
+  const items = () => within(screen.getByRole('list')).getAllByRole('listitem').map(item => item.querySelector('.rule-row-text')?.textContent)
+  expect(items()).toEqual(['“GREEN GROCER” → Groceries · JointSorted 1 transaction', '“CORNER CAFE” → Eating out · JointOnly Ben ··41009 · Sorted 0 transactions'])
+  fireEvent.click(screen.getByRole('button', { name: 'Move the rule for CORNER CAFE up' }))
+  expect(saved!.card!.rules.map(rule => rule.id)).toEqual(['r-cafe', 'r-grocer'])
+  fireEvent.click(screen.getByRole('button', { name: 'Edit the rule for GREEN GROCER' }))
+  const form = screen.getByRole('form', { name: 'Edit the rule for GREEN GROCER' })
+  fireEvent.change(within(form).getByLabelText('Matching text'), { target: { value: 'grocer' } })
+  fireEvent.change(within(form).getByLabelText('Card'), { target: { value: '41001' } })
+  fireEvent.change(within(form).getByLabelText('Sort to'), { target: { value: 'pot:treats' } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+  expect(saved!.card!.rules[1]).toMatchObject({ id: 'r-grocer', contains: 'GROCER', cardSuffix: '41001', destination: { kind: 'pot', potId: 'treats' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Delete the rule for CORNER CAFE' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete rule' }))
+  expect(saved!.card!.rules.map(rule => rule.id)).toEqual(['r-grocer'])
 })
