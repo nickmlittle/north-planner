@@ -16,6 +16,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Refund matching, refund of a split, linked rows, payments listed apart | 6 | `src/domain/cardRefunds.ts`, `src/pages/SortSheet.tsx` |
 | This month: planned vs spent, pace, pot detail and chart, pot settings | 7 | `src/domain/cardSpending.ts`, `src/pages/SpendingMonth.tsx`, `BudgetManagement.tsx` |
 | Carry-over pots: Free, Check against the bank, annual costs | 8 | `potFree`, `checkPotBalance`, `annualCosts` in `cardSpending.ts`; `src/domain/cardStatements.ts` (settle keys) |
+| Statements, statement detail, settle up | 9 | `src/domain/cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -144,7 +145,23 @@ free = checked balance
 
 ## Payments
 
-Payments to Amex (`payments`) are never sorted or counted as spending. They're listed apart under All transactions. The statement's "Amex shows a payment of £X" hint and the offer to tick Pay Amex come with settling up (PR 9).
+Payments to Amex (`payments`) are never sorted or counted as spending. They're listed apart under All transactions, and on their statement as "Amex shows a payment of £X on 8 Nov". When one equals an open Pay step, the statement offers "Tick Pay Amex" (`paymentMatchingPay`); it is never ticked automatically.
+
+## Statements (§6.7)
+
+- **Which statement** a transaction is on is its `statementKey`. A statement is named by the month it closes in: the 25 Oct – 24 Nov statement is the "November statement". Statements are listed newest first (`statementKeys`).
+- **Total** = Σ purchases and refunds on it; payments are excluded. **Which months it counts in**: the same transactions totalled by the month of their date.
+- **Summary check**: North's positive rows against Amex's Charges, and negative rows (refunds and payments) against Payments & Credits, from the latest import of the period.
+- **Open** while today ≤ the close date. **Complete** once a final export is in (`finalImportAt`) or "Settle without the final export" is chosen (`settleWithoutFinalAt`). **Ready to settle**: closed, complete and every purchase and refund on it sorted. **Settled**: ready, and every settle-up step done (`settledAt` records when the last tick made it so; unticking or a later change clears it).
+
+## Settle up (§6.8)
+
+`settleSteps(document, statementKey)`:
+
+1. **Shares**: Σ the statement's split lines by destination; each pot share goes to its account, account shares stay on their account.
+2. **Accounts in order**: each person's own accounts (household order), then joint accounts, then accounts without an owner, with the pay-from account last. For each: **Out of <pot>** for each pot share above 0 (`settle:out:<potId>`), **Into <pot>** for one below 0 (`settle:into:<potId>`), pots A–Z; then, unless it's the pay-from account, **Send to <pay-from account>** with the account's net share (`settle:send:<accountId>`), or, when the net is below 0, the pay-from account sends the difference back (`settle:return:<accountId>`). Spend sorted to the pay-from account itself needs no step: "Includes £95.00 of one-offs already in Monzo Joint".
+3. The last step is **Pay <card> from <pay-from account>** for the statement total (`settle:pay`). The steps add up to the bill by construction.
+4. Ticks reuse `StepTick` and `stepStatus`: a step ticked at a different amount (a late refund, a re-sort) shows "Changed since ticked" with the difference to copy, and tapping its circle accepts the new amount. Each account says who makes its steps: the owner, or "Either of you" for a joint account. Tap-to-copy and the one-time hint are shared with Transfers (`copyHint.ts`).
 
 ## Baseline fixture
 

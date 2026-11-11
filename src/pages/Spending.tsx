@@ -15,6 +15,7 @@ import { RulesPanel } from './RulesPanel'
 import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
 import { PotDetail, ThisMonthPanel } from './SpendingMonth'
+import { StatementsPanel } from './StatementsPanel'
 import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
 
@@ -30,6 +31,9 @@ type Props = {
   /** A pot's detail on This month. */
   potId?: string | null
   onOpenPot: (potId: string | null) => void
+  /** A statement's detail on Statements. */
+  statementKey?: string | null
+  onOpenStatement?: (key: string | null) => void
   /** Today, for pace; tests pass a fixed one. */
   today?: string
 }
@@ -67,7 +71,7 @@ export function TransactionRow({ document, transaction, where, tag, action, onSe
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
-export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, today = localDate() }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -82,6 +86,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const sections: Section[] = [
     { id: 'sort', label: 'To sort', count: toSort.length },
     { id: 'month', label: 'This month' },
+    { id: 'statements', label: 'Statements' },
     { id: 'all', label: 'All transactions', desktopOnly: true },
     { id: 'rules', label: 'Rules', count: tracker.rules.length, desktopOnly: true },
   ]
@@ -155,6 +160,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
         ? potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} headingExtra={headingExtra}/>
+        : active === 'statements' ? <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>
         : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
     {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}

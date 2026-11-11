@@ -1501,3 +1501,35 @@ div.spending-pot{padding-right:var(--space-4)}
 .carry-over-check{justify-self:start;min-height:44px;margin:var(--space-2) 0 0}
 .check-balance-sheet .budget-info-content{padding-top:var(--space-3)}
 @media(max-width:640px){.carry-over-sums{margin-inline:calc(var(--space-4) * -1)}.carry-over-sums>div{padding-inline:var(--space-4)}.carry-over-check{width:100%}}
+.statement-row{position:relative;display:grid;gap:2px;width:100%;margin:0;padding:var(--space-3) var(--space-6) var(--space-3) var(--space-4);border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.statement-row:hover{background:var(--surface-header)}
+.statement-row:focus-visible{outline:2px solid var(--orange);outline-offset:-2px}
+.statement-status{font-weight:700}
+.statement-status.is-open{color:var(--muted)}
+.statement-status.is-todo{color:var(--status-review)}
+.statement-status.is-ready{color:var(--link)}
+.statement-status.is-done{color:var(--pine)}
+.statement-detail{display:grid;gap:var(--space-3)}
+.statement-detail .spending-back{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;margin:0;justify-self:start}
+.statement-detail .spending-back svg{width:18px;height:18px}
+.statement-checks{display:grid;gap:var(--space-2);margin:var(--space-2) 0 0;padding:0;list-style:none}
+.statement-checks li{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);color:var(--charcoal)}
+.statement-checks li.is-ok{color:var(--pine)}
+.statement-checks li.is-todo{color:var(--status-review)}
+.statement-checks svg{flex:none;width:18px;height:18px}
+.statement-checks .text-button{min-height:44px;padding:0 var(--space-1);font-weight:700}
+.statement-months{margin:0;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);overflow:hidden}
+.statement-months>div:last-child{border-bottom:0}
+.statement-share-head{display:flex;justify-content:space-between;gap:var(--space-3);margin:0;padding:var(--space-3) var(--space-4) var(--space-2);color:var(--pine);font-weight:700}
+.statement-share-list{display:grid;gap:var(--space-1);padding:0 var(--space-4) var(--space-3)!important;color:var(--muted)}
+.statement-share-list li{display:flex;justify-content:space-between;gap:var(--space-3);border:0!important}
+.statement-share-list li span:last-child{flex:none;font-variant-numeric:tabular-nums}
+.statement-settle .primary-button{min-height:48px;margin:0}
+.settle-progress{margin:var(--space-1) 0 0;color:var(--pine);font-weight:700}
+.settle-up{display:grid;gap:var(--space-3)}
+.settle-account{overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
+.settle-account .payday-person-heading{margin:0;padding:var(--space-3) var(--space-4)}
+.statement-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:600}
+.statement-heading p{margin:2px 0 0}
+.settle-account .payday-person-heading{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);border-bottom:1px solid var(--line);color:var(--charcoal);font-size:var(--text-lg);font-weight:700}
+.settle-account .payday-person-heading span:last-child{color:var(--muted);font-size:var(--text-sm);font-weight:600}

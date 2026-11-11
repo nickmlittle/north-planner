@@ -4,15 +4,12 @@ import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 import { stepSummary } from './budgetLabels'
+import { copyHintSeen, rememberCopyHint } from './copyHint'
 import { fundStepKey, moveStepKey, personProgress, stepStatus, type StepTick } from '../domain/transferTicks'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
 const plural = (count: number, word: string) => `${count} ${count === 1 ? word : `${word}s`}`
-const COPY_HINT_KEY = 'north.copyHint.seen'
-/** The "tap an amount" hint shows until the first copy on this device. */
-function copyHintSeen() { try { return window.localStorage.getItem(COPY_HINT_KEY) === '1' } catch { return false } }
-function rememberCopyHint() { try { window.localStorage.setItem(COPY_HINT_KEY, '1') } catch { /* Per-device convenience only. */ } }
 
 /** Why an account's steps are withheld, and what to do about it. */
 function reviewReasonText(reason: NeedsReviewReason) {
