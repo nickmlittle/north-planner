@@ -1,6 +1,6 @@
 # Card tracker (Spending): design and PR build plan
 
-Status: agreed design, not started. Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins. In particular, the canvas uses illustrative statement dates (3rd–2nd). The real Amex statements run from the 25th to the 24th (§4).
+Status: agreed design, being built (see [card-tracker-rules](card-tracker-rules.md) for what has shipped). Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins. In particular, the canvas uses illustrative statement dates (3rd–2nd). The real Amex statements run from the 25th to the 24th (§4).
 
 - **Design canvas** (wireframes; private to the owner): https://claude.ai/artifact/9x86swd2UHgJcRKBNZKYA6, section "Card tracker (Amex)", boards 1–7. The older "Card tracker sketch" board at the top is superseded.
 - **Related rules:** [transfer-calculation-rules](transfer-calculation-rules.md) (ticks, Move, Funding), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (calendar months, snapshots), [product-design-spec](product-design-spec.md) (layout, language, glossary).
@@ -213,6 +213,12 @@ export interface PotTracking {
 
 export interface ImportRecord { at: string; cardId: string; fileName: string; statementKey: string; rows: number; added: number; skipped: number; sortedByRules: number; latestDate: string; matchesSummary: boolean }
 ```
+
+### 5.1a Refinements made in PR 1
+
+- `CardTransaction.merchant: string`: `merchantKey` of the *raw* description, stored at import. The stored description is whitespace-collapsed (§4.4), so the run of spaces that `merchantKey` splits on is gone once stored. Suggestions (§6.3) and refund matching (§6.4) read this field.
+- `TransactionSort.checkedAt?: string` (PR 4's "Check"), `StatementRecord.finalImportAt?` and `settleWithoutFinalAt?` (§6.7 complete and its override), `MonthRecord.allInAt?` (§6.10's override) and `closedSpent?` ("Changed since closed"), and `PotTracking.keptBuildUpPence?` ("Keep it").
+- The validator ignores unknown fields, so a later PR can add one without failing older checks.
 
 ### 5.2 Settings
 
