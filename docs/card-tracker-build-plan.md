@@ -45,7 +45,7 @@ Agreed with Nick, 11 Nov 2026. Don't change these without asking.
 
 ### Refinement made while planning (R1)
 
-Board 5 on the canvas shows an overspend cover as an "Out of Buffer" step inside the statement settle-up. In the build, **cover steps are ticked on the Close month screen** instead, as "Buffer → Eating out £35.00". The reason: the real Amex statement closes around the 23rd (§4.1), so months and statements overlap a lot. Tying a month's cover to one statement would be fragile. Settle-up steps are then purely the statement's shares. The "next month" cover option moves no money: next month shows "£35.00 taken by October" against that pot.
+The first canvas draft showed an overspend cover as an "Out of Buffer" step inside the statement settle-up. **Cover steps are ticked on the Close month screen** instead, as "Buffer → Eating out £35.00". Board 5 has been updated to match. The reason: the real Amex statement closes around the 23rd (§4.1), so months and statements overlap a lot. Tying a month's cover to one statement would be fragile. Settle-up steps are then purely the statement's shares. The "next month" cover option moves no money: next month shows "£35.00 taken by October" against that pot.
 
 ## 3. Words on screen
 
