@@ -79,3 +79,25 @@ it('edits an existing card', () => {
   fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
   expect(saved?.card?.cards[0]).toMatchObject({ id: 'amex', dueDaysAfterClose: 21 })
 })
+
+it('sets money aside in a pot from a chosen statement, and paying from it shows in the summary', () => {
+  let saved: BudgetDocument | undefined
+  const document = household()
+  document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
+  document.card = { cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }], transactions: [], rules: [], statements: {}, months: {}, pots: {}, imports: [] }
+  render(<Harness initial={document} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Amex' }))
+  const form = screen.getByRole('form', { name: 'Edit Amex' })
+  expect(within(form).getByLabelText('Set money aside in')).toHaveValue('')
+  expect(within(form).queryByLabelText('Starting with')).not.toBeInTheDocument()
+  fireEvent.change(within(form).getByLabelText('Set money aside in'), { target: { value: 'amex-pot' } })
+  // The statement open today is the default (today is the device's date, so check it's one of the choices).
+  const from = within(form).getByLabelText('Starting with') as HTMLSelectElement
+  expect(from.value).toMatch(/^\d{4}-\d{2}-24$/)
+  expect(within(form).getByText('As you review, move each pot’s share into the Amex pot. The bill is paid from it.')).toBeInTheDocument()
+  fireEvent.change(from, { target: { value: from.options[1]!.value } })
+  fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
+  expect(saved!.card!.cards[0]!.setAside).toEqual({ potId: 'amex-pot', fromCloseDate: from.options[1]!.value })
+  expect(decodeBudgetDocument(saved)).not.toBeNull()
+  expect(screen.getByText(/paid from the Amex pot from the \w+ statement/)).toBeInTheDocument()
+})

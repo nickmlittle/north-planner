@@ -10,7 +10,6 @@ export const settleSendKey = (accountId: string) => `settle:send:${accountId}`
 export const settleReturnKey = (accountId: string) => `settle:return:${accountId}`
 export const SETTLE_PAY_KEY = 'settle:pay'
 
-
 /** A statement's transactions: everything Amex put on it (by `statementKey`), payments included. */
 export const statementTransactions = (tracker: Pick<CardTracker, 'transactions'>, key: string) => tracker.transactions.filter(row => row.statementKey === key)
 
@@ -74,20 +73,15 @@ export function statementShares(tracker: Pick<CardTracker, 'transactions'>, key:
 }
 
 /**
- * Settle-up steps (§6.8). For each account, its owners' own accounts first (household order), then joint
- * accounts, the pay-from account last: Out of each pot with a share (Into a pot whose refunds outweigh its
- * spend), then Send the account's net share to the pay-from account (or the pay-from account Returns it).
- * The last step pays the card the statement total from the pay-from account.
+ * The steps that gather these shares in one account (`hubAccountId`), shared by settling up (§6.8) and moving
+ * money to the set-aside pot. Accounts go owners' own first (household order), then joint, then without an
+ * owner, the hub last. For each: Out of each pot with a share (Into a pot whose refunds outweigh its spend), then
+ * Send the account's net share to the hub (or the hub Returns it). Spend sorted to the hub itself needs no step.
  */
-export function settleSteps(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, key: string): SettlePlan | null {
-  const tracker = cardTracker(document)
-  const parsed = parseStatementKey(key)
-  const card = parsed && tracker.cards.find(row => row.id === parsed.cardId)
-  if (!card) return null
-  const shares = statementShares(tracker, key)
+export function shareSteps(document: Pick<BudgetDocument, 'budget' | 'household'>, shares: Iterable<{ destination: BudgetDestination; pence: number }>, hubAccountId: string): SettleAccount[] {
   const accountOf = (destination: BudgetDestination) => destination.kind === 'account' ? destination.accountId : document.budget.pots.find(pot => pot.id === destination.potId)?.accountId
   const byAccount = new Map<string, { pots: Array<{ potId: string; pence: number }>; direct: number }>()
-  for (const { destination, pence } of shares.values()) {
+  for (const { destination, pence } of shares) {
     const accountId = accountOf(destination)
     if (!accountId) continue
     const row = byAccount.get(accountId) ?? { pots: [], direct: 0 }
@@ -97,22 +91,34 @@ export function settleSteps(document: Pick<BudgetDocument, 'budget' | 'card' | '
   }
   const people = document.household.adults.map(person => person.id)
   const accountRank = (accountId: string) => {
-    if (accountId === card.payFromAccountId) return [3, 0]
+    if (accountId === hubAccountId) return [3, 0]
     const owners = document.budget.accounts.find(account => account.id === accountId)?.ownerPersonIds ?? []
     return owners.length === 1 ? [0, people.indexOf(owners[0]!)] : owners.length > 1 ? [1, 0] : [2, 0]
   }
   const potName = (potId: string) => document.budget.pots.find(pot => pot.id === potId)?.name ?? ''
-  const accounts: SettleAccount[] = [...byAccount.keys()].sort((a, b) => { const [ga, pa] = accountRank(a), [gb, pb] = accountRank(b); return ga! - gb! || pa! - pb! || a.localeCompare(b) }).map(accountId => {
+  return [...byAccount.keys()].sort((a, b) => { const [ga, pa] = accountRank(a), [gb, pb] = accountRank(b); return ga! - gb! || pa! - pb! || a.localeCompare(b) }).map(accountId => {
     const row = byAccount.get(accountId)!
     const steps: SettleStep[] = row.pots.filter(pot => pot.pence !== 0).sort((a, b) => potName(a.potId).localeCompare(potName(b.potId), 'en-GB')).map(pot => pot.pence > 0
       ? { key: settleOutKey(pot.potId), kind: 'out' as const, accountId, potId: pot.potId, amountPence: pot.pence }
       : { key: settleIntoKey(pot.potId), kind: 'into' as const, accountId, potId: pot.potId, amountPence: -pot.pence })
     const net = row.pots.reduce((sum, pot) => sum + pot.pence, 0) + row.direct
-    const payFrom = accountId === card.payFromAccountId
-    if (!payFrom && net > 0) steps.push({ key: settleSendKey(accountId), kind: 'send', accountId, amountPence: net })
-    if (!payFrom && net < 0) steps.push({ key: settleReturnKey(accountId), kind: 'return', accountId: card.payFromAccountId, amountPence: -net })
-    return { accountId, ownerPersonIds: document.budget.accounts.find(account => account.id === accountId)?.ownerPersonIds ?? [], steps, sharePence: net, oneOffsPence: payFrom ? row.direct : 0 }
+    const hub = accountId === hubAccountId
+    if (!hub && net > 0) steps.push({ key: settleSendKey(accountId), kind: 'send', accountId, amountPence: net })
+    if (!hub && net < 0) steps.push({ key: settleReturnKey(accountId), kind: 'return', accountId: hubAccountId, amountPence: -net })
+    return { accountId, ownerPersonIds: document.budget.accounts.find(account => account.id === accountId)?.ownerPersonIds ?? [], steps, sharePence: net, oneOffsPence: hub ? row.direct : 0 }
   })
+}
+
+/**
+ * Settle-up steps (§6.8): every share on the statement gathered in the pay-from account (`shareSteps`), then
+ * the last step pays the card the statement total from the pay-from account.
+ */
+export function settleSteps(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, key: string): SettlePlan | null {
+  const tracker = cardTracker(document)
+  const parsed = parseStatementKey(key)
+  const card = parsed && tracker.cards.find(row => row.id === parsed.cardId)
+  if (!card) return null
+  const accounts = shareSteps(document, statementShares(tracker, key).values(), card.payFromAccountId)
   const totalPence = statementTransactions(tracker, key).filter(row => row.kind !== 'payment').reduce((sum, row) => sum + row.amountPence, 0)
   return { accounts, pay: { key: SETTLE_PAY_KEY, kind: 'pay', accountId: card.payFromAccountId, amountPence: totalPence }, totalPence, payFromAccountId: card.payFromAccountId }
 }

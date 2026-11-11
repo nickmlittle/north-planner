@@ -1,11 +1,13 @@
 import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { addDays, cardDraftErrors, cardFromDraft, cardTracker, draftFromCard, saveCard, type CardAccount, type CardDraft, type CardDraftErrors } from '../domain/cardTracker'
+import { addDays, cardDraftErrors, cardFromDraft, cardTracker, closeDateFor, draftFromCard, localDate, saveCard, shiftMonth, type CardAccount, type CardDraft, type CardDraftErrors } from '../domain/cardTracker'
+import { potPhrase } from '../domain/setAside'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationGroups, ordinal, shortDate } from './cardLabels'
+import { statementName } from './spendingFormat'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>> }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; today?: string }
 
 /** A worked example for the entered days, so a typo shows before saving: "Statements run from the 25th to the 24th." */
 function previewFor(draft: CardDraft) {
@@ -18,8 +20,19 @@ function previewFor(draft: CardDraft) {
   return validDue ? `${runs} The ${shortDate(example)} statement is due ${shortDate(addDays(example, dueDays))}.` : runs
 }
 
+/** The statements a set-aside pot can start from: the two before the open one, the open one and the next. */
+function statementChoices(closeDayText: string, today: string): Array<{ closeDate: string; label: string }> {
+  const closeDay = Number(closeDayText)
+  if (!/^\d+$/.test(closeDayText.trim()) || closeDay < 1 || closeDay > 28) return []
+  const open = closeDateFor(today, closeDay)
+  return [-2, -1, 0, 1].map(by => {
+    const closeDate = `${shiftMonth(open.slice(0, 7), by)}-${String(closeDay).padStart(2, '0')}`
+    return { closeDate, label: `${statementName(closeDate)}${by === 0 ? ' (open now)' : ''}` }
+  })
+}
+
 /** Household → Cards: add or edit a card. The closing day and days until due are required, with no defaults. */
-export function CardSettings({ document, setDocument }: Props) {
+export function CardSettings({ document, setDocument, today = localDate() }: Props) {
   const id = useId()
   const tracker = cardTracker(document)
   const { accounts } = document.budget
@@ -45,7 +58,8 @@ export function CardSettings({ document, setDocument }: Props) {
     setDocument(current => saveCard(current, card))
     close(); setStatus(`${card.name} saved.`)
   }
-  const summary = (card: CardAccount) => `Closes on the ${ordinal(card.closeDay)} · due ${card.dueDaysAfterClose} days later · paid from ${accountNames.get(card.payFromAccountId) ?? 'an account'}`
+  const potLabel = (potId: string) => { const pot = document.budget.pots.find(row => row.id === potId); return pot ? `${pot.name} · ${accountNames.get(pot.accountId) ?? 'Account'}` : 'Pot' }
+  const summary = (card: CardAccount) => `Closes on the ${ordinal(card.closeDay)} · due ${card.dueDaysAfterClose} days later · paid from ${card.setAside ? potPhrase(document.budget.pots.find(pot => pot.id === card.setAside!.potId)?.name ?? 'Amex') : accountNames.get(card.payFromAccountId) ?? 'an account'}${card.setAside ? ` from the ${statementName(card.setAside.fromCloseDate)}` : ''}`
   const holders = (card: CardAccount) => card.cardholders.length
     ? card.cardholders.map(row => `${adults.find(person => person.id === row.personId)?.name ?? 'Someone'}’s ends ${row.suffix}`).join(' · ')
     : 'No card endings yet. North asks when it first sees one.'
@@ -71,6 +85,15 @@ export function CardSettings({ document, setDocument }: Props) {
       <option value="">{payFrom ? `${payFrom} main balance` : 'The account it’s paid from'}</option>
       {destinationGroups(document).map(group => <optgroup key={group.key} label={group.label}>{group.options.filter(option => option.value !== `account:${draft.payFromAccountId}`).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</optgroup>)}
     </select></label>
+    <div className="card-settings-field"><label className="setup-field">Set money aside in<select value={draft.setAsidePotId} onChange={event => update({ setAsidePotId: event.target.value, setAsideFrom: draft.setAsideFrom || (statementChoices(draft.closeDay, today).find(choice => choice.label.endsWith('(open now)'))?.closeDate ?? '') }, 'setAside')} {...field('setAside')}>
+      <option value="">No pot: settle once per statement</option>
+      {document.budget.pots.map(pot => <option key={pot.id} value={pot.id}>{potLabel(pot.id)}</option>)}
+    </select></label>{!draft.setAsidePotId && error('setAside')}</div>
+    {draft.setAsidePotId && <div className="card-settings-field"><label className="setup-field">Starting with<select value={draft.setAsideFrom} onChange={event => update({ setAsideFrom: event.target.value }, 'setAside')} {...field('setAside')}>
+      <option value="">Choose a statement</option>
+      {[...statementChoices(draft.closeDay, today), ...draft.setAsideFrom && !statementChoices(draft.closeDay, today).some(choice => choice.closeDate === draft.setAsideFrom) ? [{ closeDate: draft.setAsideFrom, label: statementName(draft.setAsideFrom) }] : []].map(choice => <option key={choice.closeDate} value={choice.closeDate}>{choice.label}</option>)}
+    </select></label>{error('setAside')}</div>}
+    <p className="card-settings-preview">{draft.setAsidePotId ? `As you review, move each pot’s share into ${potPhrase(document.budget.pots.find(pot => pot.id === draft.setAsidePotId)?.name ?? 'Amex')}. The bill is paid from it.` : `Each statement’s shares go to ${payFrom ?? 'the account it’s paid from'} once it closes, then you pay the bill.`}</p>
     <fieldset className="card-settings-holders" aria-describedby={errors.cardholders ? `${id}-cardholders-error` : undefined}>
       <legend>Whose card is whose</legend>
       {draft.cardholders.map((row, index) => <div key={index} className="card-settings-holder">
