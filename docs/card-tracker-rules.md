@@ -13,6 +13,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Spending tab, Bring in, To sort, manual entry, baseline card data | 3 | `src/pages/Spending.tsx`, `BringInSheet.tsx`, `ManualEntrySheet.tsx`, `src/state/navigation.ts` |
 | Sort sheet, suggestions, rules, Sorted by rules, All transactions | 4 | `src/domain/cardSorting.ts`, `src/pages/SortSheet.tsx`, `RulesPanel.tsx` |
 | Splits: by amount, half each, funding share, receipt items | 5 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
+| Refund matching, refund of a split, linked rows, payments listed apart | 6 | `src/domain/cardRefunds.ts`, `src/pages/SortSheet.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -69,7 +70,7 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 4. **Map each row:** the date (text `DD/MM/YYYY`, or an Excel date serial), pence (`Math.round(value * 100)` for numeric cells), the kind (§4.5: a negative `PAYMENT RECEIVED…`, or a negative blank-category `…PAYMENT…`, is a payment; other negatives are refunds; positives are purchases, fees and interest included), the card ending (without its minus) → person, the Reference, and the statement. A row dated before the period still goes on the export's statement, and counts in the month of its date.
 5. **Check the summary** over every row in the file, new or not: positives must equal Charges and negatives Payments & Credits. A mismatch is a warning, not a failure, with the amounts missing. The summary is stored on the statement.
 6. **Deduplicate** by Reference; without one, by `date|pence|normalised description|card ending`. Re-importing a file adds nothing; an overlapping export adds only its new rows.
-7. **Apply the rules** to new purchases and refunds (never payments): the first rule, in list order, whose text appears in the normalised description, on its card if it names one. A split rule divides the amount by percent into pennies that add up (floor each share, spare pennies by largest remainder, earlier parts first).
+7. **Match refunds, then apply the rules.** Each new refund first looks for its purchase (§6.4, below), among existing transactions and this file's purchases (a file lists newest first, so a refund comes before its purchase). A match wins over the rules. Otherwise, apply the rules to new purchases and refunds (never payments): the first rule, in list order, whose text appears in the normalised description, on its card if it names one. A split rule divides the amount by percent into pennies that add up (floor each share, spare pennies by largest remainder, earlier parts first).
 8. **Record** an `ImportRecord` (the last 50 are kept). The result gives the counts for the Bring in sheet: rows, already here, new, sorted by rules, to sort, payments, the summary check and the latest date.
 9. **Unknown card endings** are still imported, with no person, and listed so the screen can ask whose card it is. A period that doesn't end on the card's closing day is flagged so the setting can be updated.
 10. **A final export:** an import taken after the period's close that matches the summary sets the statement's `finalImportAt` (it is then *complete*, §6.7).
@@ -100,6 +101,18 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 - **Receipt items** (`receiptLines`): each typed item is a line with its `item` name; "Everything else" takes what's left as one more line (left out when nothing's left). Items worth more than the transaction can't be saved.
 - `totalsByDestination` adds the lines up per pot or account ("By pot"); `splitLabel` gives "Split · 4 pots", or "Split · 3 ways" when an account is one of them.
 - **Split rules** (D13): `SortRule.split` holds percentages that add up to 100, and `ruleLines` turns them into lines with `splitByPercent`. There's no UI to make one yet.
+
+## Refunds (D5, §6.4)
+
+- **Matching** (`findRefundMatch`): purchases on the same card ending with the same merchant, dated on or before the refund and no more than 180 days earlier, for at least the refund's amount. An exact amount wins, then the most recent.
+- **Where it goes back** (`refundPlan`): a purchase with one line → that pot or account; a split purchase with a line of exactly the refund's amount → that line; any other split → the user picks a line or "Spread across the split" (`spreadLines`: in proportion to the lines, pennies by largest remainder); an unsorted purchase → the usual suggestions.
+- **On import** (`matchRefundOnImport`): a clear match sorts the refund straight back with `by: 'rule'` and no `ruleId` (so it shows under Sorted by rules, tagged Refund, for checking) and sets `refundOf` (with `lineIndex` for an exact split line). An unclear match only sets `refundOf` and leaves the refund to sort.
+- **By hand** (`sortRefund`): choosing a line, spreading, or any other pot or account sorts the refund and sets `refundOf`. The refund counts in the month of its own date, and lowers its pot's share of the statement it's on.
+- Rows link both ways: "Refund of COSTCO £186.40 · 24 Oct" on the refund, "Refunded −£14.99 · 6 Nov" on the purchase (`refundsOf`).
+
+## Payments
+
+Payments to Amex (`payments`) are never sorted or counted as spending. They're listed apart under All transactions. The statement's "Amex shows a payment of £X" hint and the offer to tick Pay Amex come with settling up (PR 9).
 
 ## Baseline fixture
 

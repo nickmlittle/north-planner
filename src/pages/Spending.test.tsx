@@ -343,3 +343,57 @@ it('splits by receipt items, with Everything else taking the rest', () => {
     { amountPence: 10000, destination: { kind: 'pot', potId: 'treats' } },
   ])
 })
+
+function refundHousehold(): BudgetDocument {
+  const document = splitHousehold()
+  document.card!.transactions.push(
+    tx('costco', '2026-10-24', 'COSTCO', 18640, { merchant: 'COSTCO', sort: { lines: [
+      { amountPence: 12179, destination: { kind: 'pot', potId: 'groceries' } }, { amountPence: 3250, destination: { kind: 'pot', potId: 'treats' }, item: 'Skincare' },
+      { amountPence: 1712, destination: { kind: 'pot', potId: 'eating' }, item: 'Screenwash' }, { amountPence: 1499, destination: { kind: 'pot', potId: 'ben-treats' }, item: 'Running socks' },
+    ], by: 'person', at: 'x' } }),
+    tx('costco-refund', '2026-11-06', 'COSTCO', -1000, { merchant: 'COSTCO', refundOf: { transactionId: 'costco' } }),
+    tx('shop', '2026-10-20', 'BOOK NOOK', 3000, { merchant: 'BOOK NOOK', sort: { lines: [{ amountPence: 3000, destination: { kind: 'pot', potId: 'treats' } }], by: 'person', at: 'x' } }),
+    tx('shop-refund', '2026-11-05', 'BOOK NOOK', -1250, { merchant: 'BOOK NOOK' }),
+    tx('paid', '2026-11-08', 'PAYMENT RECEIVED - THANK YOU', -35000, { kind: 'payment' }),
+  )
+  return document
+}
+
+it('sends a refund back to the purchase’s pot, in the month it arrived, and links the two rows', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={refundHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^BOOK NOOK, −£12.50/ }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('Matches BOOK NOOK £30.00 on 20 Oct. It counts in November, the month it arrived.')).toBeInTheDocument()
+  const first = within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!
+  expect(first).toHaveTextContent('Treats · AdaSuggested · Where the purchase went')
+  fireEvent.click(first)
+  expect(saved!.card!.transactions.find(row => row.id === 'shop-refund')).toMatchObject({ refundOf: { transactionId: 'shop' }, sort: { lines: [{ amountPence: -1250, destination: { kind: 'pot', potId: 'treats' } }] } })
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending sections' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  expect(screen.getByRole('button', { name: /^BOOK NOOK, −£12.50, .*Refund of BOOK NOOK £30.00 · 20 Oct/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /^BOOK NOOK, £30.00, .*Refunded −£12.50 · 5 Nov/ })).toBeInTheDocument()
+})
+
+it('asks which part of a split purchase came back, or spreads it', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={refundHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^COSTCO, −£10.00/ }))
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText(/Matches the COSTCO purchase on 24 Oct, which was split. Which part came back\?/)).toBeInTheDocument()
+  const parts = within(within(dialog).getByRole('list', { name: 'Parts of the purchase' })).getAllByRole('button')
+  expect(parts.map(part => part.textContent)).toEqual(['Groceries · Joint£121.79', 'SkincareTreats · Ada£32.50', 'ScreenwashEating out · Joint£17.12', 'Running socksTreats · Ben£14.99', 'Spread across the splitIn proportion to each line'])
+  fireEvent.click(parts[4]!)
+  expect(saved!.card!.transactions.find(row => row.id === 'costco-refund')!.sort!.lines.map(line => line.amountPence)).toEqual([-653, -174, -92, -81])
+  expect(screen.getByRole('status')).toHaveTextContent('Sorted to each part of the split.')
+})
+
+it('lists payments to Amex apart, and never as something to sort', () => {
+  render(<Harness initial={refundHousehold()}/>)
+  expect(screen.queryByRole('button', { name: /PAYMENT RECEIVED/ })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending sections' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  const section = screen.getByRole('region', { name: 'Payments to Amex' })
+  expect(within(section).getByText('PAYMENT RECEIVED - THANK YOU')).toBeInTheDocument()
+  expect(within(section).queryByRole('button')).not.toBeInTheDocument()
+})

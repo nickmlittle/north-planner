@@ -1428,3 +1428,8 @@ button.spending-row:focus-visible{outline:2px solid var(--orange);outline-offset
 .split-totals ul{display:grid;gap:var(--space-1);margin:0;padding:0;list-style:none}
 .split-totals li{display:flex;justify-content:space-between;gap:var(--space-3)}
 @media(max-width:640px){.split-line,.split-line.is-item{grid-template-columns:minmax(0,1fr) 110px;grid-auto-flow:dense}.split-line .split-destination,.split-line .split-note{grid-column:1/-1}.split-remove{grid-column:2;justify-self:end}}
+.spending-row-link{flex-basis:100%;color:var(--link);font-weight:600}
+.spending-payments{display:grid;gap:var(--space-3);margin-top:var(--space-3)}
+.sort-refund{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
+.sort-refund p{margin:0;color:var(--pine)}
+.sort-option-amount{flex:none;font-weight:700;font-variant-numeric:tabular-nums}

@@ -162,13 +162,17 @@ describe('bringing it in', () => {
       { id: 'payments', contains: 'PAYMENT', destination: { kind: 'account', accountId: 'joint' }, createdAt: '2026-11-01T00:00:00Z' },
     ]
     const { document, result } = await importAmexWorkbook(start, 'amex', sample(), 'activity.xlsx', midPeriod)
-    expect(result).toMatchObject({ added: 15, sortedByRules: 6, toSort: 8 })
+    // The refund matches the Homeware purchase, which the split rule divided, so it waits for a choice.
+    expect(result).toMatchObject({ added: 15, sortedByRules: 5, toSort: 9 })
     const transactions = document.card!.transactions
     expect(transactions.filter(row => row.sort?.ruleId === 'grocer')).toHaveLength(3)
     // The café rule only applies to Ada's card.
     expect(transactions.filter(row => row.merchant === 'CORNER CAFE').map(row => [row.cardSuffix, row.sort?.ruleId])).toEqual([['41009', undefined], ['41001', 'cafe-ada']])
+    const purchase = transactions.find(row => row.merchant === 'HOMEWARE HUT' && row.kind === 'purchase')!
+    expect(purchase.sort?.lines).toEqual([{ amountPence: 4499, destination: { kind: 'pot', potId: 'groceries' } }, { amountPence: 4498, destination: { kind: 'account', accountId: 'joint' } }])
     const refund = transactions.find(row => row.kind === 'refund')!
-    expect(refund.sort?.lines).toEqual([{ amountPence: -1250, destination: { kind: 'pot', potId: 'groceries' } }, { amountPence: -1249, destination: { kind: 'account', accountId: 'joint' } }])
+    expect(refund.sort).toBeUndefined()
+    expect(refund.refundOf).toEqual({ transactionId: purchase.id })
     expect(transactions.find(row => row.kind === 'payment')?.sort).toBeUndefined()
     expect(decodeBudgetDocument(JSON.parse(JSON.stringify(document)))).toEqual(document)
   })

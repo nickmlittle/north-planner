@@ -8,7 +8,8 @@ import { allTransactions, checkRuleSorts, lastImport, sortDestination, transacti
 import type { SpendingView } from '../state/navigation'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { BringInSheet } from './BringInSheet'
-import { destinationNamer } from './cardLabels'
+import { destinationNamer, shortDate } from './cardLabels'
+import { payments, refundsOf } from '../domain/cardRefunds'
 import { ManualEntrySheet } from './ManualEntrySheet'
 import { RulesPanel } from './RulesPanel'
 import { SortSheet } from './SortSheet'
@@ -29,13 +30,23 @@ type Section = { id: SpendingView; label: string; count?: number; desktopOnly?: 
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
 
+/** Refunds and their purchases point at each other: "Refund of COSTCO £186.40 · 24 Oct", "Refunded −£14.99 · 6 Nov". */
+function transactionLink(document: BudgetDocument, transaction: CardTransaction): string {
+  const tracker = cardTracker(document)
+  const purchase = transaction.refundOf ? tracker.transactions.find(row => row.id === transaction.refundOf!.transactionId) : undefined
+  if (purchase) return `Refund of ${purchase.description} ${signedPounds(purchase.amountPence)} · ${shortDate(purchase.date)}`
+  return transaction.kind === 'purchase' ? refundsOf(tracker, transaction.id).map(row => `Refunded ${signedPounds(row.amountPence)} · ${shortDate(row.date)}`).join(' · ') : ''
+}
+
 /** One transaction: what, when, whose card, how much, and where it went. A button when it can be sorted. */
 export function TransactionRow({ document, transaction, where, tag, action, onSelect }: { document: BudgetDocument; transaction: CardTransaction; where?: string; tag?: string; action?: string; onSelect?: () => void }) {
   // Read as one phrase: "TESCO, £62.40, Tue 10 Nov · Ada ··41001, Groceries · Monzo Joint, rule".
-  const label = [transaction.description, signedPounds(transaction.amountPence), `${transactionMeta(document, transaction)}${transaction.kind === 'refund' ? ' · refund' : ''}`, where, tag?.toLowerCase(), action].filter(Boolean).join(', ')
+  const link = transactionLink(document, transaction)
+  const label = [transaction.description, signedPounds(transaction.amountPence), `${transactionMeta(document, transaction)}${transaction.kind === 'refund' ? ' · refund' : ''}`, link, where, tag?.toLowerCase(), action].filter(Boolean).join(', ')
   const body = <>
     <span className="spending-row-main"><span className="spending-row-title">{transaction.description}</span><span className="spending-row-amount">{signedPounds(transaction.amountPence)}</span></span>
     <span className="spending-row-meta"><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span>
+      {link && <span className="spending-row-link">{link}</span>}
       {(where || action) && <span className="spending-row-where">{where}{tag && <span className="spending-tag">{tag}</span>}{action && <span className="spending-row-action">{action}</span>}</span>}</span>
   </>
   const className = `spending-row${transaction.amountPence < 0 ? ' is-credit' : ''}`
@@ -107,16 +118,21 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
         <button type="button" className="text-button spending-disclosure" aria-expanded={checking} aria-controls="spending-rule-sorts" onClick={() => setChecking(value => !value)}>{checking ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}Check</button></div>
       {checking && <div id="spending-rule-sorts" className="spending-rule-sorts-body">
         <p className="rules-lead">Change any of these, and North offers to change the rule too.</p>
-        <ul className="spending-list">{byRules.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag="Rule" onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
+        <ul className="spending-list">{byRules.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.refundOf && !transaction.sort?.ruleId ? 'Refund' : 'Rule'} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
         <button type="button" className="secondary-button" onClick={() => { setDocument(current => checkRuleSorts(current, byRules.map(row => row.id), new Date())); setChecking(false); setMessage(`${plural(byRules.length, 'rule sort')} checked.`) }}>They all look right</button>
       </div>}
     </section>}
   </>
   const all = allTransactions(tracker)
+  const paid = payments(tracker)
   const allPanel = <>
     <div className="spending-section-heading"><h2 id="spending-all-title">All transactions</h2><span>{all.length ? plural(all.length, 'transaction') : ''}</span>{headingExtra}</div>
-    {all.length ? <ul className="spending-list">{all.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.sort?.by === 'rule' ? 'Rule' : undefined} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
+    {all.length ? <ul className="spending-list">{all.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.sort?.by === 'rule' ? transaction.refundOf && !transaction.sort.ruleId ? 'Refund' : 'Rule' : undefined} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
       : <p className="spending-none">Nothing brought in yet.</p>}
+    {paid.length > 0 && <section className="spending-payments" aria-labelledby="spending-payments-title">
+      <div className="spending-section-heading"><h2 id="spending-payments-title">Payments to {tracker.cards[0]!.name}</h2><span>Never sorted</span></div>
+      <ul className="spending-list">{paid.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction}/></li>)}</ul>
+    </section>}
   </>
 
   return <PageFrame className="spending-page" title="Spending" contentWidth="wide" summary={summary}>
