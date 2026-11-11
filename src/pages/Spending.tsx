@@ -12,6 +12,8 @@ import { destinationNamer } from './cardLabels'
 import { ManualEntrySheet } from './ManualEntrySheet'
 import { RulesPanel } from './RulesPanel'
 import { SortSheet } from './SortSheet'
+import { SplitEditor } from './SplitEditor'
+import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
 
 type Props = {
@@ -37,7 +39,11 @@ export function TransactionRow({ document, transaction, where, tag, action, onSe
       {(where || action) && <span className="spending-row-where">{where}{tag && <span className="spending-tag">{tag}</span>}{action && <span className="spending-row-action">{action}</span>}</span>}</span>
   </>
   const className = `spending-row${transaction.amountPence < 0 ? ' is-credit' : ''}`
-  return onSelect ? <button type="button" className={className} data-transaction={transaction.id} aria-label={label} onClick={onSelect}>{body}</button> : <div className={className}>{body}</div>
+  const row = onSelect ? <button type="button" className={className} data-transaction={transaction.id} aria-label={label} onClick={onSelect}>{body}</button> : <div className={className}>{body}</div>
+  const lines = transaction.sort && transaction.sort.lines.length > 1 ? transaction.sort.lines : null
+  if (!lines) return row
+  const name = destinationNamer(document)
+  return <>{row}<ul className="spending-row-lines" aria-label={`${transaction.description} split`}>{lines.map((line, index) => <li key={index}><span>{name(line.destination)}{line.item ? ` · ${line.item}` : ''}{line.note ? ` · ${line.note}` : ''}</span><span>{signedPounds(line.amountPence)}</span></li>)}</ul></>
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
@@ -47,6 +53,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const name = destinationNamer(document)
   const [sheet, setSheet] = useState<'bring-in' | 'manual' | null>(null)
   const [sorting, setSorting] = useState<string | null>(null)
+  const [splitting, setSplitting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
   const [message, setMessage] = useState('')
   const tabRefs = useRef<Partial<Record<SpendingView, HTMLButtonElement | null>>>({})
@@ -66,6 +73,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const headingExtra = navInHeading ? moreMenu : null
   const latest = lastImport(tracker)
   const sortingTransaction = tracker.transactions.find(row => row.id === sorting)
+  const splittingTransaction = tracker.transactions.find(row => row.id === splitting)
 
   if (!tracker.cards.length) return <PageFrame className="spending-page" title="Spending" contentWidth="narrow">
     <div className="spending-empty"><CreditCard aria-hidden="true"/><h2>Add your card first</h2><p>Set up the Amex in Household: when its statement closes and when it’s due. Then bring in its transactions here.</p><button type="button" className="primary-button" onClick={onOpenHousehold}>Set up a card</button></div>
@@ -79,7 +87,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   }
   const where = (transaction: CardTransaction) => {
     const destination = sortDestination(transaction.sort)
-    return transaction.sort ? destination ? name(destination) : `Split · ${transaction.sort.lines.length} lines` : 'To sort'
+    return transaction.sort ? destination ? name(destination) : splitLabel(transaction.sort.lines) : 'To sort'
   }
 
   const summary = <div className="spending-summary">
@@ -121,7 +129,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
-    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }}/>}
+    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
+    {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}
   </PageFrame>

@@ -266,3 +266,80 @@ it('edits, reorders and deletes rules', () => {
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete rule' }))
   expect(saved!.card!.rules.map(rule => rule.id)).toEqual(['r-grocer'])
 })
+
+function splitHousehold(): BudgetDocument {
+  const document = sortingHousehold()
+  document.budget.accounts.push({ id: 'ben-own', name: 'Ben', provider: 'Nationwide', ownerPersonIds: ['ben'] })
+  document.budget.pots.push({ id: 'ben-treats', name: 'Treats', accountId: 'ben-own' })
+  document.budget.incomeSources = [
+    { id: 'a', personId: 'ada', name: 'Pay', type: 'employment', baseAmountPence: 300000, changes: {} },
+    { id: 'b', personId: 'ben', name: 'Pay', type: 'employment', baseAmountPence: 200000, changes: {} },
+  ]
+  return document
+}
+
+it('splits by amount, with Left to place, Half each and the funding share', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={splitHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getAllByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81/ })[0]!)
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Split across pots' }))
+  const dialog = screen.getByRole('dialog', { name: 'Split TRAIN TICKETS ONLINE' })
+  expect(within(dialog).getByText('Left to place £0.00')).toBeInTheDocument()
+  // Typing an exception leaves something to place, and Save waits for it.
+  fireEvent.change(within(within(dialog).getByRole('listitem', { name: 'Line 1' })).getByLabelText('Amount'), { target: { value: '100' } })
+  expect(within(dialog).getByText('Left to place £12.81')).toBeInTheDocument()
+  expect(within(dialog).getByRole('button', { name: 'Save split' })).toBeDisabled()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add a line' }))
+  const second = within(dialog).getByRole('listitem', { name: 'Line 2' })
+  expect(within(second).getByLabelText('Amount')).toHaveValue('12.81')
+  fireEvent.change(within(second).getByLabelText('Pot or account'), { target: { value: 'pot:groceries' } })
+  fireEvent.change(within(second).getByLabelText('Note'), { target: { value: 'Snacks' } })
+  expect(within(dialog).getByRole('region', { name: 'By pot' })).toHaveTextContent('Treats · Ada£100.00Groceries · Joint£12.81')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save split' }))
+  expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort?.lines).toEqual([
+    { amountPence: 10000, destination: { kind: 'pot', potId: 'treats' } },
+    { amountPence: 1281, destination: { kind: 'pot', potId: 'groceries' }, note: 'Snacks' },
+  ])
+  expect(screen.getByRole('status')).toHaveTextContent('TRAIN TICKETS ONLINE: split across 2 pots.')
+
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending sections' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  expect(screen.getByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81, .*Split · 2 pots/ })).toBeInTheDocument()
+  expect(within(screen.getByRole('list', { name: 'TRAIN TICKETS ONLINE split' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Treats · Ada£100.00', 'Groceries · Joint · Snacks£12.81'])
+
+  fireEvent.click(screen.getByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81, .*Split/ }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change the split' }))
+  const again = screen.getByRole('dialog', { name: 'Split TRAIN TICKETS ONLINE' })
+  fireEvent.click(within(again).getByRole('button', { name: 'Half each' }))
+  expect(within(again).getAllByLabelText('Amount').map(input => (input as HTMLInputElement).value)).toEqual(['56.41', '56.40'])
+  fireEvent.click(within(again).getByRole('button', { name: 'Split by your 60/40 funding share' }))
+  expect(within(again).getAllByLabelText('Amount').map(input => (input as HTMLInputElement).value)).toEqual(['67.69', '45.12'])
+  fireEvent.click(within(again).getByRole('button', { name: 'Save split' }))
+  expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort?.lines).toEqual([
+    { amountPence: 6769, destination: { kind: 'pot', potId: 'treats' } },
+    { amountPence: 4512, destination: { kind: 'pot', potId: 'ben-treats' } },
+  ])
+})
+
+it('splits by receipt items, with Everything else taking the rest', () => {
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={splitHousehold()} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getAllByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81/ })[0]!)
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Split across pots' }))
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Receipt items' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add an item' }))
+  const item = within(dialog).getByRole('listitem', { name: 'Item 1' })
+  fireEvent.change(within(item).getByLabelText('Item'), { target: { value: 'Seat reservation' } })
+  fireEvent.change(within(item).getByLabelText('Amount'), { target: { value: '200' } })
+  expect(within(dialog).getByText('The items come to £87.19 more than £112.81')).toBeInTheDocument()
+  expect(within(dialog).getByRole('button', { name: 'Save 1 item' })).toBeDisabled()
+  fireEvent.change(within(item).getByLabelText('Amount'), { target: { value: '12.81' } })
+  fireEvent.change(within(item).getByLabelText('Pot or account'), { target: { value: 'pot:ben-treats' } })
+  expect(within(dialog).getByText('Everything else').parentElement).toHaveTextContent('Everything else£100.00')
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save 1 item' }))
+  expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort?.lines).toEqual([
+    { amountPence: 1281, destination: { kind: 'pot', potId: 'ben-treats' }, item: 'Seat reservation' },
+    { amountPence: 10000, destination: { kind: 'pot', potId: 'treats' } },
+  ])
+})
