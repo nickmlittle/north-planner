@@ -18,6 +18,8 @@ export interface CardTracker {
   pots: Record<string, PotTracking>
   /** Newest last; the last 50 are kept. */
   imports: ImportRecord[]
+  /** Money moved into a card's set-aside pot (the Amex pot), oldest first. Absent until the first move. */
+  moves?: SetAsideMove[]
 }
 
 export interface Cardholder { suffix: string; personId: string }
@@ -36,6 +38,24 @@ export interface CardAccount {
   bufferDestination?: BudgetDestination
   /** Account # suffix → adult. Cards are mapped to people by suffix, never by name. */
   cardholders: Cardholder[]
+  /**
+   * The pot money is set aside in as you review (the Amex pot in Monzo), from the statement closing on
+   * `fromCloseDate`. Those statements are paid from the pot; earlier ones settle once via `payFromAccountId`.
+   */
+  setAside?: SetAside
+}
+
+export interface SetAside { potId: string; fromCloseDate: string }
+
+export interface MovedLine { destination: BudgetDestination; amountPence: number }
+
+/** One "Move to the Amex pot": what each transaction moved, its lines' change since it was last moved (all of them the first time). */
+export interface SetAsideMove {
+  id: string
+  cardId: string
+  /** ISO. */
+  at: string
+  transactions: Array<{ transactionId: string; lines: MovedLine[] }>
 }
 
 export type TransactionKind = 'purchase' | 'refund' | 'payment'
@@ -284,8 +304,8 @@ export function defaultPayFromAccountId(budget: Pick<MonthlyBudget, 'accounts'>)
   return (budget.accounts.find(account => account.ownerPersonIds.length > 1) ?? budget.accounts[0])?.id
 }
 
-export type CardDraft = { name: string; closeDay: string; dueDays: string; payFromAccountId: string; buffer: string; cardholders: Array<{ suffix: string; personId: string }> }
-export type CardDraftErrors = Partial<Record<'name' | 'closeDay' | 'dueDays' | 'payFromAccountId' | 'cardholders', string>>
+export type CardDraft = { name: string; closeDay: string; dueDays: string; payFromAccountId: string; buffer: string; setAsidePotId: string; setAsideFrom: string; cardholders: Array<{ suffix: string; personId: string }> }
+export type CardDraftErrors = Partial<Record<'name' | 'closeDay' | 'dueDays' | 'payFromAccountId' | 'setAside' | 'cardholders', string>>
 
 /** Checks a card form. Creating a card requires the closing day and the days until due: no silent defaults. */
 export function cardDraftErrors(draft: CardDraft, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>): CardDraftErrors {
@@ -295,6 +315,7 @@ export function cardDraftErrors(draft: CardDraft, budget: Pick<MonthlyBudget, 'a
   if (!/^\d+$/.test(draft.closeDay.trim()) || closeDay < 1 || closeDay > 28) errors.closeDay = 'Enter a day from 1 to 28.'
   if (!/^\d+$/.test(draft.dueDays.trim()) || dueDays < 1 || dueDays > 60) errors.dueDays = 'Enter a number of days from 1 to 60.'
   if (!budget.accounts.some(account => account.id === draft.payFromAccountId)) errors.payFromAccountId = 'Choose an account.'
+  if (draft.setAsidePotId && (!budget.pots.some(pot => pot.id === draft.setAsidePotId) || !validIsoDate(draft.setAsideFrom))) errors.setAside = 'Choose the pot and the first statement to pay from it.'
   const suffixes = draft.cardholders.map(row => row.suffix.trim()).filter(Boolean)
   if (draft.cardholders.some(row => row.suffix.trim() && !/^-?\d{4,6}$/.test(row.suffix.trim()))) errors.cardholders = 'A card ending is 4 to 6 digits.'
   else if (draft.cardholders.some(row => row.suffix.trim() && !row.personId)) errors.cardholders = 'Choose whose card it is.'
@@ -310,13 +331,14 @@ export function cardFromDraft(draft: CardDraft, id: string): CardAccount {
   return {
     id, name: draft.name.trim(), closeDay: Number(draft.closeDay), dueDaysAfterClose: Number(draft.dueDays), payFromAccountId: draft.payFromAccountId,
     ...(buffer && !(buffer.kind === 'account' && buffer.accountId === draft.payFromAccountId) ? { bufferDestination: buffer } : {}),
+    ...(draft.setAsidePotId ? { setAside: { potId: draft.setAsidePotId, fromCloseDate: draft.setAsideFrom } } : {}),
     cardholders: draft.cardholders.filter(row => row.suffix.trim()).map(row => ({ suffix: normaliseSuffix(row.suffix), personId: row.personId })),
   }
 }
 
 export function draftFromCard(card: CardAccount | undefined, budget: Pick<MonthlyBudget, 'accounts'>): CardDraft {
-  if (!card) return { name: 'Amex', closeDay: '', dueDays: '', payFromAccountId: defaultPayFromAccountId(budget) ?? '', buffer: '', cardholders: [] }
-  return { name: card.name, closeDay: String(card.closeDay), dueDays: String(card.dueDaysAfterClose), payFromAccountId: card.payFromAccountId, buffer: card.bufferDestination ? destinationKey(card.bufferDestination) : '', cardholders: card.cardholders.map(row => ({ ...row })) }
+  if (!card) return { name: 'Amex', closeDay: '', dueDays: '', payFromAccountId: defaultPayFromAccountId(budget) ?? '', buffer: '', setAsidePotId: '', setAsideFrom: '', cardholders: [] }
+  return { name: card.name, closeDay: String(card.closeDay), dueDays: String(card.dueDaysAfterClose), payFromAccountId: card.payFromAccountId, buffer: card.bufferDestination ? destinationKey(card.bufferDestination) : '', setAsidePotId: card.setAside?.potId ?? '', setAsideFrom: card.setAside?.fromCloseDate ?? '', cardholders: card.cardholders.map(row => ({ ...row })) }
 }
 
 /** "pot:<id>" / "account:<id>" from a select's value. */
@@ -346,8 +368,8 @@ const uniqueIds = (rows: Array<{ id: unknown }>) => rows.every(row => typeof row
 
 export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>, personIds: ReadonlySet<string>): value is CardTracker {
   if (!isRecord(value)) return false
-  const { cards, transactions, rules, statements, months, pots, imports } = value
-  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports)) return false
+  const { cards, transactions, rules, statements, months, pots, imports, moves } = value
+  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves)) return false
   const destination = (row: unknown) => validDestination(row, budget)
   if (!cards.every(isRecord) || !uniqueIds(cards as Array<{ id: unknown }>)) return false
   for (const card of cards as Array<Record<string, unknown>>) {
@@ -355,6 +377,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
     if (!budget.accounts.some(account => account.id === card.payFromAccountId) || card.bufferDestination !== undefined && !destination(card.bufferDestination)) return false
     if (!Array.isArray(card.cardholders) || !card.cardholders.every(row => isRecord(row) && typeof row.suffix === 'string' && !!row.suffix && typeof row.personId === 'string' && personIds.has(row.personId))) return false
     if (new Set(card.cardholders.map(row => (row as Cardholder).suffix)).size !== card.cardholders.length) return false
+    if (card.setAside !== undefined && !(isRecord(card.setAside) && typeof card.setAside.potId === 'string' && budget.pots.some(pot => pot.id === (card.setAside as SetAside).potId) && validIsoDate(card.setAside.fromCloseDate))) return false
   }
   const cardIds = new Set((cards as unknown as CardAccount[]).map(card => card.id))
   const validStatementKey = (key: unknown) => { if (typeof key !== 'string') return false; const parsed = parseStatementKey(key); return !!parsed && cardIds.has(parsed.cardId) }
@@ -400,6 +423,15 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
     if (tracking.checkedBalance !== undefined && !(isRecord(tracking.checkedBalance) && isInt(tracking.checkedBalance.pence) && typeof tracking.checkedBalance.at === 'string')) return false
     if (tracking.movedOut !== undefined && !(Array.isArray(tracking.movedOut) && tracking.movedOut.every(row => isRecord(row) && isInt(row.pence) && row.pence > 0 && typeof row.at === 'string'))) return false
     if (tracking.keptBuildUpPence !== undefined && !isInt(tracking.keptBuildUpPence)) return false
+  }
+  if (moves !== undefined) {
+    const transactionIds = new Set((transactions as unknown as CardTransaction[]).map(row => row.id))
+    if (!moves.every(isRecord) || !uniqueIds(moves as Array<{ id: unknown }>)) return false
+    for (const move of moves as Array<Record<string, unknown>>) {
+      if (typeof move.cardId !== 'string' || !cardIds.has(move.cardId) || typeof move.at !== 'string' || !Array.isArray(move.transactions)) return false
+      if (!move.transactions.every(row => isRecord(row) && typeof row.transactionId === 'string' && transactionIds.has(row.transactionId) && Array.isArray(row.lines)
+        && row.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination)))) return false
+    }
   }
   return imports.every(row => isRecord(row) && typeof row.at === 'string' && typeof row.cardId === 'string' && typeof row.fileName === 'string' && typeof row.statementKey === 'string'
     && [row.rows, row.added, row.skipped, row.sortedByRules].every(count => isInt(count) && (count as number) >= 0) && typeof row.latestDate === 'string' && typeof row.matchesSummary === 'boolean')

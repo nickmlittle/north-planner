@@ -20,6 +20,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Month stages, Close <Month>, covers, leftovers and the build-up flag | 10 | `src/domain/monthStages.ts`, `src/pages/CloseMonth.tsx` |
 | Home month cards, paydays, England and Wales working days | 11 | `homeMonths` in `monthStages.ts`, `src/domain/workingDays.ts`, `src/pages/HomeMonths.tsx`, `IncomeDialog.tsx` |
 | Desktop: keyboard sorting table, side panel, settle up in columns | 12 | `src/pages/SortTable.tsx`, `SpendingSide.tsx` |
+| Amex pot 1: set-aside pot setting, moves, what's left to move and its steps | A1 | `src/domain/setAside.ts`, `shareSteps` in `cardStatements.ts`, `src/pages/CardSettings.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -219,6 +220,16 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - `normaliseDescription`: uppercase, whitespace collapsed, trimmed. Rules match against it.
 - `merchantKey`: the raw description before its first run of 2+ spaces, uppercase, without digits or `*`, whitespace collapsed: `"B&M Retail - 10742 B&M  Dartford"` gives `"B&M RETAIL - B&M"`.
 - A rule made from the sort sheet defaults its text to the first word of the merchant, or the first two when the first is three letters or fewer (`defaultRuleText`).
+
+## The Amex pot (set aside as you go)
+
+**Status:** agreed with Nick on 11 November 2026, after #137. Nick keeps an "Amex" pot in Monzo and moves money into it from the spending pots during each review, rather than once per statement. Built in the `amex-pot/1`–`4` PR series (A1–A4 in the table above).
+
+- **The setting** (Household → Cards): "Set money aside in" a pot, "Starting with" a statement (`CardAccount.setAside = { potId, fromCloseDate }`). The choices are the two statements before the open one, the open one (the default) and the next. Statements closing on or after `fromCloseDate` are paid from the pot (`usesSetAside`); earlier ones keep settling once via the pay-from account (§6.8). With no pot, nothing changes.
+- **A move** (`SetAsideMove`, `card.moves`) records when it happened and, for each transaction, the lines it moved: all its lines the first time, the change since it was last moved after that. What a transaction has moved is the sum over moves (`movedByTransaction`), so undoing any move (`undoMove`) is just removing it.
+- **To move** (`toMove`): sorted purchases and refunds on statements paid from the pot whose lines differ from what has moved (`pendingLines`), newest first. Unsorted transactions wait until they're sorted; payments never move. A transaction re-sorted or split after moving is **Changed since moved** (`moveState`) and moves only the difference: "Out of Eating out £20.00, Into Groceries £20.00".
+- **The steps** (`moveSteps`) are settle-up's (`shareSteps`) with the pot's account as the hub: for each account, Out of each pot (Into one whose refunds outweigh its spend), then Send to the pot's account (or it sends the difference back); spend sorted to the pot's account itself is already in its main balance. The last step is Into the pot with the total (Out of it when refunds outweigh spend). Lines sorted to the pot itself need no step.
+- **Moved** (`recordMove`) records what's still to move for the ticked transactions at that moment. Transactions with nothing to move are skipped.
 
 ## Words on screen
 
