@@ -1,5 +1,5 @@
 import { useId, useState, type Dispatch, type SetStateAction } from 'react'
-import { Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, defaultRuleText, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
@@ -15,6 +15,8 @@ type Props = {
   onClose: () => void
   /** After placing it: what to announce. */
   onSorted: (message: string) => void
+  /** "Split across pots": open the split editor instead. */
+  onSplit?: () => void
   now?: () => Date
 }
 
@@ -22,7 +24,7 @@ type Props = {
 const SHOWN = 6
 
 /** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, now = () => new Date() }: Props) {
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date() }: Props) {
   const id = useId()
   const name = destinationNamer(document)
   const tracker = cardTracker(document)
@@ -83,6 +85,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
       {groups.map(group => <section key={group.key} aria-label={group.label}><h3 className="sort-group-heading">{group.label}</h3><ul className="sort-options">{group.options.map(row => option(row.destination))}</ul></section>)}
       {!groups.length && <p className="spending-none">No pot or account matches “{filter.trim()}”.</p>}
     </div>}
+    {onSplit && <button type="button" className="secondary-button sort-split" onClick={onSplit}><Split aria-hidden="true"/>{transaction.sort && transaction.sort.lines.length > 1 ? 'Change the split' : 'Split across pots'}</button>}
     {transaction.sort && <button type="button" className="text-button sort-unsort" onClick={() => { setDocument(latest => unsortTransaction(latest, transaction.id)); onSorted(`${transaction.description} is back in To sort.`) }}>Move back to To sort</button>}
   </ModalDialog>
 }
