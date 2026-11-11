@@ -17,6 +17,8 @@ import { SplitEditor } from './SplitEditor'
 import { PotDetail, ThisMonthPanel } from './SpendingMonth'
 import { StatementsPanel } from './StatementsPanel'
 import { CloseMonth } from './CloseMonth'
+import { SortTable } from './SortTable'
+import { SpendingSide } from './SpendingSide'
 import { splitLabel } from '../domain/cardSplits'
 import { dayOf, plural, signedPounds, transactionMeta } from './spendingFormat'
 
@@ -102,6 +104,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const navInHeading = tabs.length <= 1
   const headingExtra = navInHeading ? moreMenu : null
   const latest = lastImport(tracker)
+  const sortedThrough = tracker.transactions.reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
   const sortingTransaction = tracker.transactions.find(row => row.id === sorting)
   const splittingTransaction = tracker.transactions.find(row => row.id === splitting)
 
@@ -121,7 +124,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   }
 
   const summary = <div className="spending-summary">
-    <p className="spending-last"><strong>{tracker.cards.map(card => card.name).join(' · ')}</strong><span>{latest ? `Last brought in ${dayOf(latest.at)}` : 'Nothing brought in yet'}</span></p>
+    <p className="spending-last"><strong>{tracker.cards.map(card => card.name).join(' · ')}</strong><span>{latest ? `Last brought in ${dayOf(latest.at)}` : 'Nothing brought in yet'}{!compact && sortedThrough ? ` · sorted to ${shortDate(sortedThrough)}` : ''}</span></p>
     <div className="spending-actions">
       <button type="button" className="primary-button" onClick={() => setSheet('bring-in')}><FileSpreadsheet aria-hidden="true"/>Bring in transactions</button>
       <button type="button" className="secondary-button" onClick={() => setSheet('manual')}><Plus aria-hidden="true"/>Add a transaction</button>
@@ -130,7 +133,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
 
   const sortPanel = <>
     <div className="spending-section-heading"><h2 id="spending-sort-title">To sort</h2><span>{toSort.length ? plural(toSort.length, 'transaction') : ''}</span>{headingExtra}</div>
-    {toSort.length ? <ul className="spending-list">{toSort.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} action="Choose" onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
+    {toSort.length ? compact ? <ul className="spending-list">{toSort.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} action="Choose" onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
+      : <SortTable document={document} setDocument={setDocument} transactions={toSort} onSorted={setMessage} onSplit={setSplitting} onOpen={setSorting}/>
       : <p className="spending-none">{tracker.transactions.length ? 'Everything is sorted.' : 'Nothing to sort. Bring in new transactions to start.'}</p>}
     {byRules.length > 0 && <section className="spending-rule-sorts" aria-labelledby="spending-rules-title">
       <div className="spending-section-heading"><h2 id="spending-rules-title">Sorted by rules · {byRules.length}</h2>
@@ -161,6 +165,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
       {moreMenu}
     </div>}
     {compact && more.some(section => section.id === active) && <button type="button" className="text-button spending-back" onClick={() => onSelectView('sort')}>Back to To sort</button>}
+    <div className={`spending-layout${!compact && (active === 'sort' || active === 'all') ? ' has-side' : ''}`}>
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
         ? closing ? <CloseMonth document={document} setDocument={setDocument} month={month} today={today} onBack={() => onOpenClose(false)} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>
@@ -168,6 +173,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
         : active === 'statements' ? <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>
         : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
+    {!compact && (active === 'sort' || active === 'all') && <SpendingSide document={document} today={today} onOpenMonth={() => onSelectView('month')} onOpenPot={potId => { onSelectView('month'); onOpenPot(potId) }} onOpenStatement={key => { onSelectView('statements'); onOpenStatement(key) }}/>}
+    </div>
     {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}

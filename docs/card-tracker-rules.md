@@ -1,6 +1,6 @@
 # Card tracker (Spending) rules
 
-**Status:** agreed with Nick on 11 November 2026. Built in the `card/1`–`card/12` PR series from the [build plan](card-tracker-build-plan.md), which holds the full design, the Amex export format (§4) and the screens (§7). This document is the contract for what has shipped; keep it current with each PR. Where they disagree, the build plan's decisions (D1–D16, R1) win until this document is updated with Nick.
+**Status:** agreed with Nick on 11 November 2026. Built in the `card/1`–`card/12` PR series (#126–#137) from the [build plan](card-tracker-build-plan.md), which holds the full design, the Amex export format (§4) and the screens (§7). This document is the contract for what has shipped; keep it current with each PR. Where they disagree, the build plan's decisions (D1–D16, R1) win until this document is updated with Nick.
 
 Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Move, Funding), [recurring monthly budget rules](recurring-monthly-budget-rules.md) (calendar months, snapshots), [product design spec](product-design-spec.md) (layout, language, glossary).
 
@@ -19,6 +19,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Statements, statement detail, settle up | 9 | `src/domain/cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
 | Month stages, Close <Month>, covers, leftovers and the build-up flag | 10 | `src/domain/monthStages.ts`, `src/pages/CloseMonth.tsx` |
 | Home month cards, paydays, England and Wales working days | 11 | `homeMonths` in `monthStages.ts`, `src/domain/workingDays.ts`, `src/pages/HomeMonths.tsx`, `IncomeDialog.tsx` |
+| Desktop: keyboard sorting table, side panel, settle up in columns | 12 | `src/pages/SortTable.tsx`, `SpendingSide.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -184,6 +185,10 @@ Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks 
 - An employment income source can have a **payday** (`{ day, ifNotWorkingDay: 'previous' | 'next' }`), edited in the income dialog ("Paid on day", "On a weekend or bank holiday"). It is shared by every month; an empty day removes it.
 - **Working days** (`workingDays.ts`) exclude weekends and bank holidays in England and Wales, worked out without a network: New Year's Day, Good Friday and Easter Monday (from Easter), the early May, spring and summer bank holidays, Christmas Day and Boxing Day with substitute days, plus known one-off changes (2020, 2022, 2023) and any extras passed in.
 - A payday is the rule's day in a month (or the month's last day), moved back or forward to a working day (`paydayIn`). A month's money arrives in the month before (`moneyArrives`): 28 Dec 2026 is the Boxing Day substitute, so January's money comes Thu 24 Dec (previous) and Tue 29 Dec (next). With "next working day" it can land in the month itself (28 Feb 2026 is a Saturday, so March's arrives Mon 2 Mar); it's still that month's money.
+
+## Desktop sorting (board 7)
+
+On desktop, To sort is a table. Each row's "Pot or account" starts at its first suggestion (or the refund's purchase pot); Enter or Place sorts it there, as the sort sheet does: a refund is linked to its purchase, and Always makes a rule from the first word or two of the merchant (it also sorts anything else waiting that it matches). A refund of a split purchase opens the sort sheet to choose the part. Rows take ↑/↓, /, Enter, A and S, and focus moves to the next row after placing. The side panel's figures come from `monthSpending` and `statementSummary`, like every other screen.
 
 ## Payments
 
