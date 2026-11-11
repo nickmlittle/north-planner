@@ -126,8 +126,8 @@ const document = {
     accounts, pots, categories,
     snapshots: { '2026-10': { items }, '2027-03': { items } },
     incomeSources: [
-      { id: 'pay-ada', personId: 'ada', name: 'Salary', type: 'employment', baseAmountPence: 400000, changes: {} },
-      { id: 'pay-ben', personId: 'ben', name: 'Salary', type: 'employment', baseAmountPence: 250000, changes: {} },
+      { id: 'pay-ada', personId: 'ada', name: 'Salary', type: 'employment', baseAmountPence: 400000, changes: {}, payday: { day: 28, ifNotWorkingDay: 'previous' } },
+      { id: 'pay-ben', personId: 'ben', name: 'Salary', type: 'employment', baseAmountPence: 250000, changes: {}, payday: { day: 28, ifNotWorkingDay: 'next' } },
     ],
     incomePolicies: [],
   },

@@ -1555,3 +1555,20 @@ div.spending-pot{padding-right:var(--space-4)}
 .close-flag-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
 .close-flag-actions .secondary-button{min-height:44px;margin:0}
 @media(max-width:640px){.close-left>div{flex-wrap:wrap}.close-left dd{gap:var(--space-2);margin-left:auto}.spending-tabs button{padding:var(--space-1);font-size:var(--text-sm);white-space:nowrap}}
+.budget-income-payday{display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr);gap:var(--space-3);margin-top:var(--space-2)}
+.budget-income-payday label{display:grid;gap:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:600}
+.budget-income-payday input,.budget-income-payday select{min-height:44px;margin:0}
+.home-months{display:grid;gap:var(--space-3);margin:0 0 var(--space-5)}
+.home-month{display:grid;gap:var(--space-2);padding:var(--space-4) var(--space-4) var(--space-2);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
+.home-month header{display:grid;gap:var(--space-1)}
+.home-month h2{margin:0;color:var(--pine);font-size:var(--text-xl);font-weight:600}
+.home-month-arrives{color:var(--muted);font-size:var(--text-md);font-weight:600}
+.home-month-spent{margin:0;color:var(--muted)}
+.home-month-spent strong{color:var(--pine);font-size:var(--text-xl)}
+.home-month-tasks{display:grid;margin:0 calc(var(--space-4) * -1);padding:0;list-style:none}
+.home-month-tasks li{border-top:1px solid var(--line)}
+.home-month .home-task.is-done .home-task-title{color:var(--muted);text-decoration:line-through}
+.home-month-early{margin:0}
+.home-month-settled{display:flex;align-items:center;gap:var(--space-2);margin:0;padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);background:var(--surface-band);color:var(--pine)}
+.home-month-settled svg{width:18px;height:18px}
+.home-month>header{margin:0;padding:0;border:0;background:transparent}

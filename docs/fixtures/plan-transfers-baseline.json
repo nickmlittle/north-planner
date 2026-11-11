@@ -1318,7 +1318,11 @@
         "name": "Salary",
         "type": "employment",
         "baseAmountPence": 400000,
-        "changes": {}
+        "changes": {},
+        "payday": {
+          "day": 28,
+          "ifNotWorkingDay": "previous"
+        }
       },
       {
         "id": "pay-ben",
@@ -1326,7 +1330,11 @@
         "name": "Salary",
         "type": "employment",
         "baseAmountPence": 250000,
-        "changes": {}
+        "changes": {},
+        "payday": {
+          "day": 28,
+          "ifNotWorkingDay": "next"
+        }
       }
     ],
     "incomePolicies": []

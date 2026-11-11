@@ -144,3 +144,58 @@ describe('closing a month', () => {
     expect(closeMonthPlan(document, '2026-10', '2026-11-04')!.carryOver).toEqual([{ potId: 'bills', freePence: 100000 - 1999 - 4000, checkedAt: '2026-11-01T00:00:00Z' }])
   })
 })
+
+describe('Home month cards', () => {
+  async function load() { return import('./monthStages') }
+
+  it('shows the closing month’s checklist, the current month and next month with when its money arrives', async () => {
+    const { homeMonths } = await load()
+    const document = household()
+    document.budget.incomeSources[0]!.payday = { day: 28, ifNotWorkingDay: 'previous' }
+    document.budget.incomeSources[1]!.payday = { day: 28, ifNotWorkingDay: 'next' }
+    const cards = homeMonths(document, '2026-11-12')
+    expect(cards.map(card => `${card.role}:${card.month}`)).toEqual(['previous:2026-10', 'current:2026-11', 'next:2026-12'])
+    const previous = cards[0] as Extract<typeof cards[number], { role: 'previous' }>
+    expect(previous.tasks.map(task => [task.kind, task.done, task.statementKey ?? ''])).toEqual([['sorted', true, ''], ['close', false, ''], ['settle', false, 'amex:2026-10-24'], ['settle', false, 'amex:2026-11-24']])
+    expect(previous.overspends).toBe(1)
+    const current = cards[1] as Extract<typeof cards[number], { role: 'current' }>
+    expect(current.status.stage).toBe('in-progress')
+    // Last brought in 4 Nov, eight days ago; the October statement closed without its final export.
+    expect(current.tasks.map(task => task.kind)).toEqual(['bring-in', 'final-export'])
+    const next = cards[2] as Extract<typeof cards[number], { role: 'next' }>
+    expect(next).toMatchObject({ arrives: ['2026-11-27', '2026-11-30'], early: false, tasks: [] })
+  })
+
+  it('asks for the final export after a statement closes, and warns the day before', async () => {
+    const { homeMonths } = await load()
+    const document = household()
+    document.card!.imports[0]!.at = '2026-11-22T08:00:00.000Z'
+    const before = homeMonths(document, '2026-11-23').find(card => card.role === 'current')!
+    expect(before.role === 'current' && before.tasks.map(task => `${task.kind}:${task.statementKey ?? ''}`)).toEqual(['closes-soon:amex:2026-11-24', 'final-export:amex:2026-10-24'])
+    const after = homeMonths(document, '2026-11-25').find(card => card.role === 'current')!
+    expect(after.role === 'current' && after.tasks.map(task => `${task.kind}:${task.statementKey ?? ''}`)).toEqual(['bring-in:', 'final-export:amex:2026-10-24', 'final-export:amex:2026-11-24'])
+  })
+
+  it('shows next month’s funding once a step is ticked, and early pay', async () => {
+    const { homeMonths } = await load()
+    let document = household()
+    document.budget.incomeSources[0]!.payday = { day: 28, ifNotWorkingDay: 'previous' }
+    document = tickPayday(document, '2027-01', 2)
+    document.ticks!['2027-01'] = Object.fromEntries(Object.entries(document.ticks!['2027-01']!).map(([key, tick]) => [key, { ...tick, at: '2026-12-18T10:00:00Z' }]))
+    const next = homeMonths(document, '2026-12-18').find(card => card.role === 'next')!
+    expect(next).toMatchObject({ month: '2027-01', arrives: ['2026-12-24'], early: true, tasks: [{ kind: 'transfers', done: false }] })
+    expect(next.role === 'next' && next.status.stage).toBe('funding')
+  })
+
+  it('folds a settled month to one line until the month after it settles', async () => {
+    const { homeMonths } = await load()
+    let document = household()
+    document.card!.transactions = document.card!.transactions.filter(row => row.statementKey === 'amex:2026-10-24')
+    document = closeMonth(markAllIn(document, '2026-10', now), '2026-10', '2026-11-04', now)
+    document = settleWithoutFinal(document, 'amex:2026-10-24', now)
+    for (const step of allSettleSteps(settleSteps(document, 'amex:2026-10-24')!)) document = setSettleTick(document, 'amex:2026-10-24', step.key, step.amountPence, new Date('2026-11-23T09:00:00Z'))
+    const cards = homeMonths(document, '2026-11-25')
+    expect(cards[0]).toEqual({ role: 'settled', month: '2026-10', settledAt: '2026-11-23T09:00:00.000Z' })
+    expect(homeMonths({ ...document, card: undefined }, '2026-11-25')).toEqual([])
+  })
+})

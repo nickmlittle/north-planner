@@ -87,3 +87,47 @@ it('counts changed steps and says when everyone is up to date', () => {
   expect(screen.queryByText('You’re up to date for November')).toBeNull()
   expect(within(screen.getByRole('region', { name: 'Nick' })).getByRole('button')).toHaveTextContent('Payday transfers1 changed since ticked · send £50.00 more')
 })
+
+function withCard(): BudgetDocument {
+  const document = household()
+  document.budget.pots.push({ id: 'treats', name: 'Treats', accountId: 'immy-own' })
+  document.budget.snapshots[month]!.items.push({ id: 'tr', name: 'Treats', categoryId: 'gifts', destination: { kind: 'pot', potId: 'treats' }, entryAmountPence: 20000, amountPence: 20000, frequency: 'monthly', funding: 'single', singleFunderId: 'immy' })
+  document.budget.incomeSources[0]!.payday = { day: 28, ifNotWorkingDay: 'next' }
+  document.budget.incomeSources[1]!.payday = { day: 28, ifNotWorkingDay: 'previous' }
+  const line = (potId: string, pence: number) => ({ lines: [{ amountPence: pence, destination: { kind: 'pot' as const, potId } }], by: 'person' as const, at: 'x' })
+  const tx = (id: string, date: string, pence: number, potId: string, statementKey = 'amex:2026-11-24') => ({ id, cardId: 'amex', date, description: 'SHOP', merchant: 'SHOP', amountPence: pence, kind: 'purchase' as const, cardSuffix: '41001', statementKey, importedAt: 'x', sort: line(potId, pence) })
+  document.card = {
+    cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }],
+    transactions: [tx('a', '2026-10-10', 5000, 'treats', 'amex:2026-10-24'), tx('b', '2026-11-04', 21250, 'treats')],
+    rules: [], statements: {}, months: {}, pots: {},
+    imports: [{ at: '2026-11-09T19:30:00.000Z', cardId: 'amex', fileName: 'a.xlsx', statementKey: 'amex:2026-11-24', rows: 2, added: 2, skipped: 0, sortedByRules: 0, latestDate: '2026-11-04', matchesSummary: true }],
+  }
+  return document
+}
+
+it('shows a card per month that isn’t finished: this month, last month’s checklist and next month', () => {
+  const onOpenSpending = vi.fn(), onOpenTransfersMonth = vi.fn()
+  render(<Home document={withCard()} month={month} today="2026-11-12" onOpenPlan={vi.fn()} onOpenTransfers={vi.fn()} onReviewPerson={vi.fn()} onOpenSpending={onOpenSpending} onOpenTransfersMonth={onOpenTransfersMonth}/>)
+  const november = screen.getByRole('region', { name: 'November' })
+  expect([...november.querySelectorAll('.spending-chip')].map(chip => chip.textContent)).toEqual(['In progress · 18 days left', 'Funding · 0 of 6', 'Sorted to 4 Nov', '1 pot needs care'])
+  expect(november.querySelector('.home-month-spent')).toHaveTextContent('£212.50 of £2,200.00 spent')
+  const over = within(november).getByRole('button', { name: /Treats · Current is £12.50 over/ })
+  expect(over).toHaveTextContent('Covered when November closes')
+  fireEvent.click(over)
+  expect(onOpenSpending).toHaveBeenCalledWith({ view: 'month', month: '2026-11', potId: 'treats' })
+  expect(within(november).getByRole('button', { name: /Bring in Amex transactions/ })).toHaveTextContent('Last done Mon 9 Nov')
+  expect(within(november).getByRole('button', { name: /Bring in the final October statement/ })).toBeInTheDocument()
+  const october = screen.getByRole('region', { name: 'October' })
+  expect(within(october).getAllByRole('button').map(button => button.querySelector('.home-task-title')?.textContent)).toEqual(['All transactions in and sorted', 'Close October', 'Settle the October statement'])
+  fireEvent.click(within(october).getByRole('button', { name: /Close October/ }))
+  expect(onOpenSpending).toHaveBeenLastCalledWith({ view: 'month', month: '2026-10', close: true })
+  fireEvent.click(within(october).getByRole('button', { name: /Settle the October statement/ }))
+  expect(onOpenSpending).toHaveBeenLastCalledWith({ view: 'statements', statementKey: 'amex:2026-10-24' })
+  expect(screen.getByRole('heading', { name: 'December · money arrives Fri 27 Nov · Mon 30 Nov' })).toBeInTheDocument()
+})
+
+it('keeps Home as it was without a card', () => {
+  renderHome(household())
+  expect(screen.queryByRole('region', { name: 'October' })).toBeNull()
+  expect(document.querySelector('.home-months')).toBeNull()
+})

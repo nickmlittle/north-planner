@@ -17,6 +17,9 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
   const adults = document.household.adults
   const incomes = resolveIncomeSources(document.budget, month)
   const [draft, setDraft] = useState<Record<string, string>>({})
+  // Paydays are shared by every month; an empty day removes one.
+  const [paydays, setPaydays] = useState<Record<string, { day: string; ifNotWorkingDay: 'previous' | 'next' }>>({})
+  const paydayFor = (source: { id: string; payday?: { day: number; ifNotWorkingDay: 'previous' | 'next' } }) => paydays[source.id] ?? { day: source.payday ? String(source.payday.day) : '', ifNotWorkingDay: source.payday?.ifNotWorkingDay ?? 'previous' }
   const [newName, setNewName] = useState('')
   const [newPerson, setNewPerson] = useState(adults[0]?.id ?? '')
   const [newType, setNewType] = useState<IncomeType>('employment')
@@ -32,6 +35,15 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
     setDocument(current => {
       let budget = current.budget
       for (const source of budget.incomeSources) if (draft[source.id] !== undefined) budget = updateIncomeAtMonth(budget, month, source.id, pence(draft[source.id]!))
+      budget = { ...budget, incomeSources: budget.incomeSources.map(source => {
+        const payday = paydays[source.id]
+        if (!payday) return source
+        const day = Number(payday.day)
+        const next = { ...source }
+        if (payday.day.trim() && Number.isInteger(day) && day >= 1 && day <= 31) next.payday = { day, ifNotWorkingDay: payday.ifNotWorkingDay }
+        else delete next.payday
+        return next
+      }) }
       if (newName.trim() && newPerson) budget = addIncomeSource(budget, month, { personId: newPerson, name: newName.trim(), type: newType, baseAmountPence: pence(newAmount) })
       return { ...current, budget }
     })
@@ -46,6 +58,10 @@ export function IncomeDialog({ document, setDocument, month, onClose }: Props) {
     {incomes.map(source => <div className="budget-income-source" key={source.id}>
       <label>{adults.find(adult => adult.id === source.personId)?.name} — {source.name}{source.name.trim().toLowerCase() === typeLabel(source.type).toLowerCase() ? '' : ` · ${typeLabel(source.type)}`}<span className="budget-money-field"><input aria-describedby={sharedScope ? 'income-scope-shared' : `income-scope-${source.id}`} inputMode="decimal" value={draft[source.id] ?? amountText(source.amountPence)} onChange={event => setDraft(current => ({ ...current, [source.id]: event.target.value }))}/></span></label>
       {!sharedScope && <p id={`income-scope-${source.id}`} className="budget-edit-scope">Changes apply: {scopes[incomes.indexOf(source)]}.</p>}
+      {source.type === 'employment' && <div className="budget-income-payday">
+        <label>Paid on day<input inputMode="numeric" value={paydayFor(source).day} placeholder="28" onChange={event => setPaydays({ ...paydays, [source.id]: { ...paydayFor(source), day: event.target.value } })}/></label>
+        <label>On a weekend or bank holiday<select value={paydayFor(source).ifNotWorkingDay} onChange={event => setPaydays({ ...paydays, [source.id]: { ...paydayFor(source), ifNotWorkingDay: event.target.value as 'previous' | 'next' } })}><option value="previous">The working day before</option><option value="next">The next working day</option></select></label>
+      </div>}
     </div>)}
     {!adding && <button type="button" className="secondary-button budget-income-add" onClick={() => setAdding(true)}>Add income source</button>}
     {adding && <fieldset><legend>Add recurring income source</legend>
