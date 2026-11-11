@@ -456,3 +456,30 @@ it('shows what’s left in each pot when sorting', () => {
   expect(options.map(option => option.textContent)).toContain('Eating out · JointJoint£86.00 left')
   expect(options.map(option => option.textContent)).toContain('Treats · AdaSuggested · Ada’s card£12.50 over')
 })
+
+it('shows what’s free in a carry-over pot, how it’s worked out, and checks it against the bank', () => {
+  const document = monthHousehold()
+  document.budget.pots.push({ id: 'bills', name: 'Bills', accountId: 'joint' })
+  document.budget.snapshots['2026-11']!.items.push({ id: 'ins', name: 'Car insurance', categoryId: 'c', entryAmountPence: 61200, amountPence: 5100, frequency: 'annually', destination: { kind: 'pot', potId: 'bills' }, funding: 'equal' })
+  document.card!.pots = { bills: { carriesOver: true } }
+  document.card!.transactions.push(
+    tx('b1', '2026-10-10', 'STREAMFLIX', 8600, { statementKey: 'amex:2026-10-24', sort: { lines: [{ amountPence: 8600, destination: { kind: 'pot', potId: 'bills' } }], by: 'person', at: 'x' } }),
+    tx('b2', '2026-11-05', 'STREAMFLIX', 1999, { sort: { lines: [{ amountPence: 1999, destination: { kind: 'pot', potId: 'bills' } }], by: 'person', at: 'x' } }),
+  )
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} startView="month" onChange={next => { saved = next }}/>)
+  expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. Check the balance to see what’s free' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^Bills:/ }))
+  expect(screen.getByText('Free in the pot').parentElement).toHaveTextContent('Free in the pot—')
+  const sums = () => [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
+  expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99', 'Car insurance£612.00 a year'])
+  fireEvent.click(screen.getByRole('button', { name: 'Check against Monzo' }))
+  const dialog = screen.getByRole('dialog', { name: 'Check against Monzo' })
+  fireEvent.change(within(dialog).getByLabelText('What’s in Bills now?'), { target: { value: '1,240' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save balance' }))
+  expect(saved!.card!.pots.bills!.checkedBalance).toEqual({ pence: 124000, at: expect.any(String) })
+  expect(sums()[0]).toMatch(/^In the pot · checked .+£1,240.00$/)
+  expect(sums()).toContain('Free£1,134.01')
+  fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
+  expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. £1,134.01 free in the pot' })).toBeInTheDocument()
+})

@@ -154,7 +154,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
     {compact && more.some(section => section.id === active) && <button type="button" className="text-button spending-back" onClick={() => onSelectView('sort')}>Back to To sort</button>}
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
       {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
-        ? potId ? <PotDetail document={document} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} headingExtra={headingExtra}/>
+        ? potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} headingExtra={headingExtra}/>
         : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
     </section>
     {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
