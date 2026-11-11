@@ -1,6 +1,6 @@
 # Card tracker (Spending): design and PR build plan
 
-Status: agreed design, not started. Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
+Status: agreed design, not started. Written 11 November 2026 with Nick. This document is the single reference for building the card tracker. Read it in full before starting any PR in it. Where it disagrees with the design canvas, this document wins. In particular, the canvas uses illustrative statement dates (3rd–2nd). The real Amex statements run from the 25th to the 24th (§4).
 
 - **Design canvas** (wireframes; private to the owner): https://claude.ai/artifact/9x86swd2UHgJcRKBNZKYA6, section "Card tracker (Amex)", boards 1–7. The older "Card tracker sketch" board at the top is superseded.
 - **Related rules:** [transfer-calculation-rules](transfer-calculation-rules.md) (ticks, Move, Funding), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (calendar months, snapshots), [product-design-spec](product-design-spec.md) (layout, language, glossary).
@@ -11,7 +11,7 @@ Status: agreed design, not started. Written 11 November 2026 with Nick. This doc
 
 About 90% of the household's spending goes on one Amex account (two cards: Nick's and Immy's). The Plan says where money *should* go. The card tracker records where it *did* go, and settles the bill:
 
-1. **Bring in**: upload the Amex CSV every few days.
+1. **Bring in**: upload the Amex Excel export every few days.
 2. **Sort**: every transaction goes to a pot or an account. Rules do most of it. A transaction can be split across pots and people, including by receipt items.
 3. **Track**: planned vs spent for each pot this month, with pace. Carry-over pots (e.g. Bills) show a balance instead.
 4. **Close the month**: cover overspends, record leftovers, flag a surplus that has built up.
@@ -32,20 +32,21 @@ Agreed with Nick, 11 Nov 2026. Don't change these without asking.
 | D3 | **Everything is sorted.** Every purchase or refund goes to a pot or an account (a one-off can go to "Joint account"). Card payments to Amex are not sorted (§4.3). |
 | D4 | **Splits.** One transaction can be split into lines by amount, half each, the 60/40 funding share, or receipt items (typed in, with no photo capture). Each line goes to a pot or account. Lines must add up to the transaction. |
 | D5 | **Refunds go back to the pot of the original purchase**, in the month the refund arrives, and lower that pot's share of the next statement. If the purchase was split, suggest the line with the exact amount, else let the user choose one or spread it in proportion. |
-| D6 | **The bill is paid by hand**, once per statement: each pot's share moves to **Joint Monzo**, then Nick pays Amex from Joint Monzo. Pots are managed during the month, and settlement happens once. |
-| D7 | **Overspend** (a pot spent more than planned in a month) is covered when the month closes, from **Buffer** by default, or another pot with money left that month, or **next month's** funding for that pot. |
+| D6 | **The bill is paid by hand**, once per statement: each pot's share moves to **Joint Monzo**, then Nick pays Amex from Joint Monzo. It is always paid from Joint Monzo (confirmed). Pots are managed during the month, and settlement happens once. |
+| D7 | **Overspend** (a pot spent more than planned in a month) is covered when the month closes, from the **buffer** by default, or another pot with money left that month, or **next month's** funding for that pot. The buffer is **Joint Monzo's main balance** (a card setting that can be an account or a pot). |
 | D8 | **Leftovers stay in the pot.** North tracks the build-up and flags a pot holding more than **2× its monthly funding** (a per-pot setting) so it can be moved elsewhere. |
 | D9 | **Some pots carry over** (e.g. Bills, saving for annual costs). They show a balance and what's free, not a pace. |
 | D10 | **Pace only for steady pots** (Groceries, Eating out, Treats). Irregular pots (Fuel, Car) show only what's left. This is a per-pot setting. |
 | D11 | **Closing a month is one household button.** |
 | D12 | **The tab is called Spending.** Navigation: Home · Plan · Spending · Transfers · Household. |
 | D13 | **Split rules** (e.g. "Ocado: half each") are allowed but low priority. Build the data model for them, and the UI last. |
-| D14 | **Design for automation** (daily CSV pull, bank balances, rules), with manual steps only where needed. |
+| D14 | **Design for automation** (daily export pull, bank balances, rules), with manual steps only where needed. |
 | D15 | Ticks are **household-wide** for now (as for Transfers), and become per person once shared login exists. |
+| D16 | **Amex statements run from the 25th of the previous month to the 24th.** North **requires the Excel (.xlsx) export**, because it states the statement period and has a summary that North can check the rows against (§4). The CSV export isn't supported. |
 
 ### Refinement made while planning (R1)
 
-The first canvas draft showed an overspend cover as an "Out of Buffer" step inside the statement settle-up. **Cover steps are ticked on the Close month screen** instead, as "Buffer → Eating out £35.00". Board 5 has been updated to match. The reason: the real Amex statement closes around the 23rd (§4.1), so months and statements overlap a lot. Tying a month's cover to one statement would be fragile. Settle-up steps are then purely the statement's shares. The "next month" cover option moves no money: next month shows "£35.00 taken by October" against that pot.
+The first canvas draft showed an overspend cover as an "Out of Buffer" step inside the statement settle-up. **Cover steps are ticked on the Close month screen** instead. With the buffer as Joint Monzo's main balance, a cover reads "Move £35.00 from Joint Monzo into Eating out", which uses the existing meaning of **Move**. Board 5 has been updated to match. The reason: the real Amex statement closes on the 24th (§4), so months and statements overlap a lot. Tying a month's cover to one statement would be fragile. Settle-up steps are then purely the statement's shares. The "next month" cover option moves no money: next month shows "£35.00 taken by October" against that pot.
 
 ## 3. Words on screen
 
@@ -56,7 +57,7 @@ The glossary in `product-design-spec.md` stays authoritative, and `src/copy.voca
 | **Spending** | The tab. |
 | **Spent** | Card spend sorted to a pot or account in a month: "£338.60 of £520.00 spent". |
 | **Left** | Planned minus Spent for a pot: "£181.40 left". Negative is "£12.50 over". |
-| **Bring in** | Import transactions: "Bring in transactions", "Last brought in Mon 9 Nov". |
+| **Bring in** | Import the Excel export: "Bring in transactions", "Last brought in Mon 9 Nov". |
 | **Sort / To sort / Sorted** | Give a transaction a pot or account. "Sorted by rules". Avoid "assign" in the UI. |
 | **Split** | A transaction with more than one line. |
 | **Pace** | "On track", "£131 ahead of pace", "Runs out around Thu 19 Nov". |
@@ -67,29 +68,52 @@ The glossary in `product-design-spec.md` stays authoritative, and `src/copy.voca
 
 **Move** keeps its glossary meaning (account → pot). Money leaving a pot is "Out of <pot>", and account to account is "Send to <account>". Add these rows to the glossary in PR 1.
 
-## 4. The Amex CSV (from a real export, 11 Nov 2026)
+## 4. The Amex export (Excel, required)
 
-**Privacy:** the real export lives only on Nick's machine. **Never copy it, or any of its rows, merchants, names, card numbers or references, into the repo, tests, fixtures, PR text or logs.** Use the synthetic fixture created in PR 2.
+**Privacy:** Nick's real exports (`activity.csv`, `activity-9.xlsx`) live only on his machine. **Never copy them, or any of their rows, merchants, names, card numbers, references or balances, into the repo, tests, fixtures, PR text or logs.** Use the synthetic fixture created in PR 2.
 
-### 4.1 Facts from the sample
+### 4.1 Why the Excel export (D16)
 
-- **The header** (13 columns, in this order): `Date, Description, Card Member, Account #, Amount, Extended Details, Appears On Your Statement As, Address, Town/City, Postcode, Country, Reference, Category`.
-- **It covers the current statement period only, with posted transactions only (no pending).** The sample ran from 24 Oct to 9 Nov, so **the statement period starts around the 24th, not the 3rd** used on the canvas. The canvas dates are illustrative. The closing day and the due date are card settings (§5.2), so nothing is hardcoded. Ask Nick for the real closing day and due date before PR 1 sets the defaults.
-- **Date** is `DD/MM/YYYY`.
-- **Amount** is a plain decimal with a `.` and no thousands separator, e.g. `61.12`. A **charge is positive and a credit negative**, e.g. `-40.00`.
-- **Card Member** holds the cardholder's name as printed. **Account #** is a 5-digit suffix with a leading minus, e.g. `-9xxxx`, one per card. **Map cards to people by the Account # suffix, never by the name.** Don't store names.
-- **Reference** is unique for every row: 25 characters wrapped in single quotes, e.g. `'AT26…'`. Strip the quotes; this is the **deduplication key**.
+- **It tells you which statement a row is on.** Amex puts a transaction on a statement by its *posting* date, but the export's Date column is the *transaction* date. The export for 25 Oct – 24 Nov contained rows dated 24 Oct. Only the export's own period reliably says which statement a row belongs to. The CSV has no period.
+- **It lets North check the import is complete.** The Transaction Summary sheet gives Previous Balance, Payments & Credits, Charges and Total Balance. In the sample, the rows' positive amounts summed exactly to Charges, and the negative ones to Payments & Credits. North can say "All 38 transactions match Amex's summary", or "£12.34 of charges are missing".
+
+### 4.2 Workbook layout (from a real export, 11 Nov 2026)
+
+- **Two sheets:** `Transaction Details` and `Transaction Summary`. Both start with the same 6-row header:
+  - **A1:** the sheet title.
+  - **B1:** `<card product> Credit Card / Oct 25, 2026 to Nov 24, 2026`, which is **the statement period**. Parse it with `/(\w{3}) (\d{1,2}), (\d{4}) to (\w{3}) (\d{1,2}), (\d{4})\s*$/` (English month abbreviations).
+  - **A2–A5:** `Prepared for`, the account holder's name, `Account Number`, and a masked number such as `XXXX-XXXXXX-9xxxx`.
+  - **Row 6:** blank.
+- **Transaction Details:**
+  - Row 7 is the header, with 13 columns in this order: `Date, Description, Card Member, Account #, Amount, Extended Details, Appears On Your Statement As, Address, Town/City, Postcode, Country, Reference, Category`.
+  - Rows 8 onwards hold one transaction each, newest first.
+- **Transaction Summary:**
+  - A7 is `SUMMARY` and B8 is `Total`.
+  - Below them come label/number rows: `Previous Balance`, `Payments & Credits` (negative), `Charges`, and `Total Balance`.
+  - Previous Balance + Payments & Credits + Charges = Total Balance.
+- **Cell types:**
+  - Text is stored as shared strings (`t="s"`).
+  - **Date** is text in `DD/MM/YYYY`. Also accept an Excel date serial number in case Amex changes it.
+  - **Amount** is a **numeric cell** written as a float (`18.0`, `61.12`), so convert it with `Math.round(value * 100)`.
+  - Extended Details and Address can contain newlines.
+  - **Reference** is plain text such as `AT26…` (23 characters, no quotes; the CSV wrapped the same value in quotes).
+- **Scope:** the current statement period only, with posted transactions only (no pending). Because the export is usually taken mid-period, the period's end can be in the future.
+
+### 4.3 Facts about the rows
+
+- A **charge is positive and a credit negative**.
+- **Card Member** holds the cardholder's name as printed. **Account #** is a 5-digit suffix with a leading minus, one per card (Nick's and Immy's differ). **Map cards to people by the Account # suffix, never by the name.** Don't store names.
+- **Reference** is unique for every row and is the **deduplication key**.
 - **Category** is Amex's own, e.g. `General Purchases-Groceries`, `General Purchases-Fuel`, `Travel-Lodging`. It's blank on payments. Use it only as a hint for suggestions.
 - **Payments to Amex** look like `PAYMENT RECEIVED - THANK YOU`: a negative amount with a blank Category.
 - **Refunds** are negative amounts on a merchant row, with a Category.
-- **Description** pads the merchant and town with runs of spaces, e.g. `MERCHANT NAME         TOWN`. `Appears On Your Statement As` was identical to Description on every row.
-- **Address fields contain quoted newlines and doubled quotes** (`"""6TH FLOOR, …""\nDUBLIN"`). About half the rows span several lines. A naive `split('\n')` breaks the import, so it needs a proper RFC 4180 parser (quotes, `""` escapes, CR/LF inside quotes, an optional UTF-8 BOM).
+- **Description** pads the merchant and town with runs of spaces, e.g. `MERCHANT NAME         TOWN`. `Appears On Your Statement As` was identical to Description.
 
-### 4.2 What to store for each transaction
+### 4.4 What to store for each transaction
 
-Store only: the reference, date, description (whitespace collapsed), amount in pence, card suffix, Amex category, and the import time. **Drop** Card Member, Address, Town/City, Postcode, Country and Extended Details, for privacy and document size.
+Store only: the reference, date, description (whitespace collapsed), amount in pence, card suffix, Amex category, the statement it came from, and the import time. **Drop** Card Member, Address, Town/City, Postcode, Country and Extended Details, for privacy and document size. Don't store the header block's name or account number.
 
-### 4.3 Kinds of row
+### 4.5 Kinds of row
 
 - `payment`: amount < 0 and the description matches `/^PAYMENT RECEIVED/i`, or the Category is blank and the description contains `PAYMENT`. These aren't sorted or counted as spending. They're shown on the statement as "Amex shows a payment of £X on 8 Nov". When the amount equals an open "Pay Amex" step, offer to tick it, but never tick automatically.
 - `refund`: any other amount < 0. Sorted (D5).
@@ -118,10 +142,10 @@ export interface CardTracker {
 export interface CardAccount {
   id: string
   name: string                                   // "Amex"
-  closeDay: number                               // 1–28: the statement closes on this day each month
+  closeDay: number                               // 1–28: the statement closes on this day; 24 for this Amex (25th–24th)
   dueDaysAfterClose: number                      // the payment is due this many days after closing
   payFromAccountId: string                       // Joint Monzo: where pot shares collect and the bill is paid from
-  bufferPotId?: string                           // the default source for overspend covers
+  bufferDestination?: BudgetDestination          // the default source for overspend covers; default: the pay-from account's main balance
   cardholders: Array<{ suffix: string; personId: string }>   // Account # suffix → adult
 }
 
@@ -133,6 +157,7 @@ export interface CardTransaction {
   amountPence: number                            // + purchase, − refund or payment
   kind: 'purchase' | 'refund' | 'payment'
   cardSuffix: string
+  statementKey: string                           // `${cardId}:${closeDate}` from the export's period (§4.1); manual entries by date window
   personId?: string                              // from cardholders; absent if the suffix is unknown
   amexCategory?: string
   importedAt: string                             // ISO
@@ -166,13 +191,14 @@ export interface SortRule {
 export interface StatementRecord {
   cardId: string
   closeDate: string
-  ticks?: Record<string, StepTick>               // settle-up steps (§7.4)
+  amexSummary?: { previousPence: number; paymentsAndCreditsPence: number; chargesPence: number; totalPence: number; at: string }  // from the latest import of this period
+  ticks?: Record<string, StepTick>               // settle-up steps (§6.8)
   settledAt?: string                             // set when every step is done
 }
 
 export interface MonthRecord {
   closedAt?: string
-  covers?: Array<{ potId: string; amountPence: number; source: { kind: 'pot'; potId: string } | { kind: 'next-month' } }>
+  covers?: Array<{ potId: string; amountPence: number; source: BudgetDestination | { kind: 'next-month' } }>
   coverTicks?: Record<string, StepTick>          // `cover:<potId>`
   leftovers?: Record<string, number>             // potId → pence left at close (monthly pots)
 }
@@ -185,12 +211,12 @@ export interface PotTracking {
   movedOut?: Array<{ pence: number; at: string }>  // built-up money moved elsewhere (D8)
 }
 
-export interface ImportRecord { at: string; cardId: string; fileName: string; rows: number; added: number; skipped: number; sortedByRules: number; latestDate: string }
+export interface ImportRecord { at: string; cardId: string; fileName: string; statementKey: string; rows: number; added: number; skipped: number; sortedByRules: number; latestDate: string; matchesSummary: boolean }
 ```
 
 ### 5.2 Settings
 
-The card's settings go in Household (a "Cards" section): the name, closing day, days until due, the account it's paid from (default: the joint account), the Buffer pot, and which person each card suffix belongs to. The first import that meets an unknown suffix asks "Whose card ends 9xxxx?".
+The card's settings go in Household (a "Cards" section): the name, closing day (default 24), days until due, the account it's paid from (default: the joint account), the buffer (default: the pay-from account's main balance), and which person each card suffix belongs to. The first import that meets an unknown suffix asks "Whose card ends 9xxxx?". If an export's period doesn't end on the closing day, warn and offer to update the setting.
 
 Each pot gets pace, carries over, and the build-up limit, edited wherever pots are managed (`BudgetManagement`).
 
@@ -210,16 +236,18 @@ Implement these as pure functions with unit tests. The UI never recomputes them.
 - `merchantKey(s)`: take the part before the first run of 2+ spaces in the *raw* description, uppercase it, drop digits and `*`, collapse whitespace and trim. For example, `"B&M Retail - 10742 B&M  Dartford"` gives `"B&M RETAIL - B&M"`. A rule created from the sort sheet defaults `contains` to the first word or two of the merchant key, and the user can edit it.
 - Rule matching: the first rule (in list order) whose `contains` appears in the normalised description, and whose `cardSuffix` matches if it has one.
 
-### 6.2 Import (`importAmexCsv(document, cardId, csvText, fileName, now)`)
+### 6.2 Import (`importAmexWorkbook(document, cardId, bytes, fileName, now)`)
 
-1. Parse the CSV (RFC 4180) and check the header (§4.1). If it's wrong, fail with "This doesn't look like an Amex activity export". Don't make a partial import.
-2. Map each row: the date, pence (integer maths, never floats), the kind, the suffix → person, and the Reference without quotes.
-3. Skip rows whose id already exists (deduplication). If a Reference is missing, use the key `date|amount|normalised description|suffix`.
-4. Apply the rules to new purchases and refunds (`by: 'rule'`). Refunds first try a refund match (§6.4).
-5. Add an `ImportRecord`. Return the counts, used for: "23 transactions · 14 already here · 9 new · 6 sorted by your rules · 3 to sort".
-6. Unknown suffixes: still import the rows, with no `personId`, and ask the user to map the suffix.
+1. Read the workbook (§8, PR 2) and check that both sheets exist and the row 7 header matches §4.2. If not, fail with "This doesn't look like an Amex Excel export. Download the Excel version of your transactions." Don't make a partial import.
+2. Read the period from B1 and set `statementKey` = `cardId:<period end>`. Read the four Summary figures.
+3. Map each row: the date, pence (integer maths, never floats), the kind, the suffix → person, the Reference, and the `statementKey`.
+4. **Check the file against the summary.** Over *every* row in the file (new or already imported), Σ positives must equal Charges, and Σ negatives must equal Payments & Credits. Record `matchesSummary`, and store the summary on the statement. A mismatch is a warning, not a failure: "£12.34 of charges in Amex's summary aren't in this file".
+5. Skip rows whose Reference already exists (deduplication). If a Reference is missing, use the key `date|amount|normalised description|suffix`.
+6. Apply the rules to new purchases and refunds (`by: 'rule'`). Refunds first try a refund match (§6.4).
+7. Add an `ImportRecord`. Return the counts, used for: "38 transactions · 29 already here · 9 new · 6 sorted by your rules · 3 to sort · matches Amex's summary".
+8. Unknown suffixes: still import the rows, with no `personId`, and ask the user to map the suffix.
 
-**Manual entry:** the user can add a transaction by hand (date, description, amount, card), with id `manual:<uuid>`. This covers anything missed after a statement closes, because the CSV only covers the current period.
+**Manual entry:** the user can add a transaction by hand (date, description, amount, card), with id `manual:<uuid>`. Its statement comes from the date window (§6.7). This covers anything missed after a statement closes, because the export only covers the current period.
 
 ### 6.3 Suggestions when no rule matches
 
@@ -228,8 +256,8 @@ Offer these in order, without duplicates:
 1. The destination(s) last used for the same merchant key.
 2. The cardholder's own pots (the pot's account owners include that person and nobody else).
 3. Joint pots.
-4. "Joint account".
-5. Buffer.
+4. "Joint account" (Joint Monzo's main balance, which is also the buffer).
+5. The buffer, if it's set to something other than the joint account.
 
 Each option shows the pot's current month "£X left" once PR 7 exists, and is labelled "Suggested: Nick's card, used last time", and so on.
 
@@ -266,13 +294,13 @@ The annual costs listed under the pot come from Plan items with that destination
 
 ### 6.7 Statements
 
-- A statement window for close day *d*: from (the previous close date + 1) to the close date. A transaction belongs to the window that contains its date. Due date = close date + `dueDaysAfterClose`.
+- **Which statement a transaction is on comes from `statementKey`**, set from the export's period at import, not from its date (§4.1). Manual entries use the date window: for close day *d*, from (the previous close date + 1) to the close date. Window helpers are also used for the open statement, the next close date and the due date: due date = close date + `dueDaysAfterClose`.
 - **Open**: today ≤ close date. **Ready to settle**: closed, and every purchase and refund in it is sorted. **Settled**: every settle-up step is done.
-- **The total** = Σ purchases and refunds in the window. Payments are excluded. Show any payment rows separately (§4.3).
+- **The total** = Σ purchases and refunds with that `statementKey`. Payments are excluded. Show any payment rows separately (§4.5). When `amexSummary` exists, show whether North's rows match Amex's Charges and Payments & Credits.
 
 ### 6.8 Settle-up steps (`settleSteps(document, statementKey)`)
 
-1. Shares: Σ the split lines in the window by destination. Turn each pot share into its account, and keep account shares on their own account.
+1. Shares: Σ the split lines of the statement's transactions by destination. Turn each pot share into its account, and keep account shares on their own account.
 2. For each account in order (each person's own accounts first, Immy then Nick in household order, then joint accounts, with the pay-from account last):
    - For each pot share > 0: **Out of <pot>**, key `settle:out:<potId>`.
    - For each pot share < 0 (refunds bigger than spend): **Into <pot>**, key `settle:into:<potId>`, made after the account has the money.
@@ -298,7 +326,9 @@ Home shows every month from the oldest unsettled one up to next month.
 ### 6.10 Closing a month (D7, D8, D11, R1)
 
 - **Can close when** all of the month's transactions are sorted, and the latest import is at least 3 days after the month ended (to catch late postings). An override is allowed: "All October transactions are in".
-- **Overspends:** every pot with Spent > Planned. The cover source defaults to Buffer. The alternatives are another pot with money left that month, or `next-month`. Each pot-sourced cover creates a step on the close screen, "Buffer → Eating out £35.00" (key `cover:<potId>`), ticked like any step.
+- **Overspends:** every pot with Spent > Planned. The cover source defaults to the buffer (`bufferDestination`: Joint Monzo's main balance). The alternatives are another pot with money left that month, or `next-month`. Each cover that moves money creates a step on the close screen (key `cover:<potId>`), ticked like any step:
+  - from an account: "Move £35.00 from Joint Monzo into Eating out";
+  - from a pot: "Out of Treats £35.00, then move into Eating out".
 - **Leftovers:** store `Planned − Spent` (> 0) for each monthly pot in `leftovers`.
 - **Built up** for a monthly pot = Σ leftovers − Σ movedOut. Flag it when built up > `buildUpLimit` × monthly Planned. The flag offers "Move £X…" (which records `movedOut`; the user moves the money in their bank) or "Keep it" (which hides the flag until it grows again).
 - **The Close button** sets `closedAt`. Re-sorting a transaction in a closed month afterwards shows "Changed since closed" on that month, with "Close again".
@@ -308,16 +338,16 @@ Home shows every month from the oldest unsettled one up to next month.
 | Screen | Board | Notes |
 |---|---|---|
 | Spending tab: To sort, This month, Statements (+ Rules on desktop, and under ⋯ on phones) | 3, 4, 7 | Its own `view=spending` with a `spendingView` param, following `navigation.ts` patterns. |
-| Bring in sheet | 3 | File input (`.csv`), the counts afterwards, "Sort N transactions". |
+| Bring in sheet | 3 | File input (`.xlsx`), "Download the Excel version of your transactions from Amex online", the counts afterwards, the summary check, "Sort N transactions". |
 | Sort sheet | 3 | Suggestions with "£X left", "Always put <merchant> in this pot", "All pots and accounts", Split. |
 | Split editor | 6 | Two modes: By amount / Receipt items. "Half each" and "60/40" shortcuts. "Everything else" takes the remainder. "Left to place £0.00" before Save. |
 | Refund-of-split sheet | 6 | Exact match first, then each line, or "Spread across the split". |
 | This month | 4 | Grouped like Plan (Joint, then each person, then Accounts). Bar plus pace tick, and status text. |
 | Pot detail (steady) | 4 | "£X left for N days", "About £Y a day. You've averaged £Z", a cumulative chart vs planned pace, "Runs out around <date>", transactions with "on <Month> statement". |
 | Pot detail (carry-over) | 4 | Free, broken down (§6.6), "Check against Monzo", annual costs from Plan. |
-| Statement | 5 | Total, "All N sorted", which months it counts in, shares by person and pot, Settle up. |
+| Statement | 5 | Total, "All N sorted", "Matches Amex's summary", which months it counts in, shares by person and pot, Settle up. |
 | Settle up | 5 | Steps per account (§6.8), tap-to-copy amounts, ticks, progress. |
-| Close month | 2 | Overspends with cover pickers and cover steps, leftovers with built up, the build-up flag, carry-over pots, one Close button. |
+| Close month | 2 | Overspends with cover pickers (default: Joint Monzo) and cover steps, leftovers with built up, the build-up flag, carry-over pots, one Close button. |
 | Home month cards | 2 | Described in §7.1. |
 | Desktop Spending | 7 | A sorting table you can use from the keyboard (↑/↓, `/` to search pots, Enter, `A` for Always, `S` for split), with the month panel and current statement alongside. |
 
@@ -344,29 +374,44 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 4. Run `npm run check` (lint, tests, build). The CI runs the same.
 5. Check it visually at **375×812 and 1440×900**. Run the dev server with `npm run dev -- --port 5174 --strictPort --mode localonly`, and seed it from `/scripts/baseline-seed.html`. From PR 3 on, the baseline fixture includes card data.
 6. Run `gh pr create`. Wait until CI shows a run before `gh pr checks --watch`, because `--watch` can exit early with "no checks reported". Then `gh pr merge --squash --delete-branch`, and check CI on `main`.
-7. Never put the real CSV or its contents anywhere (§4).
+7. Never put Nick's real exports or their contents anywhere (§4).
 
 ### Series A: Foundations
 
 **PR 1 · `card/1-model`: data model, settings and rules doc**
 - `src/domain/cardTracker.ts`: the §5.1 types, `validCardTracker`, `normaliseDescription`, `merchantKey`, the statement window helpers (`statementFor(date, card)`, `dueDate`), `monthOf(date)`, and a pence parser.
 - Wire `card` into `decodeBudgetDocument`: optional, and invalid makes the document invalid. Add a test that old documents still load.
-- Household → "Cards" section: add or edit a card (name, closing day, days to due, pay-from account, Buffer pot, cardholder suffixes). Ask Nick for the closing day and due date before choosing defaults; the sample suggests the period starts around the 24th.
+- Household → "Cards" section: add or edit a card (name, closing day (default 24), days to due, pay-from account (default the joint account), buffer (default the pay-from account's main balance), cardholder suffixes). Ask Nick how many days after the 24th payment is due.
 - Docs: create `docs/card-tracker-rules.md` from §2, §3 and §6 here, link it from the README, and add the glossary rows (§3).
 - Done when: a document with a card round-trips through save and load; invalid shapes are rejected; the settings save.
 
-**PR 2 · `card/2-csv-import`: parser and importer**
-- `src/domain/csv.ts`: a small RFC 4180 parser with no new dependency.
-- `src/domain/amexImport.ts`: header check, row mapping, kinds, deduplication, rule application (the matcher is built here even though rules UI comes in PR 4), and `ImportRecord`.
-- `docs/fixtures/amex-activity-sample.csv`: a **synthetic** export with the real header and quirks: a BOM, multi-line quoted addresses, `""` escapes, padded descriptions, a payment row, a refund, two card suffixes, quoted references, and an Amex category. Use fictitious merchants, names, addresses and references.
-- Tests cover the parser's edge cases, pence accuracy (`0.1+0.2` style cases), re-importing the same file (0 added), overlapping files, an unknown suffix, and a wrong file.
+**PR 2 · `card/2-xlsx-import`: workbook reader and importer**
+- `src/domain/xlsx.ts`: a minimal, dependency-free XLSX reader.
+  - Unzip using the ZIP central directory, inflating entries with `DecompressionStream('deflate-raw')` (available in current browsers and in Node 18+ for tests); support stored entries too.
+  - Read `xl/workbook.xml` and its rels to find sheets by name.
+  - Read `xl/sharedStrings.xml` (including rich-text runs) and the sheet XML. Handle cells of type `s`, `inlineStr`, `str`, `n` and `b`.
+  - Parse XML with `DOMParser`, which jsdom provides in tests.
+  - Return rows as arrays of strings and numbers.
+  - Keep it small and well tested. Don't add a spreadsheet library.
+- `src/domain/amexImport.ts`: sheet and header checks, period and summary parsing, row mapping, kinds, `statementKey`, the summary check, deduplication, rule application (the matcher is built here even though rules UI comes in PR 4), and `ImportRecord`.
+- `scripts/amex-fixture.mjs`: generates `docs/fixtures/amex-export-sample.xlsx`, a **synthetic** workbook with the real layout and quirks:
+  - both sheets and the 6-row header with a period in B1;
+  - text dates and float amounts;
+  - a newline inside Extended Details;
+  - a payment row, a refund, and a row dated the day before the period starts;
+  - two card suffixes;
+  - a summary that matches.
+
+  It also writes a variant whose summary doesn't match. The data is fictitious (merchants, names, references, balances). Write the zip with Node's `zlib` (deflate-raw).
+- Tests cover the reader's cell types and shared strings, pence accuracy, the period parse, the summary match and mismatch, re-importing the same file (0 added), overlapping files, an unknown suffix, a wrong file (e.g. a CSV or another spreadsheet), and a row dated before the period that still lands on the export's statement.
 
 **PR 3 · `card/3-spending-tab`: the tab, Bring in, To sort, manual entry**
 - Navigation: add `spending` to `PlannerView`, plus a `spendingView` param (`sort` | `month` | `statements` | `rules`). Add a nav item in `PlannerHeader` (lucide `CreditCard`) between Plan and Transfers on both the sidebar and the bottom nav, keeping 48 px targets with 5 items at 375 px.
-- Spending page with tabs, the Bring in sheet (file input → PR 2 import → counts → "Sort N"), the To sort list (newest first, with card and person), "Last brought in …", and empty states.
+- Spending page with tabs, the Bring in sheet (`.xlsx` file input → PR 2 import → counts and the summary check → "Sort N"), the To sort list (newest first, with card and person), "Last brought in …", and empty states.
 - "Add a transaction" by hand (§6.2).
+- The baseline fixture's card has `closeDay: 24` and its transactions carry `statementKey`s, matching the real periods.
 - Extend `scripts/baseline-fixture.mjs` with synthetic card data: the Ada and Ben cards, about two months of transactions with some sorted and some not, a few rules, and one carry-over pot.
-- Done when a CSV can be brought in on a phone and desktop and its new rows listed to sort.
+- Done when an Excel export can be brought in on a phone and desktop and its new rows listed to sort.
 
 ### Series B: Sorting
 
@@ -398,7 +443,7 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 ### Series D: Months and settling
 
 **PR 9 · `card/9-statements-settle`: statements and settle up**
-- Statements tab (open, ready, settled), the statement detail (total, sorted state, which months it counts in, shares by person and pot), settle-up steps (§6.8) with ticks and tap-to-copy reusing Transfers' components, "changed since ticked", the payment-row hint, and the settled state.
+- Statements tab (open, ready, settled), the statement detail (total, sorted state, the Amex summary check, which months it counts in, shares by person and pot), settle-up steps (§6.8) with ticks and tap-to-copy reusing Transfers' components, "changed since ticked", the payment-row hint, and the settled state.
 
 **PR 10 · `card/10-close-month`: month stages and closing**
 - `src/domain/monthStages.ts` (§6.9) and the close rules (§6.10): the Close <Month> screen, cover pickers and cover steps, leftovers, built up, the build-up flag with Move or Keep, carry-over pots, and the household Close button. Re-sorting after close shows "Changed since closed".
@@ -420,7 +465,7 @@ Twelve PRs in five series. Each one is a squash-merged PR from fresh `main`, on 
 
 | Stage | Now | Later |
 |---|---|---|
-| Bring in | CSV upload; manual entry for anything missed | A daily feed, e.g. Open Banking. The Bring in button and the last-chance task disappear, and Home says "3 new to sort". |
+| Bring in | Excel export upload; manual entry for anything missed | A daily feed, e.g. Open Banking. The Bring in button and the last-chance task disappear, and Home says "3 new to sort". |
 | Sort | Rules plus suggestions | The same, with better suggestions. |
 | Balances | Checked by hand for carry-over pots | Pulled daily from the banks. "Checked Mon 9 Nov" becomes "Updated today". |
 | Settle | Ticked by hand | Still by hand. A payment row in the feed offers the Pay tick. |
@@ -429,6 +474,13 @@ To keep that possible, every computed figure comes from the stored transactions 
 
 ## 10. Questions to ask Nick before the PR that needs them
 
-1. **(PR 1)** The real statement closing day and how long until payment is due. The sample suggests the period starts around the 24th.
-2. **(PR 1)** Which pot is Buffer, and is the bill always paid from Joint Monzo?
-3. **(PR 11)** The exact payday rules, e.g. "28th, or the last weekday before" for Immy, and Nick's.
+Answered on 11 Nov 2026:
+- Statements run from the 25th to the 24th.
+- The bill is always paid from Joint Monzo.
+- The buffer is Joint Monzo's main balance.
+- North requires the Excel export.
+
+Still open:
+1. **(PR 1)** How many days after the 24th is payment due? This is the `dueDaysAfterClose` default.
+2. **(PR 11)** The exact payday rules, e.g. "28th, or the last weekday before" for Immy, and Nick's.
+3. **(PR 3, nice to have)** Can Amex online export a *past* statement period as Excel? If it can, the last-chance bring-in becomes a gentle reminder rather than a must.
