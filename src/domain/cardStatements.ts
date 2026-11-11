@@ -1,6 +1,7 @@
 import type { BudgetDocument } from './budgetDocument'
 import { cardTracker, destinationKey, dueDate, monthOf, parseStatementKey, statementWindow, type CardTracker, type CardTransaction, type StatementRecord } from './cardTracker'
 import { stepStatus, type StepTick } from './transferTicks'
+import { toMove, usesSetAside } from './setAside'
 import type { BudgetDestination } from './monthlyBudget'
 
 /** Settle-up step keys (§6.8), shared by settling up and a carry-over pot's Free (§6.6). */
@@ -39,7 +40,7 @@ export type StatementSummary = {
   steps: number
 }
 
-export type SettleStepKind = 'out' | 'into' | 'send' | 'return' | 'pay'
+export type SettleStepKind = 'out' | 'into' | 'send' | 'return' | 'pay' | 'move'
 export type SettleStep = {
   key: string
   kind: SettleStepKind
@@ -58,7 +59,17 @@ export type SettleAccount = {
   /** Spend sorted to the pay-from account itself: no step needed ("includes £95.00 of one-offs"). */
   oneOffsPence: number
 }
-export type SettlePlan = { accounts: SettleAccount[]; pay: SettleStep; totalPence: number; payFromAccountId: string }
+export type SettlePlan = {
+  accounts: SettleAccount[]
+  pay: SettleStep
+  totalPence: number
+  /** The account the card is paid from: the pay-from account, or the set-aside pot's account. */
+  payFromAccountId: string
+  /** Paid from the card's set-aside pot (the Amex pot): what's still to move into it for this statement. */
+  setAside?: { potId: string; toMovePence: number; toMove: number }
+}
+
+export const SETTLE_MOVE_KEY = 'settle:move'
 
 /** Σ split lines of a statement's transactions, by destination. */
 export function statementShares(tracker: Pick<CardTracker, 'transactions'>, key: string): Map<string, { destination: BudgetDestination; pence: number }> {
@@ -118,13 +129,26 @@ export function settleSteps(document: Pick<BudgetDocument, 'budget' | 'card' | '
   const parsed = parseStatementKey(key)
   const card = parsed && tracker.cards.find(row => row.id === parsed.cardId)
   if (!card) return null
-  const accounts = shareSteps(document, statementShares(tracker, key).values(), card.payFromAccountId)
   const totalPence = statementTransactions(tracker, key).filter(row => row.kind !== 'payment').reduce((sum, row) => sum + row.amountPence, 0)
+  const pot = usesSetAside(card, key) ? document.budget.pots.find(row => row.id === card.setAside!.potId) : undefined
+  if (pot) {
+    // Paid from the Amex pot: first everything on it moves into the pot (the Move sheet), then the card is paid from it.
+    const rows = toMove(document, card.id, key)
+    return { accounts: [], pay: { key: SETTLE_PAY_KEY, kind: 'pay', accountId: pot.accountId, potId: pot.id, amountPence: totalPence }, totalPence, payFromAccountId: pot.accountId,
+      setAside: { potId: pot.id, toMovePence: rows.reduce((sum, row) => sum + row.pence, 0), toMove: rows.length } }
+  }
+  const accounts = shareSteps(document, statementShares(tracker, key).values(), card.payFromAccountId)
   return { accounts, pay: { key: SETTLE_PAY_KEY, kind: 'pay', accountId: card.payFromAccountId, amountPence: totalPence }, totalPence, payFromAccountId: card.payFromAccountId }
 }
 
-/** Every step, in order, the pay step last. */
-export const allSettleSteps = (plan: SettlePlan) => [...plan.accounts.flatMap(account => account.steps), ...plan.totalPence > 0 ? [plan.pay] : []]
+/** Every step, in order, the pay step last. Paid from the Amex pot: "Move the rest to the pot", then pay. */
+export const allSettleSteps = (plan: SettlePlan): SettleStep[] => [
+  ...plan.setAside ? [{ key: SETTLE_MOVE_KEY, kind: 'move' as const, accountId: plan.payFromAccountId, potId: plan.setAside.potId, amountPence: plan.setAside.toMovePence }] : [],
+  ...plan.accounts.flatMap(account => account.steps), ...plan.totalPence > 0 ? [plan.pay] : []]
+
+/** A step is done when ticked at its amount; the move into the Amex pot is done once nothing on the statement is left to move. */
+export const settleStepDone = (plan: SettlePlan, ticks: Readonly<Record<string, StepTick>> | undefined, step: SettleStep) =>
+  step.kind === 'move' ? plan.setAside?.toMove === 0 : stepStatus(ticks, step.key, step.amountPence).state === 'done'
 
 /** A statement's state (§6.7): open, complete, ready to settle, settled, and its figures. */
 export function statementSummary(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, key: string, today: string): StatementSummary | null {
@@ -142,7 +166,7 @@ export function statementSummary(document: Pick<BudgetDocument, 'budget' | 'card
   const credits = rows.filter(row => row.amountPence < 0).reduce((sum, row) => sum + row.amountPence, 0)
   const plan = settleSteps(document, key)
   const steps = plan ? allSettleSteps(plan) : []
-  const done = steps.filter(step => stepStatus(record?.ticks, step.key, step.amountPence).state === 'done').length
+  const done = plan ? steps.filter(step => settleStepDone(plan, record?.ticks, step)).length : 0
   const open = today <= parsed.closeDate
   const complete = !!record?.finalImportAt || !!record?.settleWithoutFinalAt
   const toSort = spending.filter(row => !row.sort).length
@@ -185,7 +209,7 @@ export function setSettleTick<T extends Pick<BudgetDocument, 'budget' | 'card' |
   const plan = settleSteps(ticked, key)
   const record = cardTracker(ticked).statements[key]!
   const steps = plan ? allSettleSteps(plan) : []
-  const settled = steps.length > 0 && steps.every(step => stepStatus(record.ticks, step.key, step.amountPence).state === 'done')
+  const settled = !!plan && steps.length > 0 && steps.every(step => settleStepDone(plan, record.ticks, step))
   return withStatement(ticked, key, current => {
     const next = { ...current }
     if (settled) next.settledAt = current.settledAt ?? now.toISOString()
