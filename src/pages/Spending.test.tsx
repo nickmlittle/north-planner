@@ -767,6 +767,26 @@ describe('the Amex pot', () => {
     expect(screen.getByText('£120.80')).toBeInTheDocument()
   })
 
+  it('a statement paid from the pot shows what’s in it, moves the rest, then pays from the pot', () => {
+    const document = withPot()
+    document.card!.transactions = document.card!.transactions.filter(row => row.id !== 'todo')
+    document.card!.statements['amex:2026-11-24'] = { cardId: 'amex', closeDate: '2026-11-24', settleWithoutFinalAt: '2026-11-26T09:00:00Z' }
+    render(<Harness initial={document} startView="statements" today="2026-11-30"/>)
+    fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
+    expect(screen.getByText('£0.00 of £102.80 is in the Amex pot · £102.80 sorted and still to move')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))
+    expect(screen.getByText('Move the rest to the Amex pot')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' })).toBeInTheDocument()
+    expect(screen.getByText('0 of 2 done')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Move them' }))
+    const dialog = screen.getByRole('dialog', { name: 'Move to the Amex pot' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Moved £102.80' }))
+    expect(screen.getByText('Everything is in the Amex pot')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' }))
+    expect(screen.getByText('2 of 2 done')).toBeInTheDocument()
+    expect(screen.getByText('The November statement is settled')).toBeInTheDocument()
+  })
+
   it('shows nothing to move without a set-aside pot', () => {
     const document = withPot()
     delete document.card!.cards[0]!.setAside

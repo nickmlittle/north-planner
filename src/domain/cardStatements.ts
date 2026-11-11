@@ -218,6 +218,20 @@ export function setSettleTick<T extends Pick<BudgetDocument, 'budget' | 'card' |
   })
 }
 
+/**
+ * Re-check whether a statement is settled after something other than a tick changed it (a move into the Amex pot
+ * can finish its last step): sets `settledAt` when it becomes settled, clears it when it stops being.
+ */
+export function refreshSettled<T extends Pick<BudgetDocument, 'budget' | 'card' | 'household'>>(document: T, key: string, now: Date): T {
+  const plan = settleSteps(document, key)
+  const record = cardTracker(document).statements[key]
+  if (!plan || !record) return document
+  const steps = allSettleSteps(plan)
+  const settled = steps.length > 0 && steps.every(step => settleStepDone(plan, record.ticks, step))
+  if (settled === !!record.settledAt) return document
+  return withStatement(document, key, current => { const next = { ...current }; if (settled) next.settledAt = now.toISOString(); else delete next.settledAt; return next })
+}
+
 /** "Settle without the final export". */
 export const settleWithoutFinal = <T extends Pick<BudgetDocument, 'card'>>(document: T, key: string, now: Date): T => withStatement(document, key, record => ({ ...record, settleWithoutFinalAt: now.toISOString() }))
 

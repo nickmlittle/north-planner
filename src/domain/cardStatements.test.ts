@@ -143,3 +143,17 @@ describe('settling up from the Amex pot', () => {
     expect(settleSteps(document, KEY)!.accounts).toHaveLength(3)
   })
 })
+
+it('records when a move into the Amex pot finishes settling a statement', async () => {
+  const { recordMove } = await import('./setAside')
+  const { refreshSettled } = await import('./cardStatements')
+  let document = household()
+  document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
+  document.card!.cards[0]!.setAside = { potId: 'amex-pot', fromCloseDate: '2026-11-24' }
+  document = settleWithoutFinal(document, KEY, new Date('2026-11-26T09:00:00Z'))
+  document = setSettleTick(document, KEY, 'settle:pay', 127875, new Date('2026-12-01T09:00:00Z'))
+  expect(document.card!.statements[KEY]!.settledAt).toBeUndefined()
+  const moved = new Date('2026-12-02T09:00:00Z')
+  document = refreshSettled(recordMove(document, 'amex', document.card!.transactions.map(row => row.id), moved, 'm1'), KEY, moved)
+  expect(document.card!.statements[KEY]!.settledAt).toBe(moved.toISOString())
+})

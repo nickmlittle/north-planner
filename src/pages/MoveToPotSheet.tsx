@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker } from '../domain/cardTracker'
-import type { SettleStep } from '../domain/cardStatements'
+import { refreshSettled, type SettleStep } from '../domain/cardStatements'
 import { moveSteps, potPhrase, recordMove, toMove, type ToMoveRow } from '../domain/setAside'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationNamer } from './cardLabels'
@@ -75,7 +75,9 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
   const toggle = (id: string) => setUnticked(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const moved = () => {
     const id = crypto.randomUUID()
-    setDocument(current => recordMove(current, cardId, selected.map(row => row.transaction.id), now(), id))
+    const at = now()
+    const keys = [...new Set(selected.map(row => row.transaction.statementKey))]
+    setDocument(current => keys.reduce((next, key) => refreshSettled(next, key, at), recordMove(current, cardId, selected.map(row => row.transaction.id), at, id)))
     onMoved(total > 0 ? `Moved ${pounds(total)} to ${phrase}.` : total < 0 ? `Moved ${pounds(-total)} back out of ${phrase}.` : 'Moved between pots.', id)
   }
 
