@@ -1294,7 +1294,6 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .sort-refund p{margin:0;color:var(--pine)}
 .sort-option-amount{flex:none;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums}
 .sort-option-left{flex:none;margin-left:auto;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
-.spending-month-control .budget-v3-month,.spending-month-control>*{margin:0}
 .spending-month-summary{display:grid;gap:var(--space-1);padding:var(--space-4) var(--space-5);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
 .spending-eyebrow{margin:0;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .spending-big{margin:0;color:var(--pine);font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-.4px;font-variant-numeric:tabular-nums}
@@ -1305,7 +1304,6 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .spending-month-group ul{margin:0;padding:0;list-style:none}
 .spending-month-group li+li{border-top:1px solid var(--line)}
 .spending-group-heading{margin:0;padding:var(--space-3) var(--space-4) var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold);letter-spacing:.04em;text-transform:uppercase}
-.pot-detail .spending-group-heading{padding:var(--space-3) 0 var(--space-2)}
 .spending-pot{position:relative;display:grid;gap:var(--space-1);width:100%;box-sizing:border-box;margin:0;padding:var(--space-2) var(--space-6) var(--space-3) var(--space-4);border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}
 button.spending-pot{cursor:pointer}
 button.spending-pot:hover{background:var(--surface-header)}
@@ -1316,21 +1314,10 @@ div.spending-pot{padding-right:var(--space-4)}
 .spending-pot-name{font-weight:var(--weight-bold)}
 .spending-pot-amount{flex:none;color:var(--muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
 .spending-pot-amount b{color:var(--charcoal);font-size:var(--text-md)}
-.spending-bar{position:relative;display:block;height:8px;margin:var(--space-1) 0 2px;border-radius:var(--radius-pill);background:var(--soft-fern)}
-.spending-bar>span{position:absolute;inset:0 auto 0 0;border-radius:var(--radius-pill);background:var(--pine)}
-.spending-bar.is-ahead>span{background:var(--status-review)}
-.spending-bar.is-over>span{background:var(--status-error)}
-.spending-bar>i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--charcoal)}
 .spending-pot-status{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .spending-pot-status.is-on-track{color:var(--link)}
 .spending-pot-status.is-ahead{color:var(--status-review)}
 .spending-pot-status.is-over{color:var(--status-error)}
-.pot-detail{display:grid;gap:var(--space-3)}
-.pot-detail .spending-back{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;margin:0}
-.pot-detail .spending-back svg{width:18px;height:18px}
-.spending-pace-line{margin:var(--space-1) 0 0;font-weight:var(--weight-bold)}
-.spending-callout{display:flex;gap:var(--space-2);margin:0;padding:var(--space-3);border-radius:var(--radius-md);background:var(--status-review-bg);color:var(--status-review);font-weight:var(--weight-medium)}
-.spending-callout svg{flex:none;width:18px;height:18px;margin-top:2px}
 .pot-chart{margin:var(--space-2) 0 0}
 .pot-chart svg{display:block;width:100%;max-width:420px;height:auto;fill:none}
 .pot-chart path{stroke-linecap:round;stroke-linejoin:round}
@@ -1346,7 +1333,6 @@ div.spending-pot{padding-right:var(--space-4)}
 .pot-chart-legend span{display:inline-flex;align-items:center;gap:var(--space-1)}
 .pot-chart-legend i{display:inline-block;width:14px;height:3px;border-radius:var(--radius-sm);background:var(--pine)}
 .pot-chart-legend i.is-plan{background:var(--line-strong)}
-.spending-month-control{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
 .spending-pot-kind{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .carry-over-sums{display:grid;margin:var(--space-2) calc(var(--space-5) * -1) 0;border-top:1px solid var(--line)}
 .carry-over-sums>div{display:flex;justify-content:space-between;gap:var(--space-3);padding:var(--space-2) var(--space-5);border-bottom:1px solid var(--line)}
@@ -1354,9 +1340,7 @@ div.spending-pot{padding-right:var(--space-4)}
 .carry-over-sums dd{flex:none;margin:0;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;white-space:nowrap}
 .carry-over-sums>.is-total{background:var(--surface-band)}
 .carry-over-sums>.is-total dt,.carry-over-sums>.is-total dd{color:var(--pine);font-weight:var(--weight-bold)}
-.carry-over-check{justify-self:start;min-height:44px;margin:var(--space-2) 0 0}
-.check-balance-sheet .sheet-body{padding-top:var(--space-3)}
-@media(max-width:640px){.carry-over-sums{margin-inline:calc(var(--space-4) * -1)}.carry-over-sums>div{padding-inline:var(--space-4)}.carry-over-check{width:100%}}
+@media(max-width:640px){.carry-over-sums{margin-inline:calc(var(--space-4) * -1)}.carry-over-sums>div{padding-inline:var(--space-4)}}
 .statement-row{position:relative;display:grid;gap:2px;width:100%;margin:0;padding:var(--space-3) var(--space-6) var(--space-3) var(--space-4);border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .statement-row:hover{background:var(--surface-header)}
 .statement-row:focus-visible{outline-offset:-2px}
@@ -1387,27 +1371,10 @@ div.spending-pot{padding-right:var(--space-4)}
 .settle-account>.step-group-band{border-top:0}
 .statement-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium)}
 .statement-heading p{margin:2px 0 0}
-.spending-stage{display:flex;flex-wrap:wrap;gap:var(--space-1);margin:0 0 var(--space-1)}
-.spending-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:var(--weight-bold)}
-.spending-chip.is-in-progress{background:var(--pine);color:var(--cream)}
-.spending-chip.is-closing,.spending-chip.is-to-settle{background:var(--status-review-bg);color:var(--status-review)}
-.spending-callout.is-action>div{display:grid;gap:var(--space-2)}
-.spending-callout.is-action p{margin:0}
-.spending-callout.is-action button{justify-self:start;min-height:44px;margin:0}
-.close-month{display:grid;gap:var(--space-3)}
-.close-month .spending-back{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;margin:0;justify-self:start}
-.close-month .spending-back svg{width:18px;height:18px}
-.close-cover{display:grid;gap:var(--space-2);padding:var(--space-3) 0;border-top:1px solid var(--line)}
 .close-cover-head{display:flex;justify-content:space-between;gap:var(--space-3);margin:0}
 .close-cover-step{margin:0;padding:0;list-style:none}
 .close-cover-step .step-row{border-top:0;padding-left:0;padding-right:0;background:transparent}
-.close-left dd{display:grid;grid-template-columns:repeat(2,minmax(84px,auto));gap:var(--space-3);text-align:right}
-.close-left-head dt,.close-left-head dd{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
-.close-flag>div{display:grid;gap:var(--space-2)}
-.close-flag p{margin:0}
-.close-flag-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
-.close-flag-actions .secondary-button{min-height:var(--control-h);margin:0}
-@media(max-width:640px){.close-left>div{flex-wrap:wrap}.close-left dd{gap:var(--space-2);margin-left:auto}.spending-tabs button{padding:var(--space-1);font-size:var(--text-sm);white-space:nowrap}}
+@media(max-width:640px){.spending-tabs button{padding:var(--space-1);font-size:var(--text-sm);white-space:nowrap}}
 .spending-layout{display:grid;gap:var(--space-4)}
 .spending-side{display:grid;align-content:start;gap:var(--space-3)}
 .spending-side-card{display:grid;gap:var(--space-2);padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}

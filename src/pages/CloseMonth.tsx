@@ -1,25 +1,30 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
-import { ArrowLeft, Check, TriangleAlert } from 'lucide-react'
-import { ModalDialog } from '../components/ModalDialog'
+import { useId, useState, type Dispatch, type SetStateAction } from 'react'
+import { Clock, Inbox } from 'lucide-react'
+import { ListRow, Section, Sheet } from '../components/ui'
 import { StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, destinationKey, firstDayOf, lastDayOf, parseDestinationValue, parsePence, shiftMonth, type CoverSource } from '../domain/cardTracker'
-import { closeMonth, closeMonthPlan, keepBuiltUp, markAllIn, moveBuiltUp, setCover, setCoverTick, type Leftover, type Overspend } from '../domain/monthStages'
+import { cardTracker, destinationKey, lastDayOf, parseDestinationValue, parsePence, shiftMonth, type CoverSource } from '../domain/cardTracker'
+import { closeMonthPlan, keepBuiltUp, markAllIn, moveBuiltUp, setCover, setCoverTick, type Leftover, type Overspend } from '../domain/monthStages'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
-import { dayDate, destinationNamer, shortDate } from './cardLabels'
-import { dayOf, pounds, signedPounds } from './spendingFormat'
+import { destinationNamer } from './cardLabels'
+import { dayOf, plural, pounds, signedPounds } from './spendingFormat'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 const sourceValue = (source: CoverSource) => source.kind === 'next-month' ? 'next-month' : destinationKey(source)
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; today: string; onBack: () => void; onSort: () => void; onBringIn: () => void; now?: () => Date }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; today: string; onSort: () => void; onBringIn: () => void; now?: () => Date }
 
-/** Close <Month> (D7, D8, D11, R1): cover each overspend, see the leftovers build up, and close with one button (board 2, screen 3). */
-export function CloseMonth({ document, setDocument, month, today, onBack, onSort, onBringIn, now = () => new Date() }: Props) {
+/**
+ * Close <Month>, inline on an ended month (D7, D8, D11, R1): what's still waiting, each overspend's cover as a step,
+ * the money left and its build-up, and the carry-over pots. Month's header holds the Close button. Once closed,
+ * they fold to one line that expands.
+ */
+export function CloseSections({ document, setDocument, month, today, onSort, onBringIn, now = () => new Date() }: Props) {
   const plan = closeMonthPlan(document, month, today)
   const [moving, setMoving] = useState<Leftover | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const { copy, status: copiedStatus } = useStepCopy()
   if (!plan) return null
   const name = monthName(month)
@@ -35,74 +40,68 @@ export function CloseMonth({ document, setDocument, month, today, onBack, onSort
     const source = overspend.cover.source
     if (source.kind === 'account') return `Move from ${labels.get(source.accountId) ?? 'the account'} into ${potName(overspend.potId)}`
     if (source.kind === 'pot') return `Out of ${potName(source.potId)}, then into ${potName(overspend.potId)}`
-    return ''
+    return `Cover from ${nextName}’s ${potName(overspend.potId)}`
   }
-  const closed = !!plan.closedAt
+  /** The inline "covered from" choice: a compact select in the caption, not a bordered box. */
+  const coverFrom = (overspend: Overspend) => <select className="close-cover-from" aria-label="Covered from" value={sourceValue(overspend.cover.source)} onChange={event => {
+    const value = event.target.value
+    const source: CoverSource | undefined = value === 'next-month' ? { kind: 'next-month' } : parseDestinationValue(value)
+    if (source) setDocument(current => setCover(current, month, { potId: overspend.potId, amountPence: overspend.overPence, source }))
+  }}>{overspend.options.map(option => <option key={sourceValue(option.source)} value={sourceValue(option.source)}>{option.source.kind === 'next-month' ? `${nextName}’s ${potName(overspend.potId)} (moves no money)` : sourceLabel(option.source, option.leftPence)}</option>)}</select>
 
-  return <div className="close-month">
+  if (plan.closedAt && !expanded) return <Section title={`${name} closed`} id="month-close" collapsed={{ summary: `${dayOf(plan.closedAt)} · ${plural(plan.overspends.length, 'cover')} · ${plural(plan.leftovers.length, 'pot')} with money left`, onExpand: () => setExpanded(true) }}/>
+
+  return <div className="close-sections" id="month-close" tabIndex={-1}>
     {copiedStatus}
-    <button type="button" className="text-button spending-back" onClick={onBack}><ArrowLeft aria-hidden="true"/>Back to {name}</button>
-    <div className="statement-heading"><h2 id="close-title">Close {name}</h2><p className="spending-facts">{shortDate(firstDayOf(month))} – {shortDate(lastDayOf(month))}{readiness.toSort === 0 && (readiness.postingsIn || readiness.allIn) ? ' · all transactions in and sorted' : ''}</p></div>
+    {!plan.closedAt && !readiness.canClose && today > lastDayOf(month) && <Section title="Waiting">
+      <ul className="close-list" aria-label="Waiting">
+        {readiness.toSort > 0 && <li><ListRow icon={<Inbox/>} tone="warning" title={`${plural(readiness.toSort, 'transaction')} to sort`} meta={`${name} can’t close until they’re sorted`} trailing={<button type="button" className="text-button" onClick={onSort}>Sort them</button>}/></li>}
+        {!readiness.postingsIn && !readiness.allIn && <li><ListRow icon={<Clock/>} tone="warning" title={readiness.lastImportDate ? `Last brought in ${dayOf(readiness.lastImportDate)}` : 'Nothing brought in yet'} meta={`Late ${name} transactions can take a few days to post.`}
+          trailing={<span className="close-actions"><button type="button" className="text-button" onClick={onBringIn}>Bring in transactions</button><button type="button" className="text-button" onClick={() => setDocument(current => markAllIn(current, month, now()))}>All {name} transactions are in</button></span>}/></li>}
+      </ul>
+    </Section>}
 
-    {closed && <div className="transfer-done-banner" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>{name} is closed</strong><span>Closed {dayOf(plan.closedAt!)}.{plan.changedSinceClosed.length ? ' Something changed since, so close it again.' : ''}</span></span></div>}
-    {!closed && !readiness.canClose && <ul className="statement-checks close-checks">
-      {today <= lastDayOf(month) && <li className="is-todo"><TriangleAlert aria-hidden="true"/><span>{name} ends on {dayDate(lastDayOf(month))}.</span></li>}
-      {readiness.toSort > 0 && <li className="is-todo"><TriangleAlert aria-hidden="true"/><span>{readiness.toSort} {name} {readiness.toSort === 1 ? 'transaction' : 'transactions'} to sort</span><button type="button" className="text-button" onClick={onSort}>Sort them</button></li>}
-      {today > lastDayOf(month) && !readiness.postingsIn && !readiness.allIn && <li className="is-todo"><TriangleAlert aria-hidden="true"/><span>{readiness.lastImportDate ? `Last brought in ${dayOf(readiness.lastImportDate)}.` : 'Nothing brought in yet.'} Late {name} transactions can take a few days to post.</span>
-        <button type="button" className="text-button" onClick={onBringIn}>Bring in transactions</button><button type="button" className="text-button" onClick={() => setDocument(current => markAllIn(current, month, now()))}>All {name} transactions are in</button></li>}
-    </ul>}
+    <Section title="Cover overspends" count={plan.overspends.length}>
+      {!plan.overspends.length ? <p className="close-none">No pot went over in {name}.</p>
+        : <ol className="step-list close-covers">{plan.overspends.map(overspend => {
+          const caption = <>{destination({ kind: 'pot', potId: overspend.potId })} is {pounds(overspend.overPence)} over · covered from {coverFrom(overspend)}{overspend.cover.source.kind === 'next-month' && <> · Leaves {potName(overspend.potId)} {pounds(overspend.overPence)} short in {nextName}.</>}</>
+          return overspend.cover.source.kind === 'next-month'
+            ? <StepRow key={overspend.potId} stepKey={overspend.stepKey} mode="status" done name={stepText(overspend)} amountText={pounds(overspend.overPence)} caption={caption}/>
+            : <StepRow key={overspend.potId} stepKey={overspend.stepKey} name={stepText(overspend)} amountPence={overspend.cover.amountPence} ticks={record?.coverTicks} onCopy={pence => void copy(pence)} caption={caption}
+              onTick={(_, amountPence) => setDocument(current => setCoverTick(current, month, overspend.potId, amountPence, now()))} changedNote={tickedPence => <>Changed since ticked: it was {pounds(tickedPence)}, it’s now {pounds(overspend.cover.amountPence)}.</>}/>
+        })}</ol>}
+    </Section>
 
-    <section className="spending-month-summary" aria-labelledby="close-over">
-      <h3 className="spending-eyebrow" id="close-over">Over plan · {plan.overspends.length}</h3>
-      {!plan.overspends.length ? <p className="spending-facts">No pot went over in {name}.</p> : plan.overspends.map(overspend => {
-        const text = stepText(overspend)
-        return <div key={overspend.potId} className="close-cover">
-          <p className="close-cover-head"><strong>{destination({ kind: 'pot', potId: overspend.potId })}</strong><span className="spending-pot-status is-over">{pounds(overspend.overPence)} over</span></p>
-          <label className="spending-field">Covered from<select value={sourceValue(overspend.cover.source)} onChange={event => {
-            const value = event.target.value
-            const source: CoverSource | undefined = value === 'next-month' ? { kind: 'next-month' } : parseDestinationValue(value)
-            if (source) setDocument(current => setCover(current, month, { potId: overspend.potId, amountPence: overspend.overPence, source }))
-          }}>{overspend.options.map(option => <option key={sourceValue(option.source)} value={sourceValue(option.source)}>{option.source.kind === 'next-month' ? `${nextName}’s ${potName(overspend.potId)} (moves no money)` : sourceLabel(option.source, option.leftPence)}</option>)}</select></label>
-          {overspend.cover.source.kind === 'next-month'
-            ? <p className="spending-facts">Leaves {potName(overspend.potId)} {pounds(overspend.overPence)} short in {nextName}.</p>
-            : <ol className="step-list close-cover-step"><StepRow stepKey={overspend.stepKey} name={text} amountPence={overspend.cover.amountPence} ticks={record?.coverTicks} onCopy={pence => void copy(pence)}
-              onTick={(_, amountPence) => setDocument(current => setCoverTick(current, month, overspend.potId, amountPence, now()))} changedNote={tickedPence => <>Changed since ticked: it was {pounds(tickedPence)}, it’s now {pounds(overspend.cover.amountPence)}.</>}/></ol>}
-        </div>
-      })}
-    </section>
+    {plan.leftovers.length > 0 && <Section title="Money left" count="stays in the pot">
+      <div className="close-table-wrap"><table className="close-left">
+        <thead><tr><th scope="col">Pot</th><th scope="col" className="is-num">Left</th><th scope="col" className="is-num">Built up</th><th scope="col"><span className="visually-hidden">Build-up</span></th></tr></thead>
+        <tbody>{plan.leftovers.map(row => <tr key={row.potId}>
+          <th scope="row">{destination({ kind: 'pot', potId: row.potId })}</th><td className="is-num">{pounds(row.leftPence)}</td><td className="is-num">{pounds(row.builtUpPence)}</td>
+          <td className="close-flag-actions">{row.flag && <><button type="button" className="secondary-button" onClick={() => setMoving(row)}>Move {pounds(row.flag.movePence)}…</button><button type="button" className="text-button" onClick={() => setDocument(current => keepBuiltUp(current, row.potId, row.builtUpPence))}>Keep it</button></>}</td>
+        </tr>)}</tbody>
+      </table></div>
+      {plan.leftovers.filter(row => row.flag).map(row => <p key={row.potId} className="close-flag">{potName(row.potId)} has built up {pounds(row.builtUpPence)}, more than {pounds(row.flag!.limitPence)} ({row.flag!.limitPence / row.plannedPence}× its {pounds(row.plannedPence)} monthly plan). Move some?</p>)}
+    </Section>}
 
-    {plan.leftovers.length > 0 && <section className="spending-month-summary" aria-labelledby="close-left">
-      <h3 className="spending-eyebrow" id="close-left">Money left · stays in the pot</h3>
-      <dl className="carry-over-sums close-left"><div className="close-left-head"><dt>Pot</dt><dd><span>Left</span><span>Built up</span></dd></div>
-        {plan.leftovers.map(row => <div key={row.potId}><dt>{destination({ kind: 'pot', potId: row.potId })}</dt><dd><span>{pounds(row.leftPence)}</span><span>{pounds(row.builtUpPence)}</span></dd></div>)}</dl>
-      {plan.leftovers.filter(row => row.flag).map(row => <div key={row.potId} className="spending-callout close-flag"><TriangleAlert aria-hidden="true"/><div>
-        <p>{potName(row.potId)} has built up {pounds(row.builtUpPence)}, more than {pounds(row.flag!.limitPence)} ({row.flag!.limitPence / row.plannedPence}× its {pounds(row.plannedPence)} monthly plan). Move some?</p>
-        <div className="close-flag-actions"><button type="button" className="secondary-button" onClick={() => setMoving(row)}>Move {pounds(row.flag!.movePence)}…</button><button type="button" className="text-button" onClick={() => setDocument(current => keepBuiltUp(current, row.potId, row.builtUpPence))}>Keep it</button></div>
-      </div></div>)}
-    </section>}
-
-    {plan.carryOver.length > 0 && <section className="spending-month-summary" aria-labelledby="close-carry">
-      <h3 className="spending-eyebrow" id="close-carry">Carry-over pots</h3>
-      <dl className="carry-over-sums">{plan.carryOver.map(row => <div key={row.potId}><dt>{destination({ kind: 'pot', potId: row.potId })}{row.checkedAt ? ` · checked ${dayOf(row.checkedAt)}` : ''}</dt><dd>{row.freePence === undefined ? 'Not checked' : `${signedPounds(row.freePence)} free`}</dd></div>)}</dl>
-    </section>}
-
-    {plan.changedSinceClosed.length > 0 && <div className="spending-callout"><TriangleAlert aria-hidden="true"/><div><p>Changed since closed: {plan.changedSinceClosed.map(row => `${destination(row.destination)} ${pounds(row.closedPence)} → ${pounds(row.nowPence)}`).join(', ')}.</p></div></div>}
-    <div className="statement-settle">
-      <button type="button" className="primary-button" disabled={!closed && !readiness.canClose} onClick={() => setDocument(current => closeMonth(current, month, today, now()))}>{closed ? `Close ${name} again` : `Close ${name}`}</button>
-    </div>
+    {plan.carryOver.length > 0 && <Section title="Carry-over pots">
+      <ul className="close-list" aria-label="Carry-over pots">{plan.carryOver.map(row => <li key={row.potId}><ListRow title={destination({ kind: 'pot', potId: row.potId })} meta={row.checkedAt ? `Checked ${dayOf(row.checkedAt)}` : 'Not checked yet'} trailing={row.freePence === undefined ? 'Not checked' : `${signedPounds(row.freePence)} free`}/></li>)}</ul>
+    </Section>}
     {moving && <MoveBuiltUp potName={potName(moving.potId)} suggested={moving.flag?.movePence ?? 0} onClose={() => setMoving(null)} onSave={pence => { setDocument(current => moveBuiltUp(current, moving.potId, pence, now())); setMoving(null) }}/>}
   </div>
 }
 
 /** "Move £X…": record built-up money moved elsewhere; the move itself happens in the bank. */
 function MoveBuiltUp({ potName, suggested, onSave, onClose }: { potName: string; suggested: number; onSave: (pence: number) => void; onClose: () => void }) {
+  const formId = useId()
   const [value, setValue] = useState((suggested / 100).toFixed(2))
   const [error, setError] = useState('')
-  return <ModalDialog title={`Move money out of ${potName}`} onClose={onClose} className="check-balance-sheet">
-    <form className="spending-form" noValidate onSubmit={event => { event.preventDefault(); const pence = parsePence(value); if (pence === null || pence <= 0) { setError('Enter an amount, like 100.00.'); return } onSave(pence) }}>
+  return <Sheet title={`Move money out of ${potName}`} size="sm" onClose={onClose} footer={<>
+    <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
+    <button type="submit" form={formId} className="primary-button">Record the move</button>
+  </>}>
+    <form id={formId} className="spending-form" noValidate onSubmit={event => { event.preventDefault(); const pence = parsePence(value); if (pence === null || pence <= 0) { setError('Enter an amount, like 100.00.'); return } onSave(pence) }}>
       <p className="spending-facts">Move it in your banking app, then record it here so the build-up starts again.</p>
       <div className="spending-field-wrap"><label className="spending-field">Amount moved<input inputMode="decimal" value={value} data-autofocus onChange={event => setValue(event.target.value)} aria-invalid={!!error || undefined} aria-describedby={error ? 'move-built-up-error' : undefined}/></label>{error && <span id="move-built-up-error" className="input-error spending-field-error">{error}</span>}</div>
-      <div className="spending-form-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button">Record the move</button></div>
     </form>
-  </ModalDialog>
+  </Sheet>
 }
