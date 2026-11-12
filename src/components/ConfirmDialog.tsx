@@ -12,11 +12,10 @@ export function ConfirmDialog({ title, children, confirmLabel, cancelLabel = 'Ca
   onCancel: () => void
   returnFocusTo?: () => HTMLElement | null | undefined
 }) {
-  return <ModalDialog title={title} onClose={onCancel} className="confirm-dialog" returnFocusTo={returnFocusTo}>
+  return <ModalDialog title={title} onClose={onCancel} className="confirm-dialog" returnFocusTo={returnFocusTo} footer={<>
+    <button type="button" className="secondary-button" data-autofocus onClick={onCancel}>{cancelLabel}</button>
+    <button type="button" className={danger ? 'danger-button' : 'primary-button'} onClick={onConfirm}>{confirmLabel}</button>
+  </>}>
     <div className="confirm-dialog-body">{children}</div>
-    <div className="confirm-dialog-actions">
-      <button type="button" className="secondary-button" data-autofocus onClick={onCancel}>{cancelLabel}</button>
-      <button type="button" className={danger ? 'danger-button' : 'primary-button'} onClick={onConfirm}>{confirmLabel}</button>
-    </div>
   </ModalDialog>
 }

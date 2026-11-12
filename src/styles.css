@@ -199,7 +199,7 @@ body { background: var(--cream); color: var(--charcoal) }
 :focus-visible { outline: 2px solid var(--ring, var(--focus)); outline-offset: 2px }
 [tabindex="-1"]:not(button):focus { outline: none }
 .planner-sidebar, .mobile-app-header, .mobile-bottom-nav { --ring: var(--focus-on-pine) }
-.account-menu, .sidebar-warning-panel, .budget-v3-picker, .mobile-utility-sheet { --ring: var(--focus) }
+.account-menu, .sidebar-warning-panel, .budget-v3-picker { --ring: var(--focus) }
 .context-note { background: var(--soft-fern); color: var(--link) }
 
 table { color: var(--charcoal) }
@@ -422,11 +422,6 @@ small, footer { color: var(--muted) }
   .page-frame>.page-frame-heading{display:none}
   .planner-app-shell:has(.budget-v3-overlay) .mobile-bottom-nav,.planner-app-shell:has(.budget-batch-overlay) .mobile-bottom-nav,.planner-app-shell:has([aria-modal=true]) .mobile-bottom-nav{display:none}
 }
-.mobile-utility-overlay{position:fixed;z-index:1000;inset:0;display:flex;align-items:end;background:var(--scrim-strong)}
-.mobile-utility-sheet{box-sizing:border-box;width:100%;max-height:90dvh;padding:var(--space-4) max(var(--space-4),env(safe-area-inset-right,0px)) calc(var(--space-5) + env(safe-area-inset-bottom,0px)) max(var(--space-4),env(safe-area-inset-left,0px));border-radius:var(--radius-lg) var(--radius-lg) 0 0;background:var(--card);color:var(--charcoal);overflow-y:auto}
-.mobile-utility-sheet header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}
-.mobile-utility-sheet h2{margin:0;color:var(--pine);font-size:var(--text-xl)}
-.mobile-utility-sheet header button{display:grid;place-items:center;flex:none;width:44px;height:44px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine)}
 .mobile-utility-status{display:flex;align-items:center;gap:var(--space-2);margin:var(--space-4) 0;color:var(--pine)}
 .mobile-utility-warning{padding:var(--space-3);border-radius:var(--radius-md);background:var(--status-review-bg);color:var(--status-error)}
 .mobile-utility-account{padding-top:var(--space-3);border-top:1px solid var(--line)}
@@ -1002,14 +997,6 @@ small, footer { color: var(--muted) }
 
 /* Mobile monthly budget: one shared summary rhythm and vertical destinations. */
 .budget-mobile-summary,.payday,.budget-mobile-plan-heading{display:none}
-.budget-info-dialog{box-sizing:border-box;position:relative;width:min(440px,calc(100% - 32px));max-height:90dvh;margin:auto;padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);color:var(--charcoal);box-shadow:var(--shadow-dialog);overflow:auto;overscroll-behavior:contain}
-.budget-info-overlay{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;background:var(--scrim)}
-.budget-info-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
-.budget-info-dialog h2{min-width:0;margin:0;color:var(--pine);font-size:var(--text-xl);overflow-wrap:anywhere}
-.budget-info-dialog header button{display:flex;align-items:center;justify-content:center;flex:none;width:44px;min-height:44px;margin:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
-.budget-info-dialog svg{width:20px;height:20px}
-.budget-info-content{font-size:var(--text-md);line-height:1.5;overflow-wrap:anywhere}
-.budget-info-content p{margin:var(--space-3) 0}
 .budget-filter-sheet-fields{display:grid;gap:var(--space-3);margin-top:var(--space-3)}
 .budget-filter-sheet .budget-v3-filter{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-1);min-width:0;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .budget-filter-sheet .budget-v3-filter-select{width:100%;margin:0;font-size:var(--text-lg)}
@@ -1178,7 +1165,6 @@ button.payday-step-amount:active{background:var(--share-track)}
 .budget-v3-amount.is-static{border-color:transparent;background:transparent;color:var(--charcoal);cursor:default}
 .budget-v3-amount.is-static:hover{background:transparent}
 .confirm-dialog-body p{margin:var(--space-3) 0 0}
-.confirm-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-4)}
 .dialog-close{display:flex;flex:none;align-items:center;justify-content:center;width:44px;min-height:44px;margin:0;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--pine);cursor:pointer}
 .dialog-close svg{width:20px;height:20px}
 /* Keep quick-edit Save clear of the fixed mobile nav when the form scrolls into view. */
@@ -1334,8 +1320,8 @@ button.payday-step-amount:active{background:var(--share-track)}
 .spending-empty svg{width:28px;height:28px;color:var(--pine)}
 .spending-empty h2{margin:0;color:var(--pine);font-size:var(--text-xl);font-weight:var(--weight-medium)}
 .spending-empty p{margin:0;color:var(--muted)}
-.bring-in-sheet,.manual-entry-sheet{width:min(520px,calc(100% - 32px))}
-.bring-in-sheet .budget-info-content,.manual-entry-sheet .budget-info-content{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
+.bring-in-sheet,.manual-entry-sheet{--sheet-width:520px}
+.bring-in-sheet .sheet-body,.manual-entry-sheet .sheet-body{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
 .bring-in-lead{margin:0;color:var(--muted)}
 .bring-in-file{gap:var(--space-2);justify-self:start;cursor:pointer}
 .bring-in-file:has(:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
@@ -1395,8 +1381,8 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .icon-button:focus-visible{outline-offset:-2px}
 .icon-button svg{width:18px;height:18px}
 .rule-form{padding:var(--space-4)}
-.sort-sheet{width:min(520px,calc(100% - 32px))}
-.sort-sheet .budget-info-content{display:grid;gap:var(--space-3);padding-top:var(--space-2)}
+.sort-sheet{--sheet-width:520px}
+.sort-sheet .sheet-body{display:grid;gap:var(--space-3);padding-top:var(--space-2)}
 .sort-sheet-summary{display:grid;gap:2px;margin:0}
 .sort-sheet-summary strong{color:var(--pine);font-size:var(--text-xl)}
 .sort-sheet-summary span{color:var(--muted);font-size:var(--text-sm)}
@@ -1425,8 +1411,8 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .spending-row-lines li span:last-child{flex:none;font-variant-numeric:tabular-nums}
 .sort-split{gap:var(--space-2);justify-self:start;min-height:44px;margin:0}
 .sort-split svg{width:18px;height:18px}
-.split-sheet{width:min(640px,calc(100% - 32px))}
-.split-sheet .budget-info-content{display:grid;gap:var(--space-3);padding-top:var(--space-2)}
+.split-sheet{--sheet-width:640px}
+.split-sheet .sheet-body{display:grid;gap:var(--space-3);padding-top:var(--space-2)}
 .split-modes{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-1);padding:var(--space-1);border-radius:var(--radius-md);background:var(--soft-fern)}
 .split-modes button{min-height:44px;margin:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--charcoal);font:var(--weight-medium) var(--text-md) var(--font-family);cursor:pointer}
 .split-modes button[aria-pressed=true]{background:var(--card);color:var(--pine);box-shadow:var(--shadow-control);font-weight:var(--weight-bold)}
@@ -1516,7 +1502,7 @@ div.spending-pot{padding-right:var(--space-4)}
 .carry-over-sums>.is-total{background:var(--surface-band)}
 .carry-over-sums>.is-total dt,.carry-over-sums>.is-total dd{color:var(--pine);font-weight:var(--weight-bold)}
 .carry-over-check{justify-self:start;min-height:44px;margin:var(--space-2) 0 0}
-.check-balance-sheet .budget-info-content{padding-top:var(--space-3)}
+.check-balance-sheet .sheet-body{padding-top:var(--space-3)}
 @media(max-width:640px){.carry-over-sums{margin-inline:calc(var(--space-4) * -1)}.carry-over-sums>div{padding-inline:var(--space-4)}.carry-over-check{width:100%}}
 .statement-row{position:relative;display:grid;gap:2px;width:100%;margin:0;padding:var(--space-3) var(--space-6) var(--space-3) var(--space-4);border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .statement-row:hover{background:var(--surface-header)}
@@ -1633,8 +1619,8 @@ div.spending-pot{padding-right:var(--space-4)}
 .move-callout p span{color:var(--muted);font-size:var(--text-sm)}
 .move-callout button{min-height:var(--control-h)}
 @media(max-width:640px){.move-callout{grid-template-columns:auto minmax(0,1fr)}.move-callout button{grid-column:1/-1;width:100%}}
-.move-sheet{width:min(560px,calc(100% - 32px))}
-.move-sheet .budget-info-content{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
+.move-sheet{--sheet-width:560px}
+.move-sheet .sheet-body{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
 .move-summary{display:grid;gap:var(--space-1)}
 .move-summary .spending-big,.move-summary .spending-eyebrow{margin:0}
 .move-steps{display:grid;gap:var(--space-2)}
