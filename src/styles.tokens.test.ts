@@ -1,12 +1,18 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { MOBILE_QUERY } from './breakpoints'
 
-// Keeps styles.css on its design tokens: raw values live only in the :root block at the top,
-// and everything after it goes through var(--…). See the token pass in UX review §6.5.
-const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+// Keeps every stylesheet on the design tokens: raw values live only in the :root block at the top of
+// styles.css, and everything else, including component stylesheets, goes through var(--…).
+// See the token pass in UX review §6.5 and the design system in audit 3 (plan §2.3).
+const stripComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '')
+const css = stripComments(readFileSync(new URL('./styles.css', import.meta.url), 'utf8'))
 const rootEnd = css.indexOf('\n}\n')
-const rest = css.slice(rootEnd + 3)
+const otherFiles = (readdirSync(new URL('.', import.meta.url), { recursive: true }) as string[])
+  .filter(file => file.endsWith('.css') && file !== 'styles.css')
+  .map(file => ({ file, source: stripComments(readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')) }))
+/** Everything after the token block, then every other stylesheet in src/. */
+const rest = [css.slice(rootEnd + 3), ...otherFiles.map(({ source }) => source)].join('\n')
 
 /** `selector { property: value }` for every declaration after the token block, media queries included. */
 const declarations = [...rest.matchAll(/([^{}]*)\{([^{}]*)\}/g)].flatMap(([, selector, body]) =>
@@ -14,13 +20,15 @@ const declarations = [...rest.matchAll(/([^{}]*)\{([^{}]*)\}/g)].flatMap(([, sel
     const match = part.match(/^\s*([a-zA-Z-]+)\s*:\s*([\s\S]+?)\s*$/)
     return match && !match[1]!.startsWith('--') ? [{ selector: selector!.trim().replace(/\s+/g, ' '), property: match[1]!.toLowerCase(), value: match[2]! }] : []
   }))
-const offenders = (test: (d: { property: string; value: string }) => boolean) =>
+const offenders = (test: (d: { selector: string; property: string; value: string }) => boolean) =>
   declarations.filter(test).map(d => `${d.selector} { ${d.property}: ${d.value} }`)
 
 describe('design tokens', () => {
-  it('has one token block, at the top of the file', () => {
+  it('has one token block, at the top of styles.css', () => {
     expect(css.trimStart().startsWith(':root {')).toBe(true)
-    expect(rest).not.toMatch(/(^|[}\s]):root\s*\{[^}]*--(?!page-|desktop-|grouped-)/)
+    // Media queries may swap in viewport-specific values (the page gutter, the touch control height).
+    expect(rest).not.toMatch(/(^|[}\s]):root\s*\{[^}]*--(?!page-|desktop-|grouped-|control-h|row-h)/)
+    expect(otherFiles.filter(({ source }) => /(^|[}\s]):root\s*\{/.test(source)).map(({ file }) => file)).toEqual([])
   })
 
   it('uses colour tokens instead of colour literals', () => {
@@ -58,6 +66,24 @@ describe('design tokens', () => {
     const cssMobile = [...css.matchAll(/@media([^{]*max-width:\s*767px[^{]*)\{/g)].map(([, query]) => normalise(query!)).filter(query => query.includes('orientation'))
     expect(cssMobile.length).toBeGreaterThan(0)
     expect(new Set(cssMobile)).toEqual(new Set([normalise(MOBILE_QUERY)]))
+  })
+
+  it('uses the three weight tokens; only the wordmark may use 800', () => {
+    const weight = /^(inherit|var\(--weight-(regular|medium|bold)\))$/
+    expect(offenders(d => d.property === 'font-weight' && !weight.test(d.value) && !(d.value === '800' && /brand/.test(d.selector)))).toEqual([])
+    expect(offenders(d => d.property === 'font' && /\b\d00\b|\b\d50\b/.test(d.value.replace(/var\(--[\w-]+\)/g, '')))).toEqual([])
+  })
+
+  it('has one focus ring: no outline removal except on programmatic focus targets', () => {
+    // A heading or region focused by script (h1, the error summary, tabindex -1) needs no ring.
+    // The Plan filter pills draw the ring around the pill, so their select inside has none.
+    const allowed = /^(h1:focus|\.error-summary:focus|.*\[tabindex="-1"\].*|\.monthly-budget-page \.budget-v3-filter-select:focus-visible)$/
+    expect(offenders(d => d.property === 'outline' && /^(none|0)$/.test(d.value) && !d.selector.split(',').every(s => allowed.test(s.trim())))).toEqual([])
+    expect(offenders(d => d.property === 'outline' && /var\(--orange\)/.test(d.value))).toEqual([])
+  })
+
+  it('sizes controls with the control-height token, not one-off 40–48px heights', () => {
+    expect(offenders(d => /^(min-)?height$/.test(d.property) && /^(40|42|46|48)px$/.test(d.value) && /\b(input|select|textarea|button)\b|-button\b/.test(d.selector) && !/mobile-bottom-nav/.test(d.selector))).toEqual([])
   })
 
   it('uses shadow tokens', () => {
