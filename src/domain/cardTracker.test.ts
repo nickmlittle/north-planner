@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, removeAdult, type BudgetDocument } from './budgetDocument'
 import {
   addDays, cardDraftErrors, cardFromDraft, closeDateFor, daysBetween, daysInMonth, defaultRuleText, draftFromCard, dueDate, emptyCardTracker, merchantKey, monthOf,
-  normaliseDescription, parsePence, parseStatementKey, penceFromAmount, saveCard, shiftMonth, statementFor, statementKey, statementWindow, validCardTracker, validIsoDate,
+  normaliseDescription, parsePence, parseStatementKey, penceFromAmount, removeCard, saveCard, shiftMonth, statementFor, statementKey, statementWindow, validCardTracker, validIsoDate,
   type CardAccount, type CardTracker, type CardTransaction,
 } from './cardTracker'
 
@@ -203,5 +203,15 @@ describe('card settings', () => {
     expect(saved.card?.transactions[0]?.personId).toBe('ada')
     expect(saveCard(household(), amex).card?.cards).toEqual([amex])
     expect(decodeBudgetDocument(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+  })
+})
+
+describe('removeCard', () => {
+  const card: CardAccount = { id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }
+  it('removes a card with no history, and keeps one with transactions or statements', () => {
+    const fresh = { card: { ...emptyCardTracker(), cards: [card] } }
+    expect(removeCard(fresh, 'amex').card!.cards).toEqual([])
+    const used = { card: { ...emptyCardTracker(), cards: [card], statements: { 'amex:2026-10-24': { cardId: 'amex', closeDate: '2026-10-24' } } } }
+    expect(removeCard(used, 'amex')).toBe(used)
   })
 })

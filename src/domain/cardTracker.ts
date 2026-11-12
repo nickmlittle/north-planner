@@ -357,6 +357,19 @@ export function saveCard<T extends { card?: CardTracker }>(document: T, card: Ca
   return { ...document, card: { ...tracker, cards, transactions } }
 }
 
+/** A card can be removed until it has history: no transactions, statements, imports or set-aside moves. */
+export function cardRemovable(tracker: CardTracker, cardId: string): boolean {
+  return !tracker.transactions.some(row => row.cardId === cardId) && !Object.values(tracker.statements).some(row => row.cardId === cardId)
+    && !tracker.imports.some(row => row.cardId === cardId) && !(tracker.moves ?? []).some(row => row.cardId === cardId)
+}
+
+/** Remove a card with no history (cardRemovable); otherwise the document is unchanged. */
+export function removeCard<T extends { card?: CardTracker }>(document: T, cardId: string): T {
+  const tracker = cardTracker(document)
+  if (!cardRemovable(tracker, cardId)) return document
+  return { ...document, card: { ...tracker, cards: tracker.cards.filter(row => row.id !== cardId) } }
+}
+
 // ——— Validation (decodeBudgetDocument: an invalid `card` makes the document invalid, as for `ticks`) ———
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)

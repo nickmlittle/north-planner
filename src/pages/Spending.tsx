@@ -31,6 +31,8 @@ type Props = {
   onSelectView: (view: SpendingSection) => void
   /** Settings › Cards, to add the card. */
   onOpenCardSettings: () => void
+  /** Settings › Sorting rules. */
+  onOpenRules?: () => void
   /** Month's pots (or one pot's page): the side rail links there. */
   onOpenMonth: (potId?: string) => void
   /** A statement's detail on Statements. */
@@ -74,7 +76,7 @@ export function TransactionRow({ document, transaction, where, tag, moved, actio
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
-export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenMonth, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenRules = () => {}, onOpenMonth, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -102,7 +104,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   // Phones keep the tabs to the everyday sections and put the rest under ⋯.
   const tabs = compact ? sections.filter(section => !section.desktopOnly) : sections
   const more = compact ? sections.filter(section => section.desktopOnly) : []
-  const moreMenu = more.length > 0 && <BudgetOptionsMenu label="More Spending sections" options={more.map(section => ({ label: section.label, onSelect: () => onSelectView(section.id) }))}/>
+  // ⋯: on phones the desktop-only sections, then (everywhere) the settings Spending uses.
+  const moreMenu = <BudgetOptionsMenu label="More Spending options" options={[...more.map(section => ({ label: section.label, onSelect: () => onSelectView(section.id) })), { label: 'Sorting rules', onSelect: onOpenRules }, { label: 'Card settings', onSelect: onOpenCardSettings }]}/>
   const navInHeading = tabs.length <= 1
   const headingExtra = navInHeading ? moreMenu : null
   const latest = lastImport(tracker)

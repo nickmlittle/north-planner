@@ -138,11 +138,17 @@ The card tracker, built in the `card/` PR series from the [build plan](card-trac
 
 ### Settings
 
-Settings (at the sidebar foot; from the account button on phones) holds everything that sets the budget up, one section per area: **Household** (the name and adults; changes save as you type, and a blank name or adult is flagged in place), **Pay & income** (Edit income), **Accounts, pots & categories** (Manage), **Cards**, **Sorting rules** and **Account & sync** (save status and Sign out). `section` scrolls to an area. Until the household is set up, Settings is the only screen. This first version hosts the earlier panels; audit 3 PRs 08 and 09 give it its own layout.
+Settings (at the sidebar foot, <kbd>G</kbd> <kbd>,</kbd>; from the account button on phones) holds everything that sets the budget up, one section per area: **Household**, **Pay & income**, **Accounts & pots**, **Categories**, **Cards**, **Sorting rules** and **Account & sync**. On desktop a section nav sits on the left (each item with a muted count: “4 · 7” accounts and pots, “2” rules), and the right shows one section at a time; `section` in the URL names it and reload keeps it. With no `section`, desktop shows Household. On phones Settings is a list of the sections, each with a summary (“Ada, Ben”, “1 card”, “2 rules”); a section is its own page with a breadcrumb (“Settings › Cards”) and the browser’s Back returns. Editors open in the shared Sheet. Until the household is set up, Settings shows only Household. Spending’s ⋯ links to Sorting rules and Card settings.
 
-**Cards.** A Cards section lists each card (“Closes on the 24th · due 25 days later · paid from Monzo Joint”, and whose card ends in what) with Edit, and “Add a card”. The form asks for the name (Amex), the statement closing day and the days until payment is due, both required with no defaults, and previews the result (“Statements run from the 25th to the 24th. The 24 Nov statement is due 19 Dec.”). Paid from defaults to the joint account and the buffer to its main balance. “Whose card is whose” maps each card ending to an adult. Without any accounts it asks for one on the Plan first.
+**Household.** The household name saves on blur or Enter, with a “Saved” toast; a blank name or adult is flagged in place. Each adult is a name field with a remove button (“Remove Ada”), which confirms and explains that anyone who owns an account, has income or pays a fixed amount can’t be removed until that is reassigned. “+ Add an adult” adds a row.
 
-**Sorting rules.** Lists each rule as plain text (“GREEN GROCER” → Groceries · Monzo Joint, “Only Ben ··41009 · Sorted 3 transactions”) with Edit, Move up, Move down and Delete; “The first rule that matches sorts a transaction.”
+**Pay & income, Accounts & pots, Categories.** For now these open Edit income and the Manage panel; audit 3 PR 09 gives them their own lists.
+
+**Cards.** One row per card: “Closes on the 24th · due 25 days later · paid from Monzo Joint · Ada ··41001 · Ben ··41009”, with Edit under ⋯ (and Remove while the card has no transactions or statements). “Add a card” is below the list; with none, “No cards yet”. The form, in a Sheet, asks for the name (Amex), the statement closing day and the days until payment is due, both required with no defaults, and previews the result (“Statements run from the 25th to the 24th. The 24 Nov statement is due 19 Dec.”). Paid from defaults to the joint account and the buffer to its main balance. “Whose card is whose” maps each card ending to an adult. Without any accounts it asks for one first.
+
+**Sorting rules.** “The first rule that matches sorts a transaction.” Each rule is a row in plain text (“GREEN GROCER” → Groceries · Monzo Joint, “Only Ben ··41009 · Sorted 3 transactions”) with Edit (in a Sheet), Move up, Move down and Delete under ⋯; <kbd>⌥↑</kbd> and <kbd>⌥↓</kbd> move the row that has focus. Delete confirms. With none: “No sorting rules yet”, and how to make one.
+
+**Account & sync.** The save status and any warning, the signed-in email and Sign out; signed out (this device only), “Saved on this device”.
 
 ### Controls, overlays and feedback
 

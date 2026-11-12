@@ -21,7 +21,8 @@ function household(): BudgetDocument {
 
 function Harness({ initial, onChange }: { initial: BudgetDocument; onChange: (document: BudgetDocument) => void }) {
   const [document, setDocument] = useState(initial)
-  return <CardSettings document={document} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  const [message, setMessage] = useState('')
+  return <><p role="status">{message}</p><CardSettings document={document} notify={setMessage} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/></>
 }
 
 it('asks for an account first', () => {
@@ -29,14 +30,17 @@ it('asks for an account first', () => {
   document.budget.accounts = []
   document.budget.pots = []
   render(<CardSettings document={document} setDocument={() => {}}/>)
-  expect(screen.getByText('Add an account on the Plan first. A card is paid from one of them.')).toBeInTheDocument()
+  expect(screen.getByText('No accounts yet')).toBeInTheDocument()
+  expect(screen.getByText('Add an account first. A card is paid from one of them.')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Add a card' })).not.toBeInTheDocument()
 })
 
 it('requires the closing day and the days until due, then saves the card', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={household()} onChange={document => { saved = document }}/>)
+  expect(screen.getByText('No cards yet')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Add a card' }))
+  expect(screen.getByRole('dialog', { name: 'Add a card' })).toBeInTheDocument()
   const form = screen.getByRole('form', { name: 'Add a card' })
   expect(within(form).getByLabelText('Name')).toHaveValue('Amex')
   expect(within(form).getByLabelText('Statement closes on day')).toHaveValue('')
@@ -45,7 +49,7 @@ it('requires the closing day and the days until due, then saves the card', () =>
   expect(within(form).getByLabelText('Paid from')).toHaveValue('joint')
   expect(within(form).getByRole('option', { name: 'Monzo Joint main balance' })).toBeInTheDocument()
 
-  fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save card' }))
   expect(saved).toBeUndefined()
   expect(within(form).getByLabelText('Statement closes on day')).toHaveAccessibleDescription('Enter a day from 1 to 28.')
   expect(within(form).getByLabelText('Days until payment is due')).toHaveAccessibleDescription('Enter a number of days from 1 to 60.')
@@ -57,13 +61,13 @@ it('requires the closing day and the days until due, then saves the card', () =>
   fireEvent.click(within(form).getByRole('button', { name: 'Add a card ending' }))
   fireEvent.change(within(form).getByLabelText('Card ending'), { target: { value: '-41001' } })
   fireEvent.change(within(form).getByLabelText('Card member'), { target: { value: 'ada' } })
-  fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save card' }))
 
   expect(saved?.card?.cards).toEqual([{ id: expect.any(String), name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', bufferDestination: { kind: 'pot', potId: 'buffer' }, cardholders: [{ suffix: '41001', personId: 'ada' }] }])
   expect(decodeBudgetDocument(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
   expect(screen.getByRole('status')).toHaveTextContent('Amex saved.')
-  expect(screen.getByText('Closes on the 24th · due 25 days later · paid from Monzo Joint')).toBeInTheDocument()
-  expect(screen.getByText('Ada’s ends 41001')).toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByText('Closes on the 24th · due 25 days later · paid from Monzo Joint · Ada ··41001')).toBeInTheDocument()
 })
 
 it('edits an existing card', () => {
@@ -71,12 +75,13 @@ it('edits an existing card', () => {
   document.card = { cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }], transactions: [], rules: [], statements: {}, months: {}, pots: {}, imports: [] }
   let saved: BudgetDocument | undefined
   render(<Harness initial={document} onChange={next => { saved = next }}/>)
-  expect(screen.getByText('No card endings yet. North asks when it first sees one.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Amex' }))
+  expect(screen.getByText(/· No card endings yet. North asks when it first sees one.$/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
   const form = screen.getByRole('form', { name: 'Edit Amex' })
   expect(within(form).getByLabelText('Statement closes on day')).toHaveValue('24')
   fireEvent.change(within(form).getByLabelText('Days until payment is due'), { target: { value: '21' } })
-  fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save card' }))
   expect(saved?.card?.cards[0]).toMatchObject({ id: 'amex', dueDaysAfterClose: 21 })
 })
 
@@ -86,7 +91,8 @@ it('sets money aside in a pot from a chosen statement, and paying from it shows 
   document.budget.pots.push({ id: 'amex-pot', name: 'Amex', accountId: 'joint', kind: 'credit-card' })
   document.card = { cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }], transactions: [], rules: [], statements: {}, months: {}, pots: {}, imports: [] }
   render(<Harness initial={document} onChange={next => { saved = next }}/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Amex' }))
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
   const form = screen.getByRole('form', { name: 'Edit Amex' })
   expect(within(form).getByLabelText('Set money aside in')).toHaveValue('')
   expect(within(form).queryByLabelText('Starting with')).not.toBeInTheDocument()
@@ -96,8 +102,25 @@ it('sets money aside in a pot from a chosen statement, and paying from it shows 
   expect(from.value).toMatch(/^\d{4}-\d{2}-24$/)
   expect(within(form).getByText('As you review, move each pot’s share into the Amex pot. The bill is paid from it.')).toBeInTheDocument()
   fireEvent.change(from, { target: { value: from.options[1]!.value } })
-  fireEvent.click(within(form).getByRole('button', { name: 'Save card' }))
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save card' }))
   expect(saved!.card!.cards[0]!.setAside).toEqual({ potId: 'amex-pot', fromCloseDate: from.options[1]!.value })
   expect(decodeBudgetDocument(saved)).not.toBeNull()
   expect(screen.getByText(/paid from the Amex pot from the \w+ statement/)).toBeInTheDocument()
+})
+
+it('removes a card with no history, and offers only Edit once it has statements', () => {
+  const document = household()
+  document.card = { cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }], transactions: [], rules: [], statements: {}, months: {}, pots: {}, imports: [] }
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Remove Amex?' })).getByRole('button', { name: 'Remove card' }))
+  expect(saved!.card!.cards).toEqual([])
+  expect(screen.getByRole('status')).toHaveTextContent('Amex removed.')
+  cleanup()
+  document.card.statements = { 'amex:2026-10-24': { cardId: 'amex', closeDate: '2026-10-24' } }
+  render(<Harness initial={document} onChange={() => {}}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Edit'])
 })

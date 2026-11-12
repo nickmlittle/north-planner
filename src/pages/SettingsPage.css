@@ -1,15 +1,37 @@
-/* Settings (interim, audit 3 PR 06): today's panels, one per section. Tokens only (styles.tokens.test.ts). */
-.settings-page .settings-sections{display:grid;gap:var(--space-6);width:min(880px,100%)}
-.settings-page .ui-section>.setup-card,.settings-page .ui-section>.setup-card:first-of-type{margin:0}
-.settings-page .setup-card h3{margin:0 0 var(--space-4);color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+/* Settings (audit 3 PR 08): a section nav and one section on desktop; a list of sections on phones. Tokens only (styles.tokens.test.ts). */
+.settings-page .settings-layout{display:grid;gap:var(--space-6);align-items:start}
+.settings-page .settings-layout>.ui-section,.settings-page .settings-section-page{min-width:0;width:min(720px,100%)}
+.settings-page .settings-section-page{display:grid;gap:var(--space-3)}
 .settings-page .settings-lead{margin:0;color:var(--text-muted);font-size:var(--text-md)}
+.settings-nav ul{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.settings-nav a{display:flex;align-items:center;gap:var(--space-2);min-height:34px;padding:0 var(--space-3);border-radius:var(--radius-md);color:var(--text);font-size:var(--text-md);font-weight:var(--weight-medium)}
+.settings-nav a:hover{background:var(--surface-sunken)}
+.settings-nav a[aria-current="page"]{background:var(--surface-selected)}
+.settings-nav-count{margin-left:auto;color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular);font-variant-numeric:tabular-nums}
+/* A list of rows in one card: cards, rules, and the phone index. */
+.settings-page .settings-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--card);overflow:visible}
+.settings-page .settings-list>li+li .list-row{border-top:1px solid var(--border)}
+.settings-page .settings-list>li:first-child .list-row{border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.settings-page .settings-list>li:last-child .list-row{border-radius:0 0 var(--radius-lg) var(--radius-lg)}
+.settings-page .settings-list>li:only-child .list-row{border-radius:var(--radius-lg)}
+.settings-page .settings-list .budget-options-menu{justify-self:end}
+.settings-page .settings-list-actions{margin-top:var(--space-3)}
+.settings-page .card-settings,.settings-page .rules-panel{display:grid;gap:var(--space-3)}
+.settings-page .card-settings .settings-list-actions{margin:0}
+.settings-page .budget-options-list button:disabled{color:var(--text-muted);cursor:default;background:transparent}
+/* Household: the name, then the adults. */
+.settings-household{display:grid;gap:var(--space-5)}
+.settings-household fieldset{margin:0;padding:0;border:0;min-width:0}
+.settings-household legend{margin-bottom:var(--space-3);padding:0;color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
 .settings-page .settings-account .mobile-utility-status{margin:0}
-.settings-page .card-settings,.settings-page .rules-panel{margin:0}
 @media(min-width:768px){
-  /* The page scrolls as one, like a document. */
+  /* The page scrolls as one; the section nav stays put. */
   .planner-app-content .settings-page.page-frame{display:block;overflow-y:auto}
+  .settings-page .settings-layout{grid-template-columns:220px minmax(0,1fr);gap:var(--space-6)}
+  .settings-page .settings-layout.is-single{grid-template-columns:minmax(0,1fr)}
+  .settings-nav{position:sticky;top:0}
 }
 @media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
-  /* The first heading sits on the pine band that runs on under the app header. */
-  .settings-page .settings-sections>.ui-section:first-child .ui-section-title{color:var(--cream)}
+  /* The breadcrumb sits on the pine band that runs on under the app header. */
+  .settings-page .settings-section-page .breadcrumb,.settings-page .settings-section-page .breadcrumb li,.settings-page .settings-section-page .breadcrumb-link{color:var(--cream)}
 }
