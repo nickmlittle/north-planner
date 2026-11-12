@@ -122,7 +122,7 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   expect(filterValue('Owner')).toBe('Nick')
   expect(scrollTo).toHaveBeenCalledWith(0,420)
 })
-it('shows the balance and people and transfers summary',()=>{const {rerender}=render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');rerender(<Harness view="month"/>);expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
+it('shows the balance and people and transfers summary',()=>{const {rerender}=render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');rerender(<Harness view="month"/>);expect(screen.getByRole('region',{name:'Steps by person'})).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'More Month options'}));fireEvent.click(screen.getByRole('menuitem',{name:'Funding by account'}));expect(screen.getByRole('heading',{name:'Funding by account'})).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
 it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{level:1,name:/^Plan, /}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
 it('removes an item from inside its editor after the same confirm, and keeps the edit open on cancel',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
@@ -270,21 +270,21 @@ it('lists each person’s payday steps in order, with pot moves under their acco
   const seeItems=vi.fn()
   render(<SeededHarness initial={initial} view="month" onSeeTransferItems={seeItems}/>)
   const transfers=screen.getByRole('region',{name:'Steps by person'})
-  // Nobody chosen yet: everyone's steps, each headed with their total and count.
-  expect(within(transfers).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£25.00 · 2 to fund · 1 move','Immy£20.00 · 1 to fund'])
+  // Nobody chosen yet: everyone's steps, each card headed by progress and what it adds up to.
+  expect(within(transfers).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 3 · 2 to fund · 1 move','Immy0 of 1 · 1 to fund'])
+  expect(transfers.querySelector('.payday-person-sub')).toHaveTextContent('£25.00 from £4,000.00 available')
   const nick=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nick)).toEqual([
-    'Fund Monzo Nick£20.00See 3 items',
+    'Fund Monzo Nick£20.00',
     'Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
-    'Fund Nationwide Immy£5.00See 1 item',
+    'Fund Nationwide Immy£5.00',
   ])
   expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-indent')
-  // Immy pays into Nick's account; Nick moves her share on, so she has no pot step there.
-  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Fund Monzo Nick£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
+  // The band carries the owner and the item count; Immy pays into Nick's account and Nick moves her share on.
+  expect([...nick.querySelectorAll('.step-group-band')].map(band=>band.textContent)).toEqual(['Monzo NickNick’s · 3 items','Nationwide ImmyImmy’s · 1 item'])
+  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending'])
   expect(transfers).not.toHaveTextContent('Direct item')
-  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Funding£45.00All items funded')
-  expect(document.querySelector('.budget-v3-transfer-table')).toHaveTextContent('Direct to account')
-  expect(document.querySelector('.budget-v3-transfer-table')).toHaveTextContent('Spending')
+  expect(screen.getByRole('heading',{name:'Payday0 of 4'})).toBeInTheDocument()
   // Items live in Plan now; there is no detail screen to open.
   fireEvent.click(within(nick).getByRole('button',{name:'See 3 items for Monzo Nick'}))
   expect(seeItems).toHaveBeenCalledWith('a1')
@@ -302,48 +302,39 @@ function personSwitchDocument() {
   return initial
 }
 
-it('asks once whose transfers to show, then remembers the choice on this device',()=>{
+it('switches whose steps show on this phone, with each person’s progress, and remembers the choice',()=>{
   const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
-  const summary=screen.getByRole('region',{name:'Transfers summary'})
-  expect(summary).toHaveTextContent('Who’s moving money on this phone?')
-  expect(summary).toHaveTextContent('Funding£45.00')
-  const choice=within(summary).getByRole('group',{name:'Whose transfers'})
+  const choice=screen.getByRole('group',{name:'Whose steps'})
+  expect(screen.queryByText(/Who’s moving money/)).not.toBeInTheDocument()
   expect(within(choice).getAllByRole('button').map(button=>button.textContent)).toEqual(['Nick0/2','Immy0/2','Both'])
-  expect(within(choice).getAllByRole('button').every(button=>button.getAttribute('aria-pressed')==='false')).toBe(true)
-  // Unchosen, the list shows everyone's steps.
-  expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£20.00 · 1 to fund · 1 move','Immy£25.00 · 2 to fund'])
-  fireEvent.click(within(choice).getByRole('button',{name:'Immy'}))
+  // Unchosen, it shows Both: everyone's steps.
+  expect(within(choice).getByRole('button',{name:/^Both/})).toHaveAttribute('aria-pressed','true')
+  expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 2 · 1 to fund · 1 move','Immy0 of 2 · 2 to fund'])
+  fireEvent.click(within(choice).getByRole('button',{name:/^Immy/}))
   expect(window.localStorage.getItem('north.transferPerson')).toBe('immy')
-  expect(summary).not.toHaveTextContent('Who’s moving money')
-  expect(within(summary).getByRole('button',{name:'Immy'})).toHaveAttribute('aria-pressed','true')
-  expect(summary).toHaveTextContent('Immy’s funding£25.00')
-  expect(summary).toHaveTextContent('2 to fund')
+  expect(within(choice).getByRole('button',{name:/^Immy/})).toHaveAttribute('aria-pressed','true')
+  expect(screen.getByRole('heading',{name:'Payday0 of 2'})).toBeInTheDocument()
   const overview=screen.getByRole('region',{name:'Steps by person'})
-  // The hero names the person, so the list needs no heading of its own.
-  expect(within(overview).queryAllByRole('heading',{level:3})).toHaveLength(0)
+  expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Immy0 of 2 · 2 to fund'])
   expect(stepTexts(overview)).toEqual([
     'Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending',
     'Fund Nationwide Immy£5.00',
   ])
   unmount()
   render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
-  const again=screen.getByRole('region',{name:'Transfers summary'})
-  expect(again).not.toHaveTextContent('Who’s moving money')
-  expect(again).toHaveTextContent('Immy’s funding£25.00')
-  fireEvent.click(within(again).getByRole('button',{name:'Nick'}))
-  expect(again).toHaveTextContent('Nick’s funding£20.00')
-  expect(again).toHaveTextContent('1 to fund · 1 move')
+  const again=screen.getByRole('group',{name:'Whose steps'})
+  expect(within(again).getByRole('button',{name:/^Immy/})).toHaveAttribute('aria-pressed','true')
+  fireEvent.click(within(again).getByRole('button',{name:/^Nick/}))
   expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy')
   fireEvent.click(within(again).getByRole('button',{name:'Both'}))
   expect(window.localStorage.getItem('north.transferPerson')).toBe('both')
-  expect(again).toHaveTextContent('Funding£45.00')
   expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3})).toHaveLength(2)
 })
 
-it('asks again when the remembered person has left the household, and never asks a household of one',()=>{
+it('falls back to Both when the remembered person has left, and has no switch for a household of one',()=>{
   window.localStorage.setItem('north.transferPerson','someone-else')
   const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
-  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Who’s moving money on this phone?')
+  expect(within(screen.getByRole('group',{name:'Whose steps'})).getByRole('button',{name:'Both'})).toHaveAttribute('aria-pressed','true')
   unmount()
   const solo=personSwitchDocument()
   solo.household.adults=[{id:'nick',name:'Nick'}]
@@ -351,10 +342,9 @@ it('asks again when the remembered person has left the household, and never asks
   solo.budget.accounts=solo.budget.accounts.filter(account=>account.id==='a1')
   for(const snapshot of Object.values(solo.budget.snapshots))snapshot.items=snapshot.items.filter(item=>item.funding!=='single')
   render(<SeededHarness initial={solo} view="month"/>)
-  const summary=screen.getByRole('region',{name:'Transfers summary'})
-  expect(within(summary).queryByRole('group',{name:'Whose transfers'})).not.toBeInTheDocument()
-  expect(summary).toHaveTextContent('Nick’s funding£40.00')
-  expect(summary).toHaveTextContent('1 to fund · 1 move')
+  expect(screen.queryByRole('group',{name:'Whose steps'})).not.toBeInTheDocument()
+  expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 2 · 1 to fund · 1 move'])
+  expect(screen.getByRole('region',{name:'Steps by person'}).querySelector('.payday-person-sub')).toHaveTextContent('£40.00 from')
 })
 
 it('gives Month and Plan one h1 each, naming the screen and the month they share',()=>{
@@ -369,22 +359,24 @@ it('gives Month and Plan one h1 each, naming the screen and the month they share
   expect(document.querySelector('.budget-v3-date-selector')).toBeVisible()
 })
 
-it('copies a step amount as a plain number and says so',async()=>{
+it('copies a step amount as a plain number and says so; desktop hints once',async()=>{
+  desktop()
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:221545,amountPence:221545,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   const writeText=vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('denied'))
   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
   render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
-  expect(within(overview).getByText('Tap an amount to copy it for your banking app.')).toBeVisible()
+  expect(screen.getByText('Click an amount to copy it')).toBeVisible()
   fireEvent.click(within(overview).getByRole('button',{name:'Copy £2,215.45'}))
   expect(writeText).toHaveBeenCalledWith('2215.45')
-  expect(await within(overview).findByRole('status')).toHaveTextContent('Copied £2,215.45')
-  expect(within(overview).queryByText('Tap an amount to copy it for your banking app.')).not.toBeInTheDocument()
+  await waitFor(()=>expect(document.querySelector('.step-copied')).toHaveTextContent('Copied £2,215.45'))
+  expect(screen.queryByText('Click an amount to copy it')).not.toBeInTheDocument()
   expect(window.localStorage.getItem('north.copyHint.seen')).toBe('1')
   fireEvent.click(within(overview).getByRole('button',{name:'Copy £2,215.45'}))
-  await waitFor(()=>expect(within(overview).getByRole('status')).toHaveTextContent('Couldn’t copy'))
+  await waitFor(()=>expect(document.querySelector('.step-copied')).toHaveTextContent('Couldn’t copy'))
   Reflect.deleteProperty(navigator,'clipboard')
+  vi.unstubAllGlobals()
 })
 
 it('leaves people with nothing to move out of the steps',()=>{
@@ -393,13 +385,13 @@ it('leaves people with nothing to move out of the steps',()=>{
   initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
-  expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£5.00 · 1 to fund'])
+  expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 1 · 1 to fund'])
   expect(stepTexts(overview)).toEqual(['Fund Monzo Nick£5.00'])
   expect(overview).not.toHaveTextContent('Immy')
   expect(overview).not.toHaveTextContent('Sam')
-  // Without a Plan route there is nowhere for "See items" to go.
+  // Without a Plan route there is nowhere for the item count to go.
   expect(within(overview).queryByRole('button',{name:/^See /})).not.toBeInTheDocument()
-  fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Sam'}))
+  fireEvent.click(within(screen.getByRole('group',{name:'Whose steps'})).getByRole('button',{name:'Sam'}))
   expect(screen.getByRole('region',{name:'Steps by person'})).toHaveTextContent('Sam has nothing to move this month.')
 })
 
@@ -418,7 +410,7 @@ it('lists steps by who pays, with short account names, duplicate suffixes and no
   initial.budget.snapshots[month]={items:initial.budget.accounts.map(account=>({id:`item-${account.id}`,name:account.name,categoryId:'bills',destination:{kind:'account' as const,accountId:account.id},entryAmountPence:1,amountPence:1,frequency:'monthly' as const,funding:'single' as const,singleFunderId:'nick'}))}
   render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
-expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£0.06 · 6 to fund'])
+expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 6 · 6 to fund'])
   const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.step-label')!.textContent)
   expect(labels).toEqual(['Fund Home','Fund Everyday (Account 1)','Fund Everyday (Account 2)','Fund ISA','Fund Cash','Fund Old account'])
   expect(within(overview).getAllByRole('listitem')[1]).toHaveTextContent('£0.01')
@@ -431,7 +423,6 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   render(<SeededHarness initial={initial} view="month" onSeeTransferItems={seeItems}/>)
   const warning=document.querySelector<HTMLElement>('.budget-v3-transfer-warning')!
   expect(warning).toHaveTextContent('Unfunded')
-  expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('1 account needs review')
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(overview.querySelector('ol')).toBeNull()
   const review=within(overview).getByRole('region',{name:'Needs review'})
@@ -447,7 +438,7 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   cleanup()
   render(<SeededHarness initial={seededDocument()} view="month"/>)
   expect(screen.getByText('Nothing to fund yet')).toBeVisible()
-  expect(screen.getByRole('region',{name:'Transfers summary'})).not.toHaveTextContent('Nothing to fund yet')
+  expect(screen.getByText('Add items on the Plan and each person’s payday steps appear here.')).toBeVisible()
 })
 
 it('labels a resolved zero allocation without an incomplete warning',()=>{
@@ -466,10 +457,6 @@ it('withholds a partly calculated account from the steps but keeps its known amo
   initial.budget.snapshots[month]!.items.push({id:'unresolved',name:'Unfunded',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'single'})
   window.localStorage.setItem('north.transferPerson','nick')
   render(<SeededHarness initial={initial} view="month"/>)
-  const summary=screen.getByRole('region',{name:'Transfers summary'})
-  // The hero counts only money with a step: the Monzo account is withheld.
-  expect(summary).toHaveTextContent('Nick’s funding£0.00')
-  expect(summary).toHaveTextContent('No steps · 1 account needs review')
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(overview).toHaveTextContent('Nick has no steps ready this month.')
   const review=within(overview).getByRole('region',{name:'Needs review'})
@@ -482,7 +469,8 @@ it('keeps a large destination to one funding step and one pot step',()=>{
   initial.budget.snapshots[month]={items:Array.from({length:23},(_,index)=>({id:`item-${index}`,name:`Budget item ${index+1}`,categoryId:'bills',destination:{kind:'pot' as const,potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly' as const,funding:'equal' as const}))}
   render(<SeededHarness initial={initial} view="month" onSeeTransferItems={vi.fn()}/>)
   const nick=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nick)).toEqual(['Fund Monzo Nick£115.00See 23 items','Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
+  expect(stepTexts(nick)).toEqual(['Fund Monzo Nick£115.00','Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
+  expect(nick.querySelector('.step-group-band')).toHaveTextContent('Nick’s · 23 items')
   expect(nick).not.toHaveTextContent('Budget item 1')
 })
 
@@ -989,12 +977,12 @@ it('preserves month, search and owner when switching views',()=>{
   rerender(<SeededHarness initial={initial} view="month"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nickSteps)).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
-  const trigger=screen.getByRole('button',{name:'Transfers summary details'})
-  trigger.focus();fireEvent.click(trigger)
-  const dialog=screen.getByRole('dialog',{name:'Transfers summary details'})
-  expect(dialog).toHaveTextContent('already includes its moves')
-  expect(dialog).not.toHaveTextContent('exact pennies')
-  fireEvent.click(within(dialog).getByRole('button',{name:'Close'}))
+  const trigger=screen.getByRole('button',{name:'More Month options'})
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('menuitem',{name:'How funding is worked out'}))
+  const dialog=screen.getByRole('dialog',{name:'How funding is worked out'})
+  expect(dialog).toHaveTextContent('isn’t counted twice')
+  fireEvent.click(within(dialog).getByRole('button',{name:'Done'}))
   expect(trigger).toHaveFocus()
   rerender(<SeededHarness initial={initial} view="plan"/>)
   expect(screen.getByPlaceholderText('Search budget')).toHaveValue('Bill')
@@ -1167,6 +1155,8 @@ it('explains the owner-handled pot movement without changing contribution attrib
     'Move to Spending from Monzo Nick£100.01Includes £70.01 from Immy',
   ])
   // Funding still reconciles to the account total; the pot move is not added on top.
+  fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Funding by account' }))
   expect(document.querySelector('.budget-v3-transfer-table tfoot')).toHaveTextContent('£100.01')
 })
 
@@ -1174,7 +1164,6 @@ it('marks missing pot responsibility as needing review and withholds its steps',
   const initial = monthRulesDocument()
   initial.budget.accounts[0]!.ownerPersonIds = []
   render(<MonthRulesHarness initial={initial} view="month"/>)
-  expect(screen.getByRole('region', { name: 'Transfers summary' })).toHaveTextContent('1 account needs review')
   const overview = screen.getByRole('region', { name: 'Steps by person' })
   expect(overview.querySelector('ol')).toBeNull()
   const review = within(overview).getByRole('region', { name: 'Needs review' })
@@ -1214,7 +1203,8 @@ it('keeps the budget actions in the ⋯ menu, and Month gets neither the meter, 
   expect(document.querySelector('.budget-page-titlebar')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'More budget options' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Check balances' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
+  expect(screen.getByRole('menuitem', { name: 'Check balances' })).toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Plan summary' })).not.toBeInTheDocument()
 })
 
@@ -1260,11 +1250,11 @@ it('leads with whoever is over and reviews their items',()=>{
   expect(screen.getByRole('button',{name:/^Remove filter: /})).toBeInTheDocument()
 })
 
-it('ticks steps off, counts progress, and says when a person is up to date',()=>{
+it('ticks steps off, counts progress in the section and the switch, and untick undoes it',()=>{
   render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
-  const summary=screen.getByRole('region',{name:'Transfers summary'})
-  fireEvent.click(within(summary).getByRole('button',{name:'Immy'}))
-  expect(summary).toHaveTextContent('Ticked off0 of 2 done')
+  const choice=screen.getByRole('group',{name:'Whose steps'})
+  fireEvent.click(within(choice).getByRole('button',{name:/^Immy/}))
+  expect(screen.getByRole('heading',{name:'Payday0 of 2'})).toBeInTheDocument()
   const overview=screen.getByRole('region',{name:'Steps by person'})
   const ticks=within(overview).getAllByRole('button',{name:/ done$/})
   expect(ticks).toHaveLength(2)
@@ -1273,14 +1263,14 @@ it('ticks steps off, counts progress, and says when a person is up to date',()=>
   expect(ticks[0]).toHaveAttribute('aria-pressed','false')
   fireEvent.click(ticks[0]!)
   expect(ticks[0]).toHaveAttribute('aria-pressed','true')
-  expect(summary).toHaveTextContent('1 of 2 done')
-  expect(within(summary).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy1/2')
+  expect(screen.getByRole('heading',{name:'Payday1 of 2'})).toBeInTheDocument()
+  expect(within(choice).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy1/2')
+  expect(within(overview).getByRole('heading',{level:3})).toHaveTextContent('Immy1 of 2')
   fireEvent.click(ticks[1]!)
-  expect(within(summary).getByRole('status')).toHaveTextContent(/^Immy is up to date for \w+All 2 steps ticked\.$/)
-  expect(within(summary).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy✓')
+  expect(within(choice).getByRole('button',{name:/^Immy/})).toHaveTextContent('Immy✓')
   fireEvent.click(ticks[1]!)
   expect(ticks[1]).toHaveAttribute('aria-pressed','false')
-  expect(summary).toHaveTextContent('1 of 2 done')
+  expect(screen.getByRole('heading',{name:'Payday1 of 2'})).toBeInTheDocument()
 })
 
 it('shows a step whose amount changed since it was ticked, copies the difference, and accepts it',()=>{
@@ -1289,41 +1279,59 @@ it('shows a step whose amount changed since it was ticked, copies the difference
   const writeText=vi.fn().mockResolvedValue(undefined)
   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
   render(<SeededHarness initial={initial} view="month"/>)
-  fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
-  const summary=screen.getByRole('region',{name:'Transfers summary'}),overview=screen.getByRole('region',{name:'Steps by person'})
+  fireEvent.click(within(screen.getByRole('group',{name:'Whose steps'})).getByRole('button',{name:/^Immy/}))
+  const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(overview).toHaveTextContent('Changed since ticked: you sent £4.00, it’s now £5.00. Send £1.00 more.')
-  expect(summary).toHaveTextContent('0 of 2 done1 changed since ticked · send £1.00 more')
+  expect(overview.querySelector('.payday-person-sub')).toHaveTextContent('1 changed since ticked · send £1.00 more')
+  expect(screen.getByRole('heading',{name:'Payday0 of 2'})).toBeInTheDocument()
   fireEvent.click(within(overview).getByRole('button',{name:'Copy £1.00'}))
   expect(writeText).toHaveBeenCalledWith('1.00')
   fireEvent.click(within(overview).getByRole('button',{name:/: mark the change done$/}))
   expect(overview).not.toHaveTextContent('Changed since ticked')
-  expect(summary).toHaveTextContent('1 of 2 done')
+  expect(screen.getByRole('heading',{name:'Payday1 of 2'})).toBeInTheDocument()
   Reflect.deleteProperty(navigator,'clipboard')
 })
 
-it('warns on Transfers when someone’s steps add up to more than they have available',()=>{
+it('says in each person’s line when their steps add up to more than they have available, for everyone under Both',()=>{
   const initial=personSwitchDocument()
-  initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:400000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:2000,changes:{}}]
+  initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:1000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:2000,changes:{}}]
   render(<SeededHarness initial={initial} view="month"/>)
-  fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
-  const summary=screen.getByRole('region',{name:'Transfers summary'})
-  expect(summary).toHaveTextContent('Immy’s steps add up to £25.00, which is £5.00 more than Immy’s £20.00 available.')
-  expect(within(summary).getByRole('button',{name:'See it on Plan'})).toBeInTheDocument()
-  fireEvent.click(within(summary).getByRole('button',{name:'Nick'}))
-  expect(summary).not.toHaveTextContent('more than')
+  const subs=()=>[...screen.getByRole('region',{name:'Steps by person'}).querySelectorAll('.payday-person-sub')].map(line=>line.textContent)
+  // Both people's lines show, not just the worst one; no bordered warning box.
+  expect(subs()).toEqual(['£20.00 from £10.00 available · £10.00 over · Review on Plan','£25.00 from £20.00 available · £5.00 over · Review on Plan'])
+  expect(document.querySelector('.transfer-over-warning')).toBeNull()
+  fireEvent.click(within(screen.getByRole('region',{name:'Immy steps'})).getByRole('button',{name:'Review on Plan'}))
+  fireEvent.click(within(screen.getByRole('group',{name:'Whose steps'})).getByRole('button',{name:/^Nick/}))
+  expect(subs()).toEqual(['£20.00 from £10.00 available · £10.00 over · Review on Plan'])
 })
 
-it('shows everyone’s steps side by side on desktop, with progress, account bands and an up-to-date banner',()=>{
+it('shows everyone’s steps side by side on desktop, with progress, account bands and a Steps | By account switch',()=>{
   vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
   render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
+  expect(screen.queryByRole('group',{name:'Whose steps'})).not.toBeInTheDocument()
   const overview=screen.getByRole('region',{name:'Steps by person'})
-  const nick=within(overview).getByRole('region',{name:'Nick steps'}),immy=within(overview).getByRole('region',{name:'Immy steps'})
-  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick0 of 2 done')
-  expect(nick).toHaveTextContent('£20.00 from £4,000.00 available · 1 to fund · 1 move')
-  expect(nick.querySelector('.step-group-band')).toHaveTextContent('Monzo NickNick’s account')
-  expect(overview).toHaveTextContent('Click an amount to copy it for your banking app.')
-  for(const tick of within(overview).getAllByRole('button',{name:/ done$/}))fireEvent.click(tick)
-  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick2 of 2 done')
-  expect(immy).toHaveTextContent('Immy is up to date for')
-  expect(overview).toHaveTextContent('You’re both up to date for')
+  const nick=within(overview).getByRole('region',{name:'Nick steps'})
+  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick0 of 2 · 1 to fund · 1 move')
+  expect(nick).toHaveTextContent('£20.00 from £4,000.00 available')
+  expect(nick.querySelector('.step-group-band')).toHaveTextContent('Monzo NickNick’s')
+  const ticks=within(overview).getAllByRole('button',{name:/ done$/})
+  for(const tick of ticks.slice(0,-1))fireEvent.click(tick)
+  expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick2 of 2')
+  expect(screen.getByRole('heading',{name:'Payday3 of 4 done'})).toBeInTheDocument()
+  // The last tick folds Payday to one line after Pots; no banner.
+  fireEvent.click(ticks.at(-1)!)
+  const folded=screen.getByRole('button',{name:/^Payday4 of 4 done · last ticked \w{3} \d+ \w{3}$/})
+  expect(folded).toHaveAttribute('aria-expanded','false')
+  expect(screen.queryByRole('region',{name:'Steps by person'})).not.toBeInTheDocument()
+  expect(screen.queryByText(/up to date/)).toBeNull()
+  fireEvent.click(folded)
+  expect(screen.getByRole('heading',{name:'Payday4 of 4 done'})).toBeInTheDocument()
+  const view=screen.getByRole('group',{name:'Payday view'})
+  fireEvent.click(within(view).getByRole('button',{name:'By account'}))
+  expect(screen.queryByRole('region',{name:'Steps by person'})).not.toBeInTheDocument()
+  expect(screen.getByRole('heading',{name:'Funding by account'})).toBeInTheDocument()
+  expect(document.querySelector('.budget-v3-transfer-table')).toBeInTheDocument()
+  fireEvent.click(within(view).getByRole('button',{name:'Steps'}))
+  expect(screen.getByRole('region',{name:'Steps by person'})).toBeInTheDocument()
 })
+

@@ -576,7 +576,7 @@ it('closes a month: covers the overspend, ticks the cover, sees leftovers and th
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={closingHousehold()} today="2026-11-04" onChange={next => { saved = next }}/>)
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
-  expect(screen.getByText('Closing')).toBeInTheDocument()
+  expect(screen.getByText(/^Closing · ended \w{3} 31 Oct$/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
   expect(screen.getByRole('heading', { name: 'Close October' })).toBeInTheDocument()
   expect(screen.getByText('1 Oct – 31 Oct · all transactions in and sorted')).toBeInTheDocument()
@@ -741,7 +741,8 @@ describe('the Amex pot', () => {
     let saved: BudgetDocument | undefined
     render(<MonthHarness initial={document} onChange={next => { saved = next }}/>)
     expect(screen.getByRole('button', { name: /^Groceries: £44.60 spent\. £455.40 in Monzo$/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Check balances' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Check balances' }))
     const dialog = screen.getByRole('dialog', { name: 'Check balances' })
     const groceries = within(dialog).getByLabelText(/^Groceries/)
     expect(groceries).toHaveAccessibleName(/North: £455.40 · checked/)

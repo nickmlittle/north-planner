@@ -9,7 +9,7 @@ import { ImpactPreview } from '../components/ImpactPreview'
 import { MonthPage } from './MonthPage'
 import { BudgetInfoDialog } from './MobileBudgetViews'
 import { PlanPage, type PlanPageHandle } from './PlanPage'
-import { PaydayPage } from './PaydayPage'
+import { PaydaySection } from './month/PaydaySection'
 import { BudgetPageHeader } from './budget/BudgetPageHeader'
 import { useMonthBudget } from './budget/useMonthBudget'
 import { usePlanView } from './budget/usePlanView'
@@ -48,9 +48,9 @@ export function MonthlyBudget({document,setDocument,saveStatus,view:sharedView,m
  const scopedPlan=mobilePresentation&&view==='plan'&&!!planDestination
  const header=<BudgetPageHeader document={document} month={month} onMonthChange={setMonth} carriedOverNote={budget.carriedOverNote} revertLabel={revertLabel} onRevert={removeDate} mobilePresentation={mobilePresentation} optionsRef={monthOptionsRef} onOpenOptions={()=>setOptionsOpen(true)}
   options={[{label:'Edit income',onSelect:openIncome},{label:'Accounts, pots & categories',onSelect:openAccounts}]} onAddItem={()=>plan.current?.addItem()}/>
- const payday=<PaydayPage document={document} setDocument={setDocument} month={month} budget={budget} mobilePresentation={mobilePresentation} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome} onReviewPerson={personId=>{planView.reviewPerson(personId);onOpenPlan?.()}}/>
+ const payday=({byAccount,onByAccount}:{byAccount:boolean;onByAccount:(value:boolean)=>void})=><PaydaySection document={document} setDocument={setDocument} month={month} budget={budget} mobilePresentation={mobilePresentation} byAccount={byAccount} onByAccount={onByAccount} affectedTransfers={affectedTransfers} stepsReturn={stepsReturn} onSeeItems={onSeeTransferItems} onEditIncome={openIncome} onReviewPerson={personId=>{planView.reviewPerson(personId);onOpenPlan?.()}} onOpenPlan={onOpenPlan}/>
  const page=view==='month'
-  ?<MonthPage document={document} setDocument={setDocument} month={month} onMonthChange={setMonth} payday={payday} potId={potId} closing={closing} onOpenPot={onOpenPot} onOpenClose={onOpenClose} onSort={onOpenSort} today={today}/>
+  ?<MonthPage document={document} setDocument={setDocument} month={month} onMonthChange={setMonth} payday={payday} onOpenPlan={onOpenPlan} potId={potId} closing={closing} onOpenPot={onOpenPot} onOpenClose={onOpenClose} onSort={onOpenSort} today={today}/>
   :<PageFrame afterHeading={header} title={`Plan, ${monthLabel(month)}`} headingClass="route-heading visually-hidden" className={`monthly-budget-page budget-view-plan${scopedPlan?' scoped-plan':''}`} contentWidth="wide" regions={<PlanPage ref={plan} document={document} setDocument={setDocument} month={month} budget={budget} planView={planView} mobilePresentation={mobilePresentation} scoped={scopedPlan} saveStatus={saveStatus} planDestination={planDestination} planItemId={planItemId} onClearPlanDestination={onClearPlanDestination} onReturnToTransfers={onReturnToTransfers} hasTransfersOrigin={hasTransfersOrigin} onViewAffectedTransfers={onViewAffectedTransfers} onEditIncome={openIncome}/>}/>
  return <>{page}
  {confirm&&<ConfirmDialog title={confirm.title} confirmLabel={confirm.confirmLabel} danger returnFocusTo={confirm.returnFocusTo} onCancel={()=>setConfirm(null)} onConfirm={()=>{confirm.onConfirm();setConfirm(null)}}>{confirm.body}</ConfirmDialog>}
