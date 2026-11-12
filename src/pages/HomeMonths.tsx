@@ -6,11 +6,12 @@ import { closeMonthPlan, homeMonths, type HomeMonth, type HomeTask } from '../do
 import { potPhrase } from '../domain/setAside'
 import { potBalance } from '../domain/potBalances'
 import { formatMonth } from '../formatting/month'
-import type { SpendingView } from '../state/navigation'
+import type { SpendingSection } from '../state/navigation'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
 import { dayOf, pounds, signedPounds, statementName } from './spendingFormat'
 
-export type SpendingTarget = { view: SpendingView; month?: string; potId?: string; statementKey?: string; close?: boolean }
+/** Where a month card's row goes: a Spending tab, or Month (its pots, a pot, or Close <Month>). */
+export type SpendingTarget = { view: SpendingSection | 'month'; month?: string; potId?: string; statementKey?: string; close?: boolean }
 type Props = { document: BudgetDocument; today: string; onOpenSpending: (target: SpendingTarget) => void; onOpenTransfers: (month: string) => void }
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -50,7 +51,7 @@ export function HomeMonths({ document, today, onOpenSpending, onOpenTransfers }:
     if (task.kind === 'sorted') return <Row key={task.key} icon={<CreditCard/>} done={task.done} title="All transactions in and sorted" onSelect={() => onOpenSpending({ view: 'sort' })}/>
     if (task.kind === 'close') return <Row key={task.key} icon={<CalendarDays/>} done={task.done} title={`Close ${monthName(task.month)}`} sub={task.done ? 'Closed' : closeSub(document, task.month, today)} onSelect={() => onOpenSpending({ view: 'month', month: task.month, close: true })}/>
     if (task.kind === 'settle') return <Row key={task.key} icon={<Wallet/>} done={task.done} title={`Settle the ${statementName(statement!.closeDate)}`} sub={task.done ? 'Settled' : `${pounds(task.amountPence ?? 0)} by ${dayDate(task.dueDate!)}`} onSelect={() => onOpenSpending({ view: 'statements', statementKey: task.statementKey })}/>
-    return <Row key={task.key} icon={<Wallet/>} done={task.done} title={`Finish ${monthName(task.month)}’s Transfers`} sub={`Any time before ${dayDate(firstDayOf(task.month))}`} onSelect={() => onOpenTransfers(task.month)}/>
+    return <Row key={task.key} icon={<Wallet/>} done={task.done} title={`Finish ${monthName(task.month)}’s payday steps`} sub={`Any time before ${dayDate(firstDayOf(task.month))}`} onSelect={() => onOpenTransfers(task.month)}/>
   }
   return <div className="home-months">{ordered.map(month => month.role === 'settled'
     ? <p key={month.month} className="home-month-settled"><Check aria-hidden="true"/><span><strong>{monthName(month.month)}</strong> · settled{month.settledAt ? ` ${dayOf(month.settledAt)}` : ''}</span></p>

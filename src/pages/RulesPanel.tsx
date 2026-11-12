@@ -32,7 +32,7 @@ export function RulesPanel({ document, setDocument, headingExtra }: Props) {
   const move = (rule: SortRule, by: -1 | 1) => { setDocument(current => moveRule(current, rule.id, by)); setMessage(`Moved “${rule.contains}” ${by < 0 ? 'up' : 'down'}.`) }
 
   return <section className="spending-panel rules-panel" aria-labelledby={`${id}-title`}>
-    <div className="spending-section-heading"><h2 id={`${id}-title`}>Rules</h2><span>{tracker.rules.length ? plural(tracker.rules.length, 'rule') : ''}</span>{headingExtra}</div>
+    <div className="spending-section-heading"><h2 id={`${id}-title`}>Sorting rules</h2><span>{tracker.rules.length ? plural(tracker.rules.length, 'rule') : ''}</span>{headingExtra}</div>
     {tracker.rules.length > 0 && <p className="rules-lead">The first rule that matches sorts a transaction.</p>}
     <p className="visually-hidden" role="status">{message}</p>
     {!tracker.rules.length ? <p className="spending-none">No rules yet. Tick “Always put … in this pot” when you sort a transaction.</p>

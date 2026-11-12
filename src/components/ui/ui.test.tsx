@@ -13,7 +13,7 @@ it('PageHeader is the page’s only h1, and names the document', () => {
   unmount()
   render(<PageHeader title={<MonthTitle month="2026-11" onChange={() => {}}/>} titleText="Month" monthLabel="November 2026"/>)
   expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
-  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Month')
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Month, November 2026')
   expect(screen.getByRole('button', { name: /November 2026/ })).toBeInTheDocument()
   expect(document.title).toBe('Month · November 2026 · North')
 })

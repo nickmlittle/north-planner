@@ -17,4 +17,6 @@
   .page-header-mobile .page-header-actions .primary-button{border-color:var(--cream);background:var(--cream);color:var(--accent)}
   .page-header-mobile .status-chip.is-positive{background:var(--cream);color:var(--accent)}
   .page-header{margin-bottom:var(--space-4)}
+  /* Scrolled: the title joins the pinned bar's one row, like the app header's own. */
+  .mobile-app-header.is-collapsed .mobile-header-page.page-header-mobile h1.page-header-title{grid-area:auto;grid-column:1;grid-row:1;margin:0;font-size:var(--text-lg);letter-spacing:0}
 }

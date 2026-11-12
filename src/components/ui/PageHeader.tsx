@@ -33,7 +33,8 @@ export function PageHeader({ title, titleText, monthLabel, context, chip, breadc
   const mobile = useMobilePresentation()
   // The app header's slot on phones; absent when a page renders on its own (tests, setup).
   const headerSlot = useSyncExternalStore(subscribeNothing, findHeaderSlot, () => null)
-  const heading = typeof title === 'string' ? <h1 className="page-header-title">{title}</h1> : <><h1 className="visually-hidden">{titleText}</h1>{title}</>
+  // A control as the title (MonthTitle) gets a hidden h1 that names the page too: "Month, November 2026".
+  const heading = typeof title === 'string' ? <h1 className="page-header-title">{title}</h1> : <><h1 className="visually-hidden">{monthLabel ? `${titleText}, ${monthLabel}` : titleText}</h1>{title}</>
   if (portal && mobile && headerSlot) return createPortal(<div className="mobile-header-page page-header-mobile">
     {heading}
     {(context || chip) && <p className="page-header-context">{chip}{context}</p>}

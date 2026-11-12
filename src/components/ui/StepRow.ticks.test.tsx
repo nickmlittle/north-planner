@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { decodeBudgetDocument, type BudgetDocument } from '../../domain/budgetDocument'
 import { MonthlyBudget } from '../../pages/MonthlyBudget'
 import { Spending } from '../../pages/Spending'
-import type { SpendingView } from '../../state/navigation'
+import type { SpendingSection } from '../../state/navigation'
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.localStorage.clear(); window.sessionStorage.clear() })
 
 const fixture = () => decodeBudgetDocument(JSON.parse(readFileSync(resolve(__dirname, '../../../docs/fixtures/plan-transfers-baseline.json'), 'utf8')))!
@@ -22,7 +22,7 @@ it('stores November’s payday ticks under the same keys', () => {
   function Harness() {
     const [document, setDocument] = useState(fixture)
     saved = document
-    return <MonthlyBudget document={document} setDocument={setDocument} mobileBudgetView="transfers" month="2026-11"/>
+    return <MonthlyBudget document={document} setDocument={setDocument} view="month" month="2026-11"/>
   }
   render(<Harness/>)
   tickEverything()
@@ -33,10 +33,10 @@ it('stores the October statement’s settle-up ticks under the same keys', () =>
   let saved: BudgetDocument | undefined
   function Harness() {
     const [document, setDocument] = useState(fixture)
-    const [view, setView] = useState<SpendingView>('statements')
+    const [view, setView] = useState<SpendingSection>('statements')
     const [statement, setStatement] = useState<string | null>('amex:2026-10-24')
     saved = document
-    return <Spending document={document} setDocument={setDocument} view={view} onSelectView={setView} onOpenHousehold={() => {}} month="2026-11" onMonthChange={() => {}} potId={null} onOpenPot={() => {}} statementKey={statement} onOpenStatement={setStatement} closing={false} onOpenClose={() => {}} today="2026-11-12"/>
+    return <Spending document={document} setDocument={setDocument} view={view} onSelectView={setView} onOpenCardSettings={() => {}} onOpenMonth={() => {}} statementKey={statement} onOpenStatement={setStatement} today="2026-11-12"/>
   }
   render(<Harness/>)
   fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))

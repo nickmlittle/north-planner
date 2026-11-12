@@ -4,6 +4,8 @@ import { formatGBP } from '../formatting/money'
 import { dayDate } from './cardLabels'
 import type { StatementSummary } from '../domain/cardStatements'
 import { formatMonth } from '../formatting/month'
+import type { MonthSpending } from '../domain/cardSpending'
+import type { MonthStatus } from '../domain/monthStages'
 
 export const pounds = (pence: number) => formatGBP(pence / 100)
 /** "£62.40", or "−£24.99" for a refund. */
@@ -36,3 +38,11 @@ export function statementStatus(summary: StatementSummary): { text: string; tone
   return { text: `Ready to settle · due ${dayDate(summary.dueDate)}`, tone: 'ready' }
 }
 
+/** "In progress · 18 days left", "Closing", "To settle", "Settled". */
+export function stageLabel(stage: MonthStatus, figures: MonthSpending): string {
+  if (stage.stage === 'in-progress') return `In progress · ${figures.daysLeft} ${figures.daysLeft === 1 ? 'day' : 'days'} left`
+  if (stage.stage === 'closing') return 'Closing'
+  if (stage.stage === 'to-settle') return `To settle${stage.closedAt ? ` · closed ${dayOf(stage.closedAt)}` : ''}`
+  if (stage.stage === 'settled') return 'Settled'
+  return stage.stage === 'funded' ? 'Funded' : stage.stage === 'funding' ? `Funding · ${stage.funding.done} of ${stage.funding.total}` : 'Not started'
+}

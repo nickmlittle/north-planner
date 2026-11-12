@@ -24,7 +24,7 @@ function filterValue(label: 'Owner' | 'Category') {
 }
 const desktop=()=>vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
 const expandAll=()=>fireEvent.click(screen.getByRole('button',{name:'Expand all'}))
-function Harness({ view }: { view?: 'plan' | 'transfers' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} mobileBudgetView={view}/>}
+function Harness({ view }: { view?: 'plan' | 'month' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} view={view}/>}
 function createAccountInPicker(form: HTMLElement, owner='Nick', provider='Monzo', nickname='') {
   fireEvent.click(within(form).getByRole('button',{name:owner}))
   fireEvent.click(within(form).getByRole('button',{name:'+ Add account'}))
@@ -118,8 +118,8 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   expect(filterValue('Owner')).toBe('Nick')
   expect(scrollTo).toHaveBeenCalledWith(0,420)
 })
-it('shows the balance and people and transfers summary',()=>{const {rerender}=render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');rerender(<Harness view="transfers"/>);expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
-it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{name:'Monthly budget'}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
+it('shows the balance and people and transfers summary',()=>{const {rerender}=render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');rerender(<Harness view="month"/>);expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
+it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{level:1,name:/^Plan, /}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
 it('removes an item from inside its editor after the same confirm, and keeps the edit open on cancel',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   const item=(id:string,name:string)=>({id,name,categoryId:'bills',destination:{kind:'account' as const,accountId:'a1'},entryAmountPence:899,amountPence:899,frequency:'monthly' as const,funding:'single' as const,singleFunderId:'nick'})
@@ -246,9 +246,9 @@ function seededDocument() {
   d.budget.pots = [{ id: 'p1', name: 'Spending', accountId: 'a1' }]
   return d
 }
-function SeededHarness({ initial, view = 'plan', onSeeTransferItems }: { initial: BudgetDocument; view?: 'transfers' | 'plan'; onSeeTransferItems?: (accountId: string) => void }) {
+function SeededHarness({ initial, view = 'plan', onSeeTransferItems }: { initial: BudgetDocument; view?: 'month' | 'plan'; onSeeTransferItems?: (accountId: string) => void }) {
   const [document, setDocument] = useState(initial)
-  return <><MonthlyBudget document={document} setDocument={setDocument} mobileBudgetView={view} onSeeTransferItems={onSeeTransferItems}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
+  return <><MonthlyBudget document={document} setDocument={setDocument} view={view} onSeeTransferItems={onSeeTransferItems}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
 }
 /** Each numbered payday step as read: number, action, amount, captions. */
 const stepTexts = (region: HTMLElement) => within(region).getAllByRole('listitem').map(step => step.textContent)
@@ -264,7 +264,7 @@ it('lists each person’s payday steps in order, with pot moves under their acco
     {id:'single-item',name:'Single funder',categoryId:'bills',destination:{kind:'account',accountId:'a2'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'},
   ]}
   const seeItems=vi.fn()
-  render(<SeededHarness initial={initial} view="transfers" onSeeTransferItems={seeItems}/>)
+  render(<SeededHarness initial={initial} view="month" onSeeTransferItems={seeItems}/>)
   const transfers=screen.getByRole('region',{name:'Steps by person'})
   // Nobody chosen yet: everyone's steps, each headed with their total and count.
   expect(within(transfers).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£25.00 · 2 to fund · 1 move','Immy£20.00 · 1 to fund'])
@@ -299,7 +299,7 @@ function personSwitchDocument() {
 }
 
 it('asks once whose transfers to show, then remembers the choice on this device',()=>{
-  const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const summary=screen.getByRole('region',{name:'Transfers summary'})
   expect(summary).toHaveTextContent('Who’s moving money on this phone?')
   expect(summary).toHaveTextContent('Funding£45.00')
@@ -322,7 +322,7 @@ it('asks once whose transfers to show, then remembers the choice on this device'
     'Fund Nationwide Immy£5.00',
   ])
   unmount()
-  render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const again=screen.getByRole('region',{name:'Transfers summary'})
   expect(again).not.toHaveTextContent('Who’s moving money')
   expect(again).toHaveTextContent('Immy’s funding£25.00')
@@ -338,7 +338,7 @@ it('asks once whose transfers to show, then remembers the choice on this device'
 
 it('asks again when the remembered person has left the household, and never asks a household of one',()=>{
   window.localStorage.setItem('north.transferPerson','someone-else')
-  const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  const {unmount}=render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('Who’s moving money on this phone?')
   unmount()
   const solo=personSwitchDocument()
@@ -346,24 +346,23 @@ it('asks again when the remembered person has left the household, and never asks
   solo.budget.incomeSources=solo.budget.incomeSources.filter(source=>source.personId==='nick')
   solo.budget.accounts=solo.budget.accounts.filter(account=>account.id==='a1')
   for(const snapshot of Object.values(solo.budget.snapshots))snapshot.items=snapshot.items.filter(item=>item.funding!=='single')
-  render(<SeededHarness initial={solo} view="transfers"/>)
+  render(<SeededHarness initial={solo} view="month"/>)
   const summary=screen.getByRole('region',{name:'Transfers summary'})
   expect(within(summary).queryByRole('group',{name:'Whose transfers'})).not.toBeInTheDocument()
   expect(summary).toHaveTextContent('Nick’s funding£40.00')
   expect(summary).toHaveTextContent('1 to fund · 1 move')
 })
 
-it('keeps the budget title and month selector shared between Transfers and Plan',()=>{
+it('gives Month and Plan one h1 each, naming the screen and the month they share',()=>{
   const initial=seededDocument()
-  const {rerender}=render(<SeededHarness initial={initial} view="transfers"/>)
-  const title=screen.getByRole('heading',{name:'Monthly budget'})
-  const selector=document.querySelector('.budget-v3-date-selector')!
-  expect(selector).toBeVisible()
-  expect(selector.querySelector('.budget-v3-date-context')).toBeVisible()
+  const {rerender}=render(<SeededHarness initial={initial} view="month"/>)
+  const month=document.querySelector('.budget-v3-month>button:nth-child(2)')!.textContent!
+  expect(screen.getAllByRole('heading',{level:1}).map(heading=>heading.textContent)).toEqual([`Month, ${month}`])
+  expect(screen.getByRole('heading',{level:2,name:'Payday'})).toBeInTheDocument()
+  expect(screen.getByRole('heading',{level:2,name:'Pots'})).toBeInTheDocument()
   rerender(<SeededHarness initial={initial} view="plan"/>)
-  expect(screen.getByRole('heading',{name:'Monthly budget'})).toBe(title)
-  expect(document.querySelector('.budget-v3-date-selector')).toBe(selector)
-  expect(selector.querySelector('.budget-v3-date-context')).toBeVisible()
+  expect(screen.getAllByRole('heading',{level:1}).map(heading=>heading.textContent)).toEqual([`Plan, ${month}`])
+  expect(document.querySelector('.budget-v3-date-selector')).toBeVisible()
 })
 
 it('copies a step amount as a plain number and says so',async()=>{
@@ -371,7 +370,7 @@ it('copies a step amount as a plain number and says so',async()=>{
   initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:221545,amountPence:221545,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   const writeText=vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('denied'))
   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getByText('Tap an amount to copy it for your banking app.')).toBeVisible()
   fireEvent.click(within(overview).getByRole('button',{name:'Copy £2,215.45'}))
@@ -388,7 +387,7 @@ it('leaves people with nothing to move out of the steps',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.household.adults.push({id:'sam',name:'Sam'})
   initial.budget.snapshots[month]={items:[{id:'single',name:'Solo transfer',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:500,amountPence:500,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£5.00 · 1 to fund'])
   expect(stepTexts(overview)).toEqual(['Fund Monzo Nick£5.00'])
@@ -413,7 +412,7 @@ it('lists steps by who pays, with short account names, duplicate suffixes and no
   ]
   initial.budget.pots=[]
   initial.budget.snapshots[month]={items:initial.budget.accounts.map(account=>({id:`item-${account.id}`,name:account.name,categoryId:'bills',destination:{kind:'account' as const,accountId:account.id},entryAmountPence:1,amountPence:1,frequency:'monthly' as const,funding:'single' as const,singleFunderId:'nick'}))}
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
 expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£0.06 · 6 to fund'])
   const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.step-label')!.textContent)
@@ -425,7 +424,7 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'unresolved',name:'Unfunded',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'proportional'}]}
   const seeItems=vi.fn()
-  render(<SeededHarness initial={initial} view="transfers" onSeeTransferItems={seeItems}/>)
+  render(<SeededHarness initial={initial} view="month" onSeeTransferItems={seeItems}/>)
   const warning=document.querySelector<HTMLElement>('.budget-v3-transfer-warning')!
   expect(warning).toHaveTextContent('Unfunded')
   expect(screen.getByRole('region',{name:'Transfers summary'})).toHaveTextContent('1 account needs review')
@@ -441,7 +440,7 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   fireEvent.click(within(warning).getByRole('button',{name:'Edit income'}))
   expect(screen.getByRole('heading',{name:/Income for/})).toBeVisible()
   cleanup()
-  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
+  render(<SeededHarness initial={seededDocument()} view="month"/>)
   expect(screen.getByText('Nothing to fund yet')).toBeVisible()
   expect(screen.getByRole('region',{name:'Transfers summary'})).not.toHaveTextContent('Nothing to fund yet')
 })
@@ -449,7 +448,7 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
 it('labels a resolved zero allocation without an incomplete warning',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'zero',name:'Zero item',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:0,amountPence:0,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   // Nothing to fund and nothing to review: a resolved zero is not a payday step.
   expect(within(overview).queryByRole('button')).not.toBeInTheDocument()
@@ -461,7 +460,7 @@ it('withholds a partly calculated account from the steps but keeps its known amo
   const initial=personSwitchDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]!.items.push({id:'unresolved',name:'Unfunded',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'single'})
   window.localStorage.setItem('north.transferPerson','nick')
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   const summary=screen.getByRole('region',{name:'Transfers summary'})
   // The hero counts only money with a step: the Monzo account is withheld.
   expect(summary).toHaveTextContent('Nick’s funding£0.00')
@@ -476,7 +475,7 @@ it('withholds a partly calculated account from the steps but keeps its known amo
 it('keeps a large destination to one funding step and one pot step',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:Array.from({length:23},(_,index)=>({id:`item-${index}`,name:`Budget item ${index+1}`,categoryId:'bills',destination:{kind:'pot' as const,potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly' as const,funding:'equal' as const}))}
-  render(<SeededHarness initial={initial} view="transfers" onSeeTransferItems={vi.fn()}/>)
+  render(<SeededHarness initial={initial} view="month" onSeeTransferItems={vi.fn()}/>)
   const nick=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nick)).toEqual(['Fund Monzo Nick£115.00See 23 items','Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
   expect(nick).not.toHaveTextContent('Budget item 1')
@@ -713,7 +712,7 @@ it('shows missing income without blocking an income-ratio item from saving', () 
   expect(within(row).getByText('Add employment income to work out funding.')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
   expect(within(document.querySelector<HTMLElement>('.budget-v3-table')!).getByText('No income yet')).toBeVisible()
-  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  rerender(<SeededHarness initial={initial} view="month"/>)
   const warning=screen.getByText(/1 item can’t be funded yet/).closest<HTMLElement>('.budget-v3-transfer-warning')!
   expect(within(warning).getByText('Show items')).toBeVisible()
   expect(within(warning).getByRole('button',{name:'Edit income'})).toBeVisible()
@@ -940,9 +939,9 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[]}
   render(<SeededHarness initial={initial}/>)
-  const trigger=screen.getByRole('button',{name:'Budget and account'})
+  const trigger=screen.getByRole('button',{name:'Plan options'})
   trigger.focus();fireEvent.click(trigger)
-  const dialog=screen.getByRole('dialog',{name:'Budget and account'})
+  const dialog=screen.getByRole('dialog',{name:'Plan options'})
   const close=within(dialog).getByRole('button',{name:'Close'}),remove=within(dialog).getByRole('button',{name:/^(Go back to|Clear) the .* budget$/})
   expect(close).toHaveFocus()
   fireEvent.keyDown(close,{key:'Tab',shiftKey:true})
@@ -952,27 +951,27 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   fireEvent.click(remove)
   fireEvent.click(within(screen.getByRole('dialog',{name:/budget\?$/})).getByRole('button',{name:'Cancel'}))
   expect(savedBudget().snapshots[month]).toBeDefined()
-  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Plan options'})).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
 })
 
 it('hands off from month options to income and management and restores focus',()=>{
-  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
-  const trigger=screen.getByRole('button',{name:'Budget and account'})
+  render(<SeededHarness initial={seededDocument()}/>)
+  const trigger=screen.getByRole('button',{name:'Plan options'})
   trigger.focus();fireEvent.click(trigger)
-  let dialog=screen.getByRole('dialog',{name:'Budget and account'})
+  let dialog=screen.getByRole('dialog',{name:'Plan options'})
   expect(within(dialog).queryByRole('button',{name:/^(Go back to|Clear) the/})).not.toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button',{name:'Edit income'}))
-  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Plan options'})).not.toBeInTheDocument()
   const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
   expect(form).toContainElement(document.activeElement as HTMLElement)
   expect(form.closest('.page-frame-body')).toBeNull()
   fireEvent.click(within(form).getByRole('button',{name:'Cancel'}))
   expect(trigger).toHaveFocus()
   fireEvent.click(trigger)
-  dialog=screen.getByRole('dialog',{name:'Budget and account'})
+  dialog=screen.getByRole('dialog',{name:'Plan options'})
   fireEvent.click(within(dialog).getByRole('button',{name:'Manage accounts, pots & categories'}))
-  expect(screen.queryByRole('dialog',{name:'Budget and account'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog',{name:'Plan options'})).not.toBeInTheDocument()
   const management=screen.getByRole('dialog',{name:'Manage accounts, pots & categories'})
   expect(management).toContainElement(document.activeElement as HTMLElement)
   fireEvent.click(within(management).getByRole('button',{name:'Close'}))
@@ -987,7 +986,7 @@ it('preserves month, search and owner when switching views',()=>{
   const selectedMonth=document.querySelector('.budget-v3-month>button:nth-child(2)')!.textContent
   fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Bill'}})
   filterBy('Owner','Nick')
-  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  rerender(<SeededHarness initial={initial} view="month"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nickSteps)).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
   const trigger=screen.getByRole('button',{name:'Transfers summary details'})
@@ -1001,7 +1000,7 @@ it('preserves month, search and owner when switching views',()=>{
   expect(screen.getByPlaceholderText('Search budget')).toHaveValue('Bill')
   expect(filterValue('Owner')).toBe('Nick')
   expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
-  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  rerender(<SeededHarness initial={initial} view="month"/>)
   expect(stepTexts(screen.getByRole('region',{name:'Nick steps'}))).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
 })
 
@@ -1010,7 +1009,7 @@ it('renders only the screen being shown: Plan or Transfers, never both',()=>{
   const {rerender}=render(<SeededHarness initial={initial} view="plan"/>)
   expect(document.getElementById('budget-plan-panel')).toBeInTheDocument()
   expect(document.getElementById('budget-transfers-panel')).toBeNull()
-  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  rerender(<SeededHarness initial={initial} view="month"/>)
   expect(document.getElementById('budget-transfers-panel')).toBeInTheDocument()
   expect(document.getElementById('budget-plan-panel')).toBeNull()
   expect(document.querySelector('.monthly-budget-page>.page-frame-body')).toBeNull()
@@ -1026,20 +1025,22 @@ function monthRulesDocument() {
   ]
   return initial
 }
-function MonthRulesHarness({ initial = monthRulesDocument(), month = '2026-12', view = 'plan' }: { initial?: BudgetDocument; month?: string; view?: 'plan' | 'transfers' }) {
+function MonthRulesHarness({ initial = monthRulesDocument(), month = '2026-12', view = 'plan' }: { initial?: BudgetDocument; month?: string; view?: 'plan' | 'month' }) {
   const [document, setDocument] = useState(initial)
-  return <><MonthlyBudget document={document} setDocument={setDocument} month={month} mobileBudgetView={view}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
+  return <><MonthlyBudget document={document} setDocument={setDocument} month={month} view={view}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
 }
 
-it.each(['plan', 'transfers'] as const)('identifies inherited months and hides going back in %s', view => {
+it.each(['plan', 'month'] as const)('identifies inherited months and hides going back in %s', view => {
   render(<MonthRulesHarness view={view}/>)
-  expect(screen.getByText('Using the November 2026 budget')).toBeInTheDocument()
+  // Only Plan notes a carried-over budget: it's about the items, which Month doesn't show.
+  if (view === 'plan') expect(screen.getByText('Using the November 2026 budget')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'December 2026' }))
   expect(within(screen.getByRole('dialog', { name: 'Choose budget month' })).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
   fireEvent.click(screen.getAllByRole('button', { name: 'December 2026' })[0]!)
-  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
-  const dialog = screen.getByRole('dialog', { name: 'Budget and account' })
+  if (view === 'month') { expect(screen.queryByRole('button', { name: 'Plan options' })).not.toBeInTheDocument(); return }
+  fireEvent.click(screen.getByRole('button', { name: 'Plan options' }))
+  const dialog = screen.getByRole('dialog', { name: 'Plan options' })
   expect(dialog).not.toHaveTextContent('Budget edits apply')
   expect(within(dialog).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
 })
@@ -1090,8 +1091,8 @@ it('confirms the exact item-removal range', () => {
 
 it('explains what replaces a cleared budget, including when there is no previous budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
-  fireEvent.click(within(screen.getByRole('dialog', { name: 'Budget and account' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Plan options' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan options' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
   const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   expect(dialog).toHaveTextContent('November 2026–February 2027 will use no budget.')
   fireEvent.click(within(dialog).getByRole('button', { name: 'Clear the November 2026 budget' }))
@@ -1115,8 +1116,8 @@ it('shows the balance change of a removal directly above its confirm button', ()
 
 it('shows the balance change of clearing a month budget', () => {
   render(<MonthRulesHarness month="2026-11"/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Budget and account' }))
-  fireEvent.click(within(screen.getByRole('dialog', { name: 'Budget and account' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Plan options' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Plan options' })).getByRole('button', { name: 'Clear the November 2026 budget' }))
   const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget.')
@@ -1182,7 +1183,7 @@ it('does not create a new budget boundary when an inherited amount is left uncha
 it('explains the owner-handled pot movement without changing contribution attribution', () => {
   const initial = monthRulesDocument()
   initial.budget.snapshots['2026-12'] = { items: [{ id: 'personal-pot', name: 'Personal pot funding', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 10001, amountPence: 10001, frequency: 'monthly', funding: 'fixed', contributions: [{ personId: 'nick', amountPence: 3000 }, { personId: 'immy', amountPence: 7001 }] }] }
-  render(<MonthRulesHarness initial={initial} view="transfers"/>)
+  render(<MonthRulesHarness initial={initial} view="month"/>)
   // Immy funds £70.01 of Nick's account, but Nick (the owner) makes the whole pot move.
   expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['Fund Monzo Nick£70.01Nick moves it into Spending'])
   expect(stepTexts(screen.getByRole('region', { name: 'Nick steps' }))).toEqual([
@@ -1196,7 +1197,7 @@ it('explains the owner-handled pot movement without changing contribution attrib
 it('marks missing pot responsibility as needing review and withholds its steps', () => {
   const initial = monthRulesDocument()
   initial.budget.accounts[0]!.ownerPersonIds = []
-  render(<MonthRulesHarness initial={initial} view="transfers"/>)
+  render(<MonthRulesHarness initial={initial} view="month"/>)
   expect(screen.getByRole('region', { name: 'Transfers summary' })).toHaveTextContent('1 account needs review')
   const overview = screen.getByRole('region', { name: 'Steps by person' })
   expect(overview.querySelector('ol')).toBeNull()
@@ -1231,7 +1232,7 @@ it('states a shared income change range once and prefixes amounts with £',()=>{
   expect(nick).toHaveValue('3,000.00')
 })
 
-it('keeps the budget actions in the ⋯ menu, and Transfers gets neither the meter nor Add item', () => {
+it('keeps the budget actions in the ⋯ menu, and Month gets neither the meter, the ⋯ nor Add item', () => {
   const { unmount } = render(<SeededHarness initial={seededDocument()}/>)
   const toolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
   expect(within(toolbar).getByRole('button', { name: 'Add item' })).toBeInTheDocument()
@@ -1246,28 +1247,22 @@ it('keeps the budget actions in the ⋯ menu, and Transfers gets neither the met
   expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Plan summary' })).toBeInTheDocument()
   unmount()
-  render(<SeededHarness initial={seededDocument()} view="transfers"/>)
-  const transfersToolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
-  expect(within(transfersToolbar).queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
-  expect(within(transfersToolbar).getByRole('button', { name: 'More budget options' })).toBeInTheDocument()
+  render(<SeededHarness initial={seededDocument()} view="month"/>)
+  expect(document.querySelector('.budget-page-titlebar')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'More budget options' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check balances' })).toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Plan summary' })).not.toBeInTheDocument()
 })
 
-it('puts the budget actions, save status and account in one ⋯ sheet on phones', () => {
-  const signOut = vi.fn()
-  render(<MonthlyBudget document={seededDocument()} setDocument={vi.fn()} saveStatus="Saving…" email="ada@example.com" onSignOut={signOut}/>)
-  expect(screen.queryByRole('button', { name: 'Month & income' })).not.toBeInTheDocument()
-  const trigger = screen.getByRole('button', { name: 'Budget and account' })
-  expect(trigger).toHaveTextContent('◌')
+it('puts the budget actions in Plan’s ⋯ sheet on phones; save status and the account are on the app header’s account button', () => {
+  render(<MonthlyBudget document={seededDocument()} setDocument={vi.fn()} saveStatus="Saving…"/>)
+  const trigger = screen.getByRole('button', { name: 'Plan options' })
+  expect(trigger.textContent).toBe('')
   fireEvent.click(trigger)
-  const sheet = screen.getByRole('dialog', { name: 'Budget and account' })
-  expect(within(sheet).getByRole('button', { name: 'Edit income' })).toBeInTheDocument()
-  expect(within(sheet).getByRole('button', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
-  expect(within(sheet).getByText('Saving…')).toBeInTheDocument()
-  expect(within(sheet).getByText('ada@example.com')).toBeInTheDocument()
-  fireEvent.click(within(sheet).getByRole('button', { name: 'Sign out' }))
-  expect(signOut).toHaveBeenCalledOnce()
-  expect(screen.queryByRole('dialog', { name: 'Budget and account' })).not.toBeInTheDocument()
+  const sheet = screen.getByRole('dialog', { name: 'Plan options' })
+  expect(within(sheet).getAllByRole('button').map(button => button.textContent).filter(Boolean)).toEqual(['Edit income', 'Manage accounts, pots & categories'])
+  expect(within(sheet).queryByText('Saving…')).not.toBeInTheDocument()
 })
 
 it('moves the month and ⋯ into the app header on phones, and docks a slim meter once the card scrolls away', () => {
@@ -1279,7 +1274,7 @@ it('moves the month and ⋯ into the app header on phones, and docks a slim mete
   try {
     render(<SeededHarness initial={seededDocument()}/>)
     expect(within(slot).getByRole('button', { name: 'Previous month' })).toBeInTheDocument()
-    expect(within(slot).getByRole('button', { name: 'Budget and account' })).toBeInTheDocument()
+    expect(within(slot).getByRole('button', { name: 'Plan options' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Previous month' })).toHaveLength(1)
     expect(document.querySelector('.allocation-meter-mini')).toBeNull()
     act(() => report?.([{ isIntersecting: false, boundingClientRect: { bottom: -10 } as DOMRect }]))
@@ -1303,7 +1298,7 @@ it('leads with whoever is over and reviews their items',()=>{
 })
 
 it('ticks steps off, counts progress, and says when a person is up to date',()=>{
-  render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const summary=screen.getByRole('region',{name:'Transfers summary'})
   fireEvent.click(within(summary).getByRole('button',{name:'Immy'}))
   expect(summary).toHaveTextContent('Ticked off0 of 2 done')
@@ -1330,7 +1325,7 @@ it('shows a step whose amount changed since it was ticked, copies the difference
   initial.ticks={[month]:{'immy:fund:a2':{amountPence:400,at:'2026-11-01T09:00:00.000Z'}}}
   const writeText=vi.fn().mockResolvedValue(undefined)
   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
   const summary=screen.getByRole('region',{name:'Transfers summary'}),overview=screen.getByRole('region',{name:'Steps by person'})
   expect(overview).toHaveTextContent('Changed since ticked: you sent £4.00, it’s now £5.00. Send £1.00 more.')
@@ -1346,7 +1341,7 @@ it('shows a step whose amount changed since it was ticked, copies the difference
 it('warns on Transfers when someone’s steps add up to more than they have available',()=>{
   const initial=personSwitchDocument()
   initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:400000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:2000,changes:{}}]
-  render(<SeededHarness initial={initial} view="transfers"/>)
+  render(<SeededHarness initial={initial} view="month"/>)
   fireEvent.click(within(screen.getByRole('region',{name:'Transfers summary'})).getByRole('button',{name:'Immy'}))
   const summary=screen.getByRole('region',{name:'Transfers summary'})
   expect(summary).toHaveTextContent('Immy’s steps add up to £25.00, which is £5.00 more than Immy’s £20.00 available.')
@@ -1357,7 +1352,7 @@ it('warns on Transfers when someone’s steps add up to more than they have avai
 
 it('shows everyone’s steps side by side on desktop, with progress, account bands and an up-to-date banner',()=>{
   vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
-  render(<SeededHarness initial={personSwitchDocument()} view="transfers"/>)
+  render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   const nick=within(overview).getByRole('region',{name:'Nick steps'}),immy=within(overview).getByRole('region',{name:'Immy steps'})
   expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick0 of 2 done')
