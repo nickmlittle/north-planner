@@ -24,7 +24,7 @@ function filterValue(label: 'Owner' | 'Category') {
 }
 const desktop=()=>vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
 const expandAll=()=>fireEvent.click(screen.getByRole('button',{name:'Expand all'}))
-function Harness(){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument}/>}
+function Harness({ view }: { view?: 'plan' | 'transfers' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} mobileBudgetView={view}/>}
 function createAccountInPicker(form: HTMLElement, owner='Nick', provider='Monzo', nickname='') {
   fireEvent.click(within(form).getByRole('button',{name:owner}))
   fireEvent.click(within(form).getByRole('button',{name:'+ Add account'}))
@@ -118,7 +118,7 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   expect(filterValue('Owner')).toBe('Nick')
   expect(scrollTo).toHaveBeenCalledWith(0,420)
 })
-it('shows the balance and people and transfers summary',()=>{render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
+it('shows the balance and people and transfers summary',()=>{const {rerender}=render(<Harness/>);addItem('Deficit item','10');expect(screen.getByRole('region',{name:'Plan summary'}).querySelector('.allocation-meter-balance')).toHaveTextContent('£10.00 over');rerender(<Harness view="transfers"/>);expect(screen.getByRole('region',{name:'Funding'})).toBeVisible();expect(screen.getByText('Funding by account')).toBeVisible();expect(screen.queryByText('Monthly plan by person')).not.toBeInTheDocument()})
 it('omits the page subtitle and places the page heading before the month selector',()=>{render(<Harness/>);const heading=screen.getByRole('heading',{name:'Monthly budget'}),month=screen.getByRole('button',{name:/November|December|January|February|March|April|May|June|July|August|September|October/});expect(screen.queryByText('Plan the items you want to fund and where the money goes.')).not.toBeInTheDocument();expect(heading.compareDocumentPosition(month)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()})
 it('removes an item from inside its editor after the same confirm, and keeps the edit open on cancel',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
@@ -705,13 +705,15 @@ it('shows monthly funding previews for every funding type and validates annual f
 })
 
 it('shows missing income without blocking an income-ratio item from saving', () => {
-  render(<SeededHarness initial={seededDocument()}/>)
+  const initial = seededDocument()
+  const { rerender } = render(<SeededHarness initial={initial}/>)
   const form = openSeededEditor()
   const row = fillRow(form, 1, 'No income yet', '10')
   fireEvent.change(within(row).getByLabelText('Funding type'), { target: { value: 'proportional' } })
   expect(within(row).getByText('Add employment income to work out funding.')).toBeVisible()
   fireEvent.click(within(form).getByRole('button', { name: 'Save item' }))
   expect(within(document.querySelector<HTMLElement>('.budget-v3-table')!).getByText('No income yet')).toBeVisible()
+  rerender(<SeededHarness initial={initial} view="transfers"/>)
   const warning=screen.getByText(/1 item can’t be funded yet/).closest<HTMLElement>('.budget-v3-transfer-warning')!
   expect(within(warning).getByText('Show items')).toBeVisible()
   expect(within(warning).getByRole('button',{name:'Edit income'})).toBeVisible()
@@ -988,7 +990,6 @@ it('preserves month, search and owner when switching views',()=>{
   rerender(<SeededHarness initial={initial} view="transfers"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nickSteps)).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
-  const row=within(nickSteps).getAllByRole('listitem')[0]
   const trigger=screen.getByRole('button',{name:'Transfers summary details'})
   trigger.focus();fireEvent.click(trigger)
   const dialog=screen.getByRole('dialog',{name:'Transfers summary details'})
@@ -1001,7 +1002,18 @@ it('preserves month, search and owner when switching views',()=>{
   expect(filterValue('Owner')).toBe('Nick')
   expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
   rerender(<SeededHarness initial={initial} view="transfers"/>)
-  expect(within(screen.getByRole('region',{name:'Nick steps'})).getAllByRole('listitem')[0]).toBe(row)
+  expect(stepTexts(screen.getByRole('region',{name:'Nick steps'}))).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
+})
+
+it('renders only the screen being shown: Plan or Transfers, never both',()=>{
+  const initial=seededDocument()
+  const {rerender}=render(<SeededHarness initial={initial} view="plan"/>)
+  expect(document.getElementById('budget-plan-panel')).toBeInTheDocument()
+  expect(document.getElementById('budget-transfers-panel')).toBeNull()
+  rerender(<SeededHarness initial={initial} view="transfers"/>)
+  expect(document.getElementById('budget-transfers-panel')).toBeInTheDocument()
+  expect(document.getElementById('budget-plan-panel')).toBeNull()
+  expect(document.querySelector('.monthly-budget-page>.page-frame-body')).toBeNull()
 })
 
 function monthRulesDocument() {

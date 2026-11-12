@@ -557,7 +557,6 @@ small, footer { color: var(--muted) }
 .budget-v3-transfers{padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card)}.budget-v3-transfers h2{margin:0 0 var(--space-3);font-size:var(--text-xl);color:var(--pine)}.budget-v3-transfers h3{margin:var(--space-4) 0 var(--space-2);font-size:var(--text-md)}.budget-v3-person-grid{display:grid}.budget-v3-person-grid article{border-radius:var(--radius-md)}.budget-v3-person-grid h3{margin:0 0 var(--space-2)}.budget-v3-person-grid p{display:flex;justify-content:space-between;gap:var(--space-2);margin:var(--space-1) 0;font-size:var(--text-sm)}.budget-v3-transfers ul{padding-left:var(--space-4);font-size:var(--text-md)}.budget-v3-transfers li{margin:var(--space-1) 0}.budget-v3-save-status{color:var(--muted);font-size:var(--text-sm)}
 .budget-v3-people-summary{min-height:0}
 /* Plan and Transfers are separate screens at every width: one URL, one screen. */
-.monthly-budget-page.budget-view-plan>.budget-v3-people-summary,.monthly-budget-page.budget-view-transfers>.page-frame-body{display:none}
 .budget-v3-people-summary h2{margin:0 0 var(--space-2);color:var(--pine);font-size:var(--text-xl)}
 .budget-v3-person-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--space-2)}
 .budget-v3-person-grid article{min-width:0;padding:var(--space-2);background:var(--surface-subtle)}
