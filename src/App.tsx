@@ -16,6 +16,8 @@ import { hasLiveTransfersOrigin, markStepsOrigin, navigateTo, parseNavigation, s
 const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })))
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
 const Spending = lazy(() => import('./pages/Spending').then(module => ({ default: module.Spending })))
+/** Dev builds only (?view=ui-gallery): the shared UI parts. The production build drops it. */
+const UiGallery = import.meta.env.DEV ? lazy(() => import('./pages/dev/UiGallery')) : null
 
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
 function getLocationSearch() { return window.location.search }
@@ -54,7 +56,9 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   const reviewPersonOnPlan = (personId: string) => navigateTo({ view: 'budget', budgetView: 'plan', month: navigation.month, planDestination: null }, { historyState: { northReviewPerson: personId } })
   const reviewPersonId = view === 'budget' && navigation.budgetView === 'plan' && typeof window.history.state?.northReviewPerson === 'string' ? window.history.state.northReviewPerson as string : undefined
   return <AppLayout navigation={{ currentView: view, budgetView: navigation.budgetView, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, onSelectBudgetView: selectBudgetView, setupComplete, homeTitle: formatMonth(navigation.month) }}>
-    {!document.workflow.setupComplete
+    {UiGallery && new URLSearchParams(search).get('view') === 'ui-gallery'
+      ? <Suspense fallback={null}><UiGallery/></Suspense>
+      : !document.workflow.setupComplete
       ? <SetupWizard document={document} setDocument={setDocument} month={navigation.month} onFinish={() => navigateTo({ view: 'budget', budgetView: 'plan' })} />
       : view === 'household'
       ? <HouseholdSetup document={document} setDocument={setDocument} onContinue={() => { setDocument(current => ({ ...current, workflow: { setupComplete: true } })); navigateTo({ view: 'budget', budgetView: 'plan' }) }} />

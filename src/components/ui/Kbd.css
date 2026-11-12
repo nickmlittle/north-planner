@@ -1,0 +1,2 @@
+/* Kbd. Tokens only (styles.tokens.test.ts). */
+.kbd{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 var(--space-1);border:1px solid var(--border-field);border-bottom-width:2px;border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font:var(--weight-medium) var(--text-xs) var(--font-family);line-height:1}

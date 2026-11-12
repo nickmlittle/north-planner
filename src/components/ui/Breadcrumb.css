@@ -1,0 +1,6 @@
+/* Breadcrumb. Tokens only (styles.tokens.test.ts). */
+.breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1);margin:0;padding:0;list-style:none;color:var(--text-muted);font-size:var(--text-sm)}
+.breadcrumb li{display:flex;align-items:center;gap:var(--space-1);min-width:0}
+.breadcrumb svg{width:14px;height:14px}
+.breadcrumb-link{min-height:32px;padding:0;font-size:var(--text-sm)}
+.breadcrumb [aria-current=page]{color:var(--text);font-weight:var(--weight-medium)}

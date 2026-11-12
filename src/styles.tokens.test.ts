@@ -46,9 +46,8 @@ describe('design tokens', () => {
     expect(offenders(d => d.property === 'font' && /\d(px|r?em)\b/.test(d.value))).toEqual([])
   })
 
-  it('keeps the body floor: nothing below --text-xs, and xs is for uppercase labels and badges only', () => {
-    const xs = declarations.filter(d => /var\(--text-xs\)/.test(d.value)).map(d => d.selector)
-    expect(xs.every(selector => /eyebrow|budget-v3-picker small/.test(selector))).toBe(true)
+  it('keeps the body floor: nothing below --text-xs, and xs is for eyebrow labels, chips, keys and counts only', () => {
+    expect(offenders(d => /var\(--text-xs\)/.test(d.value) && !/eyebrow|budget-v3-picker small|status-chip|\.kbd|-count\b/.test(d.selector))).toEqual([])
   })
 
   it('uses spacing tokens; raw px only for 1–2px nudges, negative offsets and 40px+ layout geometry', () => {

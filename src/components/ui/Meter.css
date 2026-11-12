@@ -1,0 +1,8 @@
+/* Meter. Tokens only (styles.tokens.test.ts). */
+.meter{position:relative;display:flex;width:100%;height:6px;border-radius:var(--radius-pill);background:var(--surface-selected);overflow:visible}
+.meter-fill{display:block;height:100%;border-radius:var(--radius-pill) 0 0 var(--radius-pill);background:var(--accent)}
+.meter-fill:only-child{border-radius:var(--radius-pill)}
+.meter.is-warning .meter-fill{background:var(--warning)}
+.meter.is-critical .meter-fill{background:var(--accent)}
+.meter-over{display:block;height:100%;border-radius:0 var(--radius-pill) var(--radius-pill) 0;background:repeating-linear-gradient(-45deg,var(--critical) 0 3px,var(--status-error-hatch) 3px 6px)}
+.meter-pace{position:absolute;top:50%;width:2px;height:12px;margin-left:-1px;background:var(--text);transform:translateY(-50%)}

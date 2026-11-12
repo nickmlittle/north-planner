@@ -1,0 +1,20 @@
+/* PageHeader: one header per page. Tokens only (styles.tokens.test.ts). */
+.page-header{display:grid;gap:var(--space-1);margin:0 0 var(--space-5)}
+.page-header-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);min-height:44px}
+.page-header-heading{display:flex;align-items:center;gap:var(--space-3);min-width:0}
+.page-header-title{margin:0;color:var(--accent);font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-.5px;line-height:1.2;overflow-wrap:anywhere}
+.page-header-context{min-width:0;margin:0;color:var(--text-muted);font-size:var(--text-md)}
+.page-header-actions{display:flex;align-items:center;gap:var(--space-2);margin-left:auto}
+
+@media (max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
+  /* In the pine app header: the title row, then context. Actions take the ⋯ spot. */
+  /* The app header hides its own h1 while a page fills the slot; this one is the page's title, so it shows. */
+  .mobile-app-header .mobile-header-page.page-header-mobile h1.page-header-title{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;grid-area:title;margin:var(--space-1) 0 0;color:var(--cream);font-size:var(--text-2xl);letter-spacing:-.6px;line-height:1.15}
+  .page-header-mobile .page-header-context{grid-area:note;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-1) 0 0;color:var(--on-pine-muted);font-size:var(--text-sm)}
+  .page-header-mobile .page-header-actions{grid-area:actions;justify-self:end;margin:0}
+  /* Actions on pine: cream outlines, and the one primary in cream. */
+  .page-header-mobile .page-header-actions button{min-height:var(--control-h);border-color:var(--on-pine-strong);background:var(--on-pine-faint);color:var(--cream)}
+  .page-header-mobile .page-header-actions .primary-button{border-color:var(--cream);background:var(--cream);color:var(--accent)}
+  .page-header-mobile .status-chip.is-positive{background:var(--cream);color:var(--accent)}
+  .page-header{margin-bottom:var(--space-4)}
+}

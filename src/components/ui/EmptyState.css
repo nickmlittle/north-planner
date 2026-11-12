@@ -1,0 +1,6 @@
+/* EmptyState. Tokens only (styles.tokens.test.ts). */
+.empty-state{display:grid;justify-items:start;gap:var(--space-1);padding:var(--space-5);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.empty-state p{margin:0}
+.empty-state-title{color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.empty-state-text{color:var(--text-muted);font-size:var(--text-md)}
+.empty-state-action{margin-top:var(--space-2)}
