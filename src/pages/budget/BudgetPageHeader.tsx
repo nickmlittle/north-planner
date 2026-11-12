@@ -5,6 +5,7 @@ import type { BudgetDocument } from '../../domain/budgetDocument'
 import { budgetDateMarkers, incomeDateMarkers } from '../../domain/monthlyBudget'
 import { BudgetOptionsMenu } from '../BudgetOptionsMenu'
 import { MonthControl } from '../MonthControl'
+import { Kbd } from '../../components/ui/Kbd'
 
 const subscribeNothing = () => () => {}
 const findHeaderSlot = () => window.document.getElementById('mobile-header-page-slot')
@@ -24,5 +25,5 @@ export function BudgetPageHeader({ document, month, onMonthChange, carriedOverNo
  const mobileOptions=<button ref={optionsRef} type="button" className="budget-mobile-options" aria-label="Plan options" title="Plan options" aria-haspopup="dialog" onClick={onOpenOptions}><Ellipsis aria-hidden="true"/></button>
  const inHeader=mobilePresentation&&!!headerSlot
  if(inHeader)return createPortal(<div className="mobile-header-page">{monthControl}{mobileOptions}{budgetDateNote}</div>,headerSlot)
- return <div className="budget-page-titlebar"><div className="budget-v3-date-selector">{monthControl}<div className="budget-v3-date-context">{budgetDateNote}{mobilePresentation&&mobileOptions}</div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={options}/>{onAddItem&&<button type="button" className="primary-button" onClick={onAddItem}><Plus aria-hidden="true"/>Add item</button>}</div></div>
+ return <div className="budget-page-titlebar"><div className="budget-v3-date-selector">{monthControl}<div className="budget-v3-date-context">{budgetDateNote}{mobilePresentation&&mobileOptions}</div></div><div className="budget-v3-tools budget-desktop-toolbar"><BudgetOptionsMenu options={options}/>{onAddItem&&<button type="button" className="primary-button" onClick={onAddItem}><Plus aria-hidden="true"/>Add item<span className="shortcut-hint" aria-hidden="true"><Kbd>N</Kbd></span></button>}</div></div>
 }

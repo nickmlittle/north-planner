@@ -5,6 +5,7 @@ import { Sheet } from './ui/Sheet'
 import { saveStatusLabel, statusMark } from './saveStatus'
 import type { PlannerView } from '../state/navigation'
 import type { NavCounts } from '../state/navCounts'
+import { isMac, useShortcut } from '../state/shortcuts'
 import { MOBILE_QUERY, SIDEBAR_WIDE_QUERY } from '../breakpoints'
 
 /** The pinned bar's row under the safe area, in px; styles.css draws it as --page-bar-row. */
@@ -59,6 +60,7 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
   const [chosen, setChosen] = useState(readSidebar)
   const desktopExpanded = (chosen ?? (wide ? 'expanded' : 'collapsed')) === 'expanded'
   const toggleSidebar = () => { const next = desktopExpanded ? 'collapsed' : 'expanded'; rememberSidebar(next); setChosen(next) }
+  useShortcut({ keys: 'mod+\\', description: 'Show or hide the sidebar', group: 'General', run: toggleSidebar })
   const headerRef = useRef<HTMLElement>(null)
   const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null)
   const frozenHeight = useRef<number | null>(null)
@@ -97,17 +99,17 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
   const ownHeading = selected === 'month' || selected === 'settings'
   const pageTitle = selected === 'home' ? homeTitle ?? 'Home' : selected === 'month' ? 'Month' : selected === 'plan' ? 'Plan' : selected === 'spending' ? 'Spending' : 'Settings'
   const destinations = [
-    { id: 'home', label: 'Home', Icon: House, count: counts.home, countLabel: 'to do' },
-    { id: 'month', label: 'Month', Icon: CalendarDays },
-    { id: 'plan', label: 'Plan', Icon: List },
-    { id: 'spending', label: 'Spending', Icon: CreditCard, count: counts.spending, countLabel: 'to sort' },
+    { id: 'home', label: 'Home', Icon: House, count: counts.home, countLabel: 'to do', hint: 'G H' },
+    { id: 'month', label: 'Month', Icon: CalendarDays, hint: 'G M' },
+    { id: 'plan', label: 'Plan', Icon: List, hint: 'G P' },
+    { id: 'spending', label: 'Spending', Icon: CreditCard, count: counts.spending, countLabel: 'to sort', hint: 'G S' },
   ] as const
   /** "Spending, 4 to sort": the count is part of the name, since the collapsed rail shows only icons. */
   const accessibleName = (destination: typeof destinations[number]) => 'count' in destination && destination.count ? `${destination.label}, ${destination.count} ${destination.countLabel}` : destination.label
-  const sidebarLink = (id: PlannerView, label: string, name: string, icon: ReactNode, count?: number) => <button key={id} type="button" className="sidebar-link" aria-current={selected === id ? 'page' : undefined} aria-label={name} title={name} onClick={() => onSelectView(id)}>
+  const sidebarLink = (id: PlannerView, label: string, name: string, icon: ReactNode, hint: string, count?: number) => <button key={id} type="button" className="sidebar-link" aria-current={selected === id ? 'page' : undefined} aria-label={name} title={name} onClick={() => onSelectView(id)}>
     <span className="sidebar-icon" aria-hidden="true">{icon}{!!count && <span className="sidebar-dot"/>}</span>
     <span className="sidebar-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text={label} /></span>
-    {!!count && <span className="sidebar-count" aria-hidden="true">{count}</span>}
+    {count ? <span className="sidebar-count" aria-hidden="true">{count}</span> : <span className="sidebar-shortcut shortcut-hint" aria-hidden="true">{hint}</span>}
   </button>
   return <>
     {/* Pine, from under the status bar. Once its rows scroll away, the bar alone stays pinned to the top; the header keeps its height so nothing jumps. */}
@@ -128,11 +130,11 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
     {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(destination => <button key={destination.id} type="button" aria-current={selected === destination.id ? 'page' : undefined} aria-label={accessibleName(destination) === destination.label ? undefined : accessibleName(destination)} onClick={() => onSelectView(destination.id)}><span className="mobile-nav-icon" aria-hidden="true"><destination.Icon size={22} strokeWidth={2} />{'count' in destination && !!destination.count && <span className="mobile-nav-dot"/>}</span><span>{destination.label}</span></button>)}</nav>}
     <aside className={`planner-sidebar${desktopExpanded ? ' desktop-expanded' : ' is-compact'}`} aria-label="Application navigation">
       <div className="sidebar-rail">
-        <div className="desktop-sidebar-header"><span className="desktop-sidebar-brand" aria-hidden="true"><AnimatedSidebarText text="north." /></span><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} title={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={toggleSidebar}>{desktopExpanded ? <PanelLeftClose size={20} strokeWidth={2} aria-hidden="true"/> : <PanelLeftOpen size={20} strokeWidth={2} aria-hidden="true"/>}</button></div>
+        <div className="desktop-sidebar-header"><span className="desktop-sidebar-brand" aria-hidden="true"><AnimatedSidebarText text="north." /></span><button type="button" className="desktop-sidebar-toggle" aria-label={desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} title={`${desktopExpanded ? 'Collapse sidebar' : 'Expand sidebar'} (${isMac() ? '⌘' : 'Ctrl+'}\\)`} aria-expanded={desktopExpanded} aria-controls="desktop-navigation" onClick={toggleSidebar}>{desktopExpanded ? <PanelLeftClose size={20} strokeWidth={2} aria-hidden="true"/> : <PanelLeftOpen size={20} strokeWidth={2} aria-hidden="true"/>}</button></div>
         {/* The same four destinations as the phone's tab bar; Settings sits at the foot. Until setup is done, Settings is the only one. */}
         <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">
-          {setupComplete && destinations.map(destination => sidebarLink(destination.id, destination.label, accessibleName(destination), <destination.Icon size={22} strokeWidth={2} />, 'count' in destination ? destination.count : undefined))}
-          <div className="sidebar-foot-nav">{sidebarLink('settings', 'Settings', 'Settings', <Settings2 size={22} strokeWidth={2} />)}</div>
+          {setupComplete && destinations.map(destination => sidebarLink(destination.id, destination.label, accessibleName(destination), <destination.Icon size={22} strokeWidth={2} />, destination.hint, 'count' in destination ? destination.count : undefined))}
+          <div className="sidebar-foot-nav">{sidebarLink('settings', 'Settings', 'Settings', <Settings2 size={22} strokeWidth={2} />, 'G ,')}</div>
         </nav>
         <div className="sidebar-rail-utility">
           {warning && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status">{warning}</div>}</div>}

@@ -150,6 +150,22 @@ Use a filled pine primary button for the main action, outlined secondary buttons
 
 Dialogs and sheets need an accessible title, keyboard containment, Escape/close behavior, background isolation, independent scrolling and focus restoration. Preserve context when returning from detail. Status changes, validation and failures should be announced appropriately and remain understandable without color or icons. Ensure tap targets are comfortably usable; the mobile navigation is designed around at least 48 px targets and common controls around 44 px, but existing controls should be checked rather than assumed compliant.
 
+#### Keyboard
+
+North can be driven from the keyboard, as an enhancement: every action stays clickable. One registry (`src/state/shortcuts.ts`) owns one `keydown` listener; a screen registers its keys while it is mounted. Nothing fires while typing in a field, during IME composition, or while a dialog is open (Escape still closes it), and a key a component has already handled (To sort's table keys) is left alone. The first Tab on every screen is “Skip to content”.
+
+| Keys | Does |
+| --- | --- |
+| G then H, M, P, S or , | Go to Home, Month, Plan, Spending or Settings (the second key within a second; “G …” shows while it waits) |
+| / | Focus the page's search (Plan) |
+| N | The page's new thing: Add item (Plan), Add a transaction (Spending) |
+| I | Bring in transactions (Spending) |
+| [ and ] | Previous and next month (Month, Plan) |
+| ⌘\ (Ctrl+\ elsewhere) | Show or hide the sidebar |
+| ? | Keyboard shortcuts: everything this page offers |
+
+Hints show where there is a hovering pointer and room: “G M” beside sidebar items without a count, N on Add item, I on Bring in, / in Plan's search. Phones show none.
+
 ### Language
 
 Use plain, concise British English and familiar household finance terms. Label actions with verbs (“Edit income”, “Add item”) and name amounts with the glossary below. Explain scope in calendar months. State what needs attention and how to resolve it without blame. Avoid implying a payment has happened or that an account owner necessarily funds every item.

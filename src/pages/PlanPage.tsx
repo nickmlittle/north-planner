@@ -18,6 +18,7 @@ import type { PlanView } from './budget/usePlanView'
 import { formatMonth as monthLabel } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
 import type { PlanDestination } from '../state/navigation'
+import { useShortcut } from '../state/shortcuts'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 
@@ -51,6 +52,7 @@ export function PlanPage({ref,document,setDocument,month,budget,planView,mobileP
  const start=(item?:BudgetItem,template?:BudgetItem)=>{setInlineSavedItem(null);setSavedImpact(null);setEditingItem(item);setEditorTemplate(template);setEditorSession(session=>session+1);setEditor(true)}
  const duplicate=(item:BudgetItem)=>start(undefined,item)
  useImperativeHandle(ref,()=>({addItem:()=>start()}))
+ useShortcut({keys:'n',description:'Add item',group:'This page',run:()=>start()})
  const saveBatch=(batch:BudgetItemBatch)=>{
   const result=commitItemBatch(document,month,batch)
   if('error' in result)return result.error

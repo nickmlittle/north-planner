@@ -21,6 +21,8 @@ import { dayOf, plural, pounds, signedPounds, transactionMeta } from './spending
 import { movedByTransaction, moveState, potPhrase, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
 import { MoveToPotSheet } from './MoveToPotSheet'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
+import { Kbd } from '../components/ui/Kbd'
+import { useShortcut } from '../state/shortcuts'
 
 type Props = {
   document: BudgetDocument
@@ -85,6 +87,9 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const [moving, setMoving] = useState(false)
   const [checkingBalances, setCheckingBalances] = useState(false)
   const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
+  const hasCard = cardTracker(document).cards.length > 0
+  useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
+  useShortcut(hasCard ? { keys: 'n', description: 'Add a transaction', group: 'This page', run: () => setSheet('manual') } : null)
   const tabRefs = useRef<Partial<Record<SpendingSection, HTMLButtonElement | null>>>({})
   const toSort = transactionsToSort(tracker)
   const byRules = uncheckedRuleSorts(tracker)
@@ -133,7 +138,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const summary = <div className="spending-summary">
     <p className="spending-last"><strong>{tracker.cards.map(card => card.name).join(' · ')}</strong><span>{latest ? `Last brought in ${dayOf(latest.at)}` : 'Nothing brought in yet'}{!compact && sortedThrough ? ` · sorted to ${shortDate(sortedThrough)}` : ''}</span></p>
     <div className="spending-actions">
-      <button type="button" className="primary-button" onClick={() => setSheet('bring-in')}><FileSpreadsheet aria-hidden="true"/>Bring in transactions</button>
+      <button type="button" className="primary-button" onClick={() => setSheet('bring-in')}><FileSpreadsheet aria-hidden="true"/>Bring in transactions<span className="shortcut-hint" aria-hidden="true"><Kbd>I</Kbd></span></button>
       <button type="button" className="secondary-button" onClick={() => setSheet('manual')}><Plus aria-hidden="true"/>Add a transaction</button>
     </div>
   </div>

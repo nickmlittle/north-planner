@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from './App'
 import { budgetStorageKey } from './state/useBudgetDocument'
 import { newBudgetDocument } from './domain/budgetDocument'
+import { emptyCardTracker } from './domain/cardTracker'
 // Small fixtures still drive search and filters; the threshold has its own test.
 vi.mock('./pages/planListConfig', () => ({ PLAN_FILTER_MIN_ITEMS: 0 }))
 
@@ -486,4 +487,61 @@ it('leads Home with whoever is over and reviews their items on Plan', async () =
   await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page'))
   fireEvent.click(within(await screen.findByRole('region', { name: 'Plan summary' })).getByRole('button', { name: 'Open Plan' }))
   expect(window.location.search).toContain('view=plan')
+})
+
+it('is drivable from the keyboard: skip link, G then a key, / and N on Plan, [ ] for the month, ? for the list', async () => {
+  localStorage.setItem(budgetStorageKey, JSON.stringify(savedMixedTransferDocument()))
+  window.history.replaceState(null, '', '/?view=plan&month=2026-02')
+  render(<App />)
+  await planHeading()
+  const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(document.activeElement ?? document.body, { key, ...init })
+  // The first stop on the page skips to the content.
+  const skip = document.querySelector<HTMLAnchorElement>('a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])')!
+  expect(skip).toHaveTextContent('Skip to content')
+  fireEvent.click(skip)
+  expect(document.getElementById('content')).toHaveFocus()
+  // / focuses the search; a slash typed inside it is just a slash.
+  press('/')
+  const search = screen.getByPlaceholderText('Search budget')
+  expect(search).toHaveFocus()
+  expect(fireEvent.keyDown(search, { key: '/' })).toBe(true)
+  search.blur()
+  // [ and ] step the month.
+  press(']')
+  expect(window.location.search).toContain('month=2026-03')
+  press('[')
+  expect(window.location.search).toContain('month=2026-02')
+  // N adds an item; with its dialog open, letters don't fire.
+  press('n')
+  const editor = await screen.findByRole('form', { name: /Add/ })
+  press('g'); press('m')
+  expect(window.location.search).toContain('view=plan')
+  fireEvent.click(within(editor.closest('[role="dialog"]') ?? editor).getAllByRole('button', { name: /Close|Cancel/ })[0]!)
+  await waitFor(() => expect(screen.queryByRole('form', { name: /Add/ })).not.toBeInTheDocument())
+  // G then M opens Month; G then , opens Settings.
+  press('g'); press('m')
+  expect(await monthHeading()).toBeVisible()
+  press('g'); press(',')
+  expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
+  // ? lists what this page offers.
+  press('?', { shiftKey: true })
+  const sheet = screen.getByRole('dialog', { name: 'Keyboard shortcuts' })
+  expect(within(sheet).getByRole('region', { name: 'Go to' })).toHaveTextContent('Month')
+  expect(within(sheet).getByRole('region', { name: 'General' })).toHaveTextContent('Keyboard shortcuts')
+  expect(within(sheet).queryByText('Add item')).not.toBeInTheDocument()
+})
+
+it('brings in and adds transactions from the keyboard on Spending', async () => {
+  const saved = savedTransferDocument()
+  saved.card = { ...emptyCardTracker(), cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'account-1', cardholders: [] }] }
+  localStorage.setItem(budgetStorageKey, JSON.stringify(saved))
+  window.history.replaceState(null, '', '/?view=spending')
+  render(<App />)
+  await screen.findByRole('button', { name: 'Bring in transactions' })
+  fireEvent.keyDown(document.body, { key: 'i' })
+  expect(await screen.findByRole('dialog', { name: /Bring in/ })).toBeInTheDocument()
+  fireEvent.keyDown(screen.getByRole('dialog', { name: /Bring in/ }), { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  fireEvent.keyDown(document.body, { key: 'n' })
+  expect(await screen.findByRole('dialog', { name: 'Add a transaction' })).toBeInTheDocument()
 })

@@ -1,0 +1,10 @@
+/* The keyboard shortcuts sheet. Tokens only (styles.tokens.test.ts). */
+.shortcuts-sheet .shortcuts-group+.shortcuts-group{margin-top:var(--space-5)}
+.shortcuts-sheet .shortcuts-group h3{margin:0 0 var(--space-2);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
+.shortcuts-sheet dl{display:grid;margin:0}
+.shortcuts-sheet dl>div{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:36px;border-top:1px solid var(--border)}
+.shortcuts-sheet dl>div:first-child{border-top:0}
+.shortcuts-sheet dt{color:var(--text);font-size:var(--text-md)}
+.shortcuts-sheet dd{display:flex;gap:var(--space-2);margin:0}
+.shortcuts-keys{display:inline-flex;align-items:center;gap:var(--space-1)}
+.shortcuts-or{margin-right:var(--space-1);color:var(--text-muted);font-size:var(--text-sm)}
