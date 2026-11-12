@@ -1,0 +1,48 @@
+/* Home (audit 3 PR 10): the strip, To do, Coming up and Done. Tokens only (styles.tokens.test.ts). */
+.home-page{display:grid;align-content:start;gap:var(--space-5)}
+.home-page>.page-header{margin:0}
+.home-page .stat-strip{background:var(--card)}
+.home-tile-sub{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.home-tile-warning{color:var(--warning);font-weight:var(--weight-medium)}
+.home-columns{display:grid;gap:var(--space-5);align-items:start}
+.home-side{display:grid;gap:var(--space-5);align-content:start}
+.home-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--card);overflow:hidden}
+.home-list>li+li>.list-row{border-top:1px solid var(--border)}
+.home-list-label{padding:var(--space-2) var(--space-4);border-top:1px solid var(--border);background:var(--surface-sunken);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.home-list-label+li>.list-row{border-top:0}
+.home-figure{font-weight:var(--weight-bold)}
+.home-figure.is-critical{color:var(--critical)}
+.home-list .list-row.is-critical .list-row-icon{background:var(--critical-bg);color:var(--critical)}
+/* Fund: each person's steps with a small bar. */
+.home-progress{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-3)}
+.home-progress-person{display:inline-flex;align-items:center;gap:var(--space-2)}
+.home-progress-bar{display:inline-block;width:56px;height:4px;border-radius:var(--radius-pill);background:var(--border);overflow:hidden}
+.home-progress-bar>span{display:block;height:100%;background:var(--accent)}
+/* Coming up: a date column in place of the icon. */
+.home-coming .list-row{grid-template-columns:48px minmax(0,1fr) auto 16px}
+.home-coming .list-row.no-chevron{grid-template-columns:48px minmax(0,1fr) auto}
+.home-coming .list-row-icon{width:auto;height:auto;background:none;color:var(--text);place-items:start}
+.home-date{display:grid;font-size:var(--text-sm);font-weight:var(--weight-medium);line-height:1.2;font-variant-numeric:tabular-nums}
+.home-date>span{color:var(--text-muted);font-weight:var(--weight-regular)}
+.home-done .list-row-title{text-decoration:line-through}
+@media(min-width:768px){
+  .planner-app-content .home-page.page-frame{overflow-y:auto}
+}
+@media(min-width:1100px){
+  .home-columns{grid-template-columns:minmax(0,1fr) 340px;gap:var(--space-5)}
+}
+@media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
+  /* The strip as three rows: label and figure, the detail below; the whole row opens (its Open link, stretched). */
+  .home-page .stat-tile{position:relative;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--space-3);align-items:baseline}
+  .home-page .stat-tile-label{grid-column:1;color:var(--text);font-size:var(--text-md)}
+  .home-page .stat-tile-value{grid-column:2;grid-row:1;font-size:var(--text-lg);text-align:right}
+  .home-page .stat-tile-detail{grid-column:1/-1}
+  .home-page .stat-tile-open{position:absolute;inset:0;min-height:0;margin:0;color:transparent;overflow:hidden}
+  .home-page .stat-tile-open svg{display:none}
+  .home-tile-sub{display:none}
+  .home-progress-bar{display:none}
+  /* Rows keep to one line each so the strip and five tasks fit above the tab bar. */
+  .home-list .list-row-text>.list-row-meta{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .home-list .list-row-text{overflow:hidden}
+  .home-progress{flex-wrap:nowrap}
+}
