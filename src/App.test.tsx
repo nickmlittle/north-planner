@@ -86,7 +86,8 @@ it('keeps the sidebar controls and routes between Settings, Plan and Month', asy
   const nav = screen.getByRole('navigation', { name: 'Main navigation' })
   fireEvent.click(within(nav).getByRole('button', { name: 'Settings' }))
   expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
-  expect(screen.getByRole('heading', { level: 2, name: 'Household' })).toBeVisible()
+  // jsdom gets the phone presentation: Settings is a list of its sections.
+  expect(within(screen.getByRole('list', { name: 'Settings sections' })).getByRole('button', { name: /^Household/ })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Continue to Plan' })).not.toBeInTheDocument()
   expect(window.location.search).toContain('view=settings')
   fireEvent.click(within(nav).getByRole('button', { name: 'Month' }))
@@ -195,6 +196,7 @@ it('keeps a set-up household with a blank name on Settings until it is fixed', a
   expect(screen.getByRole('alert')).toHaveTextContent('Enter a household name and at least one adult name.')
   expectNoBudgetNavigation()
   fireEvent.change(screen.getByLabelText('Household name'), { target: { value: 'Home' } })
+  fireEvent.blur(screen.getByLabelText('Household name'))
   expect(await planHeading()).toBeVisible()
 })
 

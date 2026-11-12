@@ -1,13 +1,16 @@
 import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { Plus, X } from 'lucide-react'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EmptyState, ListRow, Sheet } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { addDays, cardDraftErrors, cardFromDraft, cardTracker, closeDateFor, draftFromCard, localDate, saveCard, shiftMonth, type CardAccount, type CardDraft, type CardDraftErrors } from '../domain/cardTracker'
+import { addDays, cardDraftErrors, cardFromDraft, cardRemovable, cardTracker, closeDateFor, draftFromCard, localDate, removeCard, saveCard, shiftMonth, type CardAccount, type CardDraft, type CardDraftErrors } from '../domain/cardTracker'
 import { potPhrase } from '../domain/setAside'
+import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationGroups, ordinal, shortDate } from './cardLabels'
 import { statementName } from './spendingFormat'
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; today?: string }
+type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; today?: string; notify?: (message: string) => void }
 
 /** A worked example for the entered days, so a typo shows before saving: "Statements run from the 25th to the 24th." */
 function previewFor(draft: CardDraft) {
@@ -31,47 +34,30 @@ function statementChoices(closeDayText: string, today: string): Array<{ closeDat
   })
 }
 
-/** Household → Cards: add or edit a card. The closing day and days until due are required, with no defaults. */
-export function CardSettings({ document, setDocument, today = localDate() }: Props) {
+/** The card form: the closing day and days until due are required, with no defaults. Rendered in a Sheet. */
+function CardForm({ document, card, today, formId, title, onSaved }: { document: BudgetDocument; card?: CardAccount; today: string; formId: string; title: string; onSaved: (card: CardAccount) => void }) {
   const id = useId()
-  const tracker = cardTracker(document)
   const { accounts } = document.budget
   const adults = document.household.adults
   const accountNames = shortAccountLabels(accounts, adults)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [draft, setDraft] = useState<CardDraft | null>(null)
+  const [draft, setDraft] = useState<CardDraft>(() => draftFromCard(card, document.budget))
   const [errors, setErrors] = useState<CardDraftErrors>({})
-  const [status, setStatus] = useState('')
-
-  const open = (card?: CardAccount) => {
-    if (editing === (card?.id ?? 'new')) { close(); return }
-    setEditing(card?.id ?? 'new'); setDraft(draftFromCard(card, document.budget)); setErrors({}); setStatus('')
-  }
-  const close = () => { setEditing(null); setDraft(null); setErrors({}) }
   const save = (event: FormEvent) => {
     event.preventDefault()
-    if (!draft) return
     const found = cardDraftErrors(draft, document.budget)
     setErrors(found)
     if (Object.keys(found).length) return
-    const card = cardFromDraft(draft, editing === 'new' || !editing ? crypto.randomUUID() : editing)
-    setDocument(current => saveCard(current, card))
-    close(); setStatus(`${card.name} saved.`)
+    onSaved(cardFromDraft(draft, card?.id ?? crypto.randomUUID()))
   }
   const potLabel = (potId: string) => { const pot = document.budget.pots.find(row => row.id === potId); return pot ? `${pot.name} · ${accountNames.get(pot.accountId) ?? 'Account'}` : 'Pot' }
-  const summary = (card: CardAccount) => `Closes on the ${ordinal(card.closeDay)} · due ${card.dueDaysAfterClose} days later · paid from ${card.setAside ? potPhrase(document.budget.pots.find(pot => pot.id === card.setAside!.potId)?.name ?? 'Amex') : accountNames.get(card.payFromAccountId) ?? 'an account'}${card.setAside ? ` from the ${statementName(card.setAside.fromCloseDate)}` : ''}`
-  const holders = (card: CardAccount) => card.cardholders.length
-    ? card.cardholders.map(row => `${adults.find(person => person.id === row.personId)?.name ?? 'Someone'}’s ends ${row.suffix}`).join(' · ')
-    : 'No card endings yet. North asks when it first sees one.'
-
   /** Editing a field clears its error until the next save. */
-  const update = (next: Partial<CardDraft>, name: keyof CardDraftErrors) => { if (draft) setDraft({ ...draft, ...next }); if (errors[name]) setErrors(current => { const rest = { ...current }; delete rest[name]; return rest }) }
+  const update = (next: Partial<CardDraft>, name: keyof CardDraftErrors) => { setDraft({ ...draft, ...next }); if (errors[name]) setErrors(current => { const rest = { ...current }; delete rest[name]; return rest }) }
   const field = (name: keyof CardDraftErrors) => ({ 'aria-invalid': !!errors[name] || undefined, 'aria-describedby': errors[name] ? `${id}-${name}-error` : undefined })
   const error = (name: keyof CardDraftErrors) => errors[name] && <span id={`${id}-${name}-error`} className="input-error card-settings-error">{errors[name]}</span>
-  const payFrom = draft ? accountNames.get(draft.payFromAccountId) : undefined
+  const payFrom = accountNames.get(draft.payFromAccountId)
 
-  const form = draft && <form className="card-settings-form" aria-label={editing === 'new' ? 'Add a card' : `Edit ${draft.name || 'card'}`} onSubmit={save} noValidate>
-    <div className="card-settings-field"><label className="setup-field">Name<input value={draft.name} onChange={event => update({ name: event.target.value }, 'name')} {...field('name')}/></label>{error('name')}</div>
+  return <form id={formId} className="card-settings-form" aria-label={title} onSubmit={save} noValidate>
+    <div className="card-settings-field"><label className="setup-field">Name<input data-autofocus value={draft.name} onChange={event => update({ name: event.target.value }, 'name')} {...field('name')}/></label>{error('name')}</div>
     <div className="card-settings-days">
       <div className="card-settings-field"><label className="setup-field">Statement closes on day<input inputMode="numeric" value={draft.closeDay} onChange={event => update({ closeDay: event.target.value }, 'closeDay')} placeholder="1–28" {...field('closeDay')}/></label>{error('closeDay')}</div>
       <div className="card-settings-field"><label className="setup-field">Days until payment is due<input inputMode="numeric" value={draft.dueDays} onChange={event => update({ dueDays: event.target.value }, 'dueDays')} {...field('dueDays')}/></label>{error('dueDays')}</div>
@@ -106,19 +92,44 @@ export function CardSettings({ document, setDocument, today = localDate() }: Pro
       {error('cardholders')}
       <button type="button" className="text-button" onClick={() => setDraft({ ...draft, cardholders: [...draft.cardholders, { suffix: '', personId: '' }] })}>Add a card ending</button>
     </fieldset>
-    <div className="card-settings-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="submit" className="primary-button">Save card</button></div>
   </form>
+}
 
-  return <section className="setup-card card-settings" aria-labelledby={`${id}-title`}>
-    <h2 id={`${id}-title`}>Cards</h2>
-    {!accounts.length ? <p className="setup-intro">Add an account on the Plan first. A card is paid from one of them.</p> : <>
-      {status && <p className="budget-manage-message" role="status">{status}</p>}
-      {tracker.cards.length > 0 && <ul className="card-settings-list">{tracker.cards.map(card => <li key={card.id}>
-        <div className="card-settings-summary"><strong>{card.name}</strong><span>{summary(card)}</span><span>{holders(card)}</span></div>
-        <button type="button" className="secondary-button" aria-expanded={editing === card.id} onClick={() => open(card)}>Edit {card.name}</button>
-        {editing === card.id && form}
-      </li>)}</ul>}
-      {editing === 'new' ? form : <button type="button" className="secondary-button" onClick={() => open()}><Plus aria-hidden="true"/>Add a card</button>}
-    </>}
-  </section>
+/**
+ * Settings › Cards: one row per card ("Closes on the 24th · due 25 days later · paid from …"), with Edit and
+ * Remove under ⋯, and "Add a card". The form opens in a Sheet.
+ */
+export function CardSettings({ document, setDocument, today = localDate(), notify = () => {} }: Props) {
+  const formId = useId()
+  const tracker = cardTracker(document)
+  const { accounts } = document.budget
+  const adults = document.household.adults
+  const accountNames = shortAccountLabels(accounts, adults)
+  const [editing, setEditing] = useState<CardAccount | 'new' | null>(null)
+  const [removing, setRemoving] = useState<CardAccount | null>(null)
+  const summary = (card: CardAccount) => `Closes on the ${ordinal(card.closeDay)} · due ${card.dueDaysAfterClose} days later · paid from ${card.setAside ? potPhrase(document.budget.pots.find(pot => pot.id === card.setAside!.potId)?.name ?? 'Amex') : accountNames.get(card.payFromAccountId) ?? 'an account'}${card.setAside ? ` from the ${statementName(card.setAside.fromCloseDate)}` : ''}`
+  const holders = (card: CardAccount) => card.cardholders.length
+    ? card.cardholders.map(row => `${adults.find(person => person.id === row.personId)?.name ?? 'Someone'} ··${row.suffix}`).join(' · ')
+    : 'No card endings yet. North asks when it first sees one.'
+  const title = editing === 'new' ? 'Add a card' : editing ? `Edit ${editing.name}` : ''
+
+  if (!accounts.length) return <EmptyState title="No accounts yet">Add an account first. A card is paid from one of them.</EmptyState>
+  return <div className="card-settings">
+    {tracker.cards.length > 0 ? <ul className="settings-list" aria-label="Cards">{tracker.cards.map(card => <li key={card.id}>
+      <ListRow title={card.name} meta={`${summary(card)} · ${holders(card)}`} trailing={<BudgetOptionsMenu row label={`More actions for ${card.name}`} options={[
+        { label: 'Edit', onSelect: () => setEditing(card) },
+        ...cardRemovable(tracker, card.id) ? [{ label: 'Remove', onSelect: () => setRemoving(card) }] : [],
+      ]}/>}/>
+    </li>)}</ul> : <EmptyState title="No cards yet">Add a credit card to bring in its statements and settle up.</EmptyState>}
+    <div className="settings-list-actions"><button type="button" className="secondary-button" onClick={() => setEditing('new')}><Plus aria-hidden="true"/>Add a card</button></div>
+    {editing && <Sheet title={title} size="lg" onClose={() => setEditing(null)} footer={<>
+      <button type="button" className="secondary-button" onClick={() => setEditing(null)}>Cancel</button>
+      <button type="submit" form={formId} className="primary-button">Save card</button>
+    </>}>
+      <CardForm document={document} card={editing === 'new' ? undefined : editing} today={today} formId={formId} title={title} onSaved={card => { setDocument(current => saveCard(current, card)); setEditing(null); notify(`${card.name} saved.`) }}/>
+    </Sheet>}
+    {removing && <ConfirmDialog title={`Remove ${removing.name}?`} confirmLabel="Remove card" danger onCancel={() => setRemoving(null)} onConfirm={() => { setDocument(current => removeCard(current, removing.id)); setRemoving(null); notify(`${removing.name} removed.`) }}>
+      <p>It has no transactions or statements yet, so nothing else changes.</p>
+    </ConfirmDialog>}
+  </div>
 }

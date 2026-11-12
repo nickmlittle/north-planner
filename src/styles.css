@@ -166,7 +166,7 @@ h1:focus, .error-summary:focus { outline: none }
 .danger-button { background: var(--danger); color: var(--white); border: 1px solid var(--danger) }
 .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) }
 .context-note { padding: var(--space-4) var(--space-4); border-radius: var(--radius-md); font-size: var(--text-md); line-height: 1.6; margin: var(--space-5) 0 }
-.error-summary, .removal-panel { background: var(--status-error-bg); padding: var(--space-4); border: 1px solid var(--status-error-line); border-radius: var(--radius-md); margin: var(--space-4) 0; color: var(--status-error) }
+.error-summary { background: var(--status-error-bg); padding: var(--space-4); border: 1px solid var(--status-error-line); border-radius: var(--radius-md); margin: var(--space-4) 0; color: var(--status-error) }
 
 @media (max-width: 640px) {
   .page-description { font-size: var(--text-md) }
@@ -465,9 +465,7 @@ main[tabindex="-1"]:focus{outline:none}
 .household-setup-page .setup-field input{width:100%;min-height:var(--control-h);background:var(--surface-field);color:var(--charcoal)}
 .household-person-row{display:flex;align-items:end;gap:var(--space-3);margin:0 0 var(--space-4)}
 .household-person-row .setup-field{flex:1}
-.household-person-row .text-button{flex:0 0 auto;margin-bottom:var(--space-2)}
-.household-setup-page .removal-panel{padding:var(--space-4);margin:var(--space-3) 0;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--cream)}
-@media(max-width:767px){.household-person-row{align-items:stretch;flex-direction:column;gap:var(--space-1)}}
+.household-person-row .household-person-remove{flex:none;width:var(--control-h-touch);height:var(--control-h-touch);margin-bottom:calc((var(--control-h) - var(--control-h-touch)) / 2)}
 .setup-progress{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);margin:0 0 var(--space-4);padding:0;list-style:none;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .setup-progress li{display:flex;align-items:center;gap:var(--space-2)}
 .setup-progress-number{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--line-strong);border-radius:50%;font-variant-numeric:tabular-nums}
