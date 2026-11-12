@@ -39,7 +39,7 @@ it('stores the October statement’s settle-up ticks under the same keys', () =>
     return <Spending document={document} setDocument={setDocument} view={view} onSelectView={setView} onOpenCardSettings={() => {}} onOpenMonth={() => {}} statementKey={statement} onOpenStatement={setStatement} today="2026-11-12"/>
   }
   render(<Harness/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))
+  // The steps are on the statement's page itself (audit 3 PR 14).
   tickEverything()
   expect(Object.keys(saved!.card?.statements['amex:2026-10-24']?.ticks ?? {}).sort()).toEqual(SETTLE_KEYS)
 })

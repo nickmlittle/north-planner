@@ -509,43 +509,53 @@ function statementHousehold(): BudgetDocument {
 
 it('lists statements newest first with where each one is', () => {
   render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30"/>)
-  expect(screen.getAllByRole('button', { name: /statement/ }).map(row => row.textContent)).toEqual([
-    'November statement£737.91 25 Oct – 24 Nov · due Sat 19 DecNeeds the final export',
-    'October statement£40.0025 Sep – 24 Oct · due Wed 18 NovReady to settle · due Wed 18 Nov',
-  ].map(text => text.replace('£737.91 ', '£737.91')))
+  expect(within(screen.getByRole('list', { name: 'Statements' })).getAllByRole('button').map(row => row.textContent)).toEqual([
+    'November statement25 Oct – 24 Nov · due Sat 19 Dec£737.91Needs the final export',
+    'October statement25 Sep – 24 Oct · due Wed 18 Nov£40.00Ready to settle · due Wed 18 Nov',
+  ])
+  expect(screen.getByText('Needs the final export')).toHaveClass('is-warning')
 })
 
-it('shows a statement’s checks, months and shares, and settles up step by step', () => {
+it('shows a statement’s checks, then its Settle up steps on the same page, with the breakdown folded', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30" onChange={next => { saved = next }}/>)
   fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
   expect(screen.getByRole('heading', { name: 'November statement' })).toBeInTheDocument()
-  expect(screen.getByText('To pay Amex').nextElementSibling).toHaveTextContent('£737.91')
-  expect(screen.getByText('All 10 transactions sorted')).toBeInTheDocument()
+  expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Statements' })).toBeInTheDocument()
+  expect(screen.getByText('To Amex by Sat 19 Dec').nextElementSibling).toHaveTextContent('£737.91')
+  expect(screen.getByText('✓ All 10 sorted')).toBeInTheDocument()
   expect(screen.getByText('No summary from Amex yet')).toBeInTheDocument()
-  expect(screen.getByText('Amex shows a payment of £40.00 on 8 Nov')).toBeInTheDocument()
-  expect([...window.document.querySelectorAll('.statement-months > div')].map(row => row.textContent)).toEqual(['Counts in October£10.00', 'Counts in November£727.91'])
-  expect(within(screen.getByRole('region', { name: 'Ada' })).getByText('Treats · Ada').nextElementSibling).toHaveTextContent('£212.50')
-  expect(within(screen.getByRole('region', { name: 'Joint' })).getByText('One-offs, already in Joint').nextElementSibling).toHaveTextContent('£112.81')
-  // Not complete yet: bring in the final export, or settle without it.
-  expect(screen.queryByRole('button', { name: 'Settle up' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Settle without the final export' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))
-  expect(screen.getByRole('heading', { name: 'Settle up · November statement' })).toBeInTheDocument()
-  expect(screen.getByText('0 of 5 done')).toBeInTheDocument()
+  // The breakdown is folded, with its figures inside.
+  const months = screen.getByText('Which months it counts in').closest('details')!
+  expect(months).not.toHaveAttribute('open')
+  expect(months.querySelector('summary')).toHaveTextContent('October £10.00 · November £727.91')
+  expect([...months.querySelectorAll('.statement-months > div')].map(row => row.textContent)).toEqual(['Counts in October£10.00', 'Counts in November£727.91'])
+  const shares = screen.getByText('Shares by account').closest('details')!
+  expect(within(within(shares).getByRole('region', { name: 'Ada' })).getByText('Treats · Ada').nextElementSibling).toHaveTextContent('£212.50')
+  expect(within(within(shares).getByRole('region', { name: 'Joint' })).getByText('One-offs, already in Joint').nextElementSibling).toHaveTextContent('£112.81')
+  // Not complete yet: what it's waiting for instead of steps.
+  const waiting = screen.getByRole('list', { name: 'Before you can settle up' })
+  expect(waiting).toHaveTextContent('Bring in the final export')
+  expect(waiting).toHaveTextContent('Amex shows a payment of £40.00 on 8 Nov')
+  expect(screen.queryByRole('region', { name: 'Settle-up steps' })).not.toBeInTheDocument()
+  fireEvent.click(within(waiting).getByRole('button', { name: 'Settle without it' }))
+  // Ready: the steps come inline, in account columns.
+  expect(screen.getByRole('heading', { name: 'Settle up0 of 5 done' })).toBeInTheDocument()
   const ada = within(screen.getByRole('region', { name: 'Ada steps' }))
   expect(ada.getAllByRole('listitem').map(item => item.querySelector('.step-main')?.textContent)).toEqual(['Out of Treats£212.50', 'Send to Joint£212.50'])
   // Joint's pot moves and paying Amex from Joint are one group, with Pay last.
   const joint = within(screen.getByRole('region', { name: 'Joint steps' }))
   expect(joint.getAllByRole('listitem').map(item => item.querySelector('.step-main')?.textContent)).toEqual(['Out of Eating out£64.00', 'Out of Groceries£348.60', 'Pay Amex from Joint£737.91'])
-  expect(joint.getByText('Pay Amex from Joint').nextElementSibling).toHaveTextContent('£737.91')
   expect(joint.getByText('Includes £112.81 of one-offs already in Joint')).toBeInTheDocument()
   fireEvent.click(ada.getByRole('button', { name: 'Out of Treats done' }))
   expect(saved!.card!.statements['amex:2026-11-24']!.ticks!['settle:out:treats']).toMatchObject({ amountPence: 21250 })
-  expect(screen.getByText('1 of 5 done')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Settle up1 of 5 done' })).toBeInTheDocument()
   for (const name of ['Send to Joint done', 'Out of Eating out done', 'Out of Groceries done', 'Pay Amex from Joint done']) fireEvent.click(screen.getByRole('button', { name }))
-  expect(screen.getByText('The November statement is settled')).toBeInTheDocument()
   expect(saved!.card!.statements['amex:2026-11-24']!.settledAt).toEqual(expect.any(String))
+  // All ticked: the chip says Settled and the steps fold to one line; no banner.
+  expect(screen.getAllByText(/^Settled /).length).toBeGreaterThan(0)
+  expect(screen.getByRole('button', { name: /^Settle up5 of 5 done/ })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByText(/is settled/)).not.toBeInTheDocument()
 })
 
 it('says what a statement is waiting for before it can be settled', () => {
@@ -553,9 +563,11 @@ it('says what a statement is waiting for before it can be settled', () => {
   document.card!.transactions.push(tx('late', '2026-11-20', 'NEW SHOP', 500))
   render(<Harness initial={document} startView="statements" today="2026-11-20"/>)
   fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
-  expect(screen.getByText('You can settle up once it closes on Tue 24 Nov.')).toBeInTheDocument()
-  expect(screen.getByText('1 to sort')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Sort them' }))
+  const waiting = screen.getByRole('list', { name: 'Before you can settle up' })
+  expect(within(waiting).getByText('Closes Tue 24 Nov')).toBeInTheDocument()
+  expect(within(waiting).getByText('1 transaction to sort')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Settle up/ })).not.toBeInTheDocument()
+  fireEvent.click(within(waiting).getByRole('button', { name: 'Sort them' }))
   expect(screen.getByRole('heading', { name: /^To sort/ })).toBeInTheDocument()
 })
 
@@ -563,7 +575,7 @@ it('offers to tick Pay when Amex shows a matching payment', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={statementHousehold()} startView="statements" today="2026-11-30" onChange={next => { saved = next }}/>)
   fireEvent.click(screen.getByRole('button', { name: /^October statement/ }))
-  expect(screen.getByText('Matches Amex’s summary')).toBeInTheDocument()
+  expect(screen.getByText('✓ Matches Amex’s summary')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Tick Pay Amex' })).not.toBeInTheDocument()
   cleanup()
   const document = statementHousehold()
@@ -809,18 +821,16 @@ describe('the Amex pot', () => {
     document.card!.statements['amex:2026-11-24'] = { cardId: 'amex', closeDate: '2026-11-24', settleWithoutFinalAt: '2026-11-26T09:00:00Z' }
     render(<Harness initial={document} startView="statements" today="2026-11-30"/>)
     fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
-    expect(screen.getByText('£0.00 of £102.80 is in the Amex pot · £102.80 sorted and still to move')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }))
+    // Ready: the steps are inline, starting with the Amex pot.
     expect(screen.getByText('Move the rest to the Amex pot')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' })).toBeInTheDocument()
-    expect(screen.getByText('0 of 2 done')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Settle up0 of 2 done' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Move them' }))
     const dialog = screen.getByRole('dialog', { name: 'Move to the Amex pot' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Moved £102.80' }))
     expect(screen.getByText('Everything is in the Amex pot')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' }))
-    expect(screen.getByText('2 of 2 done')).toBeInTheDocument()
-    expect(screen.getByText('The November statement is settled')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Settle up2 of 2 done/ })).toBeInTheDocument()
   })
 
   it('shows nothing to move without a set-aside pot', () => {
