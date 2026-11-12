@@ -1,6 +1,29 @@
 /* Month (interim, audit 3 PR 06): the payday steps, then the pots. Tokens only (styles.tokens.test.ts). */
 .month-page .ui-section+.ui-section{margin-top:var(--space-6)}
 .month-page .month-message{margin:0 0 var(--space-3)}
+.month-page .month-close-blocker{margin:calc(-1 * var(--space-3)) 0 var(--space-3);color:var(--text-muted);font-size:var(--text-sm);text-align:right}
+.month-page .month-changed{margin:0 0 var(--space-4);color:var(--warning);font-size:var(--text-md);font-weight:var(--weight-medium)}
+/* Close <Month>, inline on an ended month. */
+.close-sections{display:block}
+.month-page .close-sections+.ui-section,.month-page .ui-section+.close-sections{margin-top:var(--space-6)}
+.close-sections[tabindex="-1"]:focus{outline:0}
+.close-list{margin:0;padding:0;list-style:none;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.close-list>li+li>.list-row{border-top:1px solid var(--border)}
+.close-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-1) var(--space-3);white-space:normal}
+.close-covers{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg)}
+.close-covers>.step-row:first-child{border-top:0}
+.step-row .close-cover-from{display:inline-block;width:auto;min-width:0;max-width:100%;height:auto;min-height:28px;margin:0;padding:0 var(--space-5) 0 var(--space-2);border-color:var(--border);background-color:var(--surface);color:var(--accent);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.close-none{margin:0;color:var(--text-muted)}
+.close-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.close-left{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.close-left th,.close-left td{padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);text-align:left}
+.close-left thead th{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.close-left tbody tr:last-child>*{border-bottom:0}
+.close-left .is-num{text-align:right}
+.close-left tbody th{font-weight:var(--weight-medium)}
+.close-flag-actions{text-align:right;white-space:nowrap}
+.close-flag-actions>*+*{margin-left:var(--space-2)}
+.close-flag{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
 @media(min-width:768px){
   /* One scrolling page: the header, Payday, then Pots (Plan keeps its own fixed header and scrolling table). */
   .planner-app-content .month-page.monthly-budget-page.page-frame{display:block;overflow-y:auto}
@@ -8,6 +31,9 @@
 }
 @media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
   /* The first heading sits on the pine band that runs on under the app header. */
-  .month-page>.ui-section:first-of-type .ui-section-count{color:var(--on-pine-muted);white-space:nowrap}
-  .month-page>.ui-section:first-of-type .ui-section-title,.month-page>.pot-detail>.spending-back,.month-page>.close-month>.spending-back{color:var(--cream)}
+  .month-page>.month-close-blocker{margin:0 0 var(--space-3);color:var(--on-pine-muted);text-align:left}
+  .month-page>.ui-section:first-child .ui-section-count,.month-page>.close-sections:first-child>.ui-section:first-of-type .ui-section-count{color:var(--on-pine-muted);white-space:nowrap}
+  .month-page>.ui-section:first-child .ui-section-title,.month-page>.close-sections:first-child>.ui-section:first-of-type .ui-section-title{color:var(--cream)}
+  /* A pot page's way back: the breadcrumb, on the pine band (the header moves into the app header). */
+  .month-page .pot-detail>nav .breadcrumb,.month-page .pot-detail>nav .breadcrumb li,.month-page .pot-detail>nav .breadcrumb-link{color:var(--cream)}
 }

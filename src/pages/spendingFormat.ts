@@ -1,11 +1,11 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { localDate, type CardTransaction } from '../domain/cardTracker'
+import { lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
 import { formatGBP } from '../formatting/money'
 import { dayDate } from './cardLabels'
 import type { StatementSummary } from '../domain/cardStatements'
 import { formatMonth } from '../formatting/month'
 import type { MonthSpending } from '../domain/cardSpending'
-import type { MonthStatus } from '../domain/monthStages'
+import type { ClosePlan, MonthStatus } from '../domain/monthStages'
 
 export const pounds = (pence: number) => formatGBP(pence / 100)
 /** "£62.40", or "−£24.99" for a refund. */
@@ -46,3 +46,13 @@ export function stageLabel(stage: MonthStatus, figures: MonthSpending): string {
   if (stage.stage === 'settled') return 'Settled'
   return stage.stage === 'funded' ? 'Funded' : stage.stage === 'funding' ? `Funding · ${stage.funding.done} of ${stage.funding.total}` : 'Not started'
 }
+
+/** Why Close <Month> can't be pressed yet, for the button's title and the line beside it; null when it can. */
+export function closeBlocker(plan: ClosePlan, month: string, today: string): string | null {
+  if (plan.readiness.canClose) return null
+  const name = monthName(month)
+  if (today <= lastDayOf(month)) return `${name} ends on ${dayDate(lastDayOf(month))}.`
+  if (plan.readiness.toSort) return `Sort ${plural(plan.readiness.toSort, 'transaction')} first.`
+  return `Waiting for late ${name} transactions to post.`
+}
+

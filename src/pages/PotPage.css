@@ -1,0 +1,20 @@
+/* A pot's page (audit 3 PR 12): the lead card, one balance line, transactions. Tokens only (styles.tokens.test.ts). */
+.pot-detail{display:grid;gap:var(--space-5);min-width:0;max-width:880px}
+.pot-detail>.page-header{margin:0}
+.pot-lead{display:grid;gap:var(--space-1);padding:var(--space-4) var(--space-5);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-lead p{margin:0}
+.pot-lead-label{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.pot-lead-value{color:var(--text);font-size:var(--text-2xl);font-weight:var(--weight-bold);line-height:1.2;font-variant-numeric:tabular-nums}
+.pot-lead-value small{color:var(--text-muted);font-size:var(--text-md);font-weight:var(--weight-regular)}
+.pot-lead-pace,.pot-lead-status{color:var(--text);font-size:var(--text-md)}
+.pot-lead-status.is-over{color:var(--critical)}
+.pot-runout{color:var(--warning);font-size:var(--text-md);font-weight:var(--weight-medium)}
+.pot-lead .carry-over-sums{margin-top:var(--space-2)}
+.pot-balance-line{margin:0;font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.pot-balance-how{margin-top:var(--space-2);color:var(--text-muted);font-size:var(--text-sm)}
+.pot-balance-how summary{min-height:32px;color:var(--accent);font-weight:var(--weight-medium);cursor:pointer}
+.pot-balance-how .carry-over-sums,.pot-detail .ui-section .carry-over-sums{margin:var(--space-2) 0 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.pot-list{margin:0;padding:0;list-style:none;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-list>li+li>.list-row{border-top:1px solid var(--border)}
+.pot-credit{color:var(--positive)}
+.pot-none{margin:0;color:var(--text-muted);font-size:var(--text-md)}

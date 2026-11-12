@@ -415,31 +415,47 @@ function monthHousehold(): BudgetDocument {
 
 it('shows planned vs spent for each pot this month, grouped like Plan, with pace', () => {
   render(<MonthHarness initial={monthHousehold()}/>)
-  expect(screen.getByRole('heading', { level: 2, name: 'Pots' })).toBeInTheDocument()
-  expect(screen.getByText('Spent on Amex so far')).toBeInTheDocument()
-  expect(screen.getByText('of £870.00 planned').parentElement).toHaveTextContent('£727.92 of £870.00 planned')
-  expect(screen.getByText('2 pots need care · 18 days left · sorted to 26 Nov')).toBeInTheDocument()
-  expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['Joint', 'Ada', 'Accounts'])
-  expect(screen.getByRole('button', { name: 'Groceries: £338.61 of £520.00. £131 ahead of pace · £181.39 left' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Eating out: £64.00 of £150.00. On track · £86.00 left' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Treats: £212.50 of £200.00. £12.50 over · covered when November closes' })).toBeInTheDocument()
-  expect(within(screen.getByRole('region', { name: 'Accounts' })).getByText('one-offs').parentElement).toHaveTextContent('£112.81 one-offs')
+  expect(screen.getByRole('heading', { level: 2, name: 'Pots£727.92 spent of £870.00' })).toBeInTheDocument()
+  // Phones: a card per group, three lines a pot.
+  expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Joint', 'Ada', 'Accounts'])
+  expect(screen.getByRole('button', { name: 'Groceries: £181.39 left. £131 ahead · runs out ~Thu 19 Nov' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Eating out: £86.00 left. On track' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Treats: £12.50 over. £12.50 over · covered when November closes' })).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: 'Accounts' })).getByText(/one-offs/).closest('.pots-card-row')).toHaveTextContent('£112.81 spent')
+  expect(window.document.querySelector('.pots-status.is-warning')).toHaveTextContent('£131 ahead · runs out ~Thu 19 Nov')
+})
+
+it('shows the pots as one aligned table on desktop', () => {
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+  const onOpenPot = vi.fn()
+  render(<MonthPage document={monthHousehold()} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={onOpenPot} onSort={() => {}} today="2026-11-12"/>)
+  const table = screen.getByRole('table')
+  expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['Pot', 'Spent', 'Planned', 'Left', 'Pace', 'In Monzo'])
+  const row = (name: string) => within(table).getByRole('button', { name: new RegExp(`^${name}:`) }).closest('tr')!
+  expect([...row('Groceries').querySelectorAll('td')].map(cell => cell.textContent)).toEqual(['£338.61', '£520.00', '£181.39', '£131 ahead · runs out ~Thu 19 Nov', '—'])
+  expect(within(table).getAllByRole('rowheader').map(cell => cell.textContent)).toEqual(expect.arrayContaining(['Joint', 'Ada', 'Accounts']))
+  fireEvent.click(row('Groceries'))
+  expect(onOpenPot).toHaveBeenCalledWith('groceries')
+  vi.unstubAllGlobals()
 })
 
 it('opens a steady pot: what’s left a day, the pace chart, when it runs out, and its transactions', () => {
   render(<MonthHarness initial={monthHousehold()}/>)
   fireEvent.click(screen.getByRole('button', { name: /^Groceries:/ }))
-  expect(screen.getByRole('heading', { name: 'Groceries' })).toBeInTheDocument()
-  expect(screen.getByText('November 2026 · day 12 of 30')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 1, name: 'Groceries' })).toBeInTheDocument()
+  expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' })).toBeInTheDocument()
+  expect(screen.getByText('Joint · monthly · November 2026 · day 12 of 30')).toBeInTheDocument()
   expect(screen.getByText('for 18 days').parentElement).toHaveTextContent('£181.39 for 18 days')
-  expect(screen.getByText('About £10 a day. You’ve averaged £28.')).toBeInTheDocument()
+  expect(screen.getByText('About £10 a day · you’ve averaged £28')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'Groceries spending so far against the plan: £338.61 spent by day 12, against £208.00 at the planned pace, of £520.00 planned. Runs out around Thu 19 Nov.' })).toBeInTheDocument()
-  expect(screen.getByText('At this rate Groceries runs out around Thu 19 Nov, 11 days before the month ends.')).toBeInTheDocument()
-  const rows = within(screen.getByRole('region', { name: 'Transactions' })).getAllByRole('listitem')
-  expect(rows[0]).toHaveTextContent('GREEN GROCER£0.01Thu 26 Nov · Ada ··41001 · on December statement')
+  // One run-out message, under the chart.
+  expect(screen.getAllByText(/runs out/i)).toHaveLength(1)
+  expect(screen.getByText('At this rate it runs out around Thu 19 Nov, 11 days before the month ends.')).toBeInTheDocument()
+  const rows = within(screen.getByRole('list', { name: 'Transactions' })).getAllByRole('listitem')
+  expect(rows[0]).toHaveTextContent('GREEN GROCERThu 26 Nov · Ada ··41001 · on December statement£0.01')
   expect(rows).toHaveLength(7)
-  fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
-  expect(screen.getByText('Spent on Amex so far')).toBeInTheDocument()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' }))
+  expect(screen.getByRole('heading', { level: 2, name: /^Pots/ })).toBeInTheDocument()
 })
 
 it('shows what’s left in each pot when sorting', () => {
@@ -461,8 +477,8 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   )
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={document} onChange={next => { saved = next }}/>)
-  expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. Check the balance to see what’s free' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /^Bills:/ }))
+  expect(screen.getByRole('button', { name: 'Bills · carries over: £19.99 spent. Check the balance to see what’s free' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^Bills · carries over:/ }))
   expect(screen.getByText('Free in the pot').parentElement).toHaveTextContent('Free in the pot—')
   const sums = () => [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
   expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99', 'Car insurance£612.00 a year'])
@@ -473,8 +489,8 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   expect(saved!.card!.pots.bills!.checkedBalance).toEqual({ pence: 124000, at: expect.any(String) })
   expect(sums()[0]).toMatch(/^In Monzo · checked .+£1,240.00$/)
   expect(sums()).toContain('Free£1,134.01')
-  fireEvent.click(screen.getByRole('button', { name: 'Back to November' }))
-  expect(screen.getByRole('button', { name: 'Bills: £19.99 this month. £1,134.01 free in the pot' })).toBeInTheDocument()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' }))
+  expect(screen.getByRole('button', { name: 'Bills · carries over: £1,134.01 free. No pace' })).toBeInTheDocument()
 })
 
 function statementHousehold(): BudgetDocument {
@@ -572,33 +588,39 @@ function closingHousehold(): BudgetDocument {
   return document
 }
 
-it('closes a month: covers the overspend, ticks the cover, sees leftovers and the build-up, then closes', () => {
+it('closes a month inline: covers the overspend, ticks the cover, sees leftovers and the build-up, then closes from the header', () => {
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={closingHousehold()} today="2026-11-04" onChange={next => { saved = next }}/>)
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
   expect(screen.getByText(/^Closing · ended \w{3} 31 Oct$/)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
-  expect(screen.getByRole('heading', { name: 'Close October' })).toBeInTheDocument()
-  expect(screen.getByText('1 Oct – 31 Oct · all transactions in and sorted')).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: 'Over plan · 1' })).toBeInTheDocument()
+  // The ended month is the close checklist: Cover overspends first, Pots after it.
+  const headings = screen.getAllByRole('heading', { level: 2 }).map(heading => heading.textContent)
+  expect(headings.indexOf('Cover overspends1')).toBeLessThan(headings.findIndex(text => text?.startsWith('Pots')))
+  expect(screen.queryByRole('heading', { name: 'Waiting' })).not.toBeInTheDocument()
   const coverFrom = screen.getByLabelText('Covered from')
   expect(coverFrom).toHaveDisplayValue('Joint')
   expect([...(coverFrom as HTMLSelectElement).options].map(option => option.text)).toEqual(['Joint', 'Treats · Ada · £200.00 left', 'Car · Joint · £45.00 left', 'Groceries · Joint · £8.20 left', 'November’s Eating out (moves no money)'])
   // The cover is a payday-style step: the amount is its own copyable chip, not part of the words.
   expect(screen.getByRole('button', { name: 'Copy £35.00' })).toBeInTheDocument()
+  expect(coverFrom.closest('.step-row')).toHaveTextContent('Eating out · Joint is £35.00 over · covered from')
   fireEvent.click(screen.getByRole('button', { name: 'Move from Joint into Eating out done' }))
   expect(saved!.card!.months['2026-10']!.coverTicks!['cover:eating']).toMatchObject({ amountPence: 3500 })
-  expect([...window.document.querySelectorAll('.close-left > div')].map(row => row.textContent)).toEqual(['PotLeftBuilt up', 'Car · Joint£45.00£180.00', 'Groceries · Joint£8.20£8.20', 'Treats · Ada£200.00£200.00'])
+  expect([...window.document.querySelectorAll('.close-left tr')].map(row => row.textContent)).toEqual(['PotLeftBuilt upBuild-up', 'Car · Joint£45.00£180.00Move £100.00…Keep it', 'Groceries · Joint£8.20£8.20', 'Treats · Ada£200.00£200.00'])
   expect(screen.getByText('Car has built up £180.00, more than £160.00 (2× its £80.00 monthly plan). Move some?')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Move £100.00…' }))
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Record the move' }))
   expect(saved!.card!.pots.car!.movedOut).toEqual([{ pence: 10000, at: expect.any(String) }])
   expect(screen.queryByText(/Car has built up/)).not.toBeInTheDocument()
   fireEvent.change(coverFrom, { target: { value: 'next-month' } })
-  expect(screen.getByText('Leaves Eating out £35.00 short in November.')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
+  expect(screen.getByText(/Leaves Eating out £35.00 short in November\./)).toBeInTheDocument()
+  const close = screen.getByRole('button', { name: 'Close October' })
+  expect(close).toHaveClass('primary-button')
+  fireEvent.click(close)
   expect(saved!.card!.months['2026-10']).toMatchObject({ closedAt: expect.any(String), covers: [{ potId: 'eating', amountPence: 3500, source: { kind: 'next-month' } }], leftovers: { car: 4500, groceries: 820, treats: 20000 } })
-  expect(screen.getByText('October is closed')).toBeInTheDocument()
+  // Closed: the chip says what's next and the sections fold to one line.
+  expect(screen.getByText(/^To settle · closed /)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /^October closed/ })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByRole('button', { name: 'Close October' })).not.toBeInTheDocument()
   expect(decodeBudgetDocument(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
 })
 
@@ -608,13 +630,14 @@ it('waits for late postings before closing, unless all transactions are in', () 
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={document} today="2026-11-02" onChange={next => { saved = next }}/>)
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Close October' }))
-  const close = screen.getAllByRole('button', { name: 'Close October' }).at(-1)!
+  const close = screen.getByRole('button', { name: 'Close October' })
   expect(close).toBeDisabled()
-  expect(screen.getByText(/Late October transactions can take a few days to post/)).toBeInTheDocument()
+  expect(close).toHaveAttribute('title', 'Waiting for late October transactions to post.')
+  expect(within(screen.getByRole('list', { name: 'Waiting' })).getByText('Late October transactions can take a few days to post.')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'All October transactions are in' }))
   expect(saved!.card!.months['2026-10']!.allInAt).toEqual(expect.any(String))
-  expect(screen.getAllByRole('button', { name: 'Close October' }).at(-1)).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Close October' })).toBeEnabled()
+  expect(screen.queryByRole('heading', { name: 'Waiting' })).not.toBeInTheDocument()
 })
 
 it('shows a change after closing, and closes again', () => {
@@ -625,7 +648,6 @@ it('shows a change after closing, and closes again', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }))
   expect(screen.getByText('Changed since closed: Groceries · Joint £500.00 → £511.80.')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Close again' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Close October again' }))
   expect(saved!.card!.months['2026-10']!.closedSpent!['pot:groceries']).toBe(51180)
   document = saved!
   expect(document.card!.months['2026-10']!.leftovers).toEqual({ groceries: 820, car: 4500, treats: 20000 })
@@ -740,7 +762,7 @@ describe('the Amex pot', () => {
     document.card!.moves = [{ id: 'm1', cardId: 'amex', at: '2026-11-05T09:00:00.000Z', transactions: [{ transactionId: 'grocer', lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'groceries' } }] }] }]
     let saved: BudgetDocument | undefined
     render(<MonthHarness initial={document} onChange={next => { saved = next }}/>)
-    expect(screen.getByRole('button', { name: /^Groceries: £44.60 spent\. £455.40 in Monzo$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Groceries: £44.60 spent\./ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Check balances' }))
     const dialog = screen.getByRole('dialog', { name: 'Check balances' })
@@ -754,11 +776,12 @@ describe('the Amex pot', () => {
     expect(saved!.card!.pots.groceries!.checkedBalance!.pence).toBe(45000)
     expect(screen.getByRole('status')).toHaveTextContent('1 balance checked.')
     // The Amex pot: what each statement it pays costs, and what's still to move.
-    fireEvent.click(screen.getByRole('button', { name: 'Amex pot' }))
-    expect(screen.getByRole('heading', { name: 'Amex' })).toBeInTheDocument()
-    expect(screen.getByText('November statement')).toBeInTheDocument()
-    expect(screen.getByText('£44.60 moved in · £76.20 still to move')).toBeInTheDocument()
-    expect(screen.getByText('£120.80')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Amex · set aside: .*£76.20 still to move for November$/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Amex · set aside:/ }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Amex pot' })).toBeInTheDocument()
+    expect(screen.getByText(/^Pays the Amex from the \w+ statement$/)).toBeInTheDocument()
+    const statements = within(screen.getByRole('list', { name: 'Statements it pays' })).getAllByRole('listitem')
+    expect(statements[0]).toHaveTextContent('November statement£44.60 moved in · £76.20 still to move£120.80')
   })
 
   it('a statement paid from the pot shows what’s in it, moves the rest, then pays from the pot', () => {
