@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMonth } from '../formatting/month'
+import { useShortcut } from '../state/shortcuts'
 
 const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const shift = (month: string, by: number) => { const [y,m] = month.split('-').map(Number); const d = new Date(y!,m!-1+by,1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` }
@@ -13,10 +14,12 @@ const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${Str
  */
 export function MonthControl({month,onChange,budgetMarkers,incomeMarkers,revertLabel,onRevert}:{month:string;onChange:(value:string)=>void;budgetMarkers:string[];incomeMarkers:string[];revertLabel?:string;onRevert?:()=>void}) {
  const [open,setOpen]=useState(false), [year,setYear]=useState(Number(month.slice(0,4)))
+ useShortcut({keys:'[',description:'Previous month',group:'This page',run:()=>onChange(shift(month,-1))})
+ useShortcut({keys:']',description:'Next month',group:'This page',run:()=>onChange(shift(month,1))})
  return <div className="budget-v3-month">
-  <button type="button" aria-label="Previous month" onClick={()=>onChange(shift(month,-1))}><ChevronLeft aria-hidden="true"/></button>
+  <button type="button" aria-label="Previous month" title="Previous month ([)" onClick={()=>onChange(shift(month,-1))}><ChevronLeft aria-hidden="true"/></button>
   <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={()=>{setYear(Number(month.slice(0,4)));setOpen(!open)}}>{formatMonth(month)}<ChevronDown className="budget-v3-month-caret" aria-hidden="true"/></button>
-  <button type="button" aria-label="Next month" onClick={()=>onChange(shift(month,1))}><ChevronRight aria-hidden="true"/></button>
+  <button type="button" aria-label="Next month" title="Next month (])" onClick={()=>onChange(shift(month,1))}><ChevronRight aria-hidden="true"/></button>
   {/* A pointer convenience only (keyboard users have Escape and the month button), so not a button: it must not count among the month buttons the layout styles. */}
   {open&&<div className="budget-v3-picker-scrim" aria-hidden="true" onClick={()=>setOpen(false)}/>}
   {open&&<div className="budget-v3-picker" role="dialog" aria-label="Choose budget month" onKeyDown={event=>{if(event.key==='Escape')setOpen(false)}}>

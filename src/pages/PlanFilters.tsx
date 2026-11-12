@@ -3,6 +3,8 @@ import { Plus, SlidersHorizontal, X } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { ModalDialog } from '../components/ModalDialog'
 import { ownerAccountsLabel } from './planRows'
+import { Kbd } from '../components/ui/Kbd'
+import './PlanFilters.css'
 
 type Props = {
   query: string
@@ -41,7 +43,7 @@ export function PlanFilters({ query, onQueryChange, onSearchStart, inputRef, own
   </>
   return <div className={`budget-v3-controls${compact ? ' is-compact' : ''}`}>
     <div className="budget-v3-search-field">
-      <label className="budget-v3-search"><span className="budget-v3-search-label">Search</span><input ref={inputRef} value={query} onPointerDownCapture={onSearchStart} onFocus={onSearchStart} onChange={event => onQueryChange(event.target.value)} placeholder="Search budget"/></label>
+      <label className="budget-v3-search"><span className="budget-v3-search-label">Search</span><input ref={inputRef} data-shortcut="search" value={query} onPointerDownCapture={onSearchStart} onFocus={onSearchStart} onChange={event => onQueryChange(event.target.value)} placeholder="Search budget"/>{!compact && !query && <span className="plan-search-shortcut shortcut-hint" aria-hidden="true"><Kbd>/</Kbd></span>}</label>
       {!!query.trim() && <button type="button" className="budget-v3-search-clear" onClick={clear}>Clear search</button>}
     </div>
     {compact ? <>
