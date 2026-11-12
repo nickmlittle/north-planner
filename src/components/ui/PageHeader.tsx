@@ -11,11 +11,13 @@ const findHeaderSlot = () => window.document.getElementById('mobile-header-page-
  * Every page's header and its only h1: title (or a MonthTitle), context, a status chip, a breadcrumb back, and
  * actions (a ⋯ plus at most one primary). It sets the document title. On phones it moves into the pine app header.
  */
-export function PageHeader({ title, titleText, monthLabel, context, chip, breadcrumb, actions, portal = true }: {
+export function PageHeader({ title, titleText, titlePrefix, monthLabel, context, chip, breadcrumb, actions, portal = true }: {
   /** The visible title. A string is the h1; a control (MonthTitle) shows as is, with titleText as a hidden h1. */
   title: ReactNode
   /** The title in words, for the h1 and the document title. */
   titleText: string
+  /** Read before a string title but not shown: Home's h1 is "Home, November" and shows "November". */
+  titlePrefix?: string
   /** Adds the month to the document title: "Month · November 2026 · North". */
   monthLabel?: string
   context?: ReactNode
@@ -34,7 +36,7 @@ export function PageHeader({ title, titleText, monthLabel, context, chip, breadc
   // The app header's slot on phones; absent when a page renders on its own (tests, setup).
   const headerSlot = useSyncExternalStore(subscribeNothing, findHeaderSlot, () => null)
   // A control as the title (MonthTitle) gets a hidden h1 that names the page too: "Month, November 2026".
-  const heading = typeof title === 'string' ? <h1 className="page-header-title">{title}</h1> : <><h1 className="visually-hidden">{monthLabel ? `${titleText}, ${monthLabel}` : titleText}</h1>{title}</>
+  const heading = typeof title === 'string' ? <h1 className="page-header-title">{titlePrefix && <span className="visually-hidden">{titlePrefix}</span>}{title}</h1> : <><h1 className="visually-hidden">{monthLabel ? `${titleText}, ${monthLabel}` : titleText}</h1>{title}</>
   if (portal && mobile && headerSlot) return createPortal(<div className="mobile-header-page page-header-mobile">
     {heading}
     {(context || chip) && <p className="page-header-context">{chip}{context}</p>}

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type Dispatc
 import type { Session } from '@supabase/supabase-js'
 import { householdReady, type BudgetDocument } from './domain/budgetDocument'
 import type { BudgetImpact } from './domain/budgetImpact'
+import type { HomeTarget } from './domain/homeInbox'
 import { SetupWizard } from './pages/SetupWizard'
 import { useBudgetDocument } from './state/useBudgetDocument'
 import { useCloudBudget } from './state/useCloudBudget'
@@ -58,6 +59,13 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   /** "Review Immy's items" from Home: Plan, filtered to that person's accounts once it opens. */
   const reviewPersonOnPlan = (personId: string) => navigateTo({ view: 'plan', month: navigation.month }, { historyState: { northReviewPerson: personId } })
   const reviewPersonId = view === 'plan' && typeof window.history.state?.northReviewPerson === 'string' ? window.history.state.northReviewPerson as string : undefined
+  /** Home's rows and figures: each names where it opens. Bring in opens Spending with its sheet up. */
+  const openFromHome = (target: HomeTarget) => {
+    if (target.view === 'plan') { if (target.reviewPersonId) reviewPersonOnPlan(target.reviewPersonId); else navigateTo({ view: 'plan' }); return }
+    if (target.view === 'month') { navigateTo({ view: 'month', month: target.month, pot: target.potId ?? null, close: !!target.close }); return }
+    if (target.view === 'settings') { navigateTo({ view: 'settings', section: target.section }); return }
+    navigateTo({ view: 'spending', section: target.section, statement: target.statementKey ?? null }, target.bringIn ? { historyState: { northBringIn: true } } : {})
+  }
   const loading = (text = 'Loading…') => <p className="budget-loading" role="status">{text}</p>
   return <AppLayout navigation={{ currentView: view, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, setupComplete, counts, homeTitle: formatMonth(navigation.month) }}>
     {UiGallery && new URLSearchParams(search).get('view') === 'ui-gallery'
@@ -69,7 +77,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
       : view === 'spending'
       ? <Suspense fallback={loading()}><Spending document={document} setDocument={setDocument} view={spendingSection(navigation)} onSelectView={section => navigateTo({ view: 'spending', section, statement: null })} onOpenCardSettings={() => navigateTo({ view: 'settings', section: 'cards' })} onOpenRules={() => navigateTo({ view: 'settings', section: 'rules' })} onOpenMonth={pot => navigateTo({ view: 'month', pot: pot ?? null })} statementKey={navigation.statement} onOpenStatement={statement => navigateTo({ view: 'spending', section: 'statements', statement })}/></Suspense>
       : view === 'home'
-      ? <Suspense fallback={loading()}><Home document={document} month={navigation.month} onOpenPlan={() => navigateTo({ view: 'plan' })} onOpenTransfers={() => navigateTo({ view: 'month' })} onReviewPerson={reviewPersonOnPlan} onOpenSpending={target => target.view === 'month' ? navigateTo({ view: 'month', ...target.month ? { month: target.month } : {}, pot: target.potId ?? null, close: !!target.close }) : navigateTo({ view: 'spending', section: target.view, statement: target.statementKey ?? null })} onOpenTransfersMonth={month => navigateTo({ view: 'month', month })}/></Suspense>
+      ? <Suspense fallback={loading()}><Home document={document} month={navigation.month} onOpen={openFromHome}/></Suspense>
       : <Suspense fallback={loading('Loading budget…')}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} view={view === 'month' ? 'month' : 'plan'} month={navigation.month} onMonthChange={month => navigateTo({ month, pot: null, close: false })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={view === 'month' ? stepsReturnFromState() : null} onReturnToTransfers={returnToMonth} onOpenPlan={() => navigateTo({ view: 'plan' })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={view === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined}
           potId={navigation.pot} closing={navigation.close} onOpenPot={pot => navigateTo({ view: 'month', pot, close: false })} onOpenClose={close => navigateTo({ view: 'month', close, pot: null })} onOpenSort={() => navigateTo({ view: 'spending', section: 'sort' })} onOpenSettings={section => navigateTo({ view: 'settings', section, month: navigation.month })}/></Suspense>}
   </AppLayout>

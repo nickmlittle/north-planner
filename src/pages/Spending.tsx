@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, CreditCard, FileSpreadsheet, PiggyBank, Plus } from 'lucide-react'
 import { MOBILE_QUERY } from '../breakpoints'
 import { PageFrame } from '../components/PageFrame'
@@ -80,7 +80,9 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
-  const [sheet, setSheet] = useState<'bring-in' | 'manual' | null>(null)
+  // Home's "Bring in Amex transactions" arrives with the sheet up (history state northBringIn).
+  const [sheet, setSheet] = useState<'bring-in' | 'manual' | null>(() => window.history.state?.northBringIn ? 'bring-in' : null)
+  useEffect(() => { if (window.history.state?.northBringIn) { const rest = { ...window.history.state }; delete rest.northBringIn; window.history.replaceState(rest, '') } }, [])
   const [sorting, setSorting] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)

@@ -96,7 +96,7 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
   // Saved is the quiet default: only show a status when there is something to know.
   const statusIcon = status === 'Saved' ? null : <span aria-hidden="true">{statusMark(status)}</span>
   const selected = currentView
-  const ownHeading = selected === 'month' || selected === 'settings'
+  const ownHeading = selected === 'home' || selected === 'month' || selected === 'settings'
   const pageTitle = selected === 'home' ? homeTitle ?? 'Home' : selected === 'month' ? 'Month' : selected === 'plan' ? 'Plan' : selected === 'spending' ? 'Spending' : 'Settings'
   const destinations = [
     { id: 'home', label: 'Home', Icon: House, count: counts.home, countLabel: 'to do', hint: 'G H' },
@@ -114,10 +114,9 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
   return <>
     {/* Pine, from under the status bar. Once its rows scroll away, the bar alone stays pinned to the top; the header keeps its height so nothing jumps. */}
     <header ref={headerRef} className={`mobile-app-header${collapsedHeight === null ? '' : ' is-collapsed'}`} style={collapsedHeight === null ? undefined : { height: collapsedHeight }}>
-      <div className={`mobile-header-bar${selected === 'home' ? ' has-eyebrow' : ''}`}>
+      <div className="mobile-header-bar">
         <span className="mobile-header-brand" aria-hidden="true">north.</span>
-        {selected === 'home' && <p className="mobile-header-eyebrow">This month</p>}
-        {/* Month and Settings bring their own h1 (PageHeader, in the slot below); the other screens' titles are this one. */}
+        {/* Home, Month and Settings bring their own h1 (PageHeader, in the slot below); the other screens' titles are this one. */}
         {!ownHeading && <h1>{pageTitle}</h1>}
         {/* Month, Plan and Settings put their title (or month), ⋯ and note here. */}
         <div id="mobile-header-page-slot" className="mobile-header-slot" />
