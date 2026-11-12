@@ -31,22 +31,36 @@ The selected calendar month resolves the applicable saved budget and income. An 
 
 ## Visual identity
 
-The interface is quiet and functional: deep pine navigation and primary actions, a warm cream canvas, soft off-white surfaces, muted green-gray secondary text, fine borders and modest rounding. Use the current CSS variables as the starting palette; check contrast in the actual foreground/background combination.
+The interface is quiet and functional: deep pine navigation and primary actions, a warm cream canvas, soft off-white surfaces, muted green-gray secondary text, fine borders and modest rounding. All values are tokens in the `:root` block of `src/styles.css`; `styles.tokens.test.ts` keeps raw values out of every other rule and stylesheet, and `styles.contrast.test.ts` checks the combinations below.
 
-| Role | Current token | Value |
-| --- | --- | --- |
-| Primary / navigation | `--pine` | `#203e32` |
-| Page background | `--cream` | `#f3eedf` |
-| Surface | `--card` | `#fbf8ef` |
-| Main text | `--charcoal` | `#29312a` |
-| Secondary text | `--muted` | `#59665a` |
-| Border | `--line` | `#d6d2c3` |
-| Subtle selection | `--soft-fern` | `#e7e9dc` |
-| Accent / common focus outline | `--orange` | `#bc653d` |
+New and touched code uses the **semantic tokens**. The palette names stay as their source values.
 
-The app uses Manrope, loaded in weights 500 and 600, with system sans-serif fallbacks. Use hierarchy, weight, whitespace and alignment to distinguish headings, labels and amounts. Avoid treating the font download as a prerequisite for legibility. Currency benefits from aligned or tabular numerals and an explicit GBP context. Small secondary copy must remain readable at enlarged text sizes.
+| Role | Semantic token | Palette token | Value |
+| --- | --- | --- | --- |
+| Page background | `--bg` | `--cream` | `#f3eedf` |
+| Surface (cards) | `--surface` | `--card` | `#fbf8ef` |
+| Sunken surface | `--surface-sunken` | `--surface-subtle` | `#f5f7f2` |
+| Selected / subtle selection | `--surface-selected` | `--soft-fern` | `#e7e9dc` |
+| Main text | `--text` | `--charcoal` | `#29312a` |
+| Secondary text | `--text-muted` | `--muted` | `#59665a` |
+| Primary, navigation, links, positive | `--accent`, `--positive` | `--pine` | `#203e32` |
+| Divider | `--border` | `--line` | `#d6d2c3` |
+| Field edge (inputs, selects, textareas) | `--border-field` | — | `#80887a` (3.2–3.7:1) |
+| Over / error | `--critical`, `--critical-bg` | `--status-error`, `--status-error-bg` | `#a54232`, `#fbf0ed` |
+| Pace / needs review | `--warning`, `--warning-bg` | `--status-review`, `--status-review-bg` | `#8a5a14`, `#fff3db` |
+| Focus ring | `--focus` (`--focus-on-pine` on pine) | `--pine` (`--cream`) | |
 
-The defined spacing variables are 8, 16, 24 and 32 px; existing screens also use intermediate values. Prefer that rhythm for new work. Cards commonly have a fine border and roughly 10 px corners; inputs and buttons have smaller radii. Use subtle shadows sparingly. Lucide line icons support labels and actions; icons alone require accessible names. The compact desktop sidebar can reveal the `north.` wordmark when expanded. There is no separate logo, illustration or photography system established here.
+Red marks only an amount that is over; amber only pace and needs-review. Never rely on colour alone: always a word too.
+
+**Type.** Manrope (variable, 400–800) with system sans-serif fallbacks; tabular numerals everywhere. Sizes are `--text-xs` 12 (eyebrow labels, picker captions), `--text-sm` 13 (meta), `--text-md` 14 (body, rows, buttons), `--text-lg` 16 (section headings), `--text-xl` 20 (key figures) and `--text-2xl` 28 (page titles); the 42px display size is for the setup wizard only. **Three weights:** `--weight-regular` 400, `--weight-medium` 600 and `--weight-bold` 700. Only the `north.` wordmark may use 800. Use hierarchy, weight, whitespace and alignment to distinguish headings, labels and amounts, and don't treat the font download as a prerequisite for legibility. Small secondary copy must remain readable at enlarged text sizes.
+
+**Space, size and shape.** Spacing is `--space-1` to `--space-7` (4, 8, 12, 16, 24, 32, 48). Inputs, selects and buttons share one height, `--control-h`: 36px on desktop and 44px (`--control-h-touch`) in the phone layout. List rows use `--row-h` (44px, 56px on phones). Radii are `--radius-sm` 4 (keys), `--radius-md` 8 (controls), `--radius-lg` 12 (cards) and pill. Use subtle shadows sparingly.
+
+**Focus.** One ring everywhere: `outline: 2px solid` the focus colour with a 2px offset, or `-2px` inside rows and tables where an outside ring would clip. On pine surfaces (the sidebar, the phone header and tab bar) the ring is cream. Never remove an outline without a replacement; the only exceptions are elements focused by script (`h1`, the error summary, `tabindex="-1"` regions).
+
+**Links and text buttons** are pine at the medium weight with no underline, underlined on hover. Destructive text actions keep the error colour.
+
+Lucide line icons support labels and actions; icons alone require accessible names. The compact desktop sidebar can reveal the `north.` wordmark when expanded. There is no separate logo, illustration or photography system established here.
 
 ## Interface patterns
 

@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest'
 // styles.tokens.test.ts keeps colour literals out of the rest of the file, so new colours land here.
 const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8')
 const rootBlock = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map(match => match[1]).join(';')
-const token = (name: string) => {
+/** A colour token's hex value, following semantic aliases such as `--focus: var(--pine)`. */
+const token = (name: string): string => {
+  const alias = rootBlock.match(new RegExp(`--${name}:\\s*var\\(--([\\w-]+)\\)`))?.[1]
+  if (alias) return token(alias)
   const value = rootBlock.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1]
   if (!value) throw new Error(`Missing colour token --${name}`)
   return value
@@ -36,4 +39,15 @@ describe('text contrast (WCAG AA, 4.5:1)', () => {
   it('white on danger (destructive buttons)', () => expect(contrast(token('white'), token('danger'))).toBeGreaterThanOrEqual(4.5))
   it('cream on pine (sidebar)', () => expect(contrast(token('cream'), token('pine'))).toBeGreaterThanOrEqual(4.5))
   it('on-pine-muted on pine (phone nav labels, header note)', () => expect(contrast(token('on-pine-muted'), token('pine'))).toBeGreaterThanOrEqual(4.5))
+})
+
+// A control's edge and the focus ring need 3:1 against what they sit on (WCAG 1.4.11).
+describe('non-text contrast (WCAG 1.4.11, 3:1)', () => {
+  for (const background of ['cream', 'card', 'white', 'surface-field']) {
+    it(`field edge (border-field) on ${background}`, () => expect(contrast(token('border-field'), token(background))).toBeGreaterThanOrEqual(3))
+  }
+  for (const background of ['cream', 'card', 'white', 'soft-fern']) {
+    it(`focus ring on ${background}`, () => expect(contrast(token('focus'), token(background))).toBeGreaterThanOrEqual(3))
+  }
+  it('focus ring on pine (sidebar, phone header and tab bar)', () => expect(contrast(token('focus-on-pine'), token('pine'))).toBeGreaterThanOrEqual(3))
 })
