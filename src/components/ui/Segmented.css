@@ -1,0 +1,10 @@
+/* Segmented. Tokens only (styles.tokens.test.ts). */
+.segmented{display:inline-flex;gap:2px;padding:2px;border-radius:var(--radius-md);background:var(--surface-sunken)}
+.segmented-option{display:inline-flex;align-items:center;gap:var(--space-1);min-height:32px;margin:0;padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;cursor:pointer}
+.segmented-option:hover{color:var(--text)}
+.segmented-option[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-control)}
+.segmented-option:focus-visible{outline-offset:-2px}
+.segmented-detail{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular);font-variant-numeric:tabular-nums}
+@media (max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
+  .segmented-option{min-height:36px}
+}

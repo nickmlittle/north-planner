@@ -1,0 +1,32 @@
+/* Month › Payday (audit 3 PR 11): person cards with account bands, or the Funding by account table. Tokens only. */
+.payday-section{display:grid;gap:var(--space-3);min-width:0}
+.payday-section>.step-copied:empty{display:none}
+.payday-hint{color:var(--text-muted);font-size:var(--text-sm)}
+.payday{display:grid;gap:var(--space-4);min-width:0}
+.payday-people{display:grid;gap:var(--space-4);align-items:start}
+.payday-person,.payday-review{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.payday-person>.step-group:first-of-type .step-group-band{border-top-color:var(--border)}
+.payday-person-head{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4)}
+.payday-person-head h3{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:var(--space-1) var(--space-3);margin:0;font-size:var(--text-lg);font-weight:var(--weight-bold)}
+.payday-person-name{color:var(--text)}
+.payday-person-count{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular);font-variant-numeric:tabular-nums}
+.payday-person-sub{margin:0;color:var(--text-muted);font-size:var(--text-sm);line-height:1.5;font-variant-numeric:tabular-nums}
+.payday-person-over{color:var(--critical);font-weight:var(--weight-medium)}
+.payday-person-review{min-height:0;padding:0;font-size:var(--text-sm)}
+.payday-person-changed{color:var(--warning);font-weight:var(--weight-medium)}
+.payday .step-group-band{background:var(--surface-band)}
+.payday .step-group-title{font-size:var(--text-sm)}
+.payday-see-items{display:inline-flex;align-items:center;gap:2px;min-height:32px;margin:-6px 0;padding:0;font-size:var(--text-sm)}
+.payday-see-items svg{width:14px;height:14px;flex:none}
+.payday-see-items:focus-visible{outline-offset:-2px}
+.payday .budget-affected-label{font-size:var(--text-sm)}
+.payday-by-account{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.payday-by-account-title{margin:0;font-size:var(--text-md);font-weight:var(--weight-bold)}
+.payday-by-account-title span{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.payday-footnote{margin:0;color:var(--text-muted);font-size:var(--text-sm)}
+.payday-section .transfer-calculation-note{color:var(--text-muted);font-size:var(--text-sm)}
+.payday-section .transfer-calculation-note p{margin:0}
+.transfer-calculation-notes p{margin:0 0 var(--space-3)}
+@media(min-width:1100px){
+  .payday-people{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+}

@@ -4,12 +4,10 @@
 @media(min-width:768px){
   /* One scrolling page: the header, Payday, then Pots (Plan keeps its own fixed header and scrolling table). */
   .planner-app-content .month-page.monthly-budget-page.page-frame{display:block;overflow-y:auto}
-  .month-page .ui-section>.budget-v3-people-summary{overflow:visible}
   /* The phone's payday summary (whose funding, the person switch) has its own place on desktop. */
-  .month-page .ui-section>.page-frame-summary{display:none}
 }
 @media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
-  .month-page .ui-section>.budget-v3-people-summary{padding:0;border:0;border-radius:0;background:transparent}
   /* The first heading sits on the pine band that runs on under the app header. */
+  .month-page>.ui-section:first-of-type .ui-section-count{color:var(--on-pine-muted);white-space:nowrap}
   .month-page>.ui-section:first-of-type .ui-section-title,.month-page>.pot-detail>.spending-back,.month-page>.close-month>.spending-back{color:var(--cream)}
 }
