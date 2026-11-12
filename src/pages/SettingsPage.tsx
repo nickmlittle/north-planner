@@ -1,22 +1,24 @@
-import { useState, type Dispatch, type MouseEvent, type ReactNode, type SetStateAction } from 'react'
+import type { Dispatch, MouseEvent, ReactNode, SetStateAction } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker } from '../domain/cardTracker'
 import { Breadcrumb, ListRow, PageHeader, Section, useMobilePresentation, useToast } from '../components/ui'
 import { AccountStatusPanel } from '../components/AccountStatusPanel'
 import type { SettingsSection } from '../state/navigation'
-import { BudgetManagement } from './BudgetManagement'
 import { CardSettings } from './CardSettings'
 import { HouseholdFields } from './HouseholdSetup'
-import { IncomeDialog } from './IncomeDialog'
 import { RulesPanel } from './RulesPanel'
 import { plural } from './spendingFormat'
+import { AccountsAndPots } from './settings/AccountsAndPots'
+import { Categories } from './settings/Categories'
+import { PayAndIncome } from './settings/PayAndIncome'
 import './SettingsPage.css'
 
 type Props = {
   document: BudgetDocument
   setDocument: Dispatch<SetStateAction<BudgetDocument>>
-  /** For Pay & income: the month whose income is edited. */
+  /** For Pay & income and Categories: the month whose income and items show. */
   month: string
+  onMonthChange?: (month: string) => void
   /** The section showing; none is the list on phones and Household on desktop. */
   section?: SettingsSection | null
   /** Pushes `section` (null: back to the list on phones). */
@@ -29,7 +31,7 @@ type Props = {
   onSignOut?: () => void
 }
 
-/** The sections, in order. Categories shares Accounts' interim panel until PR 09. */
+/** The sections, in order. */
 const SETTINGS_SECTIONS: ReadonlyArray<{ key: SettingsSection; label: string }> = [
   { key: 'household', label: 'Household' },
   { key: 'income', label: 'Pay & income' },
@@ -51,11 +53,9 @@ function sectionHref(section: SettingsSection) {
  * Settings: everything that sets the budget up, in one place. Desktop: a section nav on the left and one section
  * on the right. Phones: a list of sections, each its own page with a breadcrumb back. Editors open in a Sheet.
  */
-export function SettingsPage({ document, setDocument, month, section = null, onSelectSection = () => {}, setupComplete, status, warning, email, onSignOut }: Props) {
+export function SettingsPage({ document, setDocument, month, onMonthChange = () => {}, section = null, onSelectSection = () => {}, setupComplete, status, warning, email, onSignOut }: Props) {
   const mobile = useMobilePresentation()
   const { show, toast } = useToast()
-  const [incomeOpen, setIncomeOpen] = useState(false)
-  const [managing, setManaging] = useState(false)
   const tracker = cardTracker(document)
   const { budget, household } = document
   const current: SettingsSection | null = !setupComplete ? 'household' : section ?? (mobile ? null : 'household')
@@ -81,14 +81,9 @@ export function SettingsPage({ document, setDocument, month, section = null, onS
 
   const body = (key: SettingsSection): ReactNode => {
     if (key === 'household') return <HouseholdFields document={document} setDocument={setDocument} notify={show}/>
-    if (key === 'income') return <>
-      <p className="settings-lead">Each person’s pay and any other income, and the month it changes from.</p>
-      <div><button type="button" className="secondary-button" onClick={() => setIncomeOpen(true)}>Edit income</button></div>
-    </>
-    if (key === 'accounts' || key === 'categories') return <>
-      <p className="settings-lead">{key === 'accounts' ? 'Where the money goes. Shared by every month.' : 'How Plan groups the items.'}</p>
-      <div><button type="button" className="secondary-button" onClick={() => setManaging(true)}>Manage accounts, pots &amp; categories</button></div>
-    </>
+    if (key === 'income') return <PayAndIncome document={document} setDocument={setDocument} month={month} onMonthChange={onMonthChange} notify={show}/>
+    if (key === 'accounts') return <AccountsAndPots document={document} setDocument={setDocument} notify={show}/>
+    if (key === 'categories') return <Categories document={document} setDocument={setDocument} month={month} notify={show}/>
     if (key === 'cards') return <CardSettings document={document} setDocument={setDocument} notify={show}/>
     if (key === 'rules') return <RulesPanel document={document} setDocument={setDocument} notify={show}/>
     return <div className="settings-account"><AccountStatusPanel status={!onSignOut && status === 'Saved' ? 'Saved on this device' : status} warning={warning} email={email} onSignOut={onSignOut}/></div>
@@ -113,7 +108,5 @@ export function SettingsPage({ document, setDocument, month, section = null, onS
         {SETTINGS_SECTIONS.map(row => <li key={row.key}><ListRow title={row.label} meta={summaries[row.key]} onOpen={() => onSelectSection(row.key)}/></li>)}
       </ul>}
     {toast}
-    {incomeOpen && <IncomeDialog document={document} setDocument={setDocument} month={month} onClose={() => setIncomeOpen(false)}/>}
-    {managing && <BudgetManagement document={document} setDocument={setDocument} onClose={() => setManaging(false)}/>}
   </div>
 }

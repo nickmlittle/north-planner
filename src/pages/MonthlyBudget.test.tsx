@@ -24,7 +24,9 @@ function filterValue(label: 'Owner' | 'Category') {
 }
 const desktop=()=>vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
 const expandAll=()=>fireEvent.click(screen.getByRole('button',{name:'Expand all'}))
-function Harness({ view }: { view?: 'plan' | 'month' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} view={view}/>}
+/** Income, accounts, pots and categories are edited in Settings; the budget only asks to go there. */
+const openSettings=vi.fn()
+function Harness({ view }: { view?: 'plan' | 'month' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} view={view} onOpenSettings={openSettings}/>}
 function createAccountInPicker(form: HTMLElement, owner='Nick', provider='Monzo', nickname='') {
   fireEvent.click(within(form).getByRole('button',{name:owner}))
   fireEvent.click(within(form).getByRole('button',{name:'+ Add account'}))
@@ -49,14 +51,17 @@ it('prompts for the first item, and for income only while there is none',()=>{
   render(<Harness/>)
   const prompt=document.querySelector<HTMLElement>('.budget-first-run')!
   expect(within(prompt).getByText('No income yet, so there’s nothing to split.')).toBeVisible()
+  openSettings.mockClear()
   fireEvent.click(within(prompt).getByRole('button',{name:'Add income'}))
-  const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
-  fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Pay'}})
-  fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'2000'}})
-  fireEvent.click(within(form).getByRole('button',{name:'Save income'}))
-  expect(within(prompt).queryByRole('button',{name:'Add income'})).not.toBeInTheDocument()
+  expect(openSettings).toHaveBeenCalledWith('income')
   fireEvent.click(within(prompt).getByRole('button',{name:'Add your first budget item'}))
   expect(screen.getByRole('form',{name:'Add item'})).toBeVisible()
+  cleanup()
+  const withIncome=seededDocument()
+  withIncome.budget.snapshots={}
+  withIncome.budget.incomeSources=[{id:'pay',personId:'nick',name:'Pay',type:'employment',baseAmountPence:200000,changes:{}}]
+  render(<SeededHarness initial={withIncome}/>)
+  expect(screen.queryByRole('button',{name:'Add income'})).not.toBeInTheDocument()
 })
 it('keeps mobile Plan headings and funding context in a semantic two-column table, with no row menu',()=>{
   render(<Harness/>)
@@ -68,7 +73,6 @@ it('keeps mobile Plan headings and funding context in a semantic two-column tabl
   expect(screen.queryByLabelText('More actions for Apple TV')).not.toBeInTheDocument()
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
-it('keeps income changes independent from budget snapshots',()=>{render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Edit income'}));const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!;fireEvent.change(within(form).getByLabelText('Source name'),{target:{value:'Parents'}});fireEvent.change(within(form).getByLabelText('Type'),{target:{value:'additional'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'400'}});fireEvent.click(within(form).getByRole('button',{name:'Save income'}));fireEvent.click(screen.getByRole('button',{name:'Edit income'}));expect(screen.getAllByText(/Parents/).length).toBeGreaterThan(0);expect(screen.queryByText(/Budget set for/)).not.toBeInTheDocument()})
 it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.plan-group')).not.toBeInTheDocument()})
 it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));filterBy('Owner','Immy');expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
 it('starts groups closed and keeps the open ones across filters, months and remounts',()=>{
@@ -248,7 +252,7 @@ function seededDocument() {
 }
 function SeededHarness({ initial, view = 'plan', onSeeTransferItems }: { initial: BudgetDocument; view?: 'month' | 'plan'; onSeeTransferItems?: (accountId: string) => void }) {
   const [document, setDocument] = useState(initial)
-  return <><MonthlyBudget document={document} setDocument={setDocument} view={view} onSeeTransferItems={onSeeTransferItems}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
+  return <><MonthlyBudget document={document} setDocument={setDocument} view={view} onSeeTransferItems={onSeeTransferItems} onOpenSettings={openSettings}/><output data-testid="saved-budget">{JSON.stringify(document.budget)}</output></>
 }
 /** Each numbered payday step as read: number, action, amount, captions. */
 const stepTexts = (region: HTMLElement) => within(region).getAllByRole('listitem').map(step => step.textContent)
@@ -437,8 +441,9 @@ it('keeps incomplete allocation warnings actionable and withholds steps for acco
   expect(review).not.toHaveTextContent('Unfunded')
   fireEvent.click(within(review).getByRole('button',{name:'See 1 item for Monzo Nick'}))
   expect(seeItems).toHaveBeenCalledWith('a1')
+  openSettings.mockClear()
   fireEvent.click(within(warning).getByRole('button',{name:'Edit income'}))
-  expect(screen.getByRole('heading',{name:/Income for/})).toBeVisible()
+  expect(openSettings).toHaveBeenCalledWith('income')
   cleanup()
   render(<SeededHarness initial={seededDocument()} view="month"/>)
   expect(screen.getByText('Nothing to fund yet')).toBeVisible()
@@ -909,8 +914,9 @@ it.each([
   // Phones keep the card short: no share and no basis; the pencil still edits income.
   expect(summary).not.toHaveTextContent('% planned')
   expect(summary).not.toHaveTextContent('salary')
+  openSettings.mockClear()
   fireEvent.click(within(summary).getByRole('button',{name:'Edit income'}))
-  expect(screen.getByRole('heading',{name:/income/i})).toBeInTheDocument()
+  expect(openSettings).toHaveBeenCalledWith('income')
 })
 
 it('shows mobile items under category groups and filters them by owner',()=>{
@@ -955,27 +961,21 @@ it('keeps month options keyboard focus contained and preserves a budget when rem
   expect(trigger).toHaveFocus()
 })
 
-it('hands off from month options to income and management and restores focus',()=>{
+it('sends Plan options’ income and accounts entries to Settings',()=>{
   render(<SeededHarness initial={seededDocument()}/>)
+  openSettings.mockClear()
   const trigger=screen.getByRole('button',{name:'Plan options'})
-  trigger.focus();fireEvent.click(trigger)
+  fireEvent.click(trigger)
   let dialog=screen.getByRole('dialog',{name:'Plan options'})
   expect(within(dialog).queryByRole('button',{name:/^(Go back to|Clear) the/})).not.toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button',{name:'Edit income'}))
   expect(screen.queryByRole('dialog',{name:'Plan options'})).not.toBeInTheDocument()
-  const form=screen.getByRole('heading',{name:/Income for/}).closest('form')!
-  expect(form).toContainElement(document.activeElement as HTMLElement)
-  expect(form.closest('.page-frame-body')).toBeNull()
-  fireEvent.click(within(form).getByRole('button',{name:'Cancel'}))
-  expect(trigger).toHaveFocus()
+  expect(openSettings).toHaveBeenLastCalledWith('income')
   fireEvent.click(trigger)
   dialog=screen.getByRole('dialog',{name:'Plan options'})
-  fireEvent.click(within(dialog).getByRole('button',{name:'Manage accounts, pots & categories'}))
-  expect(screen.queryByRole('dialog',{name:'Plan options'})).not.toBeInTheDocument()
-  const management=screen.getByRole('dialog',{name:'Manage accounts, pots & categories'})
-  expect(management).toContainElement(document.activeElement as HTMLElement)
-  fireEvent.click(within(management).getByRole('button',{name:'Close'}))
-  expect(trigger).toHaveFocus()
+  fireEvent.click(within(dialog).getByRole('button',{name:'Accounts, pots & categories'}))
+  expect(openSettings).toHaveBeenLastCalledWith('accounts')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
 it('preserves month, search and owner when switching views',()=>{
@@ -1140,30 +1140,6 @@ it('puts the full editor’s scope and impact in the footer, directly above Save
   expect(impact.compareDocumentPosition(within(footer).getByRole('button', { name: 'Save item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
-it('shows independent source scopes and clears income drafts between editing sessions', () => {
-  render(<MonthRulesHarness/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
-  let pay = screen.getByLabelText('Nick — Salary')
-  expect(pay).toHaveAccessibleDescription('Changes apply: December 2026–January 2027.')
-  expect(screen.getByLabelText('Immy — Gift · Other income')).toHaveAccessibleDescription('Changes apply: December 2026.')
-  expect(screen.queryByLabelText('Source name')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Add income source' }))
-  expect(screen.getByLabelText('Person')).toHaveFocus()
-  expect(screen.getByText('New income applies: December 2026 onward.')).toBeVisible()
-  fireEvent.change(pay, { target: { value: '2200' } })
-  fireEvent.change(screen.getByLabelText('Source name'), { target: { value: 'Parents' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
-  pay = screen.getByLabelText('Nick — Salary')
-  expect(pay).toHaveValue('2,000.00')
-  expect(screen.queryByLabelText('Source name')).not.toBeInTheDocument()
-  fireEvent.change(pay, { target: { value: '2,300.00' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Save income' }))
-  expect(savedBudget().incomeSources[0]?.changes).toEqual({ '2026-12': 230000, '2027-02': 300000 })
-  expect(savedBudget().incomeSources[1]?.changes).toEqual({ '2027-01': 20000 })
-  expect(Object.keys(savedBudget().snapshots)).toEqual(['2026-11', '2027-03'])
-})
-
 it('distinguishes an inherited empty snapshot from a missing budget', () => {
   const initial = monthRulesDocument()
   initial.budget.snapshots['2026-11'] = { items: [] }
@@ -1218,33 +1194,20 @@ it.each([
   expect(document.querySelector('.allocation-meter-basis')).toHaveTextContent(text)
 })
 
-it('states a shared income change range once and prefixes amounts with £',()=>{
-  const initial=seededDocument()
-  initial.budget.incomeSources=[{id:'n',personId:'nick',name:'Job',type:'employment',baseAmountPence:300000,changes:{}},{id:'i',personId:'immy',name:'Job',type:'employment',baseAmountPence:200000,changes:{}}]
-  render(<SeededHarness initial={initial}/>)
-  fireEvent.click(screen.getAllByRole('button',{name:'Edit income'})[0]!)
-  const nick=screen.getByLabelText('Nick — Job · Salary'),immy=screen.getByLabelText('Immy — Job · Salary')
-  const form=nick.closest('form')!
-  expect(within(form).getAllByText(/^Changes apply:/)).toHaveLength(1)
-  expect(nick).toHaveAccessibleDescription(/^Changes apply: .* onward\.$/)
-  expect(immy.getAttribute('aria-describedby')).toBe(nick.getAttribute('aria-describedby'))
-  expect(nick.parentElement).toHaveClass('budget-money-field')
-  expect(nick).toHaveValue('3,000.00')
-})
-
 it('keeps the budget actions in the ⋯ menu, and Month gets neither the meter, the ⋯ nor Add item', () => {
   const { unmount } = render(<SeededHarness initial={seededDocument()}/>)
   const toolbar = document.querySelector<HTMLElement>('.budget-page-titlebar .budget-desktop-toolbar')!
   expect(within(toolbar).getByRole('button', { name: 'Add item' })).toBeInTheDocument()
   expect(within(toolbar).queryByRole('menuitem')).not.toBeInTheDocument()
   fireEvent.click(within(toolbar).getByRole('button', { name: 'More budget options' }))
-  expect(within(toolbar).getByRole('menu').textContent).toBe('Edit incomeManage accounts, pots & categories')
+  expect(within(toolbar).getByRole('menu').textContent).toBe('Edit incomeAccounts, pots & categories')
   fireEvent.keyDown(within(toolbar).getByRole('menu'), { key: 'Escape' })
   expect(within(toolbar).queryByRole('menu')).not.toBeInTheDocument()
   expect(within(toolbar).getByRole('button', { name: 'More budget options' })).toHaveFocus()
   fireEvent.click(within(toolbar).getByRole('button', { name: 'More budget options' }))
-  fireEvent.click(within(toolbar).getByRole('menuitem', { name: 'Manage accounts, pots & categories' }))
-  expect(screen.getByRole('dialog', { name: 'Manage accounts, pots & categories' })).toBeInTheDocument()
+  openSettings.mockClear()
+  fireEvent.click(within(toolbar).getByRole('menuitem', { name: 'Accounts, pots & categories' }))
+  expect(openSettings).toHaveBeenCalledWith('accounts')
   expect(screen.getByRole('region', { name: 'Plan summary' })).toBeInTheDocument()
   unmount()
   render(<SeededHarness initial={seededDocument()} view="month"/>)
@@ -1261,7 +1224,7 @@ it('puts the budget actions in Plan’s ⋯ sheet on phones; save status and the
   expect(trigger.textContent).toBe('')
   fireEvent.click(trigger)
   const sheet = screen.getByRole('dialog', { name: 'Plan options' })
-  expect(within(sheet).getAllByRole('button').map(button => button.textContent).filter(Boolean)).toEqual(['Edit income', 'Manage accounts, pots & categories'])
+  expect(within(sheet).getAllByRole('button').map(button => button.textContent).filter(Boolean)).toEqual(['Edit income', 'Accounts, pots & categories'])
   expect(within(sheet).queryByText('Saving…')).not.toBeInTheDocument()
 })
 
