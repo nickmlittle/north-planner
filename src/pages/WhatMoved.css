@@ -1,0 +1,6 @@
+/* The one-time "what moved" note on Home. Tokens only (styles.tokens.test.ts). */
+.what-moved{margin:0 0 var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden}
+.what-moved .list-row-icon{color:var(--text-muted)}
+.what-moved-dismiss{display:grid;place-items:center;width:var(--control-h);height:var(--control-h);margin:0;padding:0;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);cursor:pointer}
+.what-moved-dismiss:hover{background:var(--surface-sunken);color:var(--text)}
+.what-moved-dismiss svg{width:18px;height:18px}

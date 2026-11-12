@@ -1,0 +1,15 @@
+/* Settings (interim, audit 3 PR 06): today's panels, one per section. Tokens only (styles.tokens.test.ts). */
+.settings-page .settings-sections{display:grid;gap:var(--space-6);width:min(880px,100%)}
+.settings-page .ui-section>.setup-card,.settings-page .ui-section>.setup-card:first-of-type{margin:0}
+.settings-page .setup-card h3{margin:0 0 var(--space-4);color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.settings-page .settings-lead{margin:0;color:var(--text-muted);font-size:var(--text-md)}
+.settings-page .settings-account .mobile-utility-status{margin:0}
+.settings-page .card-settings,.settings-page .rules-panel{margin:0}
+@media(min-width:768px){
+  /* The page scrolls as one, like a document. */
+  .planner-app-content .settings-page.page-frame{display:block;overflow-y:auto}
+}
+@media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
+  /* The first heading sits on the pine band that runs on under the app header. */
+  .settings-page .settings-sections>.ui-section:first-child .ui-section-title{color:var(--cream)}
+}

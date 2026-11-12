@@ -5,18 +5,15 @@ import { PageFrame } from '../components/PageFrame'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, localDate, type CardTransaction } from '../domain/cardTracker'
 import { allTransactions, checkRuleSorts, lastImport, sortDestination, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
-import type { SpendingView } from '../state/navigation'
+import type { SpendingSection } from '../state/navigation'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { BringInSheet } from './BringInSheet'
 import { destinationNamer, shortDate } from './cardLabels'
 import { payments, refundsOf } from '../domain/cardRefunds'
 import { ManualEntrySheet } from './ManualEntrySheet'
-import { RulesPanel } from './RulesPanel'
 import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
-import { PotDetail, ThisMonthPanel } from './SpendingMonth'
 import { StatementsPanel } from './StatementsPanel'
-import { CloseMonth } from './CloseMonth'
 import { SortTable } from './SortTable'
 import { SpendingSide } from './SpendingSide'
 import { splitLabel } from '../domain/cardSplits'
@@ -28,26 +25,20 @@ import { CheckBalancesSheet } from './CheckBalancesSheet'
 type Props = {
   document: BudgetDocument
   setDocument: Dispatch<SetStateAction<BudgetDocument>>
-  view: SpendingView
-  onSelectView: (view: SpendingView) => void
-  onOpenHousehold: () => void
-  /** The month This month shows (the app's selected month). */
-  month: string
-  onMonthChange: (month: string) => void
-  /** A pot's detail on This month. */
-  potId?: string | null
-  onOpenPot: (potId: string | null) => void
+  view: SpendingSection
+  onSelectView: (view: SpendingSection) => void
+  /** Settings › Cards, to add the card. */
+  onOpenCardSettings: () => void
+  /** Month's pots (or one pot's page): the side rail links there. */
+  onOpenMonth: (potId?: string) => void
   /** A statement's detail on Statements. */
   statementKey?: string | null
   onOpenStatement?: (key: string | null) => void
-  /** Close <Month> for the selected month. */
-  closing?: boolean
-  onOpenClose?: (open: boolean) => void
   /** Today, for pace; tests pass a fixed one. */
   today?: string
 }
 
-type Section = { id: SpendingView; label: string; count?: number; desktopOnly?: boolean }
+type Section = { id: SpendingSection; label: string; count?: number; desktopOnly?: boolean }
 
 const subscribeMobile = (callback: () => void) => { const media = window.matchMedia?.(MOBILE_QUERY); media?.addEventListener('change', callback); return () => media?.removeEventListener('change', callback) }
 const getMobile = () => !window.matchMedia || window.matchMedia(MOBILE_QUERY).matches
@@ -81,7 +72,7 @@ export function TransactionRow({ document, transaction, where, tag, moved, actio
 }
 
 /** The Spending tab: bring in the Amex export, sort what the rules couldn't, check the rules, and (in later PRs) track and settle. */
-export function Spending({ document, setDocument, view, onSelectView, onOpenHousehold, month, onMonthChange, potId = null, onOpenPot, statementKey = null, onOpenStatement = () => {}, closing = false, onOpenClose = () => {}, today = localDate() }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenMonth, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
   const compact = useSyncExternalStore(subscribeMobile, getMobile, () => false)
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -94,15 +85,13 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   const [moving, setMoving] = useState(false)
   const [checkingBalances, setCheckingBalances] = useState(false)
   const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
-  const tabRefs = useRef<Partial<Record<SpendingView, HTMLButtonElement | null>>>({})
+  const tabRefs = useRef<Partial<Record<SpendingSection, HTMLButtonElement | null>>>({})
   const toSort = transactionsToSort(tracker)
   const byRules = uncheckedRuleSorts(tracker)
   const sections: Section[] = [
     { id: 'sort', label: 'To sort', count: toSort.length },
-    { id: 'month', label: 'This month' },
     { id: 'statements', label: 'Statements' },
-    { id: 'all', label: 'All transactions', desktopOnly: true },
-    { id: 'rules', label: 'Rules', count: tracker.rules.length, desktopOnly: true },
+    { id: 'transactions', label: 'All transactions', desktopOnly: true },
   ]
   const active = sections.find(section => section.id === view)?.id ?? 'sort'
   // Phones keep the tabs to the everyday sections and put the rest under ⋯.
@@ -127,7 +116,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
   }
 
   if (!tracker.cards.length) return <PageFrame className="spending-page" title="Spending" contentWidth="narrow">
-    <div className="spending-empty"><CreditCard aria-hidden="true"/><h2>Add your card first</h2><p>Set up the Amex in Household: when its statement closes and when it’s due. Then bring in its transactions here.</p><button type="button" className="primary-button" onClick={onOpenHousehold}>Set up a card</button></div>
+    <div className="spending-empty"><CreditCard aria-hidden="true"/><h2>Add your card first</h2><p>Set up the Amex in Settings: when its statement closes and when it’s due. Then bring in its transactions here.</p><button type="button" className="primary-button" onClick={onOpenCardSettings}>Set up a card</button></div>
   </PageFrame>
 
   const onTabKey = (event: KeyboardEvent) => {
@@ -188,15 +177,12 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenHous
       {moreMenu}
     </div>}
     {compact && more.some(section => section.id === active) && <button type="button" className="text-button spending-back" onClick={() => onSelectView('sort')}>Back to To sort</button>}
-    <div className={`spending-layout${!compact && (active === 'sort' || active === 'all') ? ' has-side' : ''}`}>
+    <div className={`spending-layout${!compact && (active === 'sort' || active === 'transactions') ? ' has-side' : ''}`}>
     <section id="spending-panel" className="spending-panel" {...tabs.length > 1 && tabs.some(tab => tab.id === active) ? { role: 'tabpanel', 'aria-labelledby': `spending-tab-${active}` } : {}}>
-      {active === 'sort' ? sortPanel : active === 'all' ? allPanel : active === 'month'
-        ? closing ? <CloseMonth document={document} setDocument={setDocument} month={month} today={today} onBack={() => onOpenClose(false)} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>
-        : potId ? <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)}/> : <ThisMonthPanel document={document} month={month} today={today} onMonthChange={onMonthChange} onOpenPot={onOpenPot} onOpenClose={() => onOpenClose(true)} onCheckBalances={() => setCheckingBalances(true)} headingExtra={headingExtra}/>
-        : active === 'statements' ? <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>
-        : <RulesPanel document={document} setDocument={setDocument} headingExtra={headingExtra}/>}
+      {active === 'sort' ? sortPanel : active === 'transactions' ? allPanel
+        : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')} headingExtra={headingExtra}/>}
     </section>
-    {!compact && (active === 'sort' || active === 'all') && <SpendingSide document={document} today={today} onOpenMonth={() => onSelectView('month')} onOpenPot={potId => { onSelectView('month'); onOpenPot(potId) }} onOpenStatement={key => { onSelectView('statements'); onOpenStatement(key) }}/>}
+    {!compact && (active === 'sort' || active === 'transactions') && <SpendingSide document={document} today={today} onOpenMonth={() => onOpenMonth()} onOpenPot={potId => onOpenMonth(potId)} onOpenStatement={key => { onSelectView('statements'); onOpenStatement(key) }}/>}
     </div>
     {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}

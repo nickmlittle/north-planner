@@ -23,7 +23,7 @@ export function SpendingSide({ document, today, onOpenMonth, onOpenPot, onOpenSt
       <p className="spending-big">{pounds(figures.spentPence)} <small>of {pounds(figures.plannedPence)}</small></p>
       <ul className="spending-side-pots">{figures.rows.filter(row => row.destination.kind === 'pot').map(row => <li key={row.key}><button type="button" className="text-button" onClick={() => onOpenPot((row.destination as { potId: string }).potId)}>{name(row.destination)}</button>
         <span className={`spending-pot-status is-${row.status}`}>{row.carriesOver ? `${signedPounds(row.spentPence)} this month` : row.status === 'over' ? `${pounds(-row.leftPence)} over` : `${pounds(row.leftPence)} left`}</span></li>)}</ul>
-      <button type="button" className="secondary-button" onClick={onOpenMonth}>Open This month</button>
+      <button type="button" className="secondary-button" onClick={onOpenMonth}>Open Month</button>
     </section>
     {statement && card && <section className="spending-side-card" aria-labelledby="side-statement">
       <h2 id="side-statement" className="spending-eyebrow">{statementName(statement.closeDate)}</h2>

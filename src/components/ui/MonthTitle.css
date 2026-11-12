@@ -1,7 +1,9 @@
-/* MonthTitle: MonthControl drawn as the page title. Tokens only (styles.tokens.test.ts). */
-.month-title .budget-v3-month{flex-wrap:nowrap;gap:var(--space-1)}
-.month-title .budget-v3-month>button{display:inline-flex;align-items:center;justify-content:center;margin:0}
-.month-title .budget-v3-month>button:first-child,.month-title .budget-v3-month>button:nth-child(3){width:var(--control-h);height:var(--control-h);min-height:0;padding:0}
-.month-title .budget-v3-month>button svg{width:20px;height:20px}
-.month-title .budget-v3-month>button:nth-child(2){gap:var(--space-2);min-height:44px;padding:var(--space-1) var(--space-2);border-color:transparent;background:transparent;color:var(--accent);font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-.5px;line-height:1.2;white-space:nowrap}
-.month-title .budget-v3-month>button:nth-child(2):hover{background:var(--surface-selected)}
+/* MonthTitle: MonthControl drawn as the page title. Tokens only (styles.tokens.test.ts).
+   In the phone app header the header's own month styles apply instead (styles.css, .mobile-header-page). */
+.page-header-mobile .month-title{display:contents}
+.page-header .month-title .budget-v3-month{flex-wrap:nowrap;gap:var(--space-1)}
+.page-header .month-title .budget-v3-month>button{display:inline-flex;align-items:center;justify-content:center;margin:0}
+.page-header .month-title .budget-v3-month>button:first-child,.page-header .month-title .budget-v3-month>button:nth-child(3){width:var(--control-h);height:var(--control-h);min-height:0;padding:0}
+.page-header .month-title .budget-v3-month>button svg{width:20px;height:20px}
+.page-header .month-title .budget-v3-month>button:nth-child(2){gap:var(--space-2);min-height:44px;padding:var(--space-1) var(--space-2);border-color:transparent;background:transparent;color:var(--accent);font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-.5px;line-height:1.2;white-space:nowrap}
+.page-header .month-title .budget-v3-month>button:nth-child(2):hover{background:var(--surface-selected)}

@@ -7,10 +7,10 @@ import type { MonthBudget } from './useMonthBudget'
 
 /**
  * How Plan is being browsed: search, owner and category filters, open groups and grouping.
- * It outlives PlanPage, so a trip to Transfers and back keeps them (they reset on reload),
- * and "Review Immy's items" can be set from Transfers or Home before Plan is on screen.
+ * It outlives PlanPage, so a trip to Month and back keeps them (they reset on reload),
+ * and "Review Immy's items" can be set from Month or Home before Plan is on screen.
  */
-export function usePlanView({ budget, month, view, planDestination, planItemId, reviewPersonId, mobilePresentation }: { budget: MonthBudget; month: string; view: 'plan' | 'transfers'; planDestination?: PlanDestination | null; planItemId?: string; reviewPersonId?: string; mobilePresentation: boolean }) {
+export function usePlanView({ budget, month, view, planDestination, planItemId, reviewPersonId, mobilePresentation }: { budget: MonthBudget; month: string; view: 'plan' | 'month'; planDestination?: PlanDestination | null; planItemId?: string; reviewPersonId?: string; mobilePresentation: boolean }) {
  const {items,adults,labels,transferAccounts,ownerOrder}=budget
  const [ownerFilter,setOwnerFilter]=useState('All')
  const [openGroups,setOpenGroups]=useState(readOpenPlanGroups)
@@ -25,7 +25,7 @@ export function usePlanView({ budget, month, view, planDestination, planItemId, 
  // Arriving from Home's "Review Immy's items": apply it once per visit.
  const [appliedReview,setAppliedReview]=useState<string|undefined>()
  if(reviewPersonId&&reviewPersonId!==appliedReview){setAppliedReview(reviewPersonId);reviewPerson(reviewPersonId)}
- // An item opened from Transfers may sit in a closed group: open it, and Plan's focus finds the row once it renders.
+ // An item opened from Month may sit in a closed group: open it, and Plan's focus finds the row once it renders.
  const planItem=planItemId?items.find(row=>row.id===planItemId):undefined,planItemGroup=planItem&&planGroupKey(planItem,grouping,labels)
  const revealGroup=view==='plan'&&!planDestination?planItemGroup:undefined
  const [revealedGroup,setRevealedGroup]=useState<string|undefined>()

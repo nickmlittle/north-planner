@@ -14,6 +14,7 @@ import { formatMonth } from '../formatting/month'
 import { rememberTransferPerson } from '../state/transferPerson'
 import { accountOptionLabels, stepSummary } from './budgetLabels'
 import { HomeMonths, type SpendingTarget } from './HomeMonths'
+import { WhatMoved } from './WhatMoved'
 import { localDate } from '../domain/cardTracker'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
@@ -30,7 +31,7 @@ type Props = {
   onOpenTransfers: () => void
   /** Plan filtered to one person's accounts. */
   onReviewPerson: (personId: string) => void
-  /** The card tracker's month cards open Spending, and next month's Transfers. */
+  /** The card tracker's month cards open Spending or Month, and next month's payday steps on Month. */
   onOpenSpending?: (target: SpendingTarget) => void
   onOpenTransfersMonth?: (month: string) => void
   /** Today, for the month cards; tests pass a fixed one. */
@@ -70,9 +71,9 @@ export function Home({ document, month, onOpenPlan, onOpenTransfers, onReviewPer
   const people = transfers.people.map(row => ({ personId: row.personId, name: name(row.personId), availablePence: row.availablePence, plannedPence: row.plannedPence }))
   const monthLabel = formatMonth(month), monthName = monthLabel.split(' ')[0]
 
-  // The same payday steps and ticks as Transfers.
+  // The same payday steps and ticks as Month.
   let instructions: TransferInstructions | undefined
-  try { instructions = buildTransferInstructions(document, month) } catch { /* Transfers explains it; Home just has no steps. */ }
+  try { instructions = buildTransferInstructions(document, month) } catch { /* Month explains it; Home just has no steps. */ }
   const accounts = orderTransferAccounts(transfers.accounts, instructions, document.budget.accounts, adultIds, accountOptionLabels(document.budget.accounts, adults))
   const plans = personTransferPlans(accounts, instructions, adultIds)
   const ticks = document.ticks?.[month]
@@ -117,12 +118,13 @@ export function Home({ document, month, onOpenPlan, onOpenTransfers, onReviewPer
   if (incomeDateMarkers(document.budget).includes(month)) comingUp.push(<ComingUpRow key="income" icon={<Wallet/>} title={`Income changed in ${monthName}`} sub="The Plan summary uses the new amounts" onSelect={onOpenPlan}/>)
 
   return <PageFrame className="home-page" headingClass="home-heading" eyebrow="This month" title={monthLabel} contentWidth="wide"
-    headerActions={<div className="home-heading-actions"><button type="button" className="secondary-button" onClick={onOpenTransfers}>Open Transfers</button><button type="button" className="primary-button" onClick={onOpenPlan}>Open Plan</button></div>}
+    headerActions={<div className="home-heading-actions"><button type="button" className="secondary-button" onClick={onOpenTransfers}>Open Month</button><button type="button" className="primary-button" onClick={onOpenPlan}>Open Plan</button></div>}
     summary={<>
       <AllocationMeter label="Plan summary" compact={compact} eyebrow={`${monthName} plan`} availablePence={transfers.availablePence} plannedPence={planned} people={people} onReview={onReviewPerson}
         actions={<button type="button" className="allocation-meter-review home-open-plan" onClick={onOpenPlan}>Open Plan<ChevronRight aria-hidden="true"/></button>}/>
       {upToDate && <div className="transfer-done-banner home-done-banner" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>You’re up to date for {monthName}</strong><span>Every payday step is ticked.</span></span></div>}
     </>}>
+    <WhatMoved/>
     <HomeMonths document={document} today={today} onOpenSpending={onOpenSpending} onOpenTransfers={onOpenTransfersMonth}/>
     <section className="home-section" aria-labelledby="home-todo-title">
       <div className="home-section-heading"><h2 id="home-todo-title">To do</h2><span>{openCount ? `${openCount} left` : anySteps ? 'All done' : ''}</span></div>

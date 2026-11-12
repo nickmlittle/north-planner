@@ -131,3 +131,17 @@ it('keeps Home as it was without a card', () => {
   expect(screen.queryByRole('region', { name: 'October' })).toBeNull()
   expect(document.querySelector('.home-months')).toBeNull()
 })
+
+it('says once where Transfers and Household went, until dismissed on this device', () => {
+  window.localStorage.removeItem('north.whatMoved')
+  const { unmount } = render(<Home document={household()} month={month} onOpenPlan={vi.fn()} onOpenTransfers={vi.fn()} onReviewPerson={vi.fn()}/>)
+  const note = screen.getByRole('note')
+  expect(note).toHaveTextContent('Transfers is now Payday, on Month. Household is in Settings.')
+  expect(screen.getByRole('button', { name: 'Open Month' })).toBeInTheDocument()
+  fireEvent.click(within(note).getByRole('button', { name: 'Dismiss' }))
+  expect(screen.queryByRole('note')).toBeNull()
+  unmount()
+  render(<Home document={household()} month={month} onOpenPlan={vi.fn()} onOpenTransfers={vi.fn()} onReviewPerson={vi.fn()}/>)
+  expect(screen.queryByRole('note')).toBeNull()
+  window.localStorage.removeItem('north.whatMoved')
+})
