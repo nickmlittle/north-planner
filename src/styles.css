@@ -1051,8 +1051,8 @@ small, footer { color: var(--muted) }
 /* Payday steps: the phone list, and the desktop columns (.payday.is-desktop). */
 .payday.is-desktop{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--space-4) var(--space-5);margin-bottom:var(--space-5)}
 .payday.is-desktop>.payday-person{flex:1 1 380px;min-width:0}
-.payday.is-desktop>.payday-copy-hint,.payday.is-desktop>.payday-all-done,.payday.is-desktop>.payday-review,.payday.is-desktop>.budget-destination-empty{flex:1 0 100%}
-.payday.is-desktop>.payday-copy-hint{padding:0 var(--space-1)}
+.payday.is-desktop>.step-copy-hint,.payday.is-desktop>.payday-all-done,.payday.is-desktop>.payday-review,.payday.is-desktop>.budget-destination-empty{flex:1 0 100%}
+.payday.is-desktop>.step-copy-hint{padding:0 var(--space-1)}
 .payday.is-desktop>.payday-all-done{margin:0}
 .payday.is-desktop .payday-person,.payday.is-desktop .payday-review{overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
 .payday-person-head{display:grid;gap:var(--space-2);padding:var(--space-4) var(--space-5) var(--space-3)}
@@ -1062,40 +1062,15 @@ small, footer { color: var(--muted) }
 .payday-person-head .transfer-progress-changed,.payday-person-head .transfer-over-warning{margin:0}
 .payday-person-done{display:flex;align-items:center;gap:var(--space-2);margin:0;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);background:var(--pine);color:var(--cream);font-size:var(--text-md);font-weight:var(--weight-bold)}
 .payday-person-done svg{width:18px;height:18px;stroke-width:3}
-.payday-account-band{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-2);margin:0;padding:var(--space-3) var(--space-5) var(--space-2);border-top:1px solid var(--line);background:var(--surface-header);font-size:var(--text-md);font-weight:var(--weight-bold);color:var(--charcoal)}
-.payday-account-band span:last-child{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium);text-align:right}
-.payday.is-desktop .payday-step{padding-right:var(--space-4)}
-.payday.is-desktop .payday-step-label{font-size:var(--text-md)}
-.payday.is-desktop .payday-step-amount{font-size:var(--text-md)}
 .payday.is-desktop .payday-review-account{padding:var(--space-3) var(--space-5)}
 .payday.is-desktop .payday-review .payday-person-heading{display:flex;justify-content:space-between;margin:0;padding:var(--space-4) var(--space-5) var(--space-2);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 
 .payday-person,.payday-review{min-width:0}
 .monthly-budget-page .payday-person-heading{display:flex;justify-content:space-between;gap:var(--space-2);margin:0;padding:var(--space-3) var(--space-4) var(--space-2);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:1.35;font-variant-numeric:tabular-nums}
 .budget-destination-empty{margin:0;padding:var(--space-3) var(--space-4);color:var(--muted);font-size:var(--text-sm)}
-.payday-steps,.payday-review ul{margin:0;padding:0;list-style:none}
-.payday-step,.payday-review-account{display:grid;grid-template-columns:44px minmax(0,1fr);gap:var(--space-1);margin:0;padding:var(--space-2) var(--space-4) var(--space-2) var(--space-2);border-top:1px solid var(--line)}
+.payday-review ul{margin:0;padding:0;list-style:none}
+.payday-review-account{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-1);margin:0;padding:var(--space-2) var(--space-4) var(--space-2) var(--space-2);border-top:1px solid var(--line)}
 .payday-review-account{grid-template-columns:minmax(0,1fr);gap:var(--space-1);padding:var(--space-3) var(--space-4)}
-.payday-step.is-pot-move{padding-left:var(--space-5);border-top-style:dashed;background:var(--surface-subtle)}
-.payday-tick{display:grid;place-items:center;width:44px;height:44px;margin:-4px 0 0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--white);cursor:pointer}
-.payday-tick-dot{display:grid;place-items:center;box-sizing:border-box;width:26px;height:26px;border:2px solid var(--line-strong);border-radius:50%;background:var(--surface-field)}
-.payday-tick-dot svg{width:15px;height:15px;stroke-width:3}
-@media(hover:hover){.payday-tick:hover .payday-tick-dot{border-color:var(--pine)}}
-.payday-tick:focus-visible{outline-offset:-2px}
-.payday-tick.is-done .payday-tick-dot{border-color:var(--pine);background:var(--pine)}
-.payday-step.is-done .payday-step-label{color:var(--muted)}
-.payday-step.is-done button.payday-step-amount{background:transparent;color:var(--muted);font-weight:var(--weight-bold)}
-.payday-step-body{display:grid;gap:var(--space-1);min-width:0}
-.payday-step-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-2);align-items:start;margin:0;min-width:0}
-.payday-step-label{min-width:0;color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium);line-height:1.35;overflow-wrap:anywhere}
-.payday-step.is-pot-move .payday-step-label{font-weight:var(--weight-medium)}
-.payday-step-from{display:block;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
-.payday-step-amount{color:var(--pine);font:var(--weight-bold) var(--text-lg) var(--font-family);line-height:1.35;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-button.payday-step-amount{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin:-8px 0;padding:0 var(--space-3);border:0;border-radius:var(--radius-md);background:var(--surface-band);cursor:pointer}
-@media(hover:hover){button.payday-step-amount:hover{background:var(--surface-band-hover)}}
-button.payday-step-amount:active{background:var(--share-track)}
-.payday-copy-hint{margin:0;padding:var(--space-3) var(--space-4) 0;color:var(--muted);font-size:var(--text-sm)}
-.payday-step-main{min-height:36px;align-items:center}
 .transfer-person-switch small{margin-left:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .transfer-person-switch button[aria-pressed=true] small{color:inherit;opacity:.8}
 .transfer-progress{margin-top:var(--space-3)}
@@ -1108,19 +1083,12 @@ button.payday-step-amount:active{background:var(--share-track)}
 .transfer-over-warning svg{flex:none;width:18px;height:18px;margin-top:2px}
 .transfer-over-warning p{margin:0;color:var(--charcoal);font-size:var(--text-sm);line-height:1.45}
 .transfer-over-warning .text-button{min-height:32px;padding:0;color:var(--status-error);font-weight:var(--weight-bold)}
-.payday-tick.is-changed .payday-tick-dot{border-color:var(--status-review);background:var(--status-review-bg);color:var(--status-review)}
-.payday-tick.is-changed .payday-tick-dot svg{stroke-width:2.4}
-.payday-step-changed{margin:0;color:var(--status-review);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:1.4}
-.payday-step.is-changed button.payday-step-amount{background:var(--status-review-bg);color:var(--status-review)}
 .transfer-done-banner{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);background:var(--pine);color:var(--cream)}
 .transfer-done-banner>span:last-child{display:grid}
 .transfer-done-banner strong{font-size:var(--text-md)}
 .transfer-done-banner span span{color:var(--on-pine-muted);font-size:var(--text-sm)}
 .transfer-done-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:var(--soft-fern);color:var(--pine)}
 .transfer-done-icon svg{width:20px;height:20px;stroke-width:3}
-.payday-copied{position:fixed;z-index:90;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin:0;padding:var(--space-2) var(--space-4);border-radius:var(--radius-lg);background:var(--pine);color:var(--white);font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;transform:translateX(-50%);box-shadow:var(--shadow-pop);pointer-events:none}
-.payday-copied:empty{padding:0;background:transparent;box-shadow:none}
-.payday-step-caption{margin:0;color:var(--muted);font-size:var(--text-sm);line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .payday-review-amounts{display:grid;gap:2px;margin:0;font-size:var(--text-md)}
 .payday-review-amounts>div{display:flex;justify-content:space-between;gap:var(--space-3)}
 .payday-review-amounts dd{margin:0;font-weight:var(--weight-medium);font-variant-numeric:tabular-nums}
@@ -1531,11 +1499,9 @@ div.spending-pot{padding-right:var(--space-4)}
 .settle-progress{margin:var(--space-1) 0 0;color:var(--pine);font-weight:var(--weight-bold)}
 .settle-up{display:grid;gap:var(--space-3)}
 .settle-account{overflow:hidden;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
-.settle-account .payday-person-heading{margin:0;padding:var(--space-3) var(--space-4)}
+.settle-account>.step-group-band{border-top:0}
 .statement-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium)}
 .statement-heading p{margin:2px 0 0}
-.settle-account .payday-person-heading{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);border-bottom:1px solid var(--line);color:var(--charcoal);font-size:var(--text-lg);font-weight:var(--weight-bold)}
-.settle-account .payday-person-heading span:last-child{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .spending-stage{display:flex;flex-wrap:wrap;gap:var(--space-1);margin:0 0 var(--space-1)}
 .spending-chip{display:inline-flex;align-items:center;min-height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .spending-chip.is-in-progress{background:var(--pine);color:var(--cream)}
@@ -1548,9 +1514,8 @@ div.spending-pot{padding-right:var(--space-4)}
 .close-month .spending-back svg{width:18px;height:18px}
 .close-cover{display:grid;gap:var(--space-2);padding:var(--space-3) 0;border-top:1px solid var(--line)}
 .close-cover-head{display:flex;justify-content:space-between;gap:var(--space-3);margin:0}
-.close-cover-step{border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden}
-.close-cover-step .payday-step{border-top:0}
-.close-cover-step .payday-step-label{font-size:var(--text-md)}
+.close-cover-step{margin:0;padding:0;list-style:none}
+.close-cover-step .step-row{border-top:0;padding-left:0;padding-right:0;background:transparent}
 .close-left dd{display:grid;grid-template-columns:repeat(2,minmax(84px,auto));gap:var(--space-3);text-align:right}
 .close-left-head dt,.close-left-head dd{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .close-flag>div{display:grid;gap:var(--space-2)}
@@ -1609,7 +1574,7 @@ div.spending-pot{padding-right:var(--space-4)}
   .spending-page .spending-layout.has-side .spending-panel{max-width:none}
   .spending-page .spending-nav{max-width:none}
   .settle-up{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-  .settle-up>.payday-copied,.settle-up>.payday-copy-hint{grid-column:1/-1}
+  .settle-up>.step-copied,.settle-up>.step-copy-hint{grid-column:1/-1}
 }
 
 /* The Amex pot: what's left to move, the Move sheet, and moved tags */
@@ -1624,14 +1589,9 @@ div.spending-pot{padding-right:var(--space-4)}
 .move-summary{display:grid;gap:var(--space-1)}
 .move-summary .spending-big,.move-summary .spending-eyebrow{margin:0}
 .move-steps{display:grid;gap:var(--space-2)}
-.move-steps .payday-person-heading{display:flex;justify-content:space-between;gap:var(--space-2);margin:0;padding:0;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
-.move-steps ol{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card);overflow:hidden}
-.move-steps .payday-copy-hint{padding:0}
-.move-step{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);min-height:44px;padding:var(--space-1) var(--space-3)}
-.move-step+.move-step{border-top:1px solid var(--line)}
-.move-step.is-pot-move{background:var(--surface-subtle)}
-.move-step-label{min-width:0;color:var(--pine);font-weight:var(--weight-medium);overflow-wrap:anywhere}
-.move-step .payday-step-amount{min-height:36px;padding:0 var(--space-2);border:0;border-radius:var(--radius-sm);background:var(--card);font-size:var(--text-md);cursor:pointer}
+.move-steps .step-group{border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card);overflow:hidden}
+.move-steps .step-group-band{border-top:0}
+.move-steps .step-copy-hint{padding:0}
 .move-transactions{display:grid;gap:var(--space-2);margin:0;padding:0;border:0}
 .move-transactions legend{padding:0;margin-bottom:var(--space-1);color:var(--pine);font-weight:var(--weight-bold)}
 .move-hint{margin:0;color:var(--muted);font-size:var(--text-sm)}
