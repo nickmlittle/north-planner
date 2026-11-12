@@ -1,0 +1,18 @@
+/* ListRow. Tokens only (styles.tokens.test.ts). --row-h is 44px, 56px in the phone layout. */
+.list-row{box-sizing:border-box;display:grid;grid-template-columns:28px minmax(0,1fr) auto 16px;align-items:center;gap:var(--space-3);width:100%;min-height:var(--row-h);margin:0;padding:var(--space-2) var(--space-4);border:0;border-top:1px solid var(--border);background:transparent;color:var(--text);font:inherit;font-weight:var(--weight-regular);text-align:left;text-decoration:none}
+.list-row:first-child{border-top:0}
+a.list-row:hover,button.list-row:hover{background:var(--surface-sunken);text-decoration:none;cursor:pointer}
+.list-row:focus-visible{outline-offset:-2px}
+/* Focused or under list navigation: the selected surface with a 2px pine bar on the left. */
+.list-row:focus-visible,.list-row[data-focused]{background:linear-gradient(var(--accent),var(--accent)) left/2px 100% no-repeat,var(--surface-selected)}
+.list-row-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--accent)}
+.list-row-icon svg{width:16px;height:16px}
+.list-row.is-warning .list-row-icon{background:var(--warning-bg);color:var(--warning)}
+.list-row.is-critical .list-row-icon{background:var(--critical-bg);color:var(--critical)}
+.list-row.is-done .list-row-icon{background:var(--accent);color:var(--white)}
+.list-row.is-done .list-row-title{color:var(--text-muted)}
+.list-row-text,.list-row-trailing{display:grid;gap:2px;min-width:0}
+.list-row-title{font-size:var(--text-md);font-weight:var(--weight-medium);line-height:1.35;overflow-wrap:anywhere}
+.list-row-meta{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular);line-height:1.35}
+.list-row-trailing{justify-items:end;font-size:var(--text-md);font-weight:var(--weight-medium);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.list-row-chevron{width:16px;height:16px;color:var(--text-muted)}

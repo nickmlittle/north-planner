@@ -1,0 +1,8 @@
+/* Tabs. Tokens only (styles.tokens.test.ts). */
+.tabs{display:flex;gap:var(--space-5);margin:0;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tab{display:inline-flex;align-items:center;gap:var(--space-2);flex:none;min-height:44px;margin:0 0 -1px;padding:0;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-md);font-weight:var(--weight-medium);cursor:pointer}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{border-bottom-color:var(--accent);color:var(--text)}
+.tab:focus-visible{outline-offset:-2px}
+.tab-count{min-width:20px;padding:2px var(--space-2);border-radius:var(--radius-pill);background:var(--surface-selected);color:var(--text-muted);font-size:var(--text-xs);line-height:1.2;text-align:center}
+.tab-panel{min-width:0;padding-top:var(--space-4)}

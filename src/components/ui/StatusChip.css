@@ -1,0 +1,6 @@
+/* StatusChip. Tokens only (styles.tokens.test.ts). */
+.status-chip{display:inline-flex;align-items:center;gap:var(--space-1);height:22px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-selected);color:var(--text);font-size:var(--text-xs);font-weight:var(--weight-medium);line-height:1;white-space:nowrap}
+.status-chip.is-positive{background:var(--accent);color:var(--white)}
+.status-chip.is-warning{background:var(--warning-bg);color:var(--warning)}
+.status-chip.is-critical{background:var(--critical-bg);color:var(--critical)}
+.status-chip-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
