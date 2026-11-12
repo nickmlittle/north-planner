@@ -1,4 +1,4 @@
-import type { BudgetAccount, BudgetPot } from '../domain/monthlyBudget'
+import type { BudgetAccount } from '../domain/monthlyBudget'
 import { accountTypeLabel, accountTypes } from '../domain/accountTypes'
 
 type Adult = { id: string; name: string }
@@ -23,16 +23,6 @@ export function accountOwnerGroups(accounts: BudgetAccount[], adults: Adult[]) {
     budgetCollator.compare(accountTypeLabel(a.accountTypeId), accountTypeLabel(b.accountTypeId)) ||
     budgetCollator.compare(a.name, b.name) || a.id.localeCompare(b.id))
   })).filter(group => group.accounts.length)
-}
-
-/** One A–Z list of pots by name; same-named pots follow owner order (Joint, adults, Needs owner), then account. */
-export function sortPotsForManage(pots: BudgetPot[], accounts: BudgetAccount[], adults: Adult[]): BudgetPot[] {
-  const owners = ownerOrder(adults).map(owner => owner.key)
-  const byId = new Map(accounts.map(account => [account.id, account]))
-  const labels = accountOptionLabels(accounts, adults, false)
-  const rank = (pot: BudgetPot) => { const account = byId.get(pot.accountId); return account ? owners.indexOf(accountOwnerKey(account)) : owners.length }
-  return [...pots].sort((a, b) => budgetCollator.compare(a.name, b.name) || rank(a) - rank(b) ||
-    budgetCollator.compare(labels.get(a.accountId) ?? '', labels.get(b.accountId) ?? '') || a.id.localeCompare(b.id))
 }
 
 export function accountOwnerLabel(account: BudgetAccount, adults: Adult[]): string {
