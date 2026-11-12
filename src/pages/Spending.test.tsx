@@ -50,7 +50,7 @@ it('asks for a card before anything else', () => {
   delete document.card
   const onOpenCardSettings = vi.fn()
   render(<Spending document={document} setDocument={() => {}} view="sort" onSelectView={() => {}} onOpenCardSettings={onOpenCardSettings} onOpenMonth={() => {}}/>)
-  expect(screen.getByRole('heading', { name: 'Add your card first' })).toBeInTheDocument()
+  expect(screen.getByText('Add your card first')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Set up a card' }))
   expect(onOpenCardSettings).toHaveBeenCalled()
 })
@@ -66,20 +66,22 @@ it('lists what is left to sort, newest first, with card and person, and leaves p
   ]
   document.card!.imports = [{ at: '2026-11-09T19:30:00.000Z', cardId: 'amex', fileName: 'a.xlsx', statementKey: 'amex:2026-11-24', rows: 5, added: 5, skipped: 0, sortedByRules: 1, latestDate: '2026-11-08', matchesSummary: true }]
   render(<Harness initial={document}/>)
-  expect(screen.getByText('Last brought in Mon 9 Nov')).toBeInTheDocument()
-  const list = screen.getByRole('list')
+  // Phones: rows are the tap target (no Choose pill), with who and any suggestion in the meta.
+  const list = screen.getByRole('list', { name: 'To sort' })
   expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual([
-    'TRAIN TICKETS ONLINE£112.81Sun 8 Nov · Ada ··41001Choose',
-    'HOMEWARE HUT LEEDS−£24.99Thu 5 Nov · Ben ··41009 · refundChoose',
-    'BOOK NOOK YORK£12.50Tue 3 Nov · Ada ··41001Choose',
+    'TRAIN TICKETS ONLINESun 8 Nov · Ada · Suggested: Groceries · Joint£112.81',
+    'HOMEWARE HUT LEEDSThu 5 Nov · Ben · Suggested: Groceries · Joint−£24.99',
+    'BOOK NOOK YORKTue 3 Nov · Ada · Suggested: Groceries · Joint£12.50',
   ])
-  expect(screen.getByText('3 transactions')).toBeInTheDocument()
+  expect(screen.queryByText('Choose')).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'To sort3' })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: /^To sort/ })).toHaveTextContent('To sort3')
 })
 
 it('shows the empty states', () => {
   render(<Harness initial={household()}/>)
-  expect(screen.getByText('Nothing brought in yet')).toBeInTheDocument()
-  expect(screen.getByText('Nothing to sort. Bring in new transactions to start.')).toBeInTheDocument()
+  expect(screen.getByText('Nothing to sort')).toBeInTheDocument()
+  expect(screen.getByText('Bring in the Excel export from Amex to start.')).toBeInTheDocument()
   cleanup()
   const document = household()
   document.card!.transactions = [tx('e', '2026-11-06', 'GREEN GROCER', 4460, { sort: { lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'groceries' } }], by: 'person', at: 'x' } })]
@@ -153,7 +155,8 @@ it('offers to update the closing day when the export’s period ends on another 
 it('adds a transaction by hand, on the statement its date falls in', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={household()} onChange={next => { saved = next }}/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Add a transaction' }))
+  fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add a transaction (N)' }))
   const dialog = screen.getByRole('dialog', { name: 'Add a transaction' })
   fireEvent.click(within(dialog).getByRole('button', { name: 'Add transaction' }))
   expect(within(dialog).getByLabelText('Description')).toHaveAccessibleDescription('Enter what it was.')
@@ -221,8 +224,7 @@ it('makes a rule in place with Always, and it sorts the others from that merchan
 it('checks rule sorts, and offers to change the rule when one is re-sorted', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
-  expect(screen.getByRole('heading', { name: 'Sorted by rules · 1' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Check' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sorted by rules · 1 · Check' }))
   const row = screen.getByRole('button', { name: /GREEN GROCER LONDON/ })
   expect(row).toHaveAccessibleName('GREEN GROCER LONDON, £44.60, Sat 7 Nov · Ada ··41001, Groceries · Joint, rule')
   fireEvent.click(row)
@@ -234,32 +236,34 @@ it('checks rule sorts, and offers to change the rule when one is re-sorted', () 
   expect(saved!.card!.transactions.find(row => row.id === 'grocer')!.sort?.by).toBe('person')
   cleanup()
   render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
-  fireEvent.click(screen.getByRole('button', { name: 'Check' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sorted by rules · 1 · Check' }))
   fireEvent.click(screen.getByRole('button', { name: 'They all look right' }))
-  expect(screen.queryByRole('heading', { name: /Sorted by rules/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Sorted by rules/ })).not.toBeInTheDocument()
   expect(saved!.card!.transactions.find(row => row.id === 'grocer')!.sort?.checkedAt).toEqual(expect.any(String))
 })
 
-it('lists all transactions under ⋯ on phones, where any can be sorted again or put back', () => {
+it('lists all transactions on the Transactions tab, where any can be sorted again or put back', () => {
   let saved: BudgetDocument | undefined
   render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
-  fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
-  expect(screen.getByRole('heading', { name: 'All transactions' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
+  expect(screen.getByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
   const rows = screen.getAllByRole('button', { name: /TRAIN TICKETS ONLINE|GREEN GROCER/ })
   expect(rows.map(row => row.querySelector('.spending-row-where')?.textContent)).toEqual(['To sort', 'To sort', 'Groceries · JointRule', 'Treats · Ada'])
   fireEvent.click(rows[3]!)
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Move back to To sort' }))
   expect(saved!.card!.transactions.find(row => row.id === 'old')!.sort).toBeUndefined()
-  fireEvent.click(screen.getByRole('button', { name: 'Back to To sort' }))
-  expect(screen.getByRole('heading', { name: 'To sort' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: /^To sort/ }))
+  expect(screen.getByRole('heading', { name: /^To sort/ })).toBeInTheDocument()
 })
 
-it('keeps All transactions and the links to Sorting rules and Card settings under ⋯ on phones', () => {
-  render(<Harness initial={sortingHousehold()}/>)
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['To sort · 2', 'Statements'])
+it('has three tabs everywhere, a Statements badge, and ⋯ with Add a transaction, Sorting rules and Card settings', () => {
+  const onOpenRules = vi.fn(), onOpenCardSettings = vi.fn()
+  render(<Spending document={sortingHousehold()} setDocument={() => {}} view="sort" onSelectView={() => {}} onOpenCardSettings={onOpenCardSettings} onOpenRules={onOpenRules} today="2026-11-12"/>)
+  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['To sort2', 'Transactions', 'Statements'])
   fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['All transactions', 'Sorting rules', 'Card settings'])
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Add a transaction (N)', 'Sorting rules', 'Card settings'])
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Sorting rules' }))
+  expect(onOpenRules).toHaveBeenCalled()
 })
 
 function splitHousehold(): BudgetDocument {
@@ -297,8 +301,7 @@ it('splits by amount, with Left to place, Half each and the funding share', () =
   ])
   expect(screen.getByRole('status')).toHaveTextContent('TRAIN TICKETS ONLINE: split across 2 pots.')
 
-  fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
   expect(screen.getByRole('button', { name: /^TRAIN TICKETS ONLINE, £112.81, .*Split · 2 pots/ })).toBeInTheDocument()
   expect(within(screen.getByRole('list', { name: 'TRAIN TICKETS ONLINE split' })).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Treats · Ada£100.00', 'Groceries · Joint · Snacks£12.81'])
 
@@ -364,8 +367,7 @@ it('sends a refund back to the purchase’s pot, in the month it arrived, and li
   expect(first).toHaveTextContent('Treats · AdaSuggested · Where the purchase went')
   fireEvent.click(first)
   expect(saved!.card!.transactions.find(row => row.id === 'shop-refund')).toMatchObject({ refundOf: { transactionId: 'shop' }, sort: { lines: [{ amountPence: -1250, destination: { kind: 'pot', potId: 'treats' } }] } })
-  fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
   expect(screen.getByRole('button', { name: /^BOOK NOOK, −£12.50, .*Refund of BOOK NOOK £30.00 · 20 Oct/ })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /^BOOK NOOK, £30.00, .*Refunded −£12.50 · 5 Nov/ })).toBeInTheDocument()
 })
@@ -386,8 +388,7 @@ it('asks which part of a split purchase came back, or spreads it', () => {
 it('lists payments to Amex apart, and never as something to sort', () => {
   render(<Harness initial={refundHousehold()}/>)
   expect(screen.queryByRole('button', { name: /PAYMENT RECEIVED/ })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'More Spending options' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'All transactions' }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
   const section = screen.getByRole('region', { name: 'Payments to Amex' })
   expect(within(section).getByText('PAYMENT RECEIVED - THANK YOU')).toBeInTheDocument()
   expect(within(section).queryByRole('button')).not.toBeInTheDocument()
@@ -555,7 +556,7 @@ it('says what a statement is waiting for before it can be settled', () => {
   expect(screen.getByText('You can settle up once it closes on Tue 24 Nov.')).toBeInTheDocument()
   expect(screen.getByText('1 to sort')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Sort them' }))
-  expect(screen.getByRole('heading', { name: 'To sort' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: /^To sort/ })).toBeInTheDocument()
 })
 
 it('offers to tick Pay when Amex shows a matching payment', () => {
@@ -661,13 +662,21 @@ describe('on desktop', () => {
     desktop()
     let saved: BudgetDocument | undefined
     render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
-    expect(screen.getByRole('tab', { name: /All transactions/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Transactions' })).toBeInTheDocument()
     const table = screen.getByRole('table', { name: 'To sort' })
-    expect(table).toHaveAccessibleDescription('↑↓ move between rows · / choose a pot · Enter place it · A Always · S split')
+    expect(table).toHaveAccessibleDescription('J K move · ↵ place · / choose a pot · A always · S split')
+    // No Place column: Enter places, and a quiet ✓ does for the mouse.
+    expect(within(table).queryByRole('button', { name: 'Place' })).not.toBeInTheDocument()
     const rows = () => within(table).getAllByRole('row').slice(1)
     expect(rows().map(row => row.getAttribute('aria-label'))).toEqual(['TRAIN TICKETS ONLINE, £9.00, Mon 9 Nov', 'TRAIN TICKETS ONLINE, £112.81, Sun 8 Nov'])
-    expect(within(rows()[0]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveDisplayValue('Treats · Ada (suggested)')
+    expect(within(rows()[0]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveDisplayValue('Treats · Ada')
+    expect(within(rows()[0]!).getByText('Suggested')).toHaveClass('status-chip')
+    expect(within(rows()[0]!).getByRole('button', { name: 'Place TRAIN TICKETS ONLINE in Treats · Ada' })).toBeInTheDocument()
     rows()[0]!.focus()
+    fireEvent.keyDown(rows()[0]!, { key: 'j' })
+    expect(rows()[1]).toHaveFocus()
+    fireEvent.keyDown(rows()[1]!, { key: 'k' })
+    expect(rows()[0]).toHaveFocus()
     fireEvent.keyDown(rows()[0]!, { key: 'ArrowDown' })
     expect(rows()[1]).toHaveFocus()
     fireEvent.keyDown(rows()[1]!, { key: '/' })
@@ -695,14 +704,17 @@ describe('on desktop', () => {
     expect(screen.getByRole('dialog', { name: 'Split TRAIN TICKETS ONLINE' })).toBeInTheDocument()
   })
 
-  it('keeps the month and the statement to settle beside the list', () => {
+  it('leads with the card and its open statement, one Bring in, and no side rail', () => {
     desktop()
     render(<Harness initial={statementHousehold()} today="2026-11-30"/>)
-    const side = screen.getByRole('complementary', { name: 'November 2026 and the current statement' })
-    expect(within(side).getByText('November so far').nextElementSibling).toHaveTextContent('£727.91 of £870.00')
-    expect(within(side).getByText('October statement').nextElementSibling).toHaveTextContent('£40.00 due Wed 18 Nov')
-    fireEvent.click(within(side).getByRole('button', { name: 'Open statement' }))
-    expect(screen.getByRole('heading', { name: 'October statement' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Amex' })).toBeInTheDocument()
+    expect(screen.getByText(/^December statement £[\d,.]+ · closes Thu 24 Dec$/)).toBeInTheDocument()
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(window.document.querySelectorAll('.primary-button')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Bring in' })).toHaveClass('primary-button')
+    expect(screen.getByRole('heading', { name: /^To sort/ }).parentElement?.parentElement).toHaveTextContent('Nothing brought in yet · sorted to 10 Nov')
+    // October is ready and unsettled: the Statements tab says so.
+    expect(screen.getByRole('tab', { name: /^Statements/ })).toHaveTextContent('Statements1 to settle')
   })
 })
 
@@ -722,28 +734,35 @@ describe('the Amex pot', () => {
     return document
   }
 
-  it('shows what is left to move, lists the moves, and records only what was ticked', () => {
+  it('sets aside after To sort: the moves to copy, Mark moved with Undo, and Not all of it for the checklist', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     let saved: BudgetDocument | undefined
     render(<Harness initial={withPot()} onChange={next => { saved = next }}/>)
-    expect(screen.getByText('£102.80 to move to the Amex pot')).toBeInTheDocument()
-    expect(screen.getByText('2 transactions sorted since the last move')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Move to the Amex pot' }))
+    const block = screen.getByRole('heading', { name: /^Set aside in the Amex pot/ }).closest('section')!
+    expect(block).toHaveTextContent('£102.80 · 2 transactions sorted since the start')
+    expect(within(block).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Fuel£58.20', 'Send to Joint£58.20', 'Out of Groceries£44.60', 'Into Amex£102.80'])
+    expect(screen.queryByText(/to move to the Amex pot/)).not.toBeInTheDocument()
+    // Not all of it: the checklist, where the fuel can wait for next time.
+    fireEvent.click(within(block).getByRole('button', { name: 'Not all of it' }))
     const dialog = screen.getByRole('dialog', { name: 'Move to the Amex pot' })
     const steps = within(dialog).getByRole('region', { name: 'Moves to make' })
-    expect(within(steps).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Fuel£58.20', 'Send to Joint£58.20', 'Out of Groceries£44.60', 'Into Amex£102.80'])
-    // Untick the fuel: it stays for next time, and the moves follow.
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /FUEL STOP/ }))
     expect(within(steps).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Groceries£44.60', 'Into Amex£44.60'])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Moved £44.60' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Moved £44.60 to the Amex pot. Undo')
-    expect(saved!.card!.moves).toHaveLength(1)
+    const message = () => window.document.querySelector('.spending-message')
+    expect(message()).toHaveTextContent('Moved £44.60 to the Amex pot. Undo')
     expect(saved!.card!.moves![0]!.transactions.map(row => row.transactionId)).toEqual(['grocer'])
     expect(decodeBudgetDocument(saved)).not.toBeNull()
-    expect(screen.getByText('£58.20 to move to the Amex pot')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^Set aside in the Amex pot/ }).closest('section')).toHaveTextContent('£58.20 · 1 transaction sorted since')
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(saved!.card!.moves).toBeUndefined()
-    expect(screen.getByText('£102.80 to move to the Amex pot')).toBeInTheDocument()
+    // Mark moved: everything at once.
+    fireEvent.click(screen.getByRole('button', { name: 'Mark £102.80 moved' }))
+    expect(saved!.card!.moves![0]!.transactions.map(row => row.transactionId).sort()).toEqual(['fuel', 'grocer'])
+    expect(message()).toHaveTextContent('Moved £102.80 to the Amex pot. Undo')
+    expect(screen.queryByRole('heading', { name: /^Set aside/ })).not.toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it('tags moved transactions in All transactions, and a re-sort as changed since moved', () => {

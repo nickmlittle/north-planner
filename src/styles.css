@@ -1149,18 +1149,9 @@ main[tabindex="-1"]:focus{outline:none}
 /* Spending */
 .spending-page .page-frame-summary,.spending-page .page-frame-body{max-width:900px}
 .spending-page .page-frame-body--wide{margin-inline:0}
-.spending-summary{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-4) var(--space-5);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
-.spending-last{display:grid;gap:2px;margin:0;color:var(--muted);font-size:var(--text-md)}
-.spending-last strong{color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium)}
-.spending-actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
-.spending-actions .primary-button,.spending-actions .secondary-button{gap:var(--space-2);min-height:var(--control-h);margin:0}
 .spending-page svg{flex:none}
-.spending-actions svg,.bring-in-file svg{width:18px;height:18px}
+.bring-in-file svg{width:18px;height:18px}
 .spending-message{margin:0 0 var(--space-3)}
-.spending-tabs{display:grid;grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;gap:var(--space-1);margin:0 0 var(--space-4);padding:var(--space-1);border-radius:var(--radius-md);background:var(--soft-fern)}
-.spending-tabs button{min-height:44px;margin:0;padding:var(--space-2);border:0;border-radius:var(--radius-md);background:transparent;color:var(--charcoal);font:var(--weight-medium) var(--text-md) var(--font-family);cursor:pointer}
-.spending-tabs button[aria-selected=true]{background:var(--card);color:var(--pine);box-shadow:var(--shadow-control);font-weight:var(--weight-bold)}
-.spending-panel{display:grid;gap:var(--space-3)}
 .spending-section-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:44px}
 .spending-section-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium)}
 .spending-section-heading span{color:var(--muted);font-size:var(--text-sm)}
@@ -1173,10 +1164,6 @@ main[tabindex="-1"]:focus{outline:none}
 .spending-row.is-credit .spending-row-amount{color:var(--link)}
 .spending-row-meta{color:var(--muted);font-size:var(--text-sm)}
 .spending-none{margin:0;padding:var(--space-5);border:1px dashed var(--line);border-radius:var(--radius-md);color:var(--muted)}
-.spending-empty{display:grid;justify-items:start;gap:var(--space-3);padding:var(--space-5);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card)}
-.spending-empty svg{width:28px;height:28px;color:var(--pine)}
-.spending-empty h2{margin:0;color:var(--pine);font-size:var(--text-xl);font-weight:var(--weight-medium)}
-.spending-empty p{margin:0;color:var(--muted)}
 .bring-in-sheet,.manual-entry-sheet{--sheet-width:520px}
 .bring-in-sheet .sheet-body,.manual-entry-sheet .sheet-body{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
 .bring-in-lead{margin:0;color:var(--muted)}
@@ -1208,11 +1195,8 @@ main[tabindex="-1"]:focus{outline:none}
 .spending-field-error{font-size:var(--text-sm);font-weight:var(--weight-regular)}
 .spending-check{display:flex;align-items:center;gap:var(--space-2);min-height:44px;font-weight:var(--weight-medium)}
 .spending-check input{width:20px;height:20px;margin:0}
-@media(max-width:640px){.spending-summary{align-items:stretch;flex-direction:column;padding:var(--space-4)}.spending-actions{display:grid;grid-template-columns:minmax(0,1fr)}.bring-in-actions,.spending-form-actions{flex-direction:column-reverse}.bring-in-actions button,.spending-form-actions button,.bring-in-file{width:100%}}
+@media(max-width:640px){.bring-in-actions,.spending-form-actions{flex-direction:column-reverse}.bring-in-actions button,.spending-form-actions button,.bring-in-file{width:100%}}
 .spending-message:empty{display:none}
-.spending-nav{display:flex;align-items:flex-start;gap:var(--space-2)}
-.spending-nav .spending-tabs{flex:1}
-.spending-nav .budget-options-menu{margin-left:auto}
 .spending-back{justify-self:start;margin:0 0 var(--space-2)}
 button.spending-row{width:100%;margin:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 button.spending-row:hover{background:var(--surface-header)}
@@ -1224,8 +1208,7 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .spending-rule-sorts{display:grid;gap:var(--space-3);margin-top:var(--space-3)}
 .spending-rule-sorts-body{display:grid;gap:var(--space-3)}
 .spending-rule-sorts-body .secondary-button{justify-self:start;min-height:var(--control-h);margin:0}
-.spending-disclosure{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;padding:0 var(--space-2)}
-.spending-disclosure svg,.sort-all-toggle svg{width:18px;height:18px}
+.sort-all-toggle svg{width:18px;height:18px}
 .rules-lead{margin:0;color:var(--muted);font-size:var(--text-sm)}
 .rule-row{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-2) var(--space-2) var(--space-4)}
 .rule-row-text{display:grid;flex:1;gap:2px;min-width:0}
@@ -1374,51 +1357,13 @@ div.spending-pot{padding-right:var(--space-4)}
 .close-cover-head{display:flex;justify-content:space-between;gap:var(--space-3);margin:0}
 .close-cover-step{margin:0;padding:0;list-style:none}
 .close-cover-step .step-row{border-top:0;padding-left:0;padding-right:0;background:transparent}
-@media(max-width:640px){.spending-tabs button{padding:var(--space-1);font-size:var(--text-sm);white-space:nowrap}}
-.spending-layout{display:grid;gap:var(--space-4)}
-.spending-side{display:grid;align-content:start;gap:var(--space-3)}
-.spending-side-card{display:grid;gap:var(--space-2);padding:var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
-.spending-side-card .spending-big{font-size:var(--text-xl)}
-.spending-side-card .primary-button,.spending-side-card .secondary-button{justify-self:start;min-height:var(--control-h);margin:0}
-.spending-side-pots{display:grid;gap:var(--space-1);margin:0;padding:0;list-style:none}
-.spending-side-pots li{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2)}
-.spending-side-pots .text-button{min-height:32px;padding:0;text-align:left;font-weight:var(--weight-medium)}
-.spending-side-pots .spending-pot-status{flex:none}
-.spending-side .statement-status{margin:0}
-.sort-table-wrap{display:grid;gap:var(--space-2);overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
-.sort-table{width:100%;border-collapse:collapse;font-size:var(--text-md)}
-.sort-table th{padding:var(--space-2);border-bottom:1px solid var(--line);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold);text-align:left;white-space:nowrap}
-.sort-table td{padding:var(--space-2);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.sort-table td:first-child{white-space:nowrap}
-.sort-table .is-amount{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.sort-table td.is-amount{font-weight:var(--weight-bold)}
-.sort-table td.is-credit{color:var(--link)}
-.sort-table-row:focus-within{background:var(--surface-band)}.sort-table-row:focus-visible{outline-offset:-2px}
-.sort-table-merchant{display:block;font-weight:var(--weight-medium)}
-.sort-table-note{display:block;color:var(--link);font-size:var(--text-sm)}
-.sort-table select{width:100%;min-width:150px;margin:0}
-.sort-table-always{display:grid;place-items:center;width:44px;height:44px}
-.sort-table-always input{width:20px;height:20px;margin:0}
-.sort-table-actions{display:flex;align-items:center;gap:var(--space-1)}
-.sort-table-actions .secondary-button{margin:0;padding:var(--space-1) var(--space-3)}
-.sort-table-keys{margin:0;padding:var(--space-1) var(--space-3) var(--space-3);color:var(--muted);font-size:var(--text-sm)}
-.sort-table-keys kbd{display:inline-block;min-width:18px;margin:0 2px;padding:0 var(--space-1);border:1px solid var(--line-strong);border-radius:var(--radius-sm);background:var(--surface-field);color:var(--charcoal);font:var(--weight-medium) var(--text-sm) var(--font-family);text-align:center}
 @media(min-width:1100px){
   .spending-page .page-frame-summary,.spending-page .page-frame-body{max-width:1320px}
-  .spending-page .spending-panel,.spending-page .spending-nav{max-width:900px}
-  .spending-page .spending-layout.has-side{grid-template-columns:minmax(0,1fr) 256px;align-items:start}
-  .spending-page .spending-layout.has-side .spending-panel{max-width:none}
-  .spending-page .spending-nav{max-width:none}
   .settle-up{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
   .settle-up>.step-copied,.settle-up>.step-copy-hint{grid-column:1/-1}
 }
 
 /* The Amex pot: what's left to move, the Move sheet, and moved tags */
-.move-callout{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-3);margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--surface-subtle);color:var(--pine)}
-.move-callout>svg{width:22px;height:22px}
-.move-callout p{display:grid;gap:2px;margin:0}
-.move-callout p span{color:var(--muted);font-size:var(--text-sm)}
-.move-callout button{min-height:var(--control-h)}
-@media(max-width:640px){.move-callout{grid-template-columns:auto minmax(0,1fr)}.move-callout button{grid-column:1/-1;width:100%}}
 .move-sheet{--sheet-width:560px}
 .move-sheet .sheet-body{display:grid;gap:var(--space-4);padding-top:var(--space-3)}
 .move-summary{display:grid;gap:var(--space-1)}

@@ -4,8 +4,9 @@ import { StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker } from '../domain/cardTracker'
-import { refreshSettled, type SettleStep } from '../domain/cardStatements'
-import { moveSteps, potPhrase, recordMove, toMove, type ToMoveRow } from '../domain/setAside'
+import type { SettleStep } from '../domain/cardStatements'
+import { moveSteps, potPhrase, toMove, type ToMoveRow } from '../domain/setAside'
+import { markSetAsideMoved } from './setAsideMove'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationNamer } from './cardLabels'
 import { plural, pounds, signedPounds, transactionMeta } from './spendingFormat'
@@ -36,32 +37,16 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set())
   const selected = rows.filter(row => !unticked.has(row.transaction.id))
   const plan = moveSteps(document, cardId, selected)
-  const labels = shortAccountLabels(document.budget.accounts, document.household.adults)
-  const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const name = destinationNamer(document)
-  const potName = (potId?: string) => document.budget.pots.find(row => row.id === potId)?.name ?? 'Pot'
   const { copy, hintSeen, status: copiedStatus } = useStepCopy()
   if (!card || !pot || !plan) return null
   const phrase = potPhrase(pot.name)
   const title = `Move to ${phrase}`
-
-  const stepLabel = (step: SettleStep) => step.kind === 'out' ? `Out of ${potName(step.potId)}` : step.kind === 'into' ? `Into ${potName(step.potId)}`
-    : step.kind === 'send' ? `Send to ${label(plan.accountId)}` : `Send to ${label(plan.accounts.find(account => account.steps.includes(step))?.accountId ?? '')} from ${label(plan.accountId)}`
-  const step = (key: string, text: string, pence: number, potMove: boolean) => <StepRow key={key} mode="copy" stepKey={key} name={text} amountPence={pence} indent={potMove} onCopy={pence => void copy(pence)}/>
   const total = plan.totalPence
-  // Money goes into the set-aside pot last; when refunds outweigh spend it comes out of it first.
-  const potStep = total === 0 ? null : step('set-aside', total > 0 ? `Into ${pot.name}` : `Out of ${pot.name}`, Math.abs(total), true)
-  const hub = plan.accounts.find(account => account.accountId === plan.accountId)
-  const others = plan.accounts.filter(account => account.accountId !== plan.accountId && account.steps.length)
+
   const what = (row: ToMoveRow) => row.lines.map(line => `${name(line.destination)} ${signedPounds(line.amountPence)}`).join(', ')
   const toggle = (id: string) => setUnticked(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
-  const moved = () => {
-    const id = crypto.randomUUID()
-    const at = now()
-    const keys = [...new Set(selected.map(row => row.transaction.statementKey))]
-    setDocument(current => keys.reduce((next, key) => refreshSettled(next, key, at), recordMove(current, cardId, selected.map(row => row.transaction.id), at, id)))
-    onMoved(total > 0 ? `Moved ${pounds(total)} to ${phrase}.` : total < 0 ? `Moved ${pounds(-total)} back out of ${phrase}.` : 'Moved between pots.', id)
-  }
+  const moved = () => { const { text, id } = markSetAsideMoved(document, setDocument, cardId, selected, now()); onMoved(text, id) }
 
   return <ModalDialog title={title} onClose={onClose} className="move-sheet">
     {!rows.length ? <>
@@ -75,14 +60,7 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
       {selected.length > 0 && <section className="move-steps" aria-label="Moves to make">
         {copiedStatus}
         {!hintSeen && <StepCopyHint>Tap an amount to copy it for your banking app.</StepCopyHint>}
-        {total < 0 && hub && <StepGroup heading="h3" title={label(plan.accountId)} aside={owners(document, hub.ownerPersonIds)}>{potStep}</StepGroup>}
-        {others.map(account => <StepGroup key={account.accountId} label={`${label(account.accountId)} moves`} heading="h3" title={label(account.accountId)} aside={owners(document, account.ownerPersonIds)}>
-          {account.steps.map(row => step(row.key, stepLabel(row), row.amountPence, row.kind === 'out' || row.kind === 'into'))}
-        </StepGroup>)}
-        {(hub?.steps.length || total > 0) && <StepGroup label={`${label(plan.accountId)} moves`} heading="h3" title={label(plan.accountId)} aside={owners(document, document.budget.accounts.find(account => account.id === plan.accountId)?.ownerPersonIds ?? [])}
-          footer={hub?.oneOffsPence ? `Includes ${pounds(hub.oneOffsPence)} of one-offs already in ${label(plan.accountId)}` : undefined}>
-          {hub?.steps.map(row => step(row.key, stepLabel(row), row.amountPence, true))}{total > 0 && potStep}
-        </StepGroup>}
+        <SetAsideSteps document={document} cardId={cardId} rows={selected} onCopy={pence => void copy(pence)}/>
       </section>}
       <fieldset className="move-transactions">
         <legend>What it covers</legend>
@@ -102,4 +80,36 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
       </div>
     </>}
   </ModalDialog>
+}
+
+/**
+ * The moves to make in the banking app for these set-aside rows, banded by account: out of each pot, send to the
+ * hub account, into the Amex pot. Copy-only steps. Used by the Set aside block and the sheet.
+ */
+export function SetAsideSteps({ document, cardId, rows, onCopy }: { document: BudgetDocument; cardId: string; rows: readonly ToMoveRow[]; onCopy: (pence: number) => void }) {
+  const card = cardTracker(document).cards.find(row => row.id === cardId)
+  const pot = document.budget.pots.find(row => row.id === card?.setAside?.potId)
+  const plan = moveSteps(document, cardId, rows)
+  const labels = shortAccountLabels(document.budget.accounts, document.household.adults)
+  const label = (accountId: string) => labels.get(accountId) ?? 'Account'
+  const potName = (potId?: string) => document.budget.pots.find(row => row.id === potId)?.name ?? 'Pot'
+  if (!pot || !plan) return null
+  const stepLabel = (step: SettleStep) => step.kind === 'out' ? `Out of ${potName(step.potId)}` : step.kind === 'into' ? `Into ${potName(step.potId)}`
+    : step.kind === 'send' ? `Send to ${label(plan.accountId)}` : `Send to ${label(plan.accounts.find(account => account.steps.includes(step))?.accountId ?? '')} from ${label(plan.accountId)}`
+  const step = (key: string, text: string, pence: number, potMove: boolean) => <StepRow key={key} mode="copy" stepKey={key} name={text} amountPence={pence} indent={potMove} onCopy={onCopy}/>
+  const total = plan.totalPence
+  // Money goes into the set-aside pot last; when refunds outweigh spend it comes out of it first.
+  const potStep = total === 0 ? null : step('set-aside', total > 0 ? `Into ${pot.name}` : `Out of ${pot.name}`, Math.abs(total), true)
+  const hub = plan.accounts.find(account => account.accountId === plan.accountId)
+  const others = plan.accounts.filter(account => account.accountId !== plan.accountId && account.steps.length)
+  return <>
+    {total < 0 && hub && <StepGroup heading="h3" title={label(plan.accountId)} aside={owners(document, hub.ownerPersonIds)}>{potStep}</StepGroup>}
+    {others.map(account => <StepGroup key={account.accountId} label={`${label(account.accountId)} moves`} heading="h3" title={label(account.accountId)} aside={owners(document, account.ownerPersonIds)}>
+      {account.steps.map(row => step(row.key, stepLabel(row), row.amountPence, row.kind === 'out' || row.kind === 'into'))}
+    </StepGroup>)}
+    {(hub?.steps.length || total > 0) && <StepGroup label={`${label(plan.accountId)} moves`} heading="h3" title={label(plan.accountId)} aside={owners(document, document.budget.accounts.find(account => account.id === plan.accountId)?.ownerPersonIds ?? [])}
+      footer={hub?.oneOffsPence ? `Includes ${pounds(hub.oneOffsPence)} of one-offs already in ${label(plan.accountId)}` : undefined}>
+      {hub?.steps.map(row => step(row.key, stepLabel(row), row.amountPence, true))}{total > 0 && potStep}
+    </StepGroup>}
+  </>
 }
