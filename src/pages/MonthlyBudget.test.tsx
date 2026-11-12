@@ -274,7 +274,7 @@ it('lists each person’s payday steps in order, with pot moves under their acco
     'Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
     'Fund Nationwide Immy£5.00See 1 item',
   ])
-  expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-pot-move')
+  expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-indent')
   // Immy pays into Nick's account; Nick moves her share on, so she has no pot step there.
   expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Fund Monzo Nick£20.00Nick moves £15.00 of it into SpendingSee 3 items'])
   expect(transfers).not.toHaveTextContent('Direct item')
@@ -416,7 +416,7 @@ it('lists steps by who pays, with short account names, duplicate suffixes and no
   render(<SeededHarness initial={initial} view="transfers"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
 expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick£0.06 · 6 to fund'])
-  const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.payday-step-label')!.textContent)
+  const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.step-label')!.textContent)
   expect(labels).toEqual(['Fund Home','Fund Everyday (Account 1)','Fund Everyday (Account 2)','Fund ISA','Fund Cash','Fund Old account'])
   expect(within(overview).getAllByRole('listitem')[1]).toHaveTextContent('£0.01')
 })
@@ -1362,7 +1362,7 @@ it('shows everyone’s steps side by side on desktop, with progress, account ban
   const nick=within(overview).getByRole('region',{name:'Nick steps'}),immy=within(overview).getByRole('region',{name:'Immy steps'})
   expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick0 of 2 done')
   expect(nick).toHaveTextContent('£20.00 from £4,000.00 available · 1 to fund · 1 move')
-  expect(nick.querySelector('.payday-account-band')).toHaveTextContent('Monzo NickNick’s account')
+  expect(nick.querySelector('.step-group-band')).toHaveTextContent('Monzo NickNick’s account')
   expect(overview).toHaveTextContent('Click an amount to copy it for your banking app.')
   for(const tick of within(overview).getAllByRole('button',{name:/ done$/}))fireEvent.click(tick)
   expect(within(nick).getByRole('heading',{level:3})).toHaveTextContent('Nick2 of 2 done')

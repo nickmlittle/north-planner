@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { ModalDialog } from '../components/ModalDialog'
+import { StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
+import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker } from '../domain/cardTracker'
 import { refreshSettled, type SettleStep } from '../domain/cardStatements'
 import { moveSteps, potPhrase, recordMove, toMove, type ToMoveRow } from '../domain/setAside'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationNamer } from './cardLabels'
-import { copyHintSeen, copyText, rememberCopyHint } from './copyHint'
 import { plural, pounds, signedPounds, transactionMeta } from './spendingFormat'
 
 type Props = {
@@ -24,14 +25,6 @@ type Props = {
 /** "Either of you" for a joint account, else the owner's name. */
 const owners = (document: BudgetDocument, ownerPersonIds: readonly string[]) => ownerPersonIds.length > 1 ? 'Either of you' : document.household.adults.find(person => person.id === ownerPersonIds[0])?.name ?? ''
 
-/** One move to make in the banking app; tap the amount to copy it. */
-function MoveStep({ text, pence, potMove, onCopy }: { text: string; pence: number; potMove: boolean; onCopy: (pence: number) => Promise<void> }) {
-  return <li className={`move-step${potMove ? ' is-pot-move' : ''}`}>
-    <span className="move-step-label">{text}</span>
-    <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(pence)}`} onClick={() => void onCopy(pence)}>{pounds(pence)}</button>
-  </li>
-}
-
 /**
  * Move to the Amex pot: everything sorted since the last move, with the moves to make in the banking app.
  * Untick anything not moved yet, then "Moved" records the rest.
@@ -47,25 +40,14 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const name = destinationNamer(document)
   const potName = (potId?: string) => document.budget.pots.find(row => row.id === potId)?.name ?? 'Pot'
-  const [copied, setCopied] = useState('')
-  const [hintSeen, setHintSeen] = useState(copyHintSeen)
-  const clear = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(clear.current), [])
+  const { copy, hintSeen, status: copiedStatus } = useStepCopy()
   if (!card || !pot || !plan) return null
   const phrase = potPhrase(pot.name)
   const title = `Move to ${phrase}`
 
-  const copy = async (pence: number) => {
-    let message = `Copied ${pounds(pence)}`
-    try { await navigator.clipboard.writeText(copyText(pence)) } catch { message = 'Couldn’t copy' }
-    setCopied(message)
-    if (!hintSeen) { rememberCopyHint(); setHintSeen(true) }
-    clearTimeout(clear.current)
-    clear.current = setTimeout(() => setCopied(''), 2500)
-  }
   const stepLabel = (step: SettleStep) => step.kind === 'out' ? `Out of ${potName(step.potId)}` : step.kind === 'into' ? `Into ${potName(step.potId)}`
     : step.kind === 'send' ? `Send to ${label(plan.accountId)}` : `Send to ${label(plan.accounts.find(account => account.steps.includes(step))?.accountId ?? '')} from ${label(plan.accountId)}`
-  const step = (key: string, text: string, pence: number, potMove: boolean) => <MoveStep key={key} text={text} pence={pence} potMove={potMove} onCopy={copy}/>
+  const step = (key: string, text: string, pence: number, potMove: boolean) => <StepRow key={key} mode="copy" stepKey={key} name={text} amountPence={pence} indent={potMove} onCopy={pence => void copy(pence)}/>
   const total = plan.totalPence
   // Money goes into the set-aside pot last; when refunds outweigh spend it comes out of it first.
   const potStep = total === 0 ? null : step('set-aside', total > 0 ? `Into ${pot.name}` : `Out of ${pot.name}`, Math.abs(total), true)
@@ -91,18 +73,16 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
         <p className="spending-big">{pounds(Math.abs(total))} <small>{plural(selected.length, 'transaction')}</small></p>
       </section>
       {selected.length > 0 && <section className="move-steps" aria-label="Moves to make">
-        <p className="payday-copied" role="status">{copied}</p>
-        {!hintSeen && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
-        {total < 0 && hub && <><h3 className="payday-person-heading"><span>{label(plan.accountId)}</span><span>{owners(document, hub.ownerPersonIds)}</span></h3><ol>{potStep}</ol></>}
-        {others.map(account => <section key={account.accountId} aria-label={`${label(account.accountId)} moves`}>
-          <h3 className="payday-person-heading"><span>{label(account.accountId)}</span><span>{owners(document, account.ownerPersonIds)}</span></h3>
-          <ol>{account.steps.map(row => step(row.key, stepLabel(row), row.amountPence, row.kind === 'out' || row.kind === 'into'))}</ol>
-        </section>)}
-        {(hub?.steps.length || total > 0) && <section aria-label={`${label(plan.accountId)} moves`}>
-          <h3 className="payday-person-heading"><span>{label(plan.accountId)}</span><span>{owners(document, document.budget.accounts.find(account => account.id === plan.accountId)?.ownerPersonIds ?? [])}</span></h3>
-          <ol>{hub?.steps.map(row => step(row.key, stepLabel(row), row.amountPence, true))}{total > 0 && potStep}</ol>
-          {hub?.oneOffsPence ? <p className="payday-step-caption">Includes {pounds(hub.oneOffsPence)} of one-offs already in {label(plan.accountId)}</p> : null}
-        </section>}
+        {copiedStatus}
+        {!hintSeen && <StepCopyHint>Tap an amount to copy it for your banking app.</StepCopyHint>}
+        {total < 0 && hub && <StepGroup heading="h3" title={label(plan.accountId)} aside={owners(document, hub.ownerPersonIds)}>{potStep}</StepGroup>}
+        {others.map(account => <StepGroup key={account.accountId} label={`${label(account.accountId)} moves`} heading="h3" title={label(account.accountId)} aside={owners(document, account.ownerPersonIds)}>
+          {account.steps.map(row => step(row.key, stepLabel(row), row.amountPence, row.kind === 'out' || row.kind === 'into'))}
+        </StepGroup>)}
+        {(hub?.steps.length || total > 0) && <StepGroup label={`${label(plan.accountId)} moves`} heading="h3" title={label(plan.accountId)} aside={owners(document, document.budget.accounts.find(account => account.id === plan.accountId)?.ownerPersonIds ?? [])}
+          footer={hub?.oneOffsPence ? `Includes ${pounds(hub.oneOffsPence)} of one-offs already in ${label(plan.accountId)}` : undefined}>
+          {hub?.steps.map(row => step(row.key, stepLabel(row), row.amountPence, true))}{total > 0 && potStep}
+        </StepGroup>}
       </section>}
       <fieldset className="move-transactions">
         <legend>What it covers</legend>

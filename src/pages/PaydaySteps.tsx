@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, ChevronRight, TriangleAlert } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 import { stepSummary } from './budgetLabels'
-import { copyHintSeen, rememberCopyHint } from './copyHint'
-import { fundStepKey, moveStepKey, personProgress, stepStatus, type StepTick } from '../domain/transferTicks'
+import { fundStepKey, moveStepKey, personProgress, type StepTick } from '../domain/transferTicks'
+import { StepCaption, StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
+import { useStepCopy } from '../components/ui/useStepCopy'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
@@ -60,74 +60,29 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     return <button type="button" className="text-button payday-see-items" data-see-items={accountId} aria-label={`See ${plural(count, 'item')} for ${label(accountId)}`} onClick={() => onSeeItems(accountId)}>See {plural(count, 'item')}<ChevronRight size={16} aria-hidden="true"/></button>
   }
   // Tap an amount to copy it for the banking app: the plain number ("2215.45"), with a short confirmation.
-  const [copied, setCopied] = useState('')
-  const [hintSeen, setHintSeen] = useState(copyHintSeen)
-  const clearCopied = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(clearCopied.current), [])
-  const copy = async (pence: number) => {
-    let message = `Copied ${pounds(pence)}`
-    try { await navigator.clipboard.writeText((pence / 100).toFixed(2)) } catch { message = 'Couldn’t copy' }
-    setCopied(message)
-    if (!hintSeen) { rememberCopyHint(); setHintSeen(true) }
-    clearTimeout(clearCopied.current)
-    clearCopied.current = setTimeout(() => setCopied(''), 2500)
-  }
-  /** The amount copies. Changed since ticked, it shows and copies only the difference ("+£50.00"). */
-  const amount = (key: string, pence: number) => {
-    const status = stepStatus(ticks, key, pence)
-    const shown = status.state === 'changed' ? Math.abs(status.differencePence) : pence
-    const text = status.state === 'changed' ? `${status.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)
-    return <button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(shown)}`} onClick={() => void copy(shown)}>{text}</button>
-  }
-  /** What changed after the tick, and what to do about it. */
-  const changedNote = (key: string, pence: number) => {
-    const status = stepStatus(ticks, key, pence)
-    if (status.state !== 'changed') return null
-    return <p className="payday-step-changed">Changed since ticked: you sent {pounds(status.tickedPence!)}, it’s now {pounds(pence)}. {status.differencePence > 0 ? `Send ${pounds(status.differencePence)} more.` : `${pounds(-status.differencePence)} less is needed.`}</p>
-  }
-  /** The tick: a 44px circle, separate from the amount so copying never ticks. */
-  const tick = (key: string, label: string, pence: number) => {
-    const status = stepStatus(ticks, key, pence)
-    const done = status.state === 'done'
-    // Changed: the circle accepts the new amount (records it), so the step is done again.
-    return <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={done} aria-label={status.state === 'changed' ? `${label}: mark the change done` : `${label} done`} disabled={!onTick} onClick={() => onTick?.(key, done ? null : pence)}>
-      <span className="payday-tick-dot" aria-hidden="true">{done && <Check/>}{status.state === 'changed' && <RefreshCw/>}</span>
-    </button>
-  }
+  const { copy, hintSeen, status: copiedStatus } = useStepCopy()
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
 
-  const steps = (plan: PersonTransferPlan) => {
-    return plan.rows.flatMap((row: PersonTransferRow) => {
-      const account = label(row.accountId)
-      const fundKey = fundStepKey(plan.personId, row.accountId)
-      const fund = row.fundingPence > 0 ? [<li key={`${row.accountId}:fund`} className={`payday-step is-fund is-${stepStatus(ticks, fundKey, row.fundingPence).state}`} data-payday-account={row.accountId}>
-        {tick(fundKey, `Fund ${account}`, row.fundingPence)}
-        <div className="payday-step-body">
-          <p className="payday-step-main"><span className="payday-step-label">Fund {account}</span>{amount(fundKey, row.fundingPence)}</p>
-          {changedNote(fundKey, row.fundingPence)}
-          {row.movedOnBy.map(other => <p key={other.personId} className="payday-step-caption">{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</p>)}
-          {affected(row.accountId)}
-          {seeItems(row.accountId)}
-        </div>
-      </li>] : []
-      const moves = row.potMoves.map((move, index) => {
-        const first = !fund.length && index === 0
-        const moveKey = moveStepKey(plan.personId, move.potId)
-        return <li key={`${row.accountId}:${move.potId}`} className={`payday-step is-pot-move is-${stepStatus(ticks, moveKey, move.amountPence).state}`} data-payday-account={row.accountId}>
-          {tick(moveKey, `Move to ${potName(move.potId)}`, move.amountPence)}
-          <div className="payday-step-body">
-            <p className="payday-step-main"><span className="payday-step-label">Move to {potName(move.potId)}{first ? <span className="payday-step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</span>{amount(moveKey, move.amountPence)}</p>
-            {changedNote(moveKey, move.amountPence)}
-            {move.fromOthers.length > 0 && <p className="payday-step-caption">Includes {others(move.fromOthers)}</p>}
-            {first && affected(row.accountId)}
-            {first && seeItems(row.accountId)}
-          </div>
-        </li>
-      })
-      const band = desktop ? [<li key={`${row.accountId}:band`} className="payday-account-band" aria-hidden="true"><span>{account}</span>{accountOwnerLabel && <span>{accountOwnerLabel(row.accountId)}</span>}</li>] : []
-      return [...band, ...fund, ...moves]
+  /** One band per account: fund it, then its pot moves indented beneath. */
+  const steps = (plan: PersonTransferPlan) => plan.rows.map((row: PersonTransferRow) => {
+    const account = label(row.accountId)
+    const fundKey = fundStepKey(plan.personId, row.accountId)
+    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundKey} name={`Fund ${account}`} amountPence={row.fundingPence} ticks={ticks} onTick={onTick} onCopy={pence => void copy(pence)} account={row.accountId}>
+      {row.movedOnBy.map(other => <StepCaption key={other.personId}>{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</StepCaption>)}
+      {affected(row.accountId)}
+      {seeItems(row.accountId)}
+    </StepRow> : null
+    const moves = row.potMoves.map((move, index) => {
+      const first = !fund && index === 0
+      return <StepRow key={move.potId} stepKey={moveStepKey(plan.personId, move.potId)} name={`Move to ${potName(move.potId)}`} indent amountPence={move.amountPence} ticks={ticks} onTick={onTick} onCopy={pence => void copy(pence)} account={row.accountId}
+        label={<>Move to {potName(move.potId)}{first ? <span className="step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</>}
+        caption={move.fromOthers.length > 0 ? `Includes ${others(move.fromOthers)}` : undefined}>
+        {first && affected(row.accountId)}
+        {first && seeItems(row.accountId)}
+      </StepRow>
     })
-  }
+    return <StepGroup key={row.accountId} title={account} aside={accountOwnerLabel?.(row.accountId)}>{fund}{moves}</StepGroup>
+  })
 
   /** A desktop column's heading: name, progress, what it adds up to, and anything to act on. */
   const personHead = (plan: PersonTransferPlan) => {
@@ -145,24 +100,24 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   const everyoneDone = shown.length > 0 && shown.every(plan => personProgress(plan, ticks).complete)
 
   return <div className={`payday${desktop ? ' is-desktop' : ''}`} role="region" aria-label="Steps by person">
-    <p className="payday-copied" role="status">{copied}</p>
+    {copiedStatus}
     {desktop && everyoneDone && <div className="transfer-done-banner payday-all-done" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>{shown.length === 2 ? 'You’re both' : 'Everyone is'} up to date for {monthName}</strong><span>Every payday step is ticked. Changes to the plan will show here as top-ups.</span></span></div>}
-    {!hintSeen && shown.length > 0 && !everyoneDone && <p className="payday-copy-hint">{desktop ? 'Click' : 'Tap'} an amount to copy it for your banking app.</p>}
+    {!hintSeen && shown.length > 0 && !everyoneDone && <StepCopyHint>{desktop ? 'Click' : 'Tap'} an amount to copy it for your banking app.</StepCopyHint>}
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
     {shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
       {desktop ? personHead(plan) : !chosen && <h3 className="payday-person-heading"><span>{name(plan.personId)}</span><span>{pounds(plan.fundingPence)} · {stepSummary(plan)}</span></h3>}
-      <ol className="payday-steps">{steps(plan)}</ol>
+      {steps(plan)}
     </section>)}
     {plans.needsReview.length > 0 && <section className="payday-review" aria-label="Needs review">
       <h3 className="payday-person-heading"><span>Needs review</span><span>{plural(plans.needsReview.length, 'account')}</span></h3>
       <ul>{plans.needsReview.map(account => {
         const people = account.byPerson.filter(row => !chosen || row.personId === chosen)
         return <li key={account.accountId} className="payday-review-account" data-payday-account={account.accountId}>
-          <p className="payday-step-main"><span className="payday-step-label">{label(account.accountId)}</span>{account.notCalculated && <strong className="payday-step-amount">—</strong>}</p>
-          {account.notCalculated ? <p className="payday-step-caption"><span className="budget-not-calculated">Not calculated</span></p>
+          <p className="step-main"><span className="step-label">{label(account.accountId)}</span>{account.notCalculated && <strong className="step-amount">—</strong>}</p>
+          {account.notCalculated ? <p className="step-caption"><span className="budget-not-calculated">Not calculated</span></p>
             : <dl className="payday-review-amounts">{people.map(row => <div key={row.personId}><dt>{name(row.personId)} so far</dt><dd>{pounds(row.amountPence)}</dd></div>)}</dl>}
-          <p className="payday-step-caption budget-allocation-incomplete">{reviewReasonText(account.reason)}</p>
+          <p className="step-caption budget-allocation-incomplete">{reviewReasonText(account.reason)}</p>
           {affected(account.accountId)}
           {seeItems(account.accountId)}
         </li>

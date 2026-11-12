@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { ArrowLeft, Check, ChevronRight, RefreshCw, TriangleAlert } from 'lucide-react'
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { ArrowLeft, Check, ChevronRight, TriangleAlert } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { allSettleSteps, paymentMatchingPay, setSettleTick, settleStepDone, settleSteps, settleWithoutFinal, shareSteps, statementKeys, statementShares, statementSummary, type SettleAccount, type SettleStep, type StatementSummary } from '../domain/cardStatements'
 import { setAsideStatements } from '../domain/potBalances'
 import { potPhrase } from '../domain/setAside'
 import { MoveToPotSheet } from './MoveToPotSheet'
 import { cardTracker } from '../domain/cardTracker'
-import { stepStatus } from '../domain/transferTicks'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
-import { copyHintSeen, copyText, rememberCopyHint } from './copyHint'
-import { dayOf, plural, pounds, signedPounds, statementName, statementStatus } from './spendingFormat'
+import { StepCaption, StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
+import { useStepCopy } from '../components/ui/useStepCopy'
+import { plural, pounds, signedPounds, statementName, statementStatus } from './spendingFormat'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 
@@ -124,37 +124,14 @@ function SettleUp({ document, setDocument, summary, plan, title, onBack, onMove,
   const steps = allSettleSteps(plan)
   const done = steps.filter(step => settleStepDone(plan, ticks, step)).length
   const setAsidePot = plan.setAside && document.budget.pots.find(pot => pot.id === plan.setAside!.potId)
-  const [copied, setCopied] = useState('')
-  const [hintSeen, setHintSeen] = useState(copyHintSeen)
-  const clear = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(clear.current), [])
-  const copy = async (pence: number) => {
-    let message = `Copied ${pounds(pence)}`
-    try { await navigator.clipboard.writeText(copyText(pence)) } catch { message = 'Couldn’t copy' }
-    setCopied(message)
-    if (!hintSeen) { rememberCopyHint(); setHintSeen(true) }
-    clearTimeout(clear.current)
-    clear.current = setTimeout(() => setCopied(''), 2500)
-  }
+  const { copy, hintSeen, status: copiedStatus } = useStepCopy()
   const stepLabel = (step: SettleStep) => step.kind === 'out' ? `Out of ${potName(step.potId)}` : step.kind === 'into' ? `Into ${potName(step.potId)}`
     : step.kind === 'send' ? `Send to ${label(plan.payFromAccountId)}` : step.kind === 'return' ? `Send to ${label(plan.accounts.find(account => account.steps.includes(step))?.accountId ?? '')} from ${label(plan.payFromAccountId)}`
     : `Pay ${card.name} from ${setAsidePot ? potPhrase(setAsidePot.name) : label(plan.payFromAccountId)}`
-  const row = (step: SettleStep, caption?: string) => {
-    const status = stepStatus(ticks, step.key, step.amountPence)
-    const shown = status.state === 'changed' ? Math.abs(status.differencePence) : step.amountPence
-    const text = stepLabel(step)
-    return <li key={step.key} className={`payday-step is-${status.state}${step.kind === 'out' || step.kind === 'into' ? ' is-pot-move' : ''}`}>
-      <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={status.state === 'changed' ? `${text}: mark the change done` : `${text} done`} onClick={() => setDocument(current => setSettleTick(current, summary.key, step.key, status.state === 'done' ? null : step.amountPence, now()))}>
-        <span className="payday-tick-dot" aria-hidden="true">{status.state === 'done' && <Check/>}{status.state === 'changed' && <RefreshCw/>}</span>
-      </button>
-      <div className="payday-step-body">
-        <p className="payday-step-main"><span className="payday-step-label">{text}</span><button type="button" className="payday-step-amount" aria-label={`Copy ${pounds(shown)}`} onClick={() => void copy(shown)}>{status.state === 'changed' ? `${status.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)}</button></p>
-        {status.state === 'changed' && <p className="payday-step-changed">Changed since ticked: it was {pounds(status.tickedPence!)}, it’s now {pounds(step.amountPence)}. {status.differencePence > 0 ? `Move ${pounds(status.differencePence)} more.` : `${pounds(-status.differencePence)} less is needed.`}</p>}
-        {status.state === 'done' && ticks?.[step.key] && <p className="payday-step-caption">Ticked {dayOf(ticks[step.key]!.at)}</p>}
-        {caption && <p className="payday-step-caption">{caption}</p>}
-      </div>
-    </li>
-  }
+  const tick = (key: string, amountPence: number | null) => setDocument(current => setSettleTick(current, summary.key, key, amountPence, now()))
+  const moveNote = (amountPence: number) => (tickedPence: number, differencePence: number) => <>Changed since ticked: it was {pounds(tickedPence)}, it’s now {pounds(amountPence)}. {differencePence > 0 ? `Move ${pounds(differencePence)} more.` : `${pounds(-differencePence)} less is needed.`}</>
+  const row = (step: SettleStep, caption?: string) => <StepRow key={step.key} stepKey={step.key} name={stepLabel(step)} amountPence={step.amountPence} ticks={ticks} onTick={tick} onCopy={pence => void copy(pence)}
+    indent={step.kind === 'out' || step.kind === 'into'} emphasis={step === plan.pay ? 'pay' : undefined} showTickedDay changedNote={moveNote(step.amountPence)} caption={caption}/>
   const payFrom = plan.accounts.find(account => account.accountId === plan.payFromAccountId)
   return <div className="statement-detail">
     <button type="button" className="text-button spending-back" onClick={onBack}><ArrowLeft aria-hidden="true"/>Back to the {title}</button>
@@ -166,26 +143,20 @@ function SettleUp({ document, setDocument, summary, plan, title, onBack, onMove,
     </section>
     {steps.length > 0 && done === steps.length && <div className="transfer-done-banner" role="status"><span className="transfer-done-icon" aria-hidden="true"><Check/></span><span><strong>The {title} is settled</strong><span>Every step is ticked. A late change will show here as a top-up.</span></span></div>}
     <div className="payday settle-up" role="region" aria-label="Settle-up steps">
-      <p className="payday-copied" role="status">{copied}</p>
-      {!hintSeen && done < steps.length && <p className="payday-copy-hint">Tap an amount to copy it for your banking app.</p>}
-      {plan.setAside && setAsidePot && <section className="payday-person settle-account" aria-label={`Move to ${potPhrase(setAsidePot.name)}`}>
-        <h3 className="payday-person-heading"><span>Into {potPhrase(setAsidePot.name)}</span><span>{owners(document, document.budget.accounts.find(account => account.id === plan.payFromAccountId)?.ownerPersonIds ?? [])}</span></h3>
-        <ol className="payday-steps"><li className={`payday-step is-${plan.setAside.toMove ? 'todo' : 'done'}`}>
-          <span className={`payday-tick is-${plan.setAside.toMove ? 'todo' : 'done'}`} aria-hidden="true"><span className="payday-tick-dot">{!plan.setAside.toMove && <Check/>}</span></span>
-          <div className="payday-step-body">
-            <p className="payday-step-main"><span className="payday-step-label">{plan.setAside.toMove ? `Move the rest to ${potPhrase(setAsidePot.name)}` : `Everything is in ${potPhrase(setAsidePot.name)}`}</span>{plan.setAside.toMove > 0 && <span className="payday-step-amount">{signedPounds(plan.setAside.toMovePence)}</span>}</p>
-            {plan.setAside.toMove > 0 && <p className="payday-step-caption">{plural(plan.setAside.toMove, 'transaction')} not moved yet. <button type="button" className="text-button" onClick={onMove}>Move them</button></p>}
-          </div>
-        </li></ol>
-      </section>}
-      {plan.accounts.filter(account => account.steps.length).map(account => <section key={account.accountId} className="payday-person settle-account" aria-label={`${label(account.accountId)} steps`}>
-        <h3 className="payday-person-heading"><span>{label(account.accountId)}</span><span>{owners(document, account.ownerPersonIds)}</span></h3>
-        <ol className="payday-steps">{account.steps.map(step => row(step))}</ol>
-      </section>)}
-      {plan.totalPence > 0 && <section className="payday-person settle-account" aria-label={`Pay ${card.name}`}>
-        <h3 className="payday-person-heading"><span>{label(plan.payFromAccountId)}</span><span>{owners(document, payFrom?.ownerPersonIds ?? document.budget.accounts.find(account => account.id === plan.payFromAccountId)?.ownerPersonIds ?? [])}</span></h3>
-        <ol className="payday-steps">{row(plan.pay, payFrom?.oneOffsPence ? `Includes ${pounds(payFrom.oneOffsPence)} of one-offs already in ${label(plan.payFromAccountId)}` : undefined)}</ol>
-      </section>}
+      {copiedStatus}
+      {!hintSeen && done < steps.length && <StepCopyHint>Tap an amount to copy it for your banking app.</StepCopyHint>}
+      {plan.setAside && setAsidePot && <StepGroup className="settle-account" label={`Move to ${potPhrase(setAsidePot.name)}`} heading="h3" title={`Into ${potPhrase(setAsidePot.name)}`} aside={owners(document, document.budget.accounts.find(account => account.id === plan.payFromAccountId)?.ownerPersonIds ?? [])}>
+        <StepRow mode="status" stepKey="set-aside" done={!plan.setAside.toMove} name={plan.setAside.toMove ? `Move the rest to ${potPhrase(setAsidePot.name)}` : `Everything is in ${potPhrase(setAsidePot.name)}`} amountText={plan.setAside.toMove > 0 && signedPounds(plan.setAside.toMovePence)}>
+          {plan.setAside.toMove > 0 && <StepCaption>{plural(plan.setAside.toMove, 'transaction')} not moved yet. <button type="button" className="text-button" onClick={onMove}>Move them</button></StepCaption>}
+        </StepRow>
+      </StepGroup>}
+      {plan.accounts.filter(account => account.steps.length && account.accountId !== plan.payFromAccountId).map(account => <StepGroup key={account.accountId} className="settle-account" label={`${label(account.accountId)} steps`} heading="h3" title={label(account.accountId)} aside={owners(document, account.ownerPersonIds)}>
+        {account.steps.map(step => row(step))}
+      </StepGroup>)}
+      {(payFrom?.steps.length || plan.totalPence > 0) && <StepGroup className="settle-account" label={`${label(plan.payFromAccountId)} steps`} heading="h3" title={label(plan.payFromAccountId)} aside={owners(document, payFrom?.ownerPersonIds ?? document.budget.accounts.find(account => account.id === plan.payFromAccountId)?.ownerPersonIds ?? [])}>
+        {payFrom?.steps.map(step => row(step))}
+        {plan.totalPence > 0 && row(plan.pay, payFrom?.oneOffsPence ? `Includes ${pounds(payFrom.oneOffsPence)} of one-offs already in ${label(plan.payFromAccountId)}` : undefined)}
+      </StepGroup>}
     </div>
   </div>
 }

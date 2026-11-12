@@ -1,9 +1,11 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
-import { ArrowLeft, Check, RefreshCw, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Check, TriangleAlert } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
+import { StepRow } from '../components/ui/StepRow'
+import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, destinationKey, firstDayOf, lastDayOf, parseDestinationValue, parsePence, shiftMonth, type CoverSource } from '../domain/cardTracker'
-import { closeMonth, closeMonthPlan, coverStepStatus, keepBuiltUp, markAllIn, moveBuiltUp, setCover, setCoverTick, type Leftover, type Overspend } from '../domain/monthStages'
+import { closeMonth, closeMonthPlan, keepBuiltUp, markAllIn, moveBuiltUp, setCover, setCoverTick, type Leftover, type Overspend } from '../domain/monthStages'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
@@ -18,6 +20,7 @@ type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<Bu
 export function CloseMonth({ document, setDocument, month, today, onBack, onSort, onBringIn, now = () => new Date() }: Props) {
   const plan = closeMonthPlan(document, month, today)
   const [moving, setMoving] = useState<Leftover | null>(null)
+  const { copy, status: copiedStatus } = useStepCopy()
   if (!plan) return null
   const name = monthName(month)
   const destination = destinationNamer(document)
@@ -27,16 +30,17 @@ export function CloseMonth({ document, setDocument, month, today, onBack, onSort
   const { readiness } = plan
   const nextName = monthName(shiftMonth(month, 1))
   const sourceLabel = (source: Exclude<CoverSource, { kind: 'next-month' }>, leftPence?: number) => `${destination(source)}${leftPence !== undefined ? ` · ${pounds(Math.max(0, leftPence))} left` : ''}`
-  /** "Move £35.00 from Joint Monzo into Eating out", or "Out of Treats £35.00, then move into Eating out". */
+  /** "Move from Joint Monzo into Eating out", or "Out of Treats, then into Eating out". The amount is the step's own chip. */
   const stepText = (overspend: Overspend) => {
     const source = overspend.cover.source
-    if (source.kind === 'account') return `Move ${pounds(overspend.cover.amountPence)} from ${labels.get(source.accountId) ?? 'the account'} into ${potName(overspend.potId)}`
-    if (source.kind === 'pot') return `Out of ${potName(source.potId)} ${pounds(overspend.cover.amountPence)}, then move into ${potName(overspend.potId)}`
+    if (source.kind === 'account') return `Move from ${labels.get(source.accountId) ?? 'the account'} into ${potName(overspend.potId)}`
+    if (source.kind === 'pot') return `Out of ${potName(source.potId)}, then into ${potName(overspend.potId)}`
     return ''
   }
   const closed = !!plan.closedAt
 
   return <div className="close-month">
+    {copiedStatus}
     <button type="button" className="text-button spending-back" onClick={onBack}><ArrowLeft aria-hidden="true"/>Back to {name}</button>
     <div className="statement-heading"><h2 id="close-title">Close {name}</h2><p className="spending-facts">{shortDate(firstDayOf(month))} – {shortDate(lastDayOf(month))}{readiness.toSort === 0 && (readiness.postingsIn || readiness.allIn) ? ' · all transactions in and sorted' : ''}</p></div>
 
@@ -51,7 +55,6 @@ export function CloseMonth({ document, setDocument, month, today, onBack, onSort
     <section className="spending-month-summary" aria-labelledby="close-over">
       <h3 className="spending-eyebrow" id="close-over">Over plan · {plan.overspends.length}</h3>
       {!plan.overspends.length ? <p className="spending-facts">No pot went over in {name}.</p> : plan.overspends.map(overspend => {
-        const status = coverStepStatus(record, overspend)
         const text = stepText(overspend)
         return <div key={overspend.potId} className="close-cover">
           <p className="close-cover-head"><strong>{destination({ kind: 'pot', potId: overspend.potId })}</strong><span className="spending-pot-status is-over">{pounds(overspend.overPence)} over</span></p>
@@ -62,13 +65,8 @@ export function CloseMonth({ document, setDocument, month, today, onBack, onSort
           }}>{overspend.options.map(option => <option key={sourceValue(option.source)} value={sourceValue(option.source)}>{option.source.kind === 'next-month' ? `${nextName}’s ${potName(overspend.potId)} (moves no money)` : sourceLabel(option.source, option.leftPence)}</option>)}</select></label>
           {overspend.cover.source.kind === 'next-month'
             ? <p className="spending-facts">Leaves {potName(overspend.potId)} {pounds(overspend.overPence)} short in {nextName}.</p>
-            : <ol className="payday-steps close-cover-step"><li className={`payday-step is-${status.state}`}>
-              <button type="button" className={`payday-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={status.state === 'changed' ? `${text}: mark the change done` : `${text} done`} onClick={() => setDocument(current => setCoverTick(current, month, overspend.potId, status.state === 'done' ? null : overspend.cover.amountPence, now()))}>
-                <span className="payday-tick-dot" aria-hidden="true">{status.state === 'done' && <Check/>}{status.state === 'changed' && <RefreshCw/>}</span>
-              </button>
-              <div className="payday-step-body"><p className="payday-step-main"><span className="payday-step-label">{text}</span></p>
-                {status.state === 'changed' && <p className="payday-step-changed">Changed since ticked: it was {pounds(status.tickedPence!)}, it’s now {pounds(overspend.cover.amountPence)}.</p>}</div>
-            </li></ol>}
+            : <ol className="step-list close-cover-step"><StepRow stepKey={overspend.stepKey} name={text} amountPence={overspend.cover.amountPence} ticks={record?.coverTicks} onCopy={pence => void copy(pence)}
+              onTick={(_, amountPence) => setDocument(current => setCoverTick(current, month, overspend.potId, amountPence, now()))} changedNote={tickedPence => <>Changed since ticked: it was {pounds(tickedPence)}, it’s now {pounds(overspend.cover.amountPence)}.</>}/></ol>}
         </div>
       })}
     </section>

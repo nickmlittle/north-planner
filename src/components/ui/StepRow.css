@@ -1,0 +1,48 @@
+/* StepRow and StepGroup: every money move (Payday, Set aside, Settle up, covers). Tokens only (styles.tokens.test.ts). */
+
+.step-group{min-width:0}
+.step-group-band{display:flex;align-items:baseline;gap:var(--space-2);margin:0;padding:var(--space-3) var(--space-4) var(--space-2);border-top:1px solid var(--border);background:var(--surface-header);color:var(--text);font-size:var(--text-sm);line-height:1.35}
+.step-group-title{flex:1 1 auto;min-width:0;margin:0;color:inherit;font-size:var(--text-md);font-weight:var(--weight-bold);overflow-wrap:anywhere}
+.step-group-aside{flex:none;color:var(--text-muted);font-weight:var(--weight-medium);text-align:right}
+.step-group-link{display:inline-flex;align-items:center;gap:2px;flex:none;min-height:32px;margin:-6px 0;padding:0;font-size:var(--text-sm)}
+.step-group-link svg{width:16px;height:16px}
+
+.step-list{margin:0;padding:0;list-style:none}
+.step-row{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start;gap:var(--space-1);min-height:48px;margin:0;padding:var(--space-1) var(--space-4) var(--space-1) var(--space-1);border-top:1px solid var(--border);background:var(--surface)}
+.step-row.is-copy{grid-template-columns:minmax(0,1fr);padding-left:var(--space-4)}
+.step-row.is-indent{padding-left:var(--space-5);border-top-style:dashed;background:var(--surface-sunken)}
+.step-row.is-indent.is-copy{padding-left:var(--space-6)}
+.step-row.is-pay{background:var(--surface-band)}
+
+.step-tick{display:grid;place-items:center;width:44px;height:44px;margin:-2px 0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--white);cursor:pointer}
+.step-tick:disabled{cursor:default}
+.step-tick-dot{display:grid;place-items:center;box-sizing:border-box;width:24px;height:24px;border:2px solid var(--border-field);border-radius:50%;background:var(--surface-field)}
+.step-tick-dot svg{width:14px;height:14px;stroke-width:3}
+@media(hover:hover){button.step-tick:hover .step-tick-dot{border-color:var(--accent)}}
+button.step-tick:focus-visible{outline-offset:-2px}
+.step-tick.is-done .step-tick-dot{border-color:var(--accent);background:var(--accent)}
+.step-tick.is-changed .step-tick-dot{border-color:var(--warning);background:var(--warning-bg);color:var(--warning)}
+.step-tick.is-changed .step-tick-dot svg{stroke-width:2.4}
+
+.step-body{display:grid;gap:2px;align-self:center;min-width:0;padding:var(--space-1) 0}
+.step-main{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);min-width:0;min-height:32px;margin:0}
+.step-label{min-width:0;color:var(--accent);font-size:var(--text-md);font-weight:var(--weight-medium);line-height:1.35;overflow-wrap:anywhere}
+.step-row.is-done .step-label{color:var(--text-muted)}
+.step-from{display:block;color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.step-amount{color:var(--accent);font:var(--weight-bold) var(--text-md) var(--font-family);line-height:1.35;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+button.step-amount{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:32px;margin:0;padding:0 var(--space-3);border:0;border-radius:var(--radius-md);background:var(--surface-band);cursor:pointer}
+.step-row.is-pay button.step-amount{background:var(--surface)}
+@media(hover:hover){button.step-amount:hover{background:var(--surface-band-hover)}}
+button.step-amount:active{background:var(--share-track)}
+.step-row.is-done button.step-amount{background:transparent;color:var(--text-muted)}
+.step-row.is-changed button.step-amount{background:var(--warning-bg);color:var(--warning)}
+.step-changed{margin:0;color:var(--warning);font-size:var(--text-sm);font-weight:var(--weight-bold);line-height:1.4}
+.step-caption{margin:0;color:var(--text-muted);font-size:var(--text-sm);line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+/* Steps sit inside sheets and cards whose own paragraph margins would otherwise win. */
+.step-row .step-body>p,.step-group>.step-group-footer{margin:0}
+.step-group>.step-group-footer{padding:var(--space-2) var(--space-4)}
+
+/* "Copied £2,215.45": one status line per list, shown as a toast above the tab bar. */
+.step-copied{position:fixed;z-index:90;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin:0;padding:var(--space-2) var(--space-4);border-radius:var(--radius-lg);background:var(--accent);color:var(--white);font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;transform:translateX(-50%);box-shadow:var(--shadow-pop);pointer-events:none}
+.step-copied:empty{padding:0;background:transparent;box-shadow:none}
+.step-copy-hint{margin:0;padding:var(--space-3) var(--space-4) 0;color:var(--text-muted);font-size:var(--text-sm)}
