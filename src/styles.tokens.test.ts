@@ -13,6 +13,7 @@ const otherFiles = (readdirSync(new URL('.', import.meta.url), { recursive: true
   .map(file => ({ file, source: stripComments(readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')) }))
 /** Everything after the token block, then every other stylesheet in src/. */
 const rest = [css.slice(rootEnd + 3), ...otherFiles.map(({ source }) => source)].join('\n')
+const allCss = [css, ...otherFiles.map(({ source }) => source)].join('\n')
 
 /** `selector { property: value }` for every declaration after the token block, media queries included. */
 const declarations = [...rest.matchAll(/([^{}]*)\{([^{}]*)\}/g)].flatMap(([, selector, body]) =>
@@ -56,14 +57,14 @@ describe('design tokens', () => {
     expect(offenders(d => spacing.test(d.property) && offScale(d.value))).toEqual([])
   })
 
-  it('uses only the three width breakpoints (640 / 768 / 1100) and the landscape-phone query', () => {
-    const widths = [...css.matchAll(/@media[^{]*/g)].flatMap(([query]) => [...query.matchAll(/(min|max)-width:\s*(\d+)px/g)].map(([, kind, n]) => `${kind}-${n}`))
+  it('uses only the three width breakpoints (640 / 768 / 1100) and the landscape-phone query, in every stylesheet', () => {
+    const widths = [...allCss.matchAll(/@media[^{]*/g)].flatMap(([query]) => [...query.matchAll(/(min|max)-width:\s*(\d+)px/g)].map(([, kind, n]) => `${kind}-${n}`))
     expect([...new Set(widths)].filter(w => !['max-640', 'min-641', 'max-767', 'min-768', 'max-980', 'min-981', 'max-1099', 'min-1100'].includes(w))).toEqual([])
   })
 
   it('keeps the CSS mobile query in step with MOBILE_QUERY in breakpoints.ts', () => {
     const normalise = (query: string) => query.replace(/\s+/g, '')
-    const cssMobile = [...css.matchAll(/@media([^{]*max-width:\s*767px[^{]*)\{/g)].map(([, query]) => normalise(query!)).filter(query => query.includes('orientation'))
+    const cssMobile = [...allCss.matchAll(/@media([^{]*max-width:\s*767px[^{]*)\{/g)].map(([, query]) => normalise(query!)).filter(query => query.includes('orientation'))
     expect(cssMobile.length).toBeGreaterThan(0)
     expect(new Set(cssMobile)).toEqual(new Set([normalise(MOBILE_QUERY)]))
   })

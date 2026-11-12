@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
-import { ArrowLeftRight, CreditCard, House, Menu, UserRound, UserRoundGroup, Wallet, X } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { ArrowLeftRight, CreditCard, House, Menu, UserRound, UserRoundGroup, Wallet } from 'lucide-react'
 import { AccountStatusPanel } from './AccountStatusPanel'
+import { Sheet } from './ui/Sheet'
 import { saveStatusLabel, statusMark } from './saveStatus'
 import type { BudgetView, PlannerView } from '../state/navigation'
 import { MOBILE_QUERY } from '../breakpoints'
@@ -31,40 +31,9 @@ function AnimatedSidebarText({ text }: { text: string }) {
 }
 
 function UtilitySheet({ status, warning, email, onSignOut, onClose }: { status: string; warning: string; email?: string; onSignOut?: () => void; onClose: () => void }) {
-  const ref = useRef<HTMLElement>(null)
-  const titleId = useId()
-  useEffect(() => {
-    const sheet = ref.current!
-    const previous = document.activeElement as HTMLElement | null
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const background: { element: Element; inert: boolean }[] = []
-    for (let branch: Element = sheet; branch.parentElement; branch = branch.parentElement) {
-      background.push(...[...branch.parentElement.children].filter(element => element !== branch).map(element => ({ element, inert: element.hasAttribute('inert') })))
-      if (branch.parentElement === document.body) break
-    }
-    background.forEach(({ element }) => element.setAttribute('inert', ''))
-    const keepFocus = (event: FocusEvent) => { if (event.target instanceof Node && !sheet.contains(event.target)) sheet.querySelector<HTMLButtonElement>('button')?.focus() }
-    document.addEventListener('focusin', keepFocus)
-    sheet.querySelector<HTMLButtonElement>('button')?.focus()
-    return () => {
-      document.removeEventListener('focusin', keepFocus)
-      background.forEach(({ element, inert }) => { if (!inert) element.removeAttribute('inert') })
-      document.body.style.overflow = overflow
-      if (previous?.isConnected) previous.focus({ preventScroll: true })
-    }
-  }, [])
-  return createPortal(<div className="mobile-utility-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section ref={ref} className="mobile-utility-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} onKeyDown={event => {
-    if (event.key === 'Escape') { event.preventDefault(); onClose() }
-    if (event.key !== 'Tab') return
-    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]')]
-    const first = controls[0], last = controls.at(-1)
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-  }}>
-    <header><h2 id={titleId}>Account and save status</h2><button type="button" aria-label="Close account and save status" onClick={onClose}><X aria-hidden="true" /></button></header>
+  return <Sheet title="Account and save status" onClose={onClose} className="mobile-utility-sheet" dismissOnScrim>
     <AccountStatusPanel status={status} warning={warning} email={email} onSignOut={onSignOut} onBeforeSignOut={onClose} />
-  </section></div>, document.getElementById('root') ?? document.body)
+  </Sheet>
 }
 
 
