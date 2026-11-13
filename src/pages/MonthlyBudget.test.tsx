@@ -1015,7 +1015,7 @@ function MonthRulesHarness({ initial = monthRulesDocument(), month = '2026-12', 
 it.each(['plan', 'month'] as const)('identifies inherited months and hides going back in %s', view => {
   render(<MonthRulesHarness view={view}/>)
   // Only Plan notes a carried-over budget: it's about the items, which Month doesn't show.
-  if (view === 'plan') expect(screen.getByText('Using the November 2026 budget')).toBeInTheDocument()
+  if (view === 'plan') expect(screen.getByText('Carried over from November')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'December 2026' }))
   expect(within(screen.getByRole('dialog', { name: 'Choose budget month' })).queryByRole('button', { name: /^(Go back to|Clear) the/ })).not.toBeInTheDocument()
@@ -1029,7 +1029,7 @@ it.each(['plan', 'month'] as const)('identifies inherited months and hides going
 
 it('says nothing under the month when it has its own budget, and offers going back from the month picker', () => {
   render(<MonthRulesHarness month="2027-03"/>)
-  expect(screen.queryByText(/^Using the/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/^Carried over from/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Budget set|Income updated/)).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'March 2027' }))
   fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose budget month' })).getByRole('button', { name: 'Go back to the November 2026 budget' }))
@@ -1126,7 +1126,7 @@ it('distinguishes an inherited empty snapshot from a missing budget', () => {
   const initial = monthRulesDocument()
   initial.budget.snapshots['2026-11'] = { items: [] }
   render(<MonthRulesHarness initial={initial}/>)
-  expect(screen.getByText('This budget has no items yet.')).toBeVisible()
+  expect(screen.getByText(/This budget has no items yet\./)).toBeVisible()
   expect(screen.queryByText('There is no budget for this month yet.')).not.toBeInTheDocument()
 })
 

@@ -86,7 +86,7 @@ it('shows the empty states', () => {
   const document = household()
   document.card!.transactions = [tx('e', '2026-11-06', 'GREEN GROCER', 4460, { sort: { lines: [{ amountPence: 4460, destination: { kind: 'pot', potId: 'groceries' } }], by: 'person', at: 'x' } })]
   render(<Harness initial={document}/>)
-  expect(screen.getByText('Everything is sorted.')).toBeInTheDocument()
+  expect(screen.getByText('Everything is sorted')).toBeInTheDocument()
 })
 
 it('brings in an Excel export, shows the counts and the summary check, then lists the new rows to sort', async () => {
@@ -218,7 +218,7 @@ it('makes a rule in place with Always, and it sorts the others from that merchan
   expect(saved!.card!.rules[1]).toMatchObject({ contains: 'TRAIN TICKETS', cardSuffix: '41001', destination: { kind: 'pot', potId: 'treats' } })
   expect(saved!.card!.transactions.find(row => row.id === 'again')!.sort).toMatchObject({ by: 'rule', ruleId: saved!.card!.rules[1]!.id })
   expect(screen.getByRole('status')).toHaveTextContent('Sorted to Treats · Ada. New rule for “TRAIN TICKETS”, which sorted 1 more.')
-  expect(screen.getByText('Everything is sorted.')).toBeInTheDocument()
+  expect(screen.getByText('Everything is sorted')).toBeInTheDocument()
 })
 
 it('checks rule sorts, and offers to change the rule when one is re-sorted', () => {
@@ -747,7 +747,7 @@ describe('on desktop', () => {
     fireEvent.keyDown(rows()[0]!, { key: 'Enter' })
     // The merchant went to Eating out a moment ago, so that's now the suggestion.
     expect(saved!.card!.rules.at(-1)).toMatchObject({ contains: 'TRAIN', destination: { kind: 'pot', potId: 'eating' } })
-    expect(screen.getByText('Everything is sorted.')).toBeInTheDocument()
+    expect(screen.getByText('Everything is sorted')).toBeInTheDocument()
   })
 
   it('opens the split editor with S', () => {

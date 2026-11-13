@@ -224,10 +224,10 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     todo.push({ key: 'review-accounts', kind: 'review-accounts', title: `${plural(count, 'account')} ${count === 1 ? 'needs' : 'need'} review`, meta: `${current.plans.needsReview.map(row => nameAccount(row.accountId)).join(' · ')}. Their steps wait until it’s fixed.`, target: { view: 'month', month } })
   }
 
-  // ——— Heads-up: pots that need care this month ———
+  // ——— Heads-up: pots over or ahead of pace this month ———
   for (const row of care) headsUp.push({
     key: `pace:${row.key}`, kind: 'pace', tone: 'warning',
-    title: row.leftPence < 0 ? `${nameDestination(row.destination)} is ${pounds(-row.leftPence)} over` : `${nameDestination(row.destination)} is ${roundPounds(row.aheadPence ?? 0)} ahead of pace`,
+    title: row.leftPence < 0 ? `${nameDestination(row.destination)} ${pounds(-row.leftPence)} over` : `${nameDestination(row.destination)} ${roundPounds(row.aheadPence ?? 0)} ahead of pace`,
     meta: row.leftPence < 0 ? `Covered when ${monthName(month)} closes` : row.runsOut ? `At this rate it runs out around ${dayDate(row.runsOut)}` : 'Spending faster than planned',
     ...row.leftPence >= 0 ? { trailing: `${pounds(row.leftPence)} left` } : {},
     target: { view: 'month', month, ...row.destination.kind === 'pot' ? { potId: row.destination.potId } : {} },

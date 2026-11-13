@@ -1,0 +1,10 @@
+/* Notice. Tokens only (styles.tokens.test.ts). */
+.notice{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin:0 0 var(--space-4);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);color:var(--text);font-size:var(--text-md)}
+.notice.is-warning{border-color:var(--warning);background:var(--warning-bg)}
+.notice.is-critical{border-color:var(--critical);background:var(--critical-bg)}
+.notice-icon{flex:none;width:18px;height:18px}
+.notice.is-warning .notice-icon{color:var(--warning)}
+.notice.is-critical .notice-icon{color:var(--critical)}
+.notice-text{flex:1 1 240px;margin:0}
+.notice-actions{display:flex;flex-wrap:wrap;gap:var(--space-3)}
+.notice-actions>*{margin:0}

@@ -30,12 +30,13 @@ export function monthBudget(document: BudgetDocument, month: string) {
  const previousBudget=resolved.hasExplicitBudget?resolveBudget({...document.budget,snapshots:snapshotsWithoutMonth()},month):null
  const revertLabel=!previousBudget?undefined:previousBudget.sourceMonth?`Go back to the ${monthLabel(previousBudget.sourceMonth)} budget`:previousBudget.importedBaseline?'Go back to the imported budget':`Clear the ${monthLabel(month)} budget`
  const revertReplacement=!previousBudget?undefined:previousBudget.sourceMonth?`the budget from ${monthLabel(previousBudget.sourceMonth)}`:previousBudget.importedBaseline?'the imported legacy budget':'no budget'
- const incomeTotal=incomes.filter(x=>x.type==='employment').reduce((s,x)=>s+x.amountPence,0),available=transfers.availablePence,availableBasis=available===0?'no income yet':incomeTotal===0?'none from salary':incomeTotal===available?'all from salary':`${pounds(incomeTotal)} from salary`
- const basisDetail=available===0||incomeTotal===0||incomeTotal===available?availableBasis:`${pounds(incomeTotal)} salary + ${pounds(available-incomeTotal)} other`
+ const incomeTotal=incomes.filter(x=>x.type==='employment').reduce((s,x)=>s+x.amountPence,0),available=transfers.availablePence
+ // Where Available comes from, only when it isn't simply salary: "£6,000.00 salary + £500.00 other".
+ const basisDetail=available===0?'no income yet':incomeTotal===0?'none from salary':incomeTotal===available?'':`${pounds(incomeTotal)} salary + ${pounds(available-incomeTotal)} other`
  const ownerOrder=planOwnerOrder(adults)
  const meterPeople=transfers.people.map(row=>({personId:row.personId,name:adults.find(person=>person.id===row.personId)?.name??'Person',availablePence:row.availablePence,plannedPence:row.plannedPence}))
  // Only a carried-over budget needs a note: the month button already names the month, and the picker marks budget and income changes.
- const carriedOverNote=resolved.hasExplicitBudget?null:resolved.sourceMonth?`Using the ${monthLabel(resolved.sourceMonth)} budget`:resolved.importedBaseline?'Using the imported budget':null
+ const carriedOverNote=resolved.hasExplicitBudget?null:resolved.sourceMonth?`Carried over from ${resolved.sourceMonth.slice(0,4)===month.slice(0,4)?monthLabel(resolved.sourceMonth).split(' ')[0]:monthLabel(resolved.sourceMonth)}`:resolved.importedBaseline?'Carried over from the imported budget':null
  return {resolved,items,adults,editScopeLabel,incomes,transfers,instructions,unfundedItems,shortLabels,labels,total,transferAccounts,personPlans,snapshotsWithoutMonth,revertLabel,revertReplacement,available,basisDetail,ownerOrder,meterPeople,carriedOverNote}
 }
 

@@ -11,6 +11,8 @@ import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
 import { CommandPalette } from './components/CommandPalette'
+import { Notice, PageSkeleton } from './components/ui'
+import { saveStatusLabel } from './components/saveStatus'
 import { localDate } from './domain/cardTracker'
 import { formatMonth } from './formatting/month'
 import { documentTitle } from './state/documentTitle'
@@ -77,8 +79,15 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     if (target.view === 'settings') { navigateTo({ view: 'settings', section: target.section }); return }
     navigateTo({ view: 'spending', section: target.section, statement: target.statementKey ?? null }, target.bringIn ? { historyState: { northBringIn: true } } : {})
   }
-  const loading = (text = 'Loading…') => <p className="budget-loading" role="status">{text}</p>
+  const loading = () => <PageSkeleton/>
+  // A save that failed (or a conflict to resolve) is news on every screen, not only in the sidebar. Local-only never shows it.
+  const saveLabel = saveStatusLabel(status, error)
+  const saveNotice = onSignOut && (saveLabel === 'Save failed' || saveLabel === 'Choose a version') && <Notice tone="critical" actions={<>
+    {saveLabel === 'Save failed' && <button type="button" className="secondary-button" onClick={() => setDocument(current => ({ ...current }))}>Try again</button>}
+    <button type="button" className="text-button" onClick={() => navigateTo({ view: 'settings', section: 'account' })}>Details</button>
+  </>}>{saveLabel === 'Choose a version' ? 'This budget changed somewhere else. Choose which version to keep in Settings › Account & sync.' : 'Your changes aren’t saved. Check your connection, then try again.'}</Notice>
   return <AppLayout navigation={{ currentView: view, warning: error, saveStatus: status, email, onSignOut, onSelectView: selectView, setupComplete, counts, homeTitle: formatMonth(navigation.month) }}>
+    {saveNotice}
     {UiGallery && new URLSearchParams(search).get('view') === 'ui-gallery'
       ? <Suspense fallback={null}><UiGallery/></Suspense>
       : !document.workflow.setupComplete
@@ -89,7 +98,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
       ? <Suspense fallback={loading()}><Spending document={document} setDocument={setDocument} view={spendingSection(navigation)} onSelectView={section => navigateTo({ view: 'spending', section, statement: null })} onOpenCardSettings={() => navigateTo({ view: 'settings', section: 'cards' })} onOpenRules={() => navigateTo({ view: 'settings', section: 'rules' })} onOpenMonth={pot => navigateTo({ view: 'month', pot: pot ?? null })} statementKey={navigation.statement} onOpenStatement={statement => navigateTo({ view: 'spending', section: 'statements', statement })}/></Suspense>
       : view === 'home'
       ? <Suspense fallback={loading()}><Home document={document} month={navigation.month} onOpen={openFromHome}/></Suspense>
-      : <Suspense fallback={loading('Loading budget…')}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} view={view === 'month' ? 'month' : 'plan'} month={navigation.month} onMonthChange={month => navigateTo({ month, pot: null, close: false })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={view === 'month' ? stepsReturnFromState() : null} onReturnToTransfers={returnToMonth} onOpenPlan={() => navigateTo({ view: 'plan' })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={view === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined}
+      : <Suspense fallback={loading()}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} view={view === 'month' ? 'month' : 'plan'} month={navigation.month} onMonthChange={month => navigateTo({ month, pot: null, close: false })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={view === 'month' ? stepsReturnFromState() : null} onReturnToTransfers={returnToMonth} onOpenPlan={() => navigateTo({ view: 'plan' })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={view === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined}
           potId={navigation.pot} closing={navigation.close} onOpenPot={pot => navigateTo({ view: 'month', pot, close: false })} onOpenClose={close => navigateTo({ view: 'month', close, pot: null })} onOpenSort={() => navigateTo({ view: 'spending', section: 'sort' })} onOpenSettings={section => navigateTo({ view: 'settings', section, month: navigation.month })}/></Suspense>}
     {setupComplete && <CommandPalette document={document} month={navigation.month} today={localDate()}/>}
   </AppLayout>

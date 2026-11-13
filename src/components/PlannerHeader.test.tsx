@@ -8,7 +8,8 @@ afterEach(cleanup)
 it('keeps save failures visible and exposes account actions in the utility sheet', () => {
   const signOut = vi.fn()
   render(<PlannerHeader currentView="month" setupComplete warning="The latest changes could not be saved to cloud storage." saveStatus="Unsaved changes" email="person@example.com" onSignOut={signOut} onSelectView={() => {}} />)
-  expect(screen.getByRole('alert')).toHaveTextContent('Save failed')
+  // Cloud saves get the page's own Notice (App); the header keeps the status in its account button.
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Account and settings' }))
   const sheet = screen.getByRole('dialog', { name: 'Account and settings' })
   expect(within(sheet).getByText('Save failed')).toBeInTheDocument()
@@ -16,6 +17,9 @@ it('keeps save failures visible and exposes account actions in the utility sheet
   expect(within(sheet).getByText('person@example.com')).toBeInTheDocument()
   fireEvent.click(within(sheet).getByRole('button', { name: 'Sign out' }))
   expect(signOut).toHaveBeenCalledOnce()
+  cleanup()
+  render(<PlannerHeader currentView="month" setupComplete warning="Your browser storage is full." saveStatus="Saved" onSelectView={() => {}}/>)
+  expect(screen.getByRole('alert')).toHaveTextContent('Save failed')
 })
 
 it.each([

@@ -127,7 +127,8 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
         <button type="button" className="mobile-utility-trigger" aria-label="Account and settings" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={20} aria-hidden="true" /></button>
       </div>
     </header>
-    {status === 'Save failed' && <p className="mobile-save-alert" role="alert">Save failed. Open Account and settings for details.</p>}
+    {/* Cloud saves get the page's own Notice (App); this covers local storage. */}
+    {status === 'Save failed' && !onSignOut && <p className="mobile-save-alert" role="alert">Save failed. Open Account and settings for details.</p>}
     {/* Until setup is done there is nowhere else to go, so no greyed-out promises. */}
     {setupComplete && <nav className="mobile-bottom-nav" aria-label="Mobile navigation">{destinations.map(destination => <button key={destination.id} type="button" aria-current={selected === destination.id ? 'page' : undefined} aria-label={accessibleName(destination) === destination.label ? undefined : accessibleName(destination)} onClick={() => onSelectView(destination.id)}><span className="mobile-nav-icon" aria-hidden="true"><destination.Icon size={22} strokeWidth={2} />{'count' in destination && !!destination.count && <span className="mobile-nav-dot"/>}</span><span>{destination.label}</span></button>)}</nav>}
     <aside className={`planner-sidebar${desktopExpanded ? ' desktop-expanded' : ' is-compact'}`} aria-label="Application navigation">

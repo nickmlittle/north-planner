@@ -100,7 +100,7 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   const checks = document.budget.pots.map(pot => tracker.pots[pot.id]?.checkedBalance?.at).filter((at): at is string => !!at).sort()
   const bank = document.budget.pots[0] ? bankOf(document, document.budget.pots[0].id) : 'the bank'
   const aside = checks.length ? `Checked against ${bank} ${dayOf(checks[0]!)}` : 'Not checked yet'
-  const count = figures.plannedPence || figures.spentPence ? `${pounds(figures.spentPence)} spent of ${pounds(figures.plannedPence)}` : undefined
+  const count = figures.plannedPence ? `${pounds(figures.spentPence)} spent of ${pounds(figures.plannedPence)}` : figures.spentPence ? `${pounds(figures.spentPence)} spent · nothing planned` : undefined
   const open = (row: PotRow) => { if (row.potId) onOpenPot(row.potId) }
   const label = (row: PotRow) => `${row.name}${row.kind ? ` · ${row.kind}` : ''}`
   const pace = (row: PotRow) => <>{row.meter && <Meter label={`${row.name}: ${row.spent} of ${row.planned}`} value={row.meter.value} max={row.meter.max} pace={row.meter.pace} tone={row.meter.tone}/>}<span className={`pots-status${row.tone ? ` is-${row.tone}` : ''}`}>{row.status}</span></>

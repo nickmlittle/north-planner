@@ -1,0 +1,7 @@
+/* PageSkeleton. Tokens only (styles.tokens.test.ts). */
+.page-skeleton{display:grid;gap:var(--space-3);padding-top:var(--space-2)}
+.page-skeleton-title,.page-skeleton-row{display:block;border-radius:var(--radius-md);background:var(--surface-sunken);animation:page-skeleton 1.4s ease-in-out infinite}
+.page-skeleton-title{width:min(320px,60%);height:var(--control-h);margin-bottom:var(--space-4)}
+.page-skeleton-row{height:var(--row-h)}
+@keyframes page-skeleton{50%{opacity:.55}}
+@media(prefers-reduced-motion:reduce){.page-skeleton-title,.page-skeleton-row{animation:none}}

@@ -39,8 +39,8 @@ it('shows Available with its basis only when it isn’t all salary, and Edit inc
   fireEvent.click(screen.getByRole('button', { name: 'Edit income' }))
   expect(edit).toHaveBeenCalledOnce()
   cleanup()
-  render(<AllocationMeter availablePence={834000} plannedPence={831700} basis="all from salary" onEditIncome={() => {}}/>)
-  expect(screen.queryByText(/from salary/)).not.toBeInTheDocument()
+  render(<AllocationMeter availablePence={834000} plannedPence={831700} basis="" onEditIncome={() => {}}/>)
+  expect(document.querySelector('.allocation-meter-basis')).toBeNull()
 })
 
 it('keeps phones to one line and a bar, with no share and no basis', () => {
@@ -90,4 +90,12 @@ it('docks the worst figure in the mini meter, with a bar per person', () => {
   expect(document.querySelector('.allocation-meter-mini')).toHaveClass('is-deficit')
   expect(document.querySelector('.allocation-meter-mini-balance')).toHaveTextContent('Immy £187.22 over')
   expect(document.querySelectorAll('.allocation-meter-mini-person')).toHaveLength(2)
+})
+
+it('says nothing is planned yet instead of "left" before the first item', () => {
+  render(<AllocationMeter availablePence={650000} plannedPence={0} people={[{ ...nick, plannedPence: 0 }, { ...immy, plannedPence: 0 }]}/>)
+  const summary = screen.getByRole('region', { name: 'Plan summary' })
+  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('Nothing planned yet')
+  expect(summary).not.toHaveTextContent(/left|fits/)
+  expect(within(summary).getAllByRole('listitem')[0]).toHaveTextContent('Nick£3,900.00 available')
 })

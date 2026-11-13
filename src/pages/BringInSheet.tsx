@@ -1,3 +1,4 @@
+import { Notice } from '../components/ui'
 import { useEffect, useId, useRef, useState, type ChangeEvent, type Dispatch, type SetStateAction } from 'react'
 import { Check, FileSpreadsheet, TriangleAlert } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
@@ -77,7 +78,7 @@ export function BringInSheet({ document, setDocument, onClose, onSort, now = () 
         <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="visually-hidden" data-autofocus onChange={event => void choose(event)}/>
       </label>
       {state.kind === 'reading' && <p role="status" className="bring-in-status">Reading {state.fileName}…</p>}
-      {state.kind === 'error' && <p role="alert" className="bring-in-error"><TriangleAlert aria-hidden="true"/>{state.message}</p>}
+      {state.kind === 'error' && <Notice tone="critical">{state.message}</Notice>}
     </>}
     {result && card && <div className="bring-in-result" aria-labelledby={`${id}-result`}>
       <p ref={resultRef} tabIndex={-1} id={`${id}-result`} className="bring-in-file-name" role="status"><strong>{state.kind === 'done' && state.fileName}</strong><span>{plural(result.rows, 'transaction')} · {shortDate(result.period.from)} – {shortDate(result.period.to)} statement</span></p>
