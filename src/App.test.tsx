@@ -2,8 +2,11 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
+import { isMac } from './state/shortcuts'
 import { budgetStorageKey } from './state/useBudgetDocument'
-import { newBudgetDocument } from './domain/budgetDocument'
+import { decodeBudgetDocument, newBudgetDocument } from './domain/budgetDocument'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { emptyCardTracker } from './domain/cardTracker'
 // Small fixtures still drive search and filters; the threshold has its own test.
 vi.mock('./pages/planListConfig', () => ({ PLAN_FILTER_MIN_ITEMS: 0 }))
@@ -553,4 +556,30 @@ it('brings in and adds transactions from the keyboard on Spending', async () => 
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   fireEvent.keyDown(document.body, { key: 'n' })
   expect(await screen.findByRole('dialog', { name: 'Add a transaction' })).toBeInTheDocument()
+})
+
+it('opens ⌘K anywhere, jumps to an item, and runs Add item from another screen', async () => {
+  localStorage.setItem(budgetStorageKey, JSON.stringify(decodeBudgetDocument(JSON.parse(readFileSync(resolve(process.cwd(), 'docs/fixtures/plan-transfers-baseline.json'), 'utf8')))))
+  window.history.replaceState(null, '', '/?view=home&month=2026-11')
+  render(<App />)
+  await screen.findByRole('heading', { level: 1 })
+  const trigger = screen.getAllByRole('button', { name: 'Search North' })[0]!
+  trigger.focus()
+  fireEvent.keyDown(window, { key: 'k', ...isMac() ? { metaKey: true } : { ctrlKey: true } })
+  const palette = screen.getByRole('dialog', { name: 'Search North' })
+  const input = within(palette).getByRole('combobox', { name: 'Search North' })
+  expect(input).toHaveFocus()
+  fireEvent.change(input, { target: { value: 'groceries' } })
+  const options = within(palette).getAllByRole('option')
+  expect(options[0]).toHaveAttribute('aria-selected', 'true')
+  expect(input).toHaveAttribute('aria-activedescendant', options[0]!.id)
+  fireEvent.keyDown(input, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Search North' })).not.toBeInTheDocument()
+  expect(trigger).toHaveFocus()
+  // The sidebar's Search opens it too; "add" runs Add item, on Plan.
+  fireEvent.click(trigger)
+  fireEvent.change(screen.getByRole('combobox', { name: 'Search North' }), { target: { value: 'add' } })
+  fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search North' }), { key: 'Enter' })
+  expect(window.location.search).toContain('view=plan')
+  expect(await screen.findByRole('dialog', { name: 'Add item' })).toBeInTheDocument()
 })

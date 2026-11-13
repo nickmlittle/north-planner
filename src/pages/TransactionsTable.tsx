@@ -31,7 +31,11 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
   const mobile = useMobilePresentation()
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
-  const [query, setQuery] = useState('')
+  // ⌘K's transaction results arrive searching for that merchant (history state northTransactionSearch).
+  const arriving = typeof window.history.state?.northTransactionSearch === 'string' ? window.history.state.northTransactionSearch as string : ''
+  const [query, setQuery] = useState(arriving)
+  const [arrived, setArrived] = useState(arriving)
+  if (arriving && arriving !== arrived) { setArrived(arriving); setQuery(arriving) }
   const [filters, setFilters] = useState<TransactionFilters>(NO_FILTERS)
   const [filtering, setFiltering] = useState(false)
   const rowKeys = useListNavigation({ label: 'Transactions', keys: { enter: 'Open the sort sheet' } })

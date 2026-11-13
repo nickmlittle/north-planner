@@ -44,7 +44,7 @@ it('offers Home, Month, Plan and Spending in the sidebar and on the phone, with 
   render(<PlannerHeader currentView="month" setupComplete counts={{ spending: 4 }} onSelectView={selectView} />)
   const sidebar = within(screen.getByRole('navigation', { name: 'Main navigation' }))
   const phone = within(screen.getByRole('navigation', { name: 'Mobile navigation' }))
-  expect(sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Home', 'Month', 'Plan', 'Spending, 4 to sort', 'Settings'])
+  expect(sidebar.getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Home', 'Month', 'Plan', 'Spending, 4 to sort', 'Search North', 'Settings'])
   expect(phone.getAllByRole('button').map(button => button.textContent)).toEqual(['Home', 'Month', 'Plan', 'Spending'])
   expect(phone.getByRole('button', { name: 'Spending, 4 to sort' })).toBeInTheDocument()
   expect(sidebar.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
