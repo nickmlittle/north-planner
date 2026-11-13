@@ -43,7 +43,9 @@ export function AllocationMeter({ availablePence, plannedPence, people = [], bas
   label?: string
 }) {
   const summary = meterSummary(people, availablePence, plannedPence)
-  const balance = <strong className={`allocation-meter-balance${summary.household < 0 ? ' is-over' : ''}`}>{balanceText(summary.household)}</strong>
+  // Nothing planned yet: no "left" (it would read as a result), just what's available.
+  const nothingPlanned = plannedPence === 0
+  const balance = <strong className={`allocation-meter-balance${summary.household < 0 ? ' is-over' : ''}`}>{nothingPlanned ? 'Nothing planned yet' : balanceText(summary.household)}</strong>
   const share = availablePence > 0 ? Math.round(plannedPence / availablePence * 1000) / 10 : null
   const bars = summary.split ? <ul className="allocation-meter-people" aria-label="By person">
     {people.map(person => {
@@ -51,13 +53,13 @@ export function AllocationMeter({ availablePence, plannedPence, people = [], bas
       return <li key={person.personId} className={`allocation-meter-person${left < 0 ? ' is-over' : ''}`}>
         <span className="allocation-meter-name">{person.name}</span>
         <Track availablePence={person.availablePence} plannedPence={person.plannedPence} label={`${person.name}: ${pounds(person.plannedPence)} planned of ${pounds(person.availablePence)} available`}/>
-        <span className="allocation-meter-person-balance">{balanceText(left)}</span>
+        <span className="allocation-meter-person-balance">{nothingPlanned ? `${pounds(person.availablePence)} available` : balanceText(left)}</span>
       </li>
     })}
   </ul> : <div className="allocation-meter-single" role="meter" aria-label="Planned" aria-valuemin={0} aria-valuemax={100} aria-valuenow={share === null ? plannedPence > 0 ? 100 : 0 : Math.round(Math.min(share, 100))} aria-valuetext={share === null ? 'No income yet' : `${share}% of Available planned`}><Track availablePence={availablePence} plannedPence={plannedPence}/></div>
   const review = summary.worst && onReview && <button type="button" className="text-button allocation-meter-review" onClick={() => onReview(summary.worst!.personId)}>Review {summary.worst.name}’s items</button>
   const edit = onEditIncome && <button type="button" className="text-button allocation-meter-edit" onClick={onEditIncome}>Edit income</button>
-  const otherBasis = basis && !/^(all from salary|no income yet)$/.test(basis) ? basis : ''
+  const otherBasis = basis && basis !== 'no income yet' ? basis : ''
   if (compact) return <section className={`allocation-meter is-compact ${summary.state} ${className}`.trim()} aria-label={label}>
     <p className="allocation-meter-line">{balance}<span className="allocation-meter-of">{pounds(plannedPence)} of {pounds(availablePence)}</span></p>
     {bars}

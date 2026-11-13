@@ -30,6 +30,11 @@ const retired: Array<[RegExp, string]> = [
   [/transfers by (destination|person)|monthly plan by person|people (&|&amp;|and) transfers/i, 'Funding by account / Funding'],
   [/later saved budgets/i, 'nothing: the scope line already says which months change'],
   [/edit budget item/i, 'Edit item'],
+  // Figure first, no second-person headlines (audit 3 D11).
+  [/you['’]re both (over|up to date)/i, 'the figure: "£1,141.87 over", "Payday · 18 of 18 done"'],
+  [/needs care|need care/i, '"ahead of pace" / "over"'],
+  [/who['’]s moving money/i, 'nothing: the person switch says whose steps'],
+  [/all from salary/i, 'nothing: the basis shows only when it isn’t all salary'],
 ]
 
 describe('on-screen vocabulary', () => {

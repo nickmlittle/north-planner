@@ -263,6 +263,9 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | **Settle up** | Paying a statement. Steps: “Out of Treats”, “Send to Joint Monzo”, “Pay Amex”. | Pay off |
 | **Built up** | The leftover total in a monthly pot. | Surplus, savings |
 | **Free** | A carry-over pot's balance minus card spend not yet settled. | Available (that is income) |
+| **Set aside** | Moving what was sorted since the last move into the card's pot, so the statement is covered when it comes: “Set aside in the Amex pot”, “Mark moved”. | Reserve, ring-fence |
+
+**Tone.** Lead with the figure, not the person: “£1,141.87 over”, “Ada £429.66 over”, “Groceries · Monzo Joint £40 ahead of pace”, never “You're both over” or “Ada is over”. A finished section folds to its count (“Payday · 18 of 18 done”) instead of congratulating. Verbs name actions. Nothing says “fits”, “left” or “up to date” when nothing is planned. Empty lists use one EmptyState where the content would be: what's missing, one sentence, one action. A failed save is a critical Notice under the page header on every screen (“Your changes aren't saved. Check your connection, then try again.” with Try again and Details); loading shows the page's skeleton.
 
 ## Review checklist for future changes
 

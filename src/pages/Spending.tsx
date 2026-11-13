@@ -164,7 +164,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
           meta={[dayDate(transaction.date), document.household.adults.find(person => person.id === transaction.personId)?.name ?? cardLabel(document, transaction), hint(transaction)].filter(Boolean).join(' · ')}
           trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li>)}</ul>
         : <SortTable document={document} setDocument={setDocument} transactions={toSort} onSorted={setMessage} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
-        : tracker.transactions.length ? <p className="spending-none">Everything is sorted.</p>
+        : tracker.transactions.length ? <EmptyState title="Everything is sorted"/>
         : <EmptyState title="Nothing to sort" action={<button type="button" className="secondary-button" onClick={() => setSheet('bring-in')}>Bring in</button>}>Bring in the Excel export from {card.name} to start.</EmptyState>}
       {(compact || !toSort.length) && ruleToggle && <div className="spending-rule-line">{ruleToggle}</div>}
       {ruleSorts}

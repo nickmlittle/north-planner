@@ -37,7 +37,7 @@ export default function UiGallery() {
       </Section>
       <Section title="To do" count={4} aside="ListRow">
         <div className="ui-gallery-card">
-          <ListRow icon={<TriangleAlert/>} tone="critical" title="Groceries · Monzo Joint is £51 ahead of pace" meta="At this rate it runs out around Sun 22 Nov" onOpen={() => {}}/>
+          <ListRow icon={<TriangleAlert/>} tone="critical" title="Groceries · Monzo Joint £51 ahead of pace" meta="At this rate it runs out around Sun 22 Nov" onOpen={() => {}}/>
           <ListRow icon={<FileUp/>} title="Bring in Amex transactions" meta="Last done Mon 9 Nov" trailing="8 new" onOpen={() => {}} focused/>
           <ListRow icon={<PiggyBank/>} tone="warning" title="Move £140.59 to the Amex pot" meta="3 transactions sorted since the last move" trailing="£140.59" trailingMeta="Amex pot £312.85" href="#move"/>
           <ListRow icon={<CalendarClock/>} tone="done" title="All transactions in and sorted" meta="October" trailing={<StatusChip tone="positive">Done</StatusChip>}/>

@@ -80,7 +80,7 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     ])
     expect(result.todo.find(row => row.kind === 'over-plan')).toMatchObject({ tone: 'critical', target: { view: 'plan', reviewPersonId: 'ben' } })
     expect(result.todo.filter(row => row.tone === 'critical')).toHaveLength(1)
-    expect(titles(result.headsUp)).toEqual([expect.stringMatching(/^Groceries .*is £62 ahead of pace$/)])
+    expect(titles(result.headsUp)).toEqual([expect.stringMatching(/^Groceries .*£62 ahead of pace$/)])
     expect(result.headsUp[0]).toMatchObject({ meta: 'At this rate it runs out around Fri 20 Nov', trailing: '£143.57 left', tone: 'warning' })
     expect(homeCount(result)).toBe(7)
   })
@@ -156,7 +156,7 @@ describe('homeInbox task kinds', () => {
     const document = withCard()
     document.card!.transactions.push({ ...document.card!.transactions[1]!, id: 'c', amountPence: 400000, sort: { lines: [{ amountPence: 400000, destination: { kind: 'pot', potId: 'bills-pot' } }], by: 'person', at: 'x' } })
     const pace = inbox(document, '2026-11-12').headsUp[0]!
-    expect(pace).toMatchObject({ kind: 'pace', title: expect.stringMatching(/^Bills .*is £[\d,.]+ over$/), meta: 'Covered when November closes' })
+    expect(pace).toMatchObject({ kind: 'pace', title: expect.stringMatching(/^Bills.* £[\d,.]+ over$/), meta: 'Covered when November closes' })
   })
 
   it('has nothing to do once everything is done, and says what comes next', () => {
