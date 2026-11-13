@@ -1376,3 +1376,26 @@ describe('keyboard lists', () => {
     } finally { Reflect.deleteProperty(navigator,'clipboard') }
   })
 })
+
+it('reads payday steps from where each salary lands: "already in" isn’t a step, others go from → to', () => {
+  const plain = render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
+  const before = within(screen.getByRole('region', { name: 'Steps by person' })).getAllByRole('heading', { level: 3 }).map(element => element.textContent)
+  plain.unmount()
+  const initial = personSwitchDocument()
+  initial.budget.incomeSources[0]!.landsInAccountId = 'a1'
+  initial.budget.incomeSources[1]!.landsInAccountId = 'a2'
+  render(<SeededHarness initial={initial} view="month"/>)
+  const nick = screen.getByRole('region', { name: 'Nick steps' }), immy = screen.getByRole('region', { name: 'Immy steps' })
+  // Nick's pay lands in a1: its funding is shown, quiet and copyable, with no tick; his pot move stays a step.
+  const already = within(nick).getAllByRole('listitem')[0]!
+  expect(already).toHaveClass('is-quiet')
+  expect(already.textContent).toMatch(/^Already in /)
+  expect(within(already).queryByRole('button', { name: / done$/ })).not.toBeInTheDocument()
+  expect(within(already).getByRole('button', { name: /^Copy / })).toBeInTheDocument()
+  // Immy's pay lands in a2: funding a1 reads from a2.
+  expect(within(immy).getAllByRole('listitem').map(step => step.textContent).join(' | ')).toMatch(/ → /)
+  const after = within(screen.getByRole('region', { name: 'Steps by person' })).getAllByRole('heading', { level: 3 }).map(element => element.textContent)
+  expect(before[0]).toMatch(/to fund/)
+  expect(after[0]).not.toMatch(/to fund/)
+  expect(after).not.toEqual(before)
+})

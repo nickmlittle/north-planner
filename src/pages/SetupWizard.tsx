@@ -1,3 +1,6 @@
+import { AccountFields, type AccountFieldsValue } from './AccountFields'
+import './SetupWizard.css'
+import { accountTypeLabel, isAccountTypeId, type AccountTypeId } from '../domain/accountTypes'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
@@ -32,6 +35,11 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
   const [step, setStep] = useState<Step>(() => firstStep(document))
   const [attempted, setAttempted] = useState(false)
   const [pay, setPay] = useState<Record<string, string>>({})
+  // Where each person's pay lands (optional): an account they own, or a new one added here ("__new__").
+  const [landing, setLanding] = useState<Record<string, string>>({})
+  const [newAccount, setNewAccount] = useState<Record<string, AccountFieldsValue>>({})
+  const draftFor = (personId: string): AccountFieldsValue => newAccount[personId] ?? { name: '', provider: '', accountTypeId: 'current-account', ownerPersonIds: [personId] }
+  const incompleteAccount = (personId: string) => landing[personId] === '__new__' && (!draftFor(personId).provider.trim() || !isAccountTypeId(draftFor(personId).accountTypeId) || !draftFor(personId).ownerPersonIds.length)
   const heading = useRef<HTMLHeadingElement>(null)
   const moved = useRef(false)
   const { household } = document
@@ -53,12 +61,21 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
   }
   const finish = (event: FormEvent) => {
     event.preventDefault()
-    if (adults.some(person => !validAmount(pay[person.id] ?? ''))) { setAttempted(true); return }
+    if (adults.some(person => !validAmount(pay[person.id] ?? '') || incompleteAccount(person.id))) { setAttempted(true); return }
     setDocument(current => {
       let budget = current.budget
       for (const person of current.household.adults) {
         const amount = pence(pay[person.id] ?? '')
-        if (amount > 0) budget = addIncomeSource(budget, month, { personId: person.id, name: 'Pay', type: 'employment', baseAmountPence: amount })
+        if (amount <= 0) continue
+        let landsInAccountId = landing[person.id] && landing[person.id] !== '__new__' ? landing[person.id] : undefined
+        if (landing[person.id] === '__new__') {
+          // The account this pay lands in, added now, so the first item can go to it.
+          const draft = draftFor(person.id), accountTypeId = draft.accountTypeId as AccountTypeId
+          const account = { id: crypto.randomUUID(), name: draft.name.trim() || accountTypeLabel(accountTypeId), provider: draft.provider.trim(), ownerPersonIds: draft.ownerPersonIds, accountTypeId }
+          budget = { ...budget, accounts: [...budget.accounts, account] }
+          landsInAccountId = account.id
+        }
+        budget = addIncomeSource(budget, month, { personId: person.id, name: 'Pay', type: 'employment', baseAmountPence: amount, ...landsInAccountId ? { landsInAccountId } : {} })
       }
       return { ...current, budget, workflow: { setupComplete: true } }
     })
@@ -91,7 +108,18 @@ export function SetupWizard({ document, setDocument, month, onFinish }: {
     {step === 3 && <form onSubmit={finish} noValidate>
       <section className="setup-card setup-pay">
         <p className="setup-intro">Take-home pay sets each adult’s share of items split by pay.</p>
-        {adults.map(person => <label className="setup-field" key={person.id}>{person.name}’s monthly take-home pay<span className="budget-money-field"><input inputMode="decimal" value={pay[person.id] ?? ''} onChange={event => setPay(state => ({ ...state, [person.id]: event.target.value }))} aria-invalid={attempted && !validAmount(pay[person.id] ?? '')} /></span></label>)}
+        {adults.map(person => <div className="setup-pay-person" key={person.id}>
+          <label className="setup-field">{person.name}’s monthly take-home pay<span className="budget-money-field"><input inputMode="decimal" value={pay[person.id] ?? ''} onChange={event => setPay(state => ({ ...state, [person.id]: event.target.value }))} aria-invalid={attempted && !validAmount(pay[person.id] ?? '')} /></span></label>
+          <label className="setup-field">Where does it land? <span className="setup-optional">Optional</span><select value={landing[person.id] ?? ''} onChange={event => setLanding(state => ({ ...state, [person.id]: event.target.value }))}>
+            <option value="">Not set</option>
+            {document.budget.accounts.filter(account => account.ownerPersonIds.includes(person.id)).map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+            <option value="__new__">Add the account…</option>
+          </select></label>
+          {landing[person.id] === '__new__' && <div className="setup-new-account" role="group" aria-label={`${person.name}’s pay account`}>
+            <AccountFields adults={adults} value={draftFor(person.id)} onChange={value => setNewAccount(state => ({ ...state, [person.id]: value }))}/>
+            {attempted && incompleteAccount(person.id) && <p role="alert" className="input-error">Enter the bank and account type, or choose Not set.</p>}
+          </div>}
+        </div>)}
       </section>
       {attempted && adults.some(person => !validAmount(pay[person.id] ?? '')) && <p role="alert" className="input-error">Enter pay as an amount in pounds, like 2450 or 2450.50.</p>}
       <div className="setup-actions">{back(2)}<button type="button" className="text-button" onClick={skip}>Skip for now</button><button className="primary-button">Finish setup</button></div>

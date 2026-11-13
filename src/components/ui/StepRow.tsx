@@ -56,6 +56,8 @@ type StepRowProps = {
   indent?: boolean
   /** The final "Pay Amex" step. */
   emphasis?: 'pay'
+  /** Not a step: money already where it needs to be ("Already in Starling Ada"), muted, with the amount still copyable. */
+  quiet?: boolean
   /** Show "Ticked Wed 18 Nov" once done. */
   showTickedDay?: boolean
   /** What to say when the amount changed after the tick. Defaults to Payday's "you sent … Send £X more." */
@@ -72,7 +74,7 @@ const sendNote = (amountPence: number) => (tickedPence: number, differencePence:
  * One money move: tick it once it's done, tap the amount to copy it. Changed since ticked, the amount shows and copies
  * only the difference ("+£50.00"), and ticking accepts the new amount. The tick and the amount are separate targets.
  */
-export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick', ticks, onTick, onCopy, done, amountText, indent, emphasis, showTickedDay, changedNote, caption, account, children }: StepRowProps) {
+export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick', ticks, onTick, onCopy, done, amountText, indent, emphasis, quiet, showTickedDay, changedNote, caption, account, children }: StepRowProps) {
   const status = mode === 'status' ? { state: done ? 'done' as const : 'todo' as const } : stepStatus(ticks, stepKey, amountPence ?? 0)
   const changed = status.state === 'changed' && 'differencePence' in status ? status : null
   const shown = changed ? Math.abs(changed.differencePence) : amountPence ?? 0
@@ -80,7 +82,7 @@ export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick
     ? amountText !== undefined && amountText !== null && amountText !== false && <span className="step-amount">{amountText}</span>
     : amountPence !== undefined && <button type="button" className="step-amount" data-list-copy aria-label={`Copy ${pounds(shown)}`} onClick={() => onCopy?.(shown)}>{changed ? `${changed.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)}</button>
   const tickedAt = showTickedDay && status.state === 'done' ? ticks?.[stepKey]?.at : undefined
-  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}`} data-payday-account={account} data-list-row>
+  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}${quiet ? ' is-quiet' : ''}`} data-payday-account={account} data-list-row>
     {mode === 'tick' && <button type="button" data-list-tick className={`step-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={changed ? `${name}: mark the change done` : `${name} done`} disabled={!onTick} onClick={() => onTick?.(stepKey, status.state === 'done' ? null : amountPence ?? 0)}>
       <span className="step-tick-dot" aria-hidden="true">{status.state === 'done' && <Check/>}{changed && <RefreshCw/>}</span>
     </button>}

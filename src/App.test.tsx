@@ -233,16 +233,24 @@ it('walks setup one step at a time: Household, Adults, then Pay', async () => {
   expect(screen.getByRole('heading', { name: 'Monthly pay' })).toBeVisible()
   fireEvent.change(screen.getByLabelText('Ada’s monthly take-home pay'), { target: { value: '2,450.50' } })
   fireEvent.change(screen.getByLabelText('Ben’s monthly take-home pay'), { target: { value: '1800' } })
+  // Where Ada's pay lands: a new account, added here (D10); incomplete, it asks for the bank first.
+  const landing = screen.getAllByLabelText(/^Where does it land\?/)
+  fireEvent.change(landing[0]!, { target: { value: '__new__' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter the bank and account type')
+  fireEvent.change(within(screen.getByRole('group', { name: 'Ada’s pay account' })).getByLabelText('Bank / provider'), { target: { value: 'Starling' } })
   fireEvent.click(screen.getByRole('button', { name: 'Finish setup' }))
   await screen.findByRole('heading', { name: /^To do/ })
   expect(window.location.search).toContain('view=home')
   const saved = JSON.parse(localStorage.getItem(budgetStorageKey)!)
   const [ada, ben] = saved.household.adults
   expect(saved.workflow.setupComplete).toBe(true)
+  expect(saved.budget.accounts).toMatchObject([{ provider: 'Starling', accountTypeId: 'current-account', ownerPersonIds: [ada.id] }])
   expect(saved.budget.incomeSources).toMatchObject([
-    { personId: ada.id, name: 'Pay', type: 'employment', baseAmountPence: 245050, baseEffectiveFrom: '2026-11' },
+    { personId: ada.id, name: 'Pay', type: 'employment', baseAmountPence: 245050, baseEffectiveFrom: '2026-11', landsInAccountId: saved.budget.accounts[0].id },
     { personId: ben.id, name: 'Pay', type: 'employment', baseAmountPence: 180000, baseEffectiveFrom: '2026-11' },
   ])
+  expect(saved.budget.incomeSources[1].landsInAccountId).toBeUndefined()
 })
 
 it('resumes setup at the first unfinished step and saves no income when pay is skipped', async () => {

@@ -146,3 +146,26 @@ it('shows the save status: Saved on this device, or the account with Sign out', 
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(onSignOut).toHaveBeenCalled()
 })
+
+it('sets where a salary lands, from the person’s own and joint accounts, and shows it on the row', () => {
+  desktop()
+  const document = household()
+  document.budget.accounts.push({ id: 'ada-own', name: 'Current account', provider: 'Starling', accountTypeId: 'current-account', ownerPersonIds: ['ada'] }, { id: 'ben-own', name: 'Current account', provider: 'Nationwide', accountTypeId: 'current-account', ownerPersonIds: ['ben'] })
+  document.budget.incomeSources = [{ id: 'ada-pay', personId: 'ada', name: 'Salary', type: 'employment', baseAmountPence: 400000, changes: {} }]
+  let saved: BudgetDocument | undefined
+  render(<Harness initial={document} start="income" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Ada · Salary' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+  const select = within(screen.getByRole('dialog')).getByLabelText('Pay lands in') as HTMLSelectElement
+  // Ada's own account first, then joint ones; Ben's isn't offered.
+  expect([...select.options].map(option => option.textContent)).toEqual(['Not set', 'Starling Ada', 'Joint'])
+  fireEvent.change(select, { target: { value: 'ada-own' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save income' }))
+  expect(saved!.budget.incomeSources[0]!.landsInAccountId).toBe('ada-own')
+  expect(screen.getByText(/lands in Starling Ada/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Ada · Salary' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+  fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Pay lands in'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save income' }))
+  expect(saved!.budget.incomeSources[0]!.landsInAccountId).toBeUndefined()
+})
