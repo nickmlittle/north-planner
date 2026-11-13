@@ -29,9 +29,13 @@ type Props = { ref?: Ref<PlanPageHandle>; document: BudgetDocument; setDocument:
 export function PlanPage({ref,document,setDocument,month,budget,planView,mobilePresentation,scoped:scopedPlan,planDestination,planItemId,onClearPlanDestination,onReturnToTransfers,hasTransfersOrigin,onViewAffectedTransfers,onEditIncome:openIncome}:Props) {
  const {resolved,items,adults,incomes,editScopeLabel,labels,shortLabels,total,transferAccounts,available,basisDetail,ownerOrder,meterPeople}=budget
  const {query,updateSearch,captureBrowseScroll,ownerFilter,setOwnerFilter,categoryFilter,setCategoryFilter,openGroups,setOpenGroups,groupsOpenByDefault,grouping,chooseGrouping,destinationItems,reviewPerson}=planView
- const [editor,setEditor]=useState(false),[editingItem,setEditingItem]=useState<BudgetItem>(),[editorTemplate,setEditorTemplate]=useState<BudgetItem>(),[editorSession,setEditorSession]=useState(0)
+ // ⌘K's "Add item" from another screen arrives with the editor open (history state northAddItem).
+ const [editor,setEditor]=useState(()=>!!window.history.state?.northAddItem),[editingItem,setEditingItem]=useState<BudgetItem>(),[editorTemplate,setEditorTemplate]=useState<BudgetItem>(),[editorSession,setEditorSession]=useState(0)
  const {show:showToast,toast}=useToast()
  const planFocusItem=useRef<string|null>(planItemId??null)
+ useEffect(()=>{if(window.history.state?.northAddItem){const rest={...window.history.state};delete rest.northAddItem;window.history.replaceState(rest,'')}},[])
+ // A later jump to an item (⌘K while on Plan) focuses it too.
+ useLayoutEffect(()=>{if(planItemId)planFocusItem.current=planItemId},[planItemId])
  const planDestinationHeading=useRef<HTMLDivElement>(null),previousPlanDestination=useRef<string|null>(null)
  // Once the meter card scrolls away on a phone, a slim copy docks above the bottom nav.
  const meterRef=useRef<HTMLDivElement>(null),[meterOffscreen,setMeterOffscreen]=useState(false)

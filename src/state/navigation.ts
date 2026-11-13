@@ -114,7 +114,8 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   if (state.view === 'month' && state.close && !state.pot) url.searchParams.set('close', '1')
   if (state.view === 'plan' && state.planDestination) url.searchParams.set('planDestination', `${state.planDestination.kind}:${state.planDestination.id}`)
   const target = `${url.pathname}${url.search}${url.hash}`
-  if (target === `${window.location.pathname}${window.location.search}${window.location.hash}`) return
+  // The same place with history state still moves (⌘K to an item while already on Plan); without, it's a no-op.
+  if (target === `${window.location.pathname}${window.location.search}${window.location.hash}` && historyState === null) return
   window.history[replace ? 'replaceState' : 'pushState'](historyState, '', target)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }

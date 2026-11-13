@@ -10,6 +10,8 @@ import { supabase } from './state/supabase'
 import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
+import { CommandPalette } from './components/CommandPalette'
+import { localDate } from './domain/cardTracker'
 import { formatMonth } from './formatting/month'
 import { documentTitle } from './state/documentTitle'
 import { useNavCounts } from './state/navCounts'
@@ -22,8 +24,17 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({
 /** Dev builds only (?view=ui-gallery): the shared UI parts. The production build drops it. */
 const UiGallery = import.meta.env.DEV ? lazy(() => import('./pages/dev/UiGallery')) : null
 
-function subscribeLocation(callback: () => void) { window.addEventListener('popstate', callback); return () => window.removeEventListener('popstate', callback) }
-function getLocationSearch() { return window.location.search }
+// Every history move counts, even to the same URL with new history state (⌘K to an item while on Plan).
+/** The tab's title, set from an effect. */
+const setPageTitle = (title: string) => { window.document.title = title }
+
+let locationVersion = 0
+function subscribeLocation(callback: () => void) {
+  const moved = () => { locationVersion++; callback() }
+  window.addEventListener('popstate', moved)
+  return () => window.removeEventListener('popstate', moved)
+}
+function getLocationKey() { return `${locationVersion}\n${window.location.search}` }
 
 function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   document: BudgetDocument
@@ -33,14 +44,14 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   email?: string
   onSignOut?: () => void
 }) {
-  const search = useSyncExternalStore(subscribeLocation, getLocationSearch, () => '')
+  const search = useSyncExternalStore(subscribeLocation, getLocationKey, () => '0\n').split('\n')[1] ?? ''
   // An old link (Transfers, This month, Household…) is rewritten in place to the screen it now names.
   useEffect(() => rewriteLegacyLink(), [search])
   const navigation = parseNavigation(search)
   const setupComplete = householdReady(document.household) && document.workflow.setupComplete
   // Until the household is set up, Settings (its Household section) is the only screen.
   const view: PlannerView = setupComplete ? navigation.view : 'settings'
-  useEffect(() => { window.document.title = documentTitle(navigation, document, document.workflow.setupComplete) })
+  useEffect(() => setPageTitle(documentTitle(navigation, document, document.workflow.setupComplete)))
   const counts = useNavCounts(document)
   const selectView = (nextView: PlannerView) => { if (nextView !== view && (setupComplete || nextView === 'settings')) navigateTo({ view: nextView }) }
   /** "See items" in the payday steps: Plan filtered to that account, with Back returning to the same step. */
@@ -80,6 +91,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
       ? <Suspense fallback={loading()}><Home document={document} month={navigation.month} onOpen={openFromHome}/></Suspense>
       : <Suspense fallback={loading('Loading budget…')}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} view={view === 'month' ? 'month' : 'plan'} month={navigation.month} onMonthChange={month => navigateTo({ month, pot: null, close: false })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={view === 'month' ? stepsReturnFromState() : null} onReturnToTransfers={returnToMonth} onOpenPlan={() => navigateTo({ view: 'plan' })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={view === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined}
           potId={navigation.pot} closing={navigation.close} onOpenPot={pot => navigateTo({ view: 'month', pot, close: false })} onOpenClose={close => navigateTo({ view: 'month', close, pot: null })} onOpenSort={() => navigateTo({ view: 'spending', section: 'sort' })} onOpenSettings={section => navigateTo({ view: 'settings', section, month: navigation.month })}/></Suspense>}
+    {setupComplete && <CommandPalette document={document} month={navigation.month} today={localDate()}/>}
   </AppLayout>
 }
 

@@ -205,9 +205,12 @@ North can be driven from the keyboard, as an enhancement: every action stays cli
 | I | Bring in transactions (Spending) |
 | [ and ] | Previous and next month (Month, Plan) |
 | ⌘\ (Ctrl+\ elsewhere) | Show or hide the sidebar |
+| ⌘K (Ctrl+K elsewhere) | Search North: jump to any screen, item, pot, statement, month or transaction, or run an action |
 | ? | Keyboard shortcuts: everything this page offers |
 
 Hints show where there is a hovering pointer and room: “G M” beside sidebar items without a count, N on Add item, I on Bring in, / in Plan's search. Phones show none.
+
+**Search North (⌘K).** Also the sidebar's **Search** (⌘K hint) and, on phones, a search icon in Home's header. A panel near the top on desktop (full height on phones) with “Search North…” focused: results in groups, at most six each and thirty in all: **Go to** (every screen and Settings section), **Actions** (Add item, Bring in transactions, Add a transaction, Previous and Next month, Keyboard shortcuts, with their keys), **Items** (“Groceries · £325.47 · Home · Groceries · Monzo Joint”, opening Plan with the row focused and its group open), **Pots** (the pot page), **Statements** (“October statement · £646.88 · Ready to settle”), **Months** (six back, two ahead) and **Transactions** (from three letters; Transactions searching that merchant). Word prefixes rank above substrings, then initials; an amount (“325”) matches items and transactions; groups order by their best match. An empty query shows **Recent** (the last five run), then Go to and Actions. ↑/↓ move, ↵ runs, Esc closes and focus returns. An action does what its button does: on its own page in place, else on the way there (Add item from Home opens Plan with the editor up). The input is a combobox over a listbox, with the active option announced.
 
 **Lists.** Every list moves and acts the same way (`src/state/useListNavigation.tsx`). A list is one Tab stop, landing on the last row you were on (else the first); the controls inside a row leave the Tab order because the keys reach them. J or ↓ and K or ↑ move, Home and End jump, ↵ opens, Esc leaves to the list, and the focused row shows the selected surface with an accent bar. Each key clicks the row's own visible control, so nothing is keyboard-only. A visually hidden sentence names the keys once on entering the list, ? lists them while the list is on screen, and desktop headings show them as keys (“J K move · ↵ open”).
 

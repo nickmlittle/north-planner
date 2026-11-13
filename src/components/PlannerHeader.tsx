@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
-import { CalendarDays, ChevronRight, CreditCard, House, List, PanelLeftClose, PanelLeftOpen, Settings2, UserRound } from 'lucide-react'
+import { CalendarDays, ChevronRight, CreditCard, House, List, PanelLeftClose, PanelLeftOpen, Search, Settings2, UserRound } from 'lucide-react'
+import { openCommandPalette } from '../state/commands'
 import { AccountStatusPanel } from './AccountStatusPanel'
 import { Sheet } from './ui/Sheet'
 import { saveStatusLabel, statusMark } from './saveStatus'
@@ -120,6 +121,8 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
         {!ownHeading && <h1>{pageTitle}</h1>}
         {/* Month, Plan and Settings put their title (or month), ⋯ and note here. */}
         <div id="mobile-header-page-slot" className="mobile-header-slot" />
+        {/* Home's search icon opens ⌘K. */}
+        {setupComplete && selected === 'home' && <button type="button" className="mobile-utility-trigger mobile-search-trigger" aria-label="Search North" onClick={openCommandPalette}><Search size={20} aria-hidden="true"/></button>}
         {/* Always the right-most button; a page's own ⋯ sits to its left. */}
         <button type="button" className="mobile-utility-trigger" aria-label="Account and settings" aria-haspopup="dialog" aria-expanded={utilityOpen} onClick={() => setUtilityOpen(true)}>{statusIcon}<UserRound size={20} aria-hidden="true" /></button>
       </div>
@@ -133,7 +136,14 @@ export function PlannerHeader({ currentView, warning = '', saveStatus = 'Saved',
         {/* The same four destinations as the phone's tab bar; Settings sits at the foot. Until setup is done, Settings is the only one. */}
         <nav id="desktop-navigation" className="sidebar-icon-nav" aria-label="Main navigation">
           {setupComplete && destinations.map(destination => sidebarLink(destination.id, destination.label, accessibleName(destination), <destination.Icon size={22} strokeWidth={2} />, destination.hint, 'count' in destination ? destination.count : undefined))}
-          <div className="sidebar-foot-nav">{sidebarLink('settings', 'Settings', 'Settings', <Settings2 size={22} strokeWidth={2} />, 'G ,')}</div>
+          <div className="sidebar-foot-nav">
+            {setupComplete && <button type="button" className="sidebar-link" aria-label="Search North" title="Search North" onClick={openCommandPalette}>
+              <span className="sidebar-icon" aria-hidden="true"><Search size={22} strokeWidth={2}/></span>
+              <span className="sidebar-label" aria-hidden={!desktopExpanded}><AnimatedSidebarText text="Search" /></span>
+              <span className="sidebar-shortcut shortcut-hint" aria-hidden="true">{isMac() ? '⌘K' : 'Ctrl K'}</span>
+            </button>}
+            {sidebarLink('settings', 'Settings', 'Settings', <Settings2 size={22} strokeWidth={2} />, 'G ,')}
+          </div>
         </nav>
         <div className="sidebar-rail-utility">
           {warning && <div className="sidebar-warning-control"><button type="button" className="sidebar-warning-icon" aria-label="Storage warning" aria-expanded={warningOpen} title="Storage warning" onClick={() => setWarningOpen(value => !value)}>!</button>{warningOpen && <div className="sidebar-warning-panel" role="status">{warning}</div>}</div>}

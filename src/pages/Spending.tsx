@@ -75,9 +75,10 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const compact = useMobilePresentation()
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
-  // Home's "Bring in Amex transactions" arrives with the sheet up (history state northBringIn).
-  const [sheet, setSheet] = useState<'bring-in' | 'manual' | null>(() => window.history.state?.northBringIn ? 'bring-in' : null)
-  useEffect(() => { if (window.history.state?.northBringIn) { const rest = { ...window.history.state }; delete rest.northBringIn; window.history.replaceState(rest, '') } }, [])
+  // Home's "Bring in Amex transactions" (and ⌘K's) arrives with the sheet up (history state northBringIn); ⌘K's
+  // "Add a transaction" with the manual sheet (northAddTransaction).
+  const [sheet, setSheet] = useState<'bring-in' | 'manual' | null>(() => window.history.state?.northBringIn ? 'bring-in' : window.history.state?.northAddTransaction ? 'manual' : null)
+  useEffect(() => { if (window.history.state?.northBringIn || window.history.state?.northAddTransaction) { const rest = { ...window.history.state }; delete rest.northBringIn; delete rest.northAddTransaction; window.history.replaceState(rest, '') } }, [])
   const [sorting, setSorting] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)

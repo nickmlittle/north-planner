@@ -1,0 +1,31 @@
+/* ⌘K (audit 3 PR 19): anchored near the top on desktop, full height on phones. Tokens only (styles.tokens.test.ts). */
+.sheet-overlay:has(.command-palette){align-items:flex-start;padding-top:15vh}
+.sheet.command-palette{--sheet-width:640px;max-height:min(70vh,560px);margin-top:0}
+.command-palette .sheet-header{display:none}
+.command-palette .sheet-body{display:flex;flex-direction:column;padding:0}
+.palette-field{display:flex;align-items:center;gap:var(--space-2);flex:none;padding:0 var(--space-4);border-bottom:1px solid var(--border)}
+.palette-field svg{flex:none;width:18px;height:18px;color:var(--text-muted)}
+.palette-field{padding-block:var(--space-2)}
+.palette-field input{flex:1;min-width:0;min-height:var(--control-h-touch);margin:0;padding:0 var(--space-2);border:0;background:transparent;color:var(--text);font:inherit;font-size:var(--text-lg)}
+.palette-results{flex:1 1 auto;min-height:0;margin:0;padding:var(--space-2) 0;overflow:auto;list-style:none}
+.palette-section ul{margin:0;padding:0;list-style:none}
+.palette-group{margin:var(--space-2) 0 var(--space-1);padding:0 var(--space-4);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.palette-option{display:flex;align-items:center;gap:var(--space-3);min-height:var(--row-h);padding:var(--space-1) var(--space-4);cursor:pointer}
+.palette-option{position:relative}
+.palette-option[aria-selected=true]{background:var(--surface-selected)}
+.palette-option[aria-selected=true]::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--accent)}
+.palette-option-text{display:grid;flex:1;min-width:0}
+.palette-option-title{overflow:hidden;color:var(--text);font-weight:var(--weight-medium);text-overflow:ellipsis;white-space:nowrap}
+.palette-option-meta{overflow:hidden;color:var(--text-muted);font-size:var(--text-sm);text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.palette-option-keys{display:inline-flex;gap:2px;flex:none}
+.palette-empty{margin:0;padding:var(--space-5) var(--space-4);color:var(--text-muted)}
+.palette-foot{display:flex;align-items:center;gap:var(--space-1);flex:none;margin:0;padding:var(--space-2) var(--space-4);border-top:1px solid var(--border);color:var(--text-muted);font-size:var(--text-sm)}
+@media(max-width:767px){
+  /* The phone header's search icon on Home, left of the account button. */
+  .mobile-header-bar .mobile-search-trigger{grid-area:actions;margin-right:0}
+  .mobile-app-header.is-collapsed .mobile-search-trigger{grid-area:auto;grid-column:2;grid-row:1}
+  .sheet-overlay:has(.command-palette){padding-top:0}
+  .sheet-overlay>.sheet.command-palette{height:100dvh;max-height:100dvh;border-radius:0}
+  .palette-foot{display:none}
+  .palette-option-keys{display:none}
+}
