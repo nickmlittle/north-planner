@@ -9,6 +9,24 @@ export interface BudgetAccount { id: string; name: string; ownerPersonIds: strin
 export interface BudgetPot { id: string; name: string; accountId: string; kind?: 'spending' | 'savings' | 'credit-card'; provider?: string }
 export type BudgetDestination = { kind: 'account'; accountId: string } | { kind: 'pot'; potId: string }
 export interface FixedContribution { personId: string; amountPence: number }
+/** The day a recurring bill comes out: 1–28, or the month's last day. There are no 29th–31st days. */
+export type BillDay = number | 'last'
+export type BillPaidBy = 'direct-debit' | 'card'
+/** Weeks before a yearly bill renews that Home reminds you; 0 is off. */
+export type RemindWeeks = 0 | 2 | 4 | 6 | 8
+export const REMIND_WEEKS: readonly RemindWeeks[] = [2, 4, 6, 8, 0]
+export const DEFAULT_REMIND_WEEKS: RemindWeeks = 4
+/** A plan item that comes out on a set date (docs/recurring-bills-rules.md). */
+export interface RecurringBill {
+  paidBy: BillPaidBy
+  /** Card only: a tracked card's id (`card.cards[].id`). Absent, or a card no longer in North, means "Another card". */
+  cardId?: string
+  day: BillDay
+  /** Yearly items only: 1–12. With `day`, this is the renewal date. */
+  month?: number
+  /** Yearly items only: weeks before the renewal to remind. Absent means the default, 4. */
+  remindWeeks?: RemindWeeks
+}
 export interface BudgetItem {
   id: string
   name: string
@@ -21,6 +39,8 @@ export interface BudgetItem {
   singleFunderId?: string
   customShares?: Record<string, number>
   contributions?: FixedContribution[]
+  /** A recurring bill: how it's paid and the day it comes out. Absent for every other item. */
+  bill?: RecurringBill
 }
 export interface BudgetSnapshot { items: BudgetItem[]; imported?: boolean }
 export interface IncomePolicyValue { mode: 'all-income' | 'live-on'; liveOnPence: number; surplusDestination?: BudgetDestination }
@@ -165,9 +185,20 @@ export function validMonthlyBudget(value: unknown): value is MonthlyBudget {
     return ids(items) && items.every((raw: unknown) => {
       if (!raw || typeof raw !== 'object') return false
       const item = raw as BudgetItem
-      return typeof item.name === 'string' && !!item.name.trim() && categoryIds.has(item.categoryId) && Number.isSafeInteger(item.entryAmountPence) && item.entryAmountPence >= 0 && ['monthly', 'annually'].includes(item.frequency) && Number.isSafeInteger(item.amountPence) && item.amountPence === monthlyContributionPence(item.entryAmountPence, item.frequency) && validDestination(item.destination, b) && ['proportional', 'equal', 'custom', 'single', 'fixed'].includes(item.funding) && (item.singleFunderId === undefined || typeof item.singleFunderId === 'string') && (item.customShares === undefined || Object.values(item.customShares).every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) && (item.contributions === undefined || Array.isArray(item.contributions) && item.contributions.every((row: { personId: string; amountPence: number }) => typeof row.personId === 'string' && Number.isSafeInteger(row.amountPence) && row.amountPence >= 0) && new Set(item.contributions.map((row: { personId: string }) => row.personId)).size === item.contributions.length) && (item.funding !== 'fixed' || Array.isArray(item.contributions) && item.contributions.reduce((sum: number, row: { amountPence: number }) => sum + row.amountPence, 0) === item.amountPence)
+      return typeof item.name === 'string' && !!item.name.trim() && categoryIds.has(item.categoryId) && Number.isSafeInteger(item.entryAmountPence) && item.entryAmountPence >= 0 && ['monthly', 'annually'].includes(item.frequency) && Number.isSafeInteger(item.amountPence) && item.amountPence === monthlyContributionPence(item.entryAmountPence, item.frequency) && validDestination(item.destination, b) && ['proportional', 'equal', 'custom', 'single', 'fixed'].includes(item.funding) && (item.singleFunderId === undefined || typeof item.singleFunderId === 'string') && (item.customShares === undefined || Object.values(item.customShares).every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0)) && (item.contributions === undefined || Array.isArray(item.contributions) && item.contributions.every((row: { personId: string; amountPence: number }) => typeof row.personId === 'string' && Number.isSafeInteger(row.amountPence) && row.amountPence >= 0) && new Set(item.contributions.map((row: { personId: string }) => row.personId)).size === item.contributions.length) && (item.funding !== 'fixed' || Array.isArray(item.contributions) && item.contributions.reduce((sum: number, row: { amountPence: number }) => sum + row.amountPence, 0) === item.amountPence) && (item.bill === undefined || validRecurringBill(item.bill, item.frequency))
     })
   }
+}
+
+/** A recurring bill's shape, for an item of this frequency (recurring-bills-rules › The item). */
+export function validRecurringBill(value: unknown, frequency: BudgetFrequency): value is RecurringBill {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const bill = value as RecurringBill
+  if (bill.paidBy !== 'direct-debit' && bill.paidBy !== 'card') return false
+  if (bill.cardId !== undefined && (bill.paidBy !== 'card' || typeof bill.cardId !== 'string' || !bill.cardId)) return false
+  if (bill.day !== 'last' && !(Number.isSafeInteger(bill.day) && bill.day >= 1 && bill.day <= 28)) return false
+  if (frequency === 'annually') return Number.isSafeInteger(bill.month) && bill.month! >= 1 && bill.month! <= 12 && (bill.remindWeeks === undefined || REMIND_WEEKS.includes(bill.remindWeeks))
+  return bill.month === undefined && bill.remindWeeks === undefined
 }
 
 export function validDestination(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>): value is BudgetDestination {

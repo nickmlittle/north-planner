@@ -7,6 +7,7 @@
 - [Card tracker build plan](docs/card-tracker-build-plan.md): the agreed design and PR plan for the Spending tab (Amex card tracking, sorting, month close and settling up).
 - [Card tracker rules](docs/card-tracker-rules.md): the contract for what has shipped of the Spending tab.
 - [Recurring bills build plan](docs/recurring-bills-build-plan.md): the agreed design and PR plan for recurring bills (paid by direct debit or card, assumed on their day, Due, renewal reminders, Plan › Dates).
+- [Recurring bills rules](docs/recurring-bills-rules.md): the contract for what has shipped of recurring bills.
 
 North is a household budget planner. Set up a household, add recurring income sources, then plan budget items by category, funding rule, and destination account or pot. A new budget starts with no accounts, categories, pots, items, or income sources.
 

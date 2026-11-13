@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetTransfers } from '../domain/budgetTransfers'
-import { commitItemBatch, itemDraft, moneyPence, newItemDraft, readItemDraft, type BatchError, type BudgetItemBatch, type BudgetItemDraft, type DestinationSelection } from '../domain/budgetItemDrafts'
+import { commitItemBatch, itemDraft, moneyPence, newBillDraft, newItemDraft, readItemDraft, type BatchError, type BillDraft, type BudgetItemBatch, type BudgetItemDraft, type DestinationSelection } from '../domain/budgetItemDrafts'
 import { budgetEditScope, monthlyContributionPence, resolveBudget, updateBudgetAtMonth, validDestination, type BudgetDestination, type BudgetItem, type FundingRule } from '../domain/monthlyBudget'
 import { formatEditScope, formatMonth } from '../formatting/month'
 import { formatGBP } from '../formatting/money'
@@ -12,6 +12,7 @@ import { PHONE_QUERY } from '../breakpoints'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Kbd, Sheet } from '../components/ui'
 import { destinationLabel, shortAccountLabels } from './budgetLabels'
+import { RecurringBillFields } from './RecurringBillFields'
 import './BudgetItemEditor.css'
 
 type Props = {
@@ -76,9 +77,11 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
   const adults = document.household.adults
   const formId = useId()
   const source = item ?? template
+  // A card no longer in North counts as Another card (recurring-bills-rules › Which card is tracked).
+  const knownCard = (draft: BudgetItemDraft): BudgetItemDraft => draft.bill.cardId && !document.card?.cards.some(card => card.id === draft.bill.cardId) ? { ...draft, bill: { ...draft.bill, cardId: '' } } : draft
   const firstDraft = () => {
-    if (item) return itemDraft(item)
-    if (template) return { ...itemDraft(template), id: crypto.randomUUID(), name: `${template.name} (copy)` }
+    if (item) return knownCard(itemDraft(item))
+    if (template) return knownCard({ ...itemDraft(template), id: crypto.randomUUID(), name: `${template.name} (copy)` })
     const funding = readLast(LAST.funding)
     return { ...newItemDraft(crypto.randomUUID(), adults[0]?.id ?? ''), ...isFunding(funding) ? { funding } : {} }
   }
@@ -154,7 +157,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
     rememberLast(LAST.funding, row.funding)
     if (!another) return
     // Start the next one: keep where it goes, the category and the funding; clear the name and amount.
-    const next = { ...row, id: crypto.randomUUID(), name: '', amount: '', touched: false }
+    const next = { ...row, id: crypto.randomUUID(), name: '', amount: '', bill: newBillDraft(), touched: false }
     if (categoryId === '__new__') { setCategoryId(newCategoryId); setNewCategoryName(''); setNewCategoryId(crypto.randomUUID()) }
     setDestination(current => ({ destination: current.destination }))
     setOtherOpen(false)
@@ -181,15 +184,24 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
   const fieldError = (field: string) => error?.rowId === row.id && error.field === field
   const errorText = (field: string) => fieldError(field) ? <p id={`${row.id}-${field}-error`} className="item-editor-error" role="alert">{error!.message}</p> : null
   const describedBy = (field: string) => fieldError(field) ? `${row.id}-${field}-error` : undefined
-  const read = readItemDraft({ ...row, name: row.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id))
+  // A recurring bill moves no money, so the previews read the item without it: an unfinished date doesn't hide them.
+  const moneyRow = { ...row, bill: { ...row.bill, on: false } }
+  const read = readItemDraft({ ...moneyRow, name: row.name || 'Preview' }, categoryId, destination.destination ?? { kind: 'account', accountId: 'preview' }, adults.map(person => person.id))
   const preview = 'item' in read ? budgetTransfers(previewBudget, adults.map(person => person.id), month, [read.item]) : undefined
   const entered = row.touched || !!row.name.trim() || !!row.amount.trim()
   const financialChange = !item ? entered : moneyPence(row.amount) !== item.entryAmountPence || row.frequency !== item.frequency || row.funding !== item.funding || row.singleFunderId !== (item.singleFunderId ?? '') || JSON.stringify(row.contributions) !== JSON.stringify(itemDraft(item).contributions) || JSON.stringify(row.customShares) !== JSON.stringify(itemDraft(item).customShares) || !sameDestination(destination.destination, item.destination)
-  const draftResult = financialChange ? commitItemBatch(document, month, batchFor({ ...row, touched: true })) : undefined
+  const draftResult = financialChange ? commitItemBatch(document, month, batchFor({ ...moneyRow, touched: true })) : undefined
   const draftImpact = draftResult && 'document' in draftResult ? budgetImpact(document, draftResult.document, month, draftResult.items.map(saved => saved.id)) : undefined
   const monthly = monthlyContributionPence(moneyPence(row.amount) ?? 0, row.frequency)
   const fixedTotal = adults.reduce((sum, person) => sum + (moneyPence(row.contributions[person.id] ?? '') ?? 0), 0)
   const noAccounts = !document.budget.accounts.length
+  const destinationName = (() => {
+    const value = destination.destination
+    if (!value) return undefined
+    if (value.kind === 'pot') return previewBudget.pots.find(pot => pot.id === value.potId)?.name
+    return accountLabels.get(value.accountId)
+  })()
+  const updateBill = (patch: Partial<BillDraft>) => update({ bill: { ...row.bill, ...patch } })
 
   const footer = <>
     <ImpactPreview compact scopeText={`Changes apply: ${formatEditScope(budgetEditScope(document.budget, month))}.`} result={draftImpact} document={draftResult && 'document' in draftResult ? draftResult.document : document} onRetry={() => setRow(current => ({ ...current }))}/>
@@ -236,6 +248,7 @@ export function BudgetItemEditor({ document, month, item, onSave, onClose, onRem
         {row.funding === 'custom' && <div className="item-editor-allocation"><strong>Relative weights</strong>{adults.map(person => <label key={person.id}>{person.name}<input inputMode="decimal" aria-label={`${person.name} relative weight`} data-error-key={`${row.id}:customShares`} value={row.customShares[person.id] ?? ''} aria-invalid={fieldError('customShares')} aria-describedby={describedBy('customShares')} onChange={event => update({ customShares: { ...row.customShares, [person.id]: event.target.value } })}/></label>)}</div>}
         {errorText('singleFunderId')}{errorText('contributions')}{errorText('customShares')}
         <p className="item-editor-split">{preview?.unresolvedItemIds.length ? 'Add employment income to work out funding.' : adults.map((person, index) => <span key={person.id}>{index > 0 && ' · '}{person.name} <span>{preview ? pounds(preview.people.find(entry => entry.personId === person.id)?.plannedPence ?? 0) : '—'}</span></span>)}</p>
+        <RecurringBillFields document={document} rowId={row.id} bill={row.bill} frequency={row.frequency} entryAmountPence={moneyPence(row.amount)} destination={destination.destination} destinationName={destinationName} error={error} onChange={updateBill}/>
       </form>
     </Sheet>
     {discarding && <ConfirmDialog title={item ? 'Discard changes to this item?' : 'Discard this item?'} confirmLabel="Discard" cancelLabel="Keep editing" danger onCancel={() => setDiscarding(false)} onConfirm={() => { const next = discarding; setDiscarding(false); if (next === 'duplicate') onDuplicate?.(); else onClose() }}><p>{discarding === 'duplicate' ? 'Your changes haven’t been saved. The copy starts from the saved item.' : 'Your changes haven’t been saved.'}</p></ConfirmDialog>}

@@ -5,6 +5,7 @@ import { EmptyState, ListRow, Sheet } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { addDays, cardDraftErrors, cardFromDraft, cardRemovable, cardTracker, closeDateFor, draftFromCard, localDate, removeCard, saveCard, shiftMonth, type CardAccount, type CardDraft, type CardDraftErrors } from '../domain/cardTracker'
 import { potPhrase } from '../domain/setAside'
+import { billsOnCard } from '../domain/recurringBills'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationGroups, ordinal, shortDate } from './cardLabels'
@@ -129,7 +130,14 @@ export function CardSettings({ document, setDocument, today = localDate(), notif
       <CardForm document={document} card={editing === 'new' ? undefined : editing} today={today} formId={formId} title={title} onSaved={card => { setDocument(current => saveCard(current, card)); setEditing(null); notify(`${card.name} saved.`) }}/>
     </Sheet>}
     {removing && <ConfirmDialog title={`Remove ${removing.name}?`} confirmLabel="Remove card" danger onCancel={() => setRemoving(null)} onConfirm={() => { setDocument(current => removeCard(current, removing.id)); setRemoving(null); notify(`${removing.name} removed.`) }}>
-      <p>It has no transactions or statements yet, so nothing else changes.</p>
+      <RemoveCardNote names={billsOnCard(document, removing.id)} card={removing.name}/>
     </ConfirmDialog>}
   </div>
+}
+
+/** What removing a card changes: nothing, or the recurring bills on it, which North then assumes are paid on their day. */
+function RemoveCardNote({ names, card }: { names: string[]; card: string }) {
+  if (!names.length) return <p>It has no transactions or statements yet, so nothing else changes.</p>
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+  return <p>{names.length === 1 ? '1 recurring bill is' : `${names.length} recurring bills are`} paid on {card}: {list}. Once it’s removed, North assumes {names.length === 1 ? 'it’s' : 'they’re'} paid on {names.length === 1 ? 'its' : 'their'} day.</p>
 }

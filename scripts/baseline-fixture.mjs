@@ -44,6 +44,30 @@ const items = names.map((name, i) => {
     ...(funding === 'fixed' ? { contributions: [{ personId: 'ada', amountPence: Math.floor(amountPence / 2) }, { personId: 'ben', amountPence: amountPence - Math.floor(amountPence / 2) }] } : {}),
   }
 })
+// Recurring bills (docs/recurring-bills-rules.md), in Bills. Three Bills items are renamed to match the design canvas
+// (Gas becomes the Streamflix subscription on the Amex, as sorted below), and the yearly ones keep their monthly amount,
+// so the plan's totals don't change. Amounts stay the fixture's made-up ones.
+const bills = {
+  'Council tax': { paidBy: 'direct-debit', day: 1 },
+  Streamflix: { paidBy: 'card', cardId: 'amex', day: 2 },
+  Water: { paidBy: 'direct-debit', day: 5 },
+  'Mobile plans': { paidBy: 'card', day: 9 },
+  Electricity: { paidBy: 'direct-debit', day: 18 },
+  Broadband: { paidBy: 'direct-debit', day: 22 },
+  'Breakdown cover': { paidBy: 'card', cardId: 'amex', day: 6, month: 12, remindWeeks: 4 },
+  'Home insurance': { paidBy: 'direct-debit', day: 12, month: 1, remindWeeks: 4 },
+  'Car insurance': { paidBy: 'direct-debit', day: 3, month: 3, remindWeeks: 6 },
+  'TV licence': { paidBy: 'direct-debit', day: 1, month: 4, remindWeeks: 2 },
+}
+const renamed = { Gas: 'Streamflix', Fuel: 'Breakdown cover', 'Rail tickets': 'TV licence' }
+for (const item of items) {
+  item.name = renamed[item.name] ?? item.name
+  const bill = bills[item.name]
+  if (!bill) continue
+  if (bill.month) Object.assign(item, { frequency: 'annually', entryAmountPence: item.amountPence * 12 })
+  item.bill = bill
+}
+
 // Card tracker (Spending): one Amex with Ada's and Ben's cards, statements 25th–24th, due 25 days later.
 // October is all sorted; November has a few left to sort. Merchants, endings and references are fictitious.
 const G = { kind: 'pot', potId: 'groceries' }, B = { kind: 'pot', potId: 'bills' }, A = { kind: 'pot', potId: 'ada-spend' }

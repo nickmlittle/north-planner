@@ -1,7 +1,23 @@
 import type { BudgetDocument } from './budgetDocument'
 import { isAccountTypeId } from './accountTypes'
-import { monthlyContributionPence, resolveBudget, updateBudgetAtMonth, validDestination, type BudgetAccount, type BudgetCategory, type BudgetDestination, type BudgetFrequency, type BudgetItem, type BudgetPot, type FundingRule } from './monthlyBudget'
+import { DEFAULT_REMIND_WEEKS, REMIND_WEEKS, monthlyContributionPence, resolveBudget, updateBudgetAtMonth, validDestination, type BillPaidBy, type BudgetAccount, type BudgetCategory, type BudgetDestination, type BudgetFrequency, type BudgetItem, type BudgetPot, type FundingRule, type RecurringBill } from './monthlyBudget'
 
+/**
+ * The editor's recurring-bill fields, as typed. They're kept while the box is unticked or the frequency changes, so
+ * switching back restores them; only what applies is saved (a month and reminder for yearly items only).
+ */
+export type BillDraft = {
+  on: boolean
+  paidBy: BillPaidBy
+  /** A tracked card's id, or '' for Another card. */
+  cardId: string
+  /** '1'–'28', 'last', or '' until chosen. */
+  day: string
+  /** '1'–'12', or '' until chosen. Yearly only. */
+  month: string
+  /** '0', '2', '4', '6' or '8'. Yearly only. */
+  remindWeeks: string
+}
 export type DestinationSelection = { destination?: BudgetDestination; stagedAccount?: BudgetAccount; stagedPot?: BudgetPot }
 export type BudgetItemDraft = {
   id: string
@@ -12,14 +28,24 @@ export type BudgetItemDraft = {
   contributions: Record<string, string>
   customShares: Record<string, string>
   singleFunderId: string
+  bill: BillDraft
   touched: boolean
 }
-export type DraftField = 'name' | 'amount' | 'frequency' | 'funding' | 'contributions' | 'customShares' | 'singleFunderId'
+export type DraftField = 'name' | 'amount' | 'frequency' | 'funding' | 'contributions' | 'customShares' | 'singleFunderId' | 'billDay' | 'billMonth'
 export type BatchError = { rowId?: string; field: DraftField | 'category' | 'destination' | 'rows'; message: string }
 export type BudgetItemBatch = { rows: BudgetItemDraft[]; categoryId: string; newCategory?: BudgetCategory; destination: DestinationSelection; editingId?: string }
 
+export function newBillDraft(): BillDraft {
+  return { on: false, paidBy: 'direct-debit', cardId: '', day: '', month: '', remindWeeks: String(DEFAULT_REMIND_WEEKS) }
+}
+
+export function billDraft(bill: RecurringBill | undefined): BillDraft {
+  if (!bill) return newBillDraft()
+  return { on: true, paidBy: bill.paidBy, cardId: bill.cardId ?? '', day: String(bill.day), month: bill.month ? String(bill.month) : '', remindWeeks: String(bill.remindWeeks ?? DEFAULT_REMIND_WEEKS) }
+}
+
 export function newItemDraft(id: string, personId: string): BudgetItemDraft {
-  return { id, name: '', amount: '', frequency: 'monthly', funding: 'proportional', contributions: {}, customShares: {}, singleFunderId: personId, touched: false }
+  return { id, name: '', amount: '', frequency: 'monthly', funding: 'proportional', contributions: {}, customShares: {}, singleFunderId: personId, bill: newBillDraft(), touched: false }
 }
 
 export function itemDraft(item: BudgetItem): BudgetItemDraft {
@@ -27,8 +53,25 @@ export function itemDraft(item: BudgetItem): BudgetItemDraft {
     id: item.id, name: item.name, amount: (item.entryAmountPence / 100).toFixed(2), frequency: item.frequency,
     funding: item.funding, contributions: Object.fromEntries((item.contributions ?? []).map(row => [row.personId, (row.amountPence / 100).toFixed(2)])),
     customShares: Object.fromEntries(Object.entries(item.customShares ?? {}).map(([id, value]) => [id, String(value)])),
-    singleFunderId: item.singleFunderId ?? '', touched: true,
+    singleFunderId: item.singleFunderId ?? '', bill: billDraft(item.bill), touched: true,
   }
+}
+
+/** The bill a draft describes for an item of this frequency, or the field to fix. Unticked: no bill. */
+export function readBillDraft(draft: BillDraft, frequency: BudgetFrequency): { bill?: RecurringBill } | { field: 'billDay' | 'billMonth'; message: string } {
+  if (!draft.on) return {}
+  const day = draft.day === 'last' ? 'last' as const : /^\d{1,2}$/.test(draft.day) && Number(draft.day) >= 1 && Number(draft.day) <= 28 ? Number(draft.day) : undefined
+  if (day === undefined) return { field: 'billDay', message: frequency === 'annually' ? 'Choose the day it renews.' : 'Choose the day it comes out.' }
+  const bill: RecurringBill = { paidBy: draft.paidBy === 'card' ? 'card' : 'direct-debit', day }
+  if (bill.paidBy === 'card' && draft.cardId) bill.cardId = draft.cardId
+  if (frequency === 'annually') {
+    const month = /^\d{1,2}$/.test(draft.month) ? Number(draft.month) : 0
+    if (month < 1 || month > 12) return { field: 'billMonth', message: 'Choose the month it renews.' }
+    bill.month = month
+    const weeks = Number(draft.remindWeeks)
+    bill.remindWeeks = REMIND_WEEKS.find(value => value === weeks) ?? DEFAULT_REMIND_WEEKS
+  }
+  return { bill }
 }
 
 export function moneyPence(value: string): number | undefined {
@@ -65,6 +108,9 @@ export function readItemDraft(row: BudgetItemDraft, categoryId: string, destinat
     if (weights.some(([, weight]) => !Number.isFinite(weight) || weight < 0 || !Number.isFinite(item.amountPence * weight)) || !Number.isFinite(totalWeight) || item.amountPence > 0 && totalWeight <= 0) return fail('customShares', 'Enter non-negative relative weights, with at least one positive weight for a positive amount.')
     item.customShares = Object.fromEntries(weights)
   }
+  const bill = readBillDraft(row.bill, row.frequency)
+  if ('field' in bill) return fail(bill.field, bill.message)
+  if (bill.bill) item.bill = bill.bill
   return { item }
 }
 

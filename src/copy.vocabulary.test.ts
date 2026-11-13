@@ -35,6 +35,10 @@ const retired: Array<[RegExp, string]> = [
   [/needs care|need care/i, '"ahead of pace" / "over"'],
   [/who['’]s moving money/i, 'nothing: the person switch says whose steps'],
   [/all from salary/i, 'nothing: the basis shows only when it isn’t all salary'],
+  // Recurring bills (recurring-bills-rules, glossary).
+  [/scheduled payment|standing item|payment method/i, 'Recurring bill / Paid by'],
+  [/\boutstanding\b|pending (bill|payment)/i, 'Due: “£172.00 of it due”, “Due 22 Nov”'],
+  [/\bexpires\b/i, 'Renews: “Renews 3 Mar”'],
 ]
 
 describe('on-screen vocabulary', () => {
