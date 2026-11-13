@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit 3 · Spending (job 3: settle the Amex)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="target.css">
+<style>
+  .combo { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--border-field); border-radius: 6px; background: #fffdf8; width: 100%; font-weight: 600; font-size: 13px; white-space: nowrap }
+  .combo .chip { flex: none }
+  .combo .chip { margin-left: auto; height: 20px }
+  .combo svg { width: 14px; height: 14px; stroke: var(--muted); fill: none; stroke-width: 2 }
+  .cb { width: 18px; height: 18px; border: 1.5px solid var(--border-field); border-radius: 4px; display: inline-block; background: var(--surface) }
+  .hints { display: flex; gap: 14px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted) }
+  .settle-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start }
+  .settle-cols .card { overflow: hidden }
+  .pay-step { background: var(--surface-band) }
+  .disclosure { display: flex; gap: 10px; align-items: center; padding: 12px 16px; font-weight: 600 }
+  .disclosure span { color: var(--text-muted); font-weight: 500 }
+</style>
+</head>
+<body>
+<div class="doc">
+<header>
+  <h1>Spending: the card, from bring in to settle up</h1>
+  <p>Job 3. Spending keeps only the card's own work. Three tabs (To sort, Transactions, Statements) sit under one header, with one primary action: <strong>Bring in</strong>. Setting money aside becomes the last step of sorting rather than a banner on every sub-page. A statement's page leads with Settle up, built from the same step rows as payday. Rules, the right-hand rail and "This month" move out: rules to Settings, pots to Month. Fixes <a href="../review.md#f03">F03</a>, <a href="../review.md#f05">F05</a>, <a href="../review.md#f13">F13</a>, <a href="../review.md#f19">F19</a>, <a href="../review.md#f20">F20</a>. Briefs: <a href="../prs/13-spending-shell.md">PR 13</a>, <a href="../prs/14-statement-settle.md">PR 14</a>, <a href="../prs/15-transactions-table.md">PR 15</a>.</p>
+  <nav class="toc"><a href="index.html">All mockups</a><a href="01-navigation.html">Navigation</a><a href="02-home.html">Home</a><a href="03-plan.html">Plan</a><a href="04-month.html">Month</a><a href="06-settings.html">Settings</a><a href="07-design-system.html">Design system</a></nav>
+</header>
+
+<section class="pair">
+  <h2>Desktop · To sort, then set aside</h2>
+  <p class="note">Before: the Amex card, the Amex pot banner and five tabs stack above every Spending page. Two filled buttons compete (Bring in, Open statement), and each row has a select, a Place button and a split icon. The select cuts off "(suggested)". At 1100px the Pot column is clipped. After: one header, three tabs, and a table where <kbd>↵</kbd> places the focused row. Set aside appears under the list as soon as anything is sorted but not yet moved.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/spending-sort-desktop.png" alt="To sort today"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="spending-desktop">
+        <aside class="sidebar">
+          <div class="brand">north.</div>
+          <a class="nav-item"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item is-current"><svg><use href="#i-card"/></svg>Spending<span class="count">4</span></a>
+          <div class="spacer"></div>
+          <div class="foot"><a class="nav-item"><svg><use href="#i-command"/></svg>Search<span class="kbd">⌘K</span></a><a class="nav-item"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a><div class="who"><span class="avatar">N</span>Nick · Saved</div></div>
+        </aside>
+        <main class="page" style="gap:16px">
+          <div class="page-header">
+            <h1>Amex</h1>
+            <span class="context">November statement £649.23 · closes Tue 24 Nov · £312.85 in the Amex pot</span>
+            <div class="actions"><span class="btn icon"><svg><use href="#i-more"/></svg></span><span class="btn primary"><svg><use href="#i-bringin"/></svg>Bring in <span class="k">I</span></span></div>
+          </div>
+          <div class="tabs"><span class="on">To sort <em>4</em></span><span>Transactions</span><span>Statements <em style="background:var(--warning-bg);color:var(--warning)">1 to settle</em></span></div>
+          <div class="card" style="overflow:hidden">
+            <table class="table">
+              <thead><tr><th style="width:110px">Date</th><th>Merchant</th><th style="width:110px">Card</th><th class="num" style="width:110px">Amount</th><th style="width:360px">Pot or account</th><th style="width:70px">Always</th><th style="width:44px"></th></tr></thead>
+              <tbody>
+                <tr class="is-focused"><td>Sun 8 Nov</td><td class="t">TRAIN TICKETS ONLINE</td><td class="m">Ada ··41001</td><td class="num t">£112.81</td><td><span class="combo">Spending · Starling Ada<span class="chip">Suggested</span><svg><use href="#i-down"/></svg></span></td><td><span class="cb"></span></td><td class="m"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2"><use href="#i-split"/></svg></td></tr>
+                <tr><td>Sat 7 Nov</td><td class="t">CORNER CAFE 0042 BRISTOL</td><td class="m">Ben ··41009</td><td class="num t">£18.00</td><td><span class="combo">Spending · Nationwide Ben<span class="chip">Suggested</span><svg><use href="#i-down"/></svg></span></td><td><span class="cb"></span></td><td></td></tr>
+                <tr><td>Thu 5 Nov</td><td class="two"><div class="t">HOMEWARE HUT LEEDS</div><div class="m">Refund of £89.97 on Mon 2 Nov</div></td><td class="m">Ben ··41009</td><td class="num t" style="color:var(--pine)">−£24.99</td><td><span class="combo">Monzo Joint<span class="chip">Same as purchase</span><svg><use href="#i-down"/></svg></span></td><td class="m">—</td><td></td></tr>
+                <tr><td>Mon 2 Nov</td><td class="t">HOMEWARE HUT LEEDS</td><td class="m">Ben ··41009</td><td class="num t">£89.97</td><td><span class="combo">Monzo Joint<span class="chip">Suggested</span><svg><use href="#i-down"/></svg></span></td><td><span class="cb"></span></td><td></td></tr>
+              </tbody>
+            </table>
+            <div class="hints"><span><kbd>J</kbd> <kbd>K</kbd> move</span><span><kbd>↵</kbd> place</span><span><kbd>/</kbd> choose a pot</span><span><kbd>A</kbd> always</span><span><kbd>S</kbd> split</span><span style="margin-left:auto">Sorted by rules · 15 · <a href="#" style="color:var(--accent);font-weight:600">Check</a></span></div>
+          </div>
+          <div class="section">
+            <div class="section-head"><h2>Set aside in the Amex pot</h2><span class="count">£140.59 · 3 transactions sorted since Fri 6 Nov</span><span class="aside"><a href="#" style="color:var(--accent);font-weight:600">What it covers</a></span></div>
+            <div class="card" style="overflow:hidden;display:grid;grid-template-columns:1fr 1fr">
+              <div style="border-right:1px solid var(--border)">
+                <div class="account-band">Nationwide Ben <span>Ben</span></div>
+                <ul class="steps"><li class="step"><span></span><div class="t">Out of Spending</div><span class="copy">£58.20</span></li><li class="step"><span></span><div class="t">Send to Monzo Joint</div><span class="copy">£58.20</span></li></ul>
+              </div>
+              <div>
+                <div class="account-band">Monzo Joint <span>Either of you</span></div>
+                <ul class="steps"><li class="step"><span></span><div class="t">Out of Bills</div><span class="copy">£19.99</span></li><li class="step"><span></span><div class="t">Out of Groceries</div><span class="copy">£62.40</span></li><li class="step"><span></span><div class="t">Into Amex</div><span class="copy">£140.59</span></li></ul>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px"><span class="btn">Not all of it</span><span class="btn">Mark £140.59 moved</span></div>
+          </div>
+        </main>
+      </div></div>
+      <ul class="callouts">
+        <li>The header line carries the card's status (statement so far, closing date, Amex pot), so the summary card, the banner and the side panel go.</li>
+        <li>No Place buttons: <kbd>↵</kbd> places the focused row, and clicking a row focuses it. The suggestion is a chip inside the field, so it can't be cut off.</li>
+        <li>Set aside uses the shared step rows in copy mode, with no ticks: you copy each amount into Monzo, then confirm once. "Not all of it" opens today's untick list.</li>
+        <li>Rules move to Settings › Sorting rules (and the ⋯ menu). "This month" moves to Month.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Desktop · a statement, led by Settle up</h2>
+  <p class="note">Before: "To pay Amex" with its checks, then "Which months it counts in", then "Shares" per account, and Settle up at the very bottom. That opens a second page with the steps. After: one page. The amount, due date and checks come first, then the steps to settle it in columns by account. The breakdown folds away underneath.</p>
+  <div class="cols">
+    <div><span class="label before">Before · statement</span><img class="shot" src="../screenshots/statement-oct-desktop.png" alt="Statement today"><br><span class="label before">Before · Settle up</span><img class="shot" src="../screenshots/settle-up-desktop.png" alt="Settle up today"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="statement-desktop">
+        <aside class="sidebar">
+          <div class="brand">north.</div>
+          <a class="nav-item"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item is-current"><svg><use href="#i-card"/></svg>Spending<span class="count">4</span></a>
+          <div class="spacer"></div>
+          <div class="foot"><a class="nav-item"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a><div class="who"><span class="avatar">N</span>Nick · Saved</div></div>
+        </aside>
+        <main class="page" style="gap:16px">
+          <div class="crumbs"><a href="#">Statements</a> › October statement</div>
+          <div class="page-header">
+            <h1>October statement</h1><span class="context">25 Sep – 24 Oct · due Wed 18 Nov</span>
+            <span class="chip dot warning">Ready to settle</span>
+            <div class="actions"><span class="btn icon"><svg><use href="#i-more"/></svg></span></div>
+          </div>
+          <div class="card" style="padding:16px 20px;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center">
+            <div><div style="font-size:13px;color:var(--text-muted);font-weight:600">To Amex by Wed 18 Nov</div><div style="font-size:28px;font-weight:700;letter-spacing:-.4px">£646.88</div></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip positive">✓ All 12 sorted</span><span class="chip positive">✓ Matches Amex's summary</span><span class="chip">Final export in</span></div>
+            <div style="display:grid;gap:6px;justify-items:end;min-width:200px"><strong>0 of 8 done</strong><div class="meter" style="width:200px"><i style="width:0"></i></div></div>
+          </div>
+          <div class="settle-cols">
+            <div class="card"><div class="account-band">Starling Ada <span>Ada</span></div><ul class="steps"><li class="step sub"><span class="tick"></span><div class="t">Out of Spending</div><span class="copy">£27.39</span></li><li class="step"><span class="tick"></span><div class="t">Send to Monzo Joint</div><span class="copy">£27.39</span></li></ul></div>
+            <div class="card"><div class="account-band">Nationwide Ben <span>Ben</span></div><ul class="steps"><li class="step sub"><span class="tick"></span><div class="t">Out of Spending</div><span class="copy">£71.20</span></li><li class="step"><span class="tick"></span><div class="t">Send to Monzo Joint</div><span class="copy">£71.20</span></li></ul></div>
+            <div class="card"><div class="account-band">Monzo Joint <span>Either of you</span></div><ul class="steps"><li class="step sub"><span class="tick"></span><div class="t">Out of Bills</div><span class="copy">£19.99</span></li><li class="step sub"><span class="tick"></span><div class="t">Out of Groceries</div><span class="copy">£303.30</span></li><li class="step sub"><span class="tick"></span><div class="t">Out of Holidays</div><span class="copy">£180.00</span></li><li class="step pay-step"><span class="tick"></span><div><div class="t">Pay Amex</div><div class="m">Includes £45.00 of one-offs already in Monzo Joint</div></div><span class="copy">£646.88</span></li></ul></div>
+          </div>
+          <div class="card" style="overflow:hidden">
+            <div class="disclosure">▸ Which months it counts in <span>October £646.88</span></div>
+            <div class="disclosure" style="border-top:1px solid var(--border)">▸ Shares by account <span>Starling Ada £27.39 · Nationwide Ben £71.20 · Monzo Joint £548.29</span></div>
+          </div>
+        </main>
+      </div></div>
+      <ul class="callouts">
+        <li>Settle up is no longer a separate page. A statement that isn't ready shows what it's waiting for in the same place ("4 to sort · Sort them", "Closes Tue 24 Nov"), with no steps.</li>
+        <li>With the Amex pot (from the November statement), the columns shrink to "Into the Amex pot" for what's still to move, then "Pay Amex from the Amex pot". The component is the same.</li>
+        <li>"Amex shows a payment of £350.00 on 8 Nov · Tick Pay Amex" stays as a line on the Pay Amex row.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Phone · To sort</h2>
+  <p class="note">Before: the first transaction is at y=596, after two full-width buttons, the Amex pot banner and the tabs. Each row has a filled "Choose" pill, so four primaries are stacked. After: header, tabs, then the list. Each row shows its suggestion, and tapping it opens the sort sheet (a bottom sheet).</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/spending-sort-phone.png" alt="To sort phone" style="max-width:375px"></div>
+    <div><span class="label">After</span>
+      <div class="scaler" style="max-width:375px"><div class="artboard phone" id="spending-phone">
+        <div class="phone-header">
+          <div class="hbar"><span class="brand">north.</span><span class="icons"><span class="icon-btn"><svg><use href="#i-bringin"/></svg></span><span class="icon-btn"><svg><use href="#i-user"/></svg></span></span></div>
+          <div class="title"><h1>Amex</h1></div>
+          <div class="sub">£649.23 this statement · £312.85 set aside</div>
+        </div>
+        <div class="phone-body" style="gap:12px">
+          <div class="tabs" style="gap:20px"><span class="on">To sort <em>4</em></span><span>Transactions</span><span>Statements <em style="background:var(--warning-bg);color:var(--warning)">1</em></span></div>
+          <ul class="list card">
+            <li class="row" style="grid-template-columns:1fr auto 16px;min-height:64px"><div><div class="t">TRAIN TICKETS ONLINE</div><div class="m">Sun 8 Nov · Ada · Suggested: Spending · Starling Ada</div></div><div class="r">£112.81</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+            <li class="row" style="grid-template-columns:1fr auto 16px;min-height:64px"><div><div class="t">CORNER CAFE 0042</div><div class="m">Sat 7 Nov · Ben · Suggested: Spending · Nationwide Ben</div></div><div class="r">£18.00</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+            <li class="row" style="grid-template-columns:1fr auto 16px;min-height:64px"><div><div class="t">HOMEWARE HUT LEEDS</div><div class="m">Thu 5 Nov · Ben · refund of £89.97</div></div><div class="r" style="color:var(--pine)">−£24.99</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+            <li class="row" style="grid-template-columns:1fr auto 16px;min-height:64px"><div><div class="t">HOMEWARE HUT LEEDS</div><div class="m">Mon 2 Nov · Ben · Suggested: Monzo Joint</div></div><div class="r">£89.97</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+          </ul>
+          <div class="card" style="padding:12px 14px;display:grid;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><strong>Set aside in the Amex pot</strong><strong>£140.59</strong></div>
+            <div class="m" style="font-size:13px;color:var(--text-muted)">3 transactions sorted since Fri 6 Nov · 5 moves</div>
+            <span class="btn block">Review and mark moved</span>
+          </div>
+        </div>
+        <nav class="tabbar"><a><span class="pill"><svg><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg><use href="#i-month"/></svg></span>Month</a><a><span class="pill"><svg><use href="#i-plan"/></svg></span>Plan</a><a class="is-current"><span class="pill"><svg><use href="#i-card"/></svg></span>Spending</a></nav>
+      </div></div>
+    </div>
+  </div>
+</section>
+</div>
+<script src="mockup.js"></script>
+</body>
+</html>

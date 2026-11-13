@@ -1,0 +1,9 @@
+plan-04-owner-ada desktop: DOM same
+plan-04-owner-ada phone: DOM same
+plan-05-category desktop: DOM same
+plan-05-category phone: DOM same
+plan-11-see-items desktop: DOM same
+plan-11-see-items phone: DOM DIFFERS
+    line 777: - </div> | + <div class="allocation-meter-mini is-deficit" aria-hidden="true">
+plan-13-options desktop: DOM same
+plan-13-options phone: DOM same

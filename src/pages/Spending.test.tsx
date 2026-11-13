@@ -524,7 +524,9 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   fireEvent.click(screen.getByRole('button', { name: /^Bills · carries over:/ }))
   expect(screen.getByText('Free in the pot').parentElement).toHaveTextContent('Free in the pot—')
   const sums = () => [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
-  expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99', 'Car insurance£612.00 a year'])
+  expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99'])
+  // The yearly item it saves for has no renewal date yet.
+  expect(screen.getByRole('list', { name: 'Yearly bills set aside here' })).toHaveTextContent('Car insuranceNo renewal date£51.00 a month£612.00 a year')
   fireEvent.click(screen.getByRole('button', { name: 'Check against Monzo' }))
   const dialog = screen.getByRole('dialog', { name: 'Check against Monzo' })
   fireEvent.change(within(dialog).getByLabelText('What’s in Bills now?'), { target: { value: '1,240' } })

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit 3 · Navigation and structure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="target.css">
+<style>
+  .map { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 0; padding: 32px 40px; background: var(--bg); width: 1200px }
+  .map h3 { margin: 0 0 12px; font-size: 16px; color: var(--text-muted) }
+  .map .colA, .map .colB { display: grid; gap: 10px; align-content: start }
+  .tile { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px 14px }
+  .tile strong { display: block; color: var(--pine) }
+  .tile ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--charcoal) }
+  .tile.old strong { color: #6c5646 }
+  .tile.new { border-color: var(--pine); border-width: 1.5px }
+  .tile .tag { float: right; font-size: 11px; font-weight: 700; color: var(--text-muted) }
+  .arrows { display: grid; align-content: center; justify-items: center; color: var(--muted); font-size: 28px }
+  .crops { display: grid; grid-template-columns: 160px 1fr; gap: 24px; align-items: start }
+  .crop { overflow: hidden; border: 1px solid #b9b3a1; border-radius: 6px }
+  .crop img { display: block }
+</style>
+</head>
+<body>
+<div class="doc">
+<header>
+  <h1>Navigation: four places, ordered by the household's routine</h1>
+  <p>Today's five tabs reflect when each feature was built: Plan, then Transfers, then Household, then Spending, then Home. The month's money is spread across four of them, and settings across three. The target has four destinations that match the jobs: <strong>Home</strong> (what needs doing), <strong>Month</strong> (fund it, watch it, close it), <strong>Plan</strong> (the budget) and <strong>Spending</strong> (the card). <strong>Settings</strong> sits at the foot of the sidebar and behind the account button on phones. Fixes <a href="../review.md#f02">F02</a>, <a href="../review.md#f08">F08</a>, <a href="../review.md#f10">F10</a>, <a href="../review.md#f25">F25</a>, <a href="../review.md#f27">F27</a>. Brief: <a href="../prs/06-nav-shell.md">PR 06</a>.</p>
+  <nav class="toc"><a href="index.html">All mockups</a><a href="02-home.html">Home</a><a href="03-plan.html">Plan</a><a href="04-month.html">Month</a><a href="05-spending.html">Spending</a><a href="06-settings.html">Settings</a><a href="07-design-system.html">Design system</a></nav>
+</header>
+
+<section class="pair">
+  <h2>Where everything goes</h2>
+  <div class="cols"><div>
+    <div class="scaler"><div class="artboard" id="nav-map" style="width:1200px">
+      <div class="map">
+        <div class="colA"><h3>Today: 5 tabs, 9 sub-sections, 3 settings locations</h3>
+          <div class="tile old"><strong>Home</strong><ul><li>Plan meter (same as Plan's)</li><li>Month cards: Nov · Oct checklist · Dec</li><li>To do: one card per adult</li><li>Coming up</li></ul></div>
+          <div class="tile old"><strong>Plan</strong><ul><li>Items, meter, filters</li><li>⋯ Edit income (dialog)</li><li>⋯ Manage accounts, pots &amp; categories (side panel, incl. pot spending settings)</li></ul></div>
+          <div class="tile old"><strong>Spending</strong><ul><li>Amex card + Bring in + Add a transaction</li><li>Amex pot banner (on every section)</li><li>To sort · This month · Statements · All transactions · Rules</li><li>Pot page · Amex pot page · Close &lt;Month&gt; · Statement · Settle up</li></ul></div>
+          <div class="tile old"><strong>Transfers</strong><ul><li>Payday steps per person</li><li>Funding by account table</li></ul></div>
+          <div class="tile old"><strong>Household</strong><ul><li>Household name, adults</li><li>Cards</li><li>"Continue to Plan"</li></ul></div>
+        </div>
+        <div class="arrows">→</div>
+        <div class="colB"><h3>Target: 4 destinations + Settings</h3>
+          <div class="tile new"><span class="tag">G H</span><strong>Home</strong><ul><li>Status strip: Plan · Spent · Amex</li><li>One To do list for every task, ordered by date</li><li>Coming up · Done</li></ul></div>
+          <div class="tile new"><span class="tag">G M</span><strong>Month</strong><ul><li>Payday steps (was Transfers), with "By account" (was Funding by account)</li><li>Pots: spent vs planned, pace, in Monzo (was Spending › This month)</li><li>Close &lt;Month&gt; inline for an ended month</li><li>Pot pages, Check balances</li></ul></div>
+          <div class="tile new"><span class="tag">G P</span><strong>Plan</strong><ul><li>Items, figures, one toolbar</li><li>One item editor</li><li>⋯ links to Settings for income and structure</li></ul></div>
+          <div class="tile new"><span class="tag">G S</span><strong>Spending</strong> <ul><li>Amex: To sort (then Set aside) · Transactions · Statements</li><li>Statement page with Settle up inline</li><li>Amex pot page</li></ul></div>
+          <div class="tile new"><span class="tag">G ,</span><strong>Settings</strong><ul><li>Household · Pay &amp; income · Accounts &amp; pots · Categories · Cards · Sorting rules · Account &amp; sync</li></ul></div>
+        </div>
+      </div>
+    </div></div>
+    <ul class="callouts">
+      <li>Every old link still works. <code>budgetView=transfers</code> opens Month, <code>spendingView=month</code> opens Month (with its pot or close state), <code>view=household</code> opens Settings › Household, and <code>spendingView=rules</code> opens Settings › Sorting rules.</li>
+      <li>"Transfers" stays in the glossary as the name for payday steps ("Payday" section) only if you want it. See decision D2 in plan.md.</li>
+    </ul>
+  </div></div>
+</section>
+
+<section class="pair">
+  <h2>Desktop sidebar</h2>
+  <p class="note">Before: icon-only by default. Plan is a wallet and Spending a card, with no labels, and the save status hides behind the collapsed rail. After: expanded by default from 1280px, with labels, a count on Home (open tasks) and Spending (to sort), go-to shortcuts, and Settings and the account at the foot. <kbd>⌘\</kbd> collapses it.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><div class="crops"><div class="crop" style="width:160px;height:560px"><img src="../screenshots/home-desktop.png" alt="Sidebar today" style="width:1440px;margin-left:0"></div><p class="note">Five unlabelled icons. Household gets a primary slot for two name fields and a card form.</p></div></div>
+    <div><span class="label">After</span>
+      <div class="scaler" style="max-width:216px"><div class="artboard" id="nav-sidebar" style="width:216px;height:720px;display:flex">
+        <aside class="sidebar" style="width:216px">
+          <div class="brand">north.</div>
+          <a class="nav-item is-current"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item"><svg><use href="#i-card"/></svg>Spending<span class="count">4</span></a>
+          <div class="spacer"></div>
+          <div class="foot"><a class="nav-item"><svg><use href="#i-command"/></svg>Search<span class="kbd">⌘K</span></a><a class="nav-item"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a><div class="who"><span class="avatar">N</span>Nick · Saved</div></div>
+        </aside>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Phone tab bar and header</h2>
+  <p class="note">Before: five tabs. The header's right-hand button is a person icon on Home and Spending but ⋯ on Plan and Transfers, so the account sheet is in a different place on each screen. After: four tabs. The account button is always top right and opens Settings, save status and Sign out. A page's own ⋯ sits to its left only when the page has actions.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><div class="crop" style="width:375px;height:90px"><img src="../screenshots/home-phone.png" alt="Tab bar today" style="width:375px;margin-top:-1924px"></div></div>
+    <div><span class="label">After</span>
+      <div class="scaler" style="max-width:375px"><div class="artboard" id="nav-tabbar" style="width:375px;height:74px;position:relative">
+        <nav class="tabbar"><a class="is-current"><span class="pill"><svg><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg><use href="#i-month"/></svg></span>Month</a><a><span class="pill"><svg><use href="#i-plan"/></svg></span>Plan</a><a><span class="pill"><svg><use href="#i-card"/></svg></span>Spending</a></nav>
+      </div></div>
+    </div>
+  </div>
+</section>
+</div>
+<script src="mockup.js"></script>
+</body>
+</html>

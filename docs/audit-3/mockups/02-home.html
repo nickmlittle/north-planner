@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit 3 · Home (job 4: quick check-in)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="target.css">
+</head>
+<body>
+<div class="doc">
+<header>
+  <h1>Home: a quick check-in in seconds</h1>
+  <p>Job 4. Home becomes an inbox: one strip says where the month stands, and one list holds everything to do, ordered by when it matters. The plan meter, month cards and per-person cards merge into those two parts. Fixes <a href="../review.md#f01">F01</a>, <a href="../review.md#f04">F04</a>, <a href="../review.md#f09">F09</a>, <a href="../review.md#f14">F14</a>. Brief: <a href="../prs/10-home-inbox.md">PR 10</a>.</p>
+  <nav class="toc"><a href="index.html">All mockups</a><a href="01-navigation.html">Navigation</a><a href="03-plan.html">Plan</a><a href="04-month.html">Month</a><a href="05-spending.html">Spending</a><a href="06-settings.html">Settings</a><a href="07-design-system.html">Design system</a></nav>
+</header>
+
+<section class="pair">
+  <h2>Desktop · 1440 × 900</h2>
+  <p class="note">Before: 1,496px tall. The first thing you read is the plan meter, which doesn't change between plan edits. The statement due in 7 days is the 7th block down. Tasks live in two systems: the month cards (Close, Settle, Move to the Amex pot) and "To do · 2 left", which counts only the per-person rows. After: everything fits on one screen. The statement due date leads, and the plan is one figure with a link.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/home-desktop.png" alt="Home today, desktop"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="home-desktop">
+        <aside class="sidebar">
+          <div class="brand">north.</div>
+          <a class="nav-item is-current"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item"><svg><use href="#i-card"/></svg>Spending<span class="kbd">G S</span></a>
+          <div class="spacer"></div>
+          <div class="foot">
+            <a class="nav-item"><svg><use href="#i-command"/></svg>Search<span class="kbd">⌘K</span></a>
+            <a class="nav-item"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a>
+            <div class="who"><span class="avatar">N</span>Nick · Saved</div>
+          </div>
+        </aside>
+        <main class="page" style="max-width:1224px">
+          <div class="page-header">
+            <h1>November</h1><span class="chip dot positive">In progress · 19 days left</span>
+            <span class="context">Wednesday 11 November</span>
+          </div>
+          <div class="card stats">
+            <div class="stat"><div class="k">Plan <a href="#">Open</a></div><div class="v critical">£1,141.87 over</div><div class="d">Ada £429.66 over · Ben £712.21 over</div></div>
+            <div class="stat"><div class="k">Spent this month <a href="#">Open</a></div><div class="v">£272.59 <span style="font-size:14px;font-weight:600;color:var(--text-muted)">of £5,262.33</span></div><div class="d"><span class="warn-text">Groceries £62 ahead of pace</span> · 4 pots on track</div></div>
+            <div class="stat"><div class="k">Amex <a href="#">Open</a></div><div class="v">£649.23 <span style="font-size:14px;font-weight:600;color:var(--text-muted)">this statement</span></div><div class="d">£312.85 set aside · closes Tue 24 Nov</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+            <div class="section">
+              <div class="section-head"><h2>To do</h2><span class="count">7</span><span class="aside"><kbd>J</kbd><kbd>K</kbd> move · <kbd>↵</kbd> open</span></div>
+              <ul class="list card">
+                <li class="row is-focused"><span class="ic"><svg><use href="#i-statement"/></svg></span><div><div class="t">Settle the October statement</div><div class="m">All 12 sorted · matches Amex's summary</div></div><div class="r">£646.88<small>due Wed 18 Nov</small></div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="row"><span class="ic"><svg><use href="#i-close"/></svg></span><div><div class="t">Close October</div><div class="m">Groceries £88.58 over · 3 pots with money left</div></div><div class="r"><span class="chip">Ended 31 Oct</span></div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="row"><span class="ic"><svg><use href="#i-transfers"/></svg></span><div><div class="t">Fund November</div><div class="m">Ada 0 of 9 <span class="mini-progress"><i style="width:0"></i></span> · Ben 0 of 9 <span class="mini-progress"><i style="width:0"></i></span></div></div><div class="r">18 steps</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="row"><span class="ic"><svg><use href="#i-inbox"/></svg></span><div><div class="t">Sort 4 Amex transactions</div><div class="m">Brought in Mon 9 Nov</div></div><div class="r">£195.79</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="row"><span class="ic"><svg><use href="#i-pot"/></svg></span><div><div class="t">Set aside in the Amex pot</div><div class="m">3 transactions sorted since Fri 6 Nov</div></div><div class="r">£140.59</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="row"><span class="ic critical"><svg><use href="#i-alert"/></svg></span><div><div class="t">Bring the plan back to Available</div><div class="m">Ada £429.66 over · Ben £712.21 over</div></div><div class="r">£1,141.87 over</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+                <li class="group-label">Heads-up</li>
+                <li class="row"><span class="ic warning"><svg><use href="#i-trend"/></svg></span><div><div class="t">Groceries is £62 ahead of pace</div><div class="m">At this rate it runs out around Fri 20 Nov</div></div><div class="r">£143.57 left</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+              </ul>
+            </div>
+            <div class="section">
+              <div class="section-head"><h2>Coming up</h2></div>
+              <ul class="list card">
+                <li class="row" style="grid-template-columns:56px 1fr"><div class="m" style="font-weight:600">Tue 24</div><div><div class="t">November statement closes</div><div class="m">£649.23 so far</div></div></li>
+                <li class="row" style="grid-template-columns:56px 1fr"><div class="m" style="font-weight:600">Fri 27</div><div><div class="t">Ada's pay arrives</div><div class="m">December's money</div></div></li>
+                <li class="row" style="grid-template-columns:56px 1fr"><div class="m" style="font-weight:600">Mon 30</div><div><div class="t">Ben's pay arrives</div><div class="m">December's money</div></div></li>
+                <li class="row" style="grid-template-columns:56px 1fr"><div class="m" style="font-weight:600">Sat 19 Dec</div><div><div class="t">November statement due</div></div></li>
+              </ul>
+              <div class="section-head" style="margin-top:8px"><h2>Done</h2><span class="count">1</span></div>
+              <ul class="list card"><li class="row done" style="grid-template-columns:28px 1fr"><span class="ic"><svg><use href="#i-check"/></svg></span><div><div class="t">All October transactions sorted</div></div></li></ul>
+            </div>
+          </div>
+        </main>
+      </div></div>
+      <ul class="callouts">
+        <li>Status strip: three figures, each opening its screen. Red is only on the amount that is over, not on a headline.</li>
+        <li>One To do list, ordered by date. The statement due in 7 days comes first; heads-ups go last under their own label.</li>
+        <li>"Fund November" is one row for the household with per-person progress (it replaces two cards and the "Funding · 0 of 18" chip).</li>
+        <li>The plan overage is one task, not a meter plus two cards.</li>
+        <li>Keyboard: <kbd>J</kbd>/<kbd>K</kbd> move between rows, <kbd>↵</kbd> opens one.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Phone · 375 × 812</h2>
+  <p class="note">Before: 2,014px. The first To do row is at y≈1,400. After: the strip and the first four tasks fit above the tab bar.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/home-phone.png" alt="Home today, phone" style="max-width:375px"></div>
+    <div><span class="label">After</span>
+      <div class="scaler" style="max-width:375px"><div class="artboard phone" id="home-phone">
+        <div class="phone-header">
+          <div class="hbar"><span class="brand">north.</span><span class="icons"><span class="icon-btn"><svg><use href="#i-search"/></svg></span><span class="icon-btn"><svg><use href="#i-user"/></svg></span></span></div>
+          <div class="title"><h1>November</h1></div>
+          <div class="sub">In progress · 19 days left</div>
+        </div>
+        <div class="phone-body">
+          <div class="card stats stack">
+            <div class="stat"><div class="k">Plan</div><div class="v critical">£1,141.87 over</div><div class="d">Ada £429.66 · Ben £712.21 over</div></div>
+            <div class="stat"><div class="k">Spent</div><div class="v">£272.59</div><div class="d">of £5,262.33 · <span class="warn-text">Groceries ahead of pace</span></div></div>
+            <div class="stat"><div class="k">Amex</div><div class="v">£649.23</div><div class="d">£312.85 set aside · closes Tue 24 Nov</div></div>
+          </div>
+          <div class="section">
+            <div class="section-head"><h2>To do</h2><span class="count">7</span></div>
+            <ul class="list card">
+              <li class="row" style="min-height:56px"><span class="ic"><svg><use href="#i-statement"/></svg></span><div><div class="t">Settle October</div><div class="m">due Wed 18 Nov</div></div><div class="r">£646.88</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+              <li class="row" style="min-height:56px"><span class="ic"><svg><use href="#i-close"/></svg></span><div><div class="t">Close October</div><div class="m">Groceries £88.58 over</div></div><div class="r"></div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+              <li class="row" style="min-height:56px"><span class="ic"><svg><use href="#i-transfers"/></svg></span><div><div class="t">Fund November</div><div class="m">Ada 0/9 · Ben 0/9</div></div><div class="r"></div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+              <li class="row" style="min-height:56px"><span class="ic"><svg><use href="#i-inbox"/></svg></span><div><div class="t">Sort 4 transactions</div><div class="m">Amex · Mon 9 Nov</div></div><div class="r">£195.79</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+              <li class="row" style="min-height:56px"><span class="ic"><svg><use href="#i-pot"/></svg></span><div><div class="t">Set aside in the Amex pot</div><div class="m">3 transactions</div></div><div class="r">£140.59</div><span class="go"><svg><use href="#i-right"/></svg></span></li>
+            </ul>
+          </div>
+        </div>
+        <nav class="tabbar"><a class="is-current"><span class="pill"><svg><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg><use href="#i-month"/></svg></span>Month</a><a><span class="pill"><svg><use href="#i-plan"/></svg></span>Plan</a><a><span class="pill"><svg><use href="#i-card"/></svg></span>Spending</a></nav>
+      </div></div>
+    </div>
+  </div>
+</section>
+</div>
+<script src="mockup.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { useId, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { annualCosts, cumulativeByDay, destinationTransactions, monthSpending, type DestinationSpending, type MonthSpending } from '../domain/cardSpending'
+import { cumulativeByDay, destinationTransactions, monthSpending, type DestinationSpending, type MonthSpending } from '../domain/cardSpending'
 import { monthBills } from '../domain/recurringBills'
 import { checkPotBalance, potBalance, setAsideStatements, type BalanceFlow, type PotBalance } from '../domain/potBalances'
 import { potPhrase, usesSetAside } from '../domain/setAside'
@@ -12,6 +12,8 @@ import { formatMonth } from '../formatting/month'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { dayDate, shortDate } from './cardLabels'
 import { dayOf, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
+import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills'
+import { spentParts } from './billLabels'
 import './PotPage.css'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -125,9 +127,8 @@ function BalanceLine({ document, potId, today }: { document: BudgetDocument; pot
   </>
 }
 
-/** A carry-over pot: what's free (with how it's worked out) and the annual costs it saves for. */
-function CarryOver({ document, potId, month, today }: { document: BudgetDocument; potId: string; month: string; today: string }) {
-  const costs = annualCosts(document, potId, month)
+/** A carry-over pot: what's free, with how it's worked out. */
+function CarryOver({ document, potId, today }: { document: BudgetDocument; potId: string; today: string }) {
   const bank = bankOf(document, potId)
   const balance = potBalance(document, potId, today)
   return <>
@@ -136,9 +137,6 @@ function CarryOver({ document, potId, month, today }: { document: BudgetDocument
       <p className="pot-lead-value">{balance.freePence === undefined ? '—' : signedPounds(balance.freePence)}</p>
       <BalanceSums document={document} balance={balance} bank={bank}/>
     </section>
-    {costs.length > 0 && <Section title="Annual costs from the Plan">
-      <dl className="carry-over-sums">{costs.map(cost => <div key={cost.id}><dt>{cost.name}</dt><dd>{pounds(cost.yearlyPence)} a year</dd></div>)}</dl>
-    </Section>}
   </>
 }
 
@@ -186,6 +184,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const destination: BudgetDestination = { kind: 'pot', potId }
   const row = figures.rows.find(item => item.key === `pot:${potId}`)
   const transactions = destinationTransactions(cardTracker(document), month, destination)
+  const bills = monthBills(document, month, today).filter(bill => bill.destination.kind === 'pot' && bill.destination.potId === potId)
   const owners = document.budget.accounts.find(account => account.id === pot?.accountId)?.ownerPersonIds ?? []
   const ownerLabel = owners.length > 1 ? 'Joint' : document.household.adults.find(person => person.id === owners[0])?.name ?? 'Pot'
   if (!pot) return <p className="pot-none">That pot no longer exists. <button type="button" className="text-button" onClick={onBack}>Back to Month</button></p>
@@ -202,18 +201,22 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
 
   return <div className="pot-detail">
     <PotHeader title={pot.name} context={context} bank={bank} month={month} onBack={onBack} onCheck={() => setChecking(true)} onOpenSettings={onOpenSettings}/>
-    {carriesOver ? <CarryOver document={document} potId={potId} month={month} today={today}/>
+    {carriesOver ? <><CarryOver document={document} potId={potId} today={today}/>{row && bills.length > 0 && <PotMonthFigures document={document} row={row}/>}</>
       : !row ? <><p className="pot-none">Nothing planned or spent in {monthName(month)}.</p><BalanceLine document={document} potId={potId} today={today}/></> : <>
       <section className="pot-lead" aria-labelledby="pot-lead-label">
         <p className="pot-lead-label" id="pot-lead-label">{row.leftPence < 0 ? 'Over this month' : 'Left this month'}</p>
         <p className="pot-lead-value">{pounds(Math.abs(row.leftPence))}{row.leftPence >= 0 && figures.when === 'current' && <small> for {daysLeft} {daysLeft === 1 ? 'day' : 'days'}</small>}</p>
         {steady && allowance !== undefined && average !== undefined && <p className="pot-lead-pace">About {whole(allowance)} a day · you’ve averaged {whole(average)}</p>}
         {!(steady && figures.when === 'current' && row.leftPence >= 0) && <p className={`pot-lead-status is-${row.status}`}>{statusText(row, figures)}</p>}
+        {bills.length > 0 && <p className="pot-lead-bills">{[row.duePence ? `${pounds(row.duePence)} of it due` : '', spentParts(document, row)].filter(Boolean).join(' · ')}</p>}
         {steady && figures.when !== 'future' && <PaceChart document={document} month={month} row={row} figures={figures} label={chartLabel}/>}
         {row.status === 'ahead' && row.runsOut && <p className="pot-runout">At this rate it runs out around {dayDate(row.runsOut)}, {daysBetween(row.runsOut, `${month}-${String(figures.daysInMonth).padStart(2, '0')}`)} days before the month ends.</p>}
       </section>
+      {bills.length > 0 && <BillsThisMonth document={document} bills={bills} month={month} today={today}/>}
       <Section title="Balance"><BalanceLine document={document} potId={potId} today={today}/></Section>
     </>}
+    {carriesOver && bills.length > 0 && <BillsThisMonth document={document} bills={bills} month={month} today={today}/>}
+    <YearlyBillsSetAside document={document} potId={potId} month={month} today={today}/>
     <Section title="Transactions">
       {transactions.length ? <ul className="pot-list" aria-label="Transactions">{transactions.map(transaction => <li key={transaction.id}>
         <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}/>
