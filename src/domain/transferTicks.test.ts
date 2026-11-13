@@ -5,12 +5,19 @@ import { fundStepKey, moveStepKey, personProgress, planSteps, setStepTick, stepS
 
 const plan: PersonTransferPlan = {
   personId: 'nick', fundingPence: 100000, fundCount: 1, moveCount: 2, stepCount: 3,
-  rows: [{ accountId: 'joint', fundingPence: 100000, movedOnBy: [], potMoves: [{ potId: 'bills', amountPence: 30000, fromOthers: [] }, { potId: 'food', amountPence: 20000, fromOthers: [] }] }],
+  rows: [{ accountId: 'joint', fundingPence: 100000, alreadyThere: false, fromAccountId: null, movedOnBy: [], potMoves: [{ potId: 'bills', amountPence: 30000, fromOthers: [] }, { potId: 'food', amountPence: 20000, fromOthers: [] }] }],
 }
 const at = new Date('2026-11-10T09:00:00Z')
 
 it('lists a plan’s steps in order: fund the account, then each pot move', () => {
   expect(planSteps(plan).map(step => [step.key, step.amountPence])).toEqual([['nick:fund:joint', 100000], ['nick:move:bills', 30000], ['nick:move:food', 20000]])
+})
+
+it('leaves out funding already where the pay lands, keeping every other step’s key, and ignores an old tick for it', () => {
+  const landed: PersonTransferPlan = { ...plan, fundCount: 0, stepCount: 2, rows: [{ ...plan.rows[0]!, alreadyThere: true, fromAccountId: 'joint' }] }
+  expect(planSteps(landed).map(step => step.key)).toEqual(['nick:move:bills', 'nick:move:food'])
+  const ticks = { 'nick:fund:joint': { amountPence: 100000, at: 'x' }, 'nick:move:bills': { amountPence: 30000, at: 'x' } }
+  expect(personProgress(landed, ticks)).toMatchObject({ total: 2, done: 1 })
 })
 
 it('ticks a step at its amount for one month, and unticks it', () => {

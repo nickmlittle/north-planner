@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { monthlyContributionPence, type BudgetItem } from './monthlyBudget'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
@@ -151,4 +151,47 @@ it('keeps a non-owner contributor responsible for their share of a joint-account
   const model = buildTransferInstructions(document, month)
   expect(model.steps.map(step => [step.kind, step.personId, step.amountPence])).toEqual([['account-funding', 'sam', 101], ['pot-movement', 'sam', 101]])
   reconcile(model)
+})
+
+describe('where the money comes from (Pay lands in)', () => {
+  const funding = (model: TransferInstructions, accountId: string, personId: string) => model.accounts.find(account => account.accountId === accountId)!.fundingRequirements.find(step => step.personId === personId)!
+  const setup = () => {
+    const document = fixture()
+    document.budget.snapshots[month] = { items: [item('rent', 90000), item('treats', 30000, { destination: { kind: 'pot', potId: 'personal-pot' }, funding: 'single', singleFunderId: 'immy' })] }
+    return document
+  }
+
+  it('reads as before with no landing account', () => {
+    const model = buildTransferInstructions(setup(), month)
+    expect(funding(model, 'joint', 'nick').source).toBeNull()
+    expect(funding(model, 'joint', 'nick').alreadyThere).toBeUndefined()
+    reconcile(model)
+  })
+
+  it('makes funding the landing account itself "already there", and every other step "from → to", keeping ids and amounts', () => {
+    const before = buildTransferInstructions(setup(), month)
+    const document = setup()
+    document.budget.incomeSources.find(source => source.id === 'immy-pay')!.landsInAccountId = 'personal'
+    const model = buildTransferInstructions(document, month)
+    const personal = funding(model, 'personal', 'immy'), joint = funding(model, 'joint', 'immy')
+    expect(personal).toMatchObject({ alreadyThere: true, source: { kind: 'account', accountId: 'personal' }, amountPence: funding(before, 'personal', 'immy').amountPence })
+    expect(joint).toMatchObject({ source: { kind: 'account', accountId: 'personal' }, id: funding(before, 'joint', 'immy').id })
+    expect(joint.alreadyThere).toBeUndefined()
+    // Not a step: left out of the steps and their total, and not a dependency of the pot move out of it.
+    expect(model.steps.some(step => step.id === personal.id)).toBe(false)
+    expect(model.totals.actionableFundingPence).toBe(before.totals.actionableFundingPence - personal.amountPence)
+    expect(model.accounts.find(account => account.accountId === 'personal')!.potMovements[0]!.dependsOn).toEqual([])
+    reconcile(model)
+  })
+
+  it('takes the larger salary as the source, and falls back to none when its account is gone', () => {
+    const document = setup()
+    document.budget.incomeSources.find(source => source.id === 'immy-pay')!.landsInAccountId = 'personal'
+    document.budget.incomeSources.push({ id: 'immy-second', name: 'Second job', personId: 'immy', type: 'employment', baseAmountPence: 150000, changes: {}, landsInAccountId: 'joint' })
+    expect(funding(buildTransferInstructions(document, month), 'personal', 'immy').source).toEqual({ kind: 'account', accountId: 'joint' })
+    document.budget.incomeSources.find(source => source.id === 'immy-second')!.landsInAccountId = 'deleted-account'
+    expect(funding(buildTransferInstructions(document, month), 'personal', 'immy').source).toEqual({ kind: 'account', accountId: 'personal' })
+    document.budget.incomeSources.find(source => source.id === 'immy-pay')!.landsInAccountId = 'also-deleted'
+    expect(funding(buildTransferInstructions(document, month), 'personal', 'immy').source).toBeNull()
+  })
 })

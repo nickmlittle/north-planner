@@ -41,7 +41,8 @@ export function setStepTick(document: BudgetDocument, month: string, key: string
 /** Every step in a person's payday plan, in order, with its key and amount. */
 export function planSteps(plan: PersonTransferPlan) {
   return plan.rows.flatMap(row => [
-    ...row.fundingPence > 0 ? [{ key: fundStepKey(plan.personId, row.accountId), kind: 'fund' as const, accountId: row.accountId, amountPence: row.fundingPence }] : [],
+    // Funding already where the pay lands isn't a step (a tick left from before is ignored, not deleted).
+    ...row.fundingPence > 0 && !row.alreadyThere ? [{ key: fundStepKey(plan.personId, row.accountId), kind: 'fund' as const, accountId: row.accountId, amountPence: row.fundingPence }] : [],
     ...row.potMoves.map(move => ({ key: moveStepKey(plan.personId, move.potId), kind: 'move' as const, accountId: row.accountId, potId: move.potId, amountPence: move.amountPence })),
   ])
 }
