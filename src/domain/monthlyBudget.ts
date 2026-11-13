@@ -134,7 +134,7 @@ export function updateIncomeAtMonth(budget: MonthlyBudget, month: string, source
 }
 
 /** A new recurring income source, starting at `month`. */
-export function addIncomeSource(budget: MonthlyBudget, month: string, source: Pick<IncomeSource, 'personId' | 'name' | 'type' | 'baseAmountPence'>): MonthlyBudget {
+export function addIncomeSource(budget: MonthlyBudget, month: string, source: Pick<IncomeSource, 'personId' | 'name' | 'type' | 'baseAmountPence'> & Partial<Pick<IncomeSource, 'landsInAccountId'>>): MonthlyBudget {
   return { ...budget, incomeSources: [...budget.incomeSources, { id: crypto.randomUUID(), ...source, baseEffectiveFrom: month, changes: {} }] }
 }
 

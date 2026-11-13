@@ -65,7 +65,9 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   /** One band per account: fund it, then its pot moves indented beneath. */
   const steps = (plan: PersonTransferPlan) => plan.rows.map((row: PersonTransferRow) => {
     const account = label(row.accountId)
-    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundStepKey(plan.personId, row.accountId)} name={`Fund ${account}`} amountPence={row.fundingPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}>
+    // Pay already lands here: shown (and copyable) but not a step to tick. With a known source, a fund step reads "from → to".
+    const fundName = row.alreadyThere ? `Already in ${account}` : row.fromAccountId ? `${label(row.fromAccountId)} → ${account}` : `Fund ${account}`
+    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundStepKey(plan.personId, row.accountId)} name={fundName} {...row.alreadyThere ? { mode: 'copy' as const, quiet: true } : {}} amountPence={row.fundingPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}>
       {row.movedOnBy.map(other => <StepCaption key={other.personId}>{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</StepCaption>)}
       {affected(row.accountId)}
     </StepRow> : null

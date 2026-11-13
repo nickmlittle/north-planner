@@ -1,3 +1,4 @@
+import { shortAccountLabels } from '../budgetLabels'
 import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { Plus } from 'lucide-react'
 import { EmptyState, ListRow, MonthTitle, Sheet } from '../../components/ui'
@@ -20,9 +21,11 @@ const typeLabel = (type: IncomeType) => type === 'employment' ? 'Salary' : 'Othe
 /** "paid on the 28th (or the working day before)". */
 const paydayText = (payday: Payday) => `paid on the ${ordinal(payday.day)} (or the ${payday.ifNotWorkingDay === 'previous' ? 'working day before' : 'next working day'})`
 
-/** Edit one source for the month: its amount (month-scoped, with the scope line) and, for salary, its payday (every month). */
-function SourceForm({ source, month, formId, onSave }: { source: ResolvedIncomeSource; month: string; formId: string; onSave: (amountPence: number | null, payday: Payday | null | undefined) => void }) {
+/** Edit one source for the month: its amount (month-scoped, with the scope line) and, for salary, its payday and where it lands (every month). */
+function SourceForm({ source, month, formId, accounts, onSave }: { source: ResolvedIncomeSource; month: string; formId: string; accounts: Array<{ id: string; label: string }>; onSave: (amountPence: number | null, payday: Payday | null | undefined, landsIn: string | null | undefined) => void }) {
   const [amount, setAmount] = useState(amountText(source.amountPence))
+  const known = !!source.landsInAccountId && accounts.some(account => account.id === source.landsInAccountId)
+  const [landsIn, setLandsIn] = useState(known ? source.landsInAccountId! : '')
   const [day, setDay] = useState(source.payday ? String(source.payday.day) : '')
   const [rule, setRule] = useState<'previous' | 'next'>(source.payday?.ifNotWorkingDay ?? 'previous')
   const scopeId = useId()
@@ -31,7 +34,7 @@ function SourceForm({ source, month, formId, onSave }: { source: ResolvedIncomeS
     const typed = Number(day)
     // An empty day removes the payday; an invalid one leaves it as it was.
     const payday = source.type !== 'employment' ? undefined : !day.trim() ? null : Number.isInteger(typed) && typed >= 1 && typed <= 31 ? { day: typed, ifNotWorkingDay: rule } : undefined
-    onSave(pence(amount) === source.amountPence ? null : pence(amount), payday)
+    onSave(pence(amount) === source.amountPence ? null : pence(amount), payday, source.type !== 'employment' ? undefined : landsIn || null)
   }
   return <form id={formId} className="settings-form" aria-label={`Edit ${source.name}`} onSubmit={save}>
     <label>Amount in {formatMonth(month)}<span className="budget-money-field"><input data-autofocus inputMode="decimal" aria-describedby={scopeId} value={amount} onChange={event => setAmount(event.target.value)}/></span></label>
@@ -40,6 +43,8 @@ function SourceForm({ source, month, formId, onSave }: { source: ResolvedIncomeS
       <label>Paid on day<input inputMode="numeric" value={day} placeholder="28" onChange={event => setDay(event.target.value)}/></label>
       <label>On a weekend or bank holiday<select value={rule} onChange={event => setRule(event.target.value as 'previous' | 'next')}><option value="previous">The working day before</option><option value="next">The next working day</option></select></label>
     </fieldset>}
+    {source.type === 'employment' && <label>Pay lands in<select value={landsIn} onChange={event => setLandsIn(event.target.value)}><option value="">Not set</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.label}</option>)}</select></label>}
+    {source.type === 'employment' && <p className="settings-form-note">Payday steps then read from this account (“Starling Ada → Monzo Joint”), and money already here isn’t a step. Every month.</p>}
   </form>
 }
 
@@ -76,22 +81,29 @@ export function PayAndIncome({ document, setDocument, month, onMonthChange, noti
   const sources = resolveIncomeSources(document.budget, month)
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   const source = sources.find(row => row.id === editing)
+  const accountLabels = shortAccountLabels(document.budget.accounts, adults)
   const title = (row: ResolvedIncomeSource) => `${adults.find(adult => adult.id === row.personId)?.name ?? 'Someone'} · ${row.name}`
   const meta = (row: ResolvedIncomeSource) => [
     `${formatGBP(row.amountPence / 100)} a month`,
     row.name.trim().toLowerCase() === typeLabel(row.type).toLowerCase() ? '' : typeLabel(row.type).toLowerCase(),
     row.type === 'employment' && row.payday ? paydayText(row.payday) : '',
+    row.type === 'employment' && row.landsInAccountId ? `lands in ${accountLabels.get(row.landsInAccountId) ?? 'an account that’s gone (not set)'}` : '',
   ].filter(Boolean).join(' · ')
+  /** Where a person's pay can land: their own accounts, then joint ones. */
+  const landingAccounts = (personId: string) => document.budget.accounts.filter(account => account.ownerPersonIds.includes(personId))
+    .sort((a, b) => a.ownerPersonIds.length - b.ownerPersonIds.length).map(account => ({ id: account.id, label: accountLabels.get(account.id) ?? account.name }))
 
-  const saveSource = (id: string, amountPence: number | null, payday: Payday | null | undefined) => {
+  const saveSource = (id: string, amountPence: number | null, payday: Payday | null | undefined, landsIn: string | null | undefined) => {
     setDocument(current => {
       let budget = amountPence === null ? current.budget : updateIncomeAtMonth(current.budget, month, id, amountPence)
-      if (payday !== undefined) budget = { ...budget, incomeSources: budget.incomeSources.map(row => {
+      if (payday !== undefined || landsIn !== undefined) budget = { ...budget, incomeSources: budget.incomeSources.map(row => {
         if (row.id !== id) return row
         const next = { ...row }
         if (payday) next.payday = payday
-        else delete next.payday
-        return next
+        else if (payday === null) delete next.payday
+        if (landsIn) next.landsInAccountId = landsIn
+        else if (landsIn === null) delete next.landsInAccountId
+        return JSON.stringify(next) === JSON.stringify(row) ? row : next
       }) }
       return budget === current.budget ? current : { ...current, budget }
     })
@@ -109,7 +121,7 @@ export function PayAndIncome({ document, setDocument, month, onMonthChange, noti
       <button type="button" className="secondary-button" onClick={() => setEditing(null)}>Cancel</button>
       <button type="submit" form={formId} className="primary-button">{source ? 'Save income' : 'Add income'}</button>
     </>}>
-      {source ? <SourceForm source={source} month={month} formId={formId} onSave={(amount, payday) => saveSource(source.id, amount, payday)}/>
+      {source ? <SourceForm source={source} month={month} formId={formId} accounts={landingAccounts(source.personId)} onSave={(amount, payday, landsIn) => saveSource(source.id, amount, payday, landsIn)}/>
         : <AddSourceForm document={document} month={month} formId={formId} onSave={row => { setDocument(current => ({ ...current, budget: addIncomeSource(current.budget, month, row) })); setEditing(null); notify(`${row.name} added.`) }}/>}
     </Sheet>}
   </div>

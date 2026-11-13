@@ -46,3 +46,5 @@ button.step-amount:active{background:var(--share-track)}
 .step-copied{position:fixed;z-index:90;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin:0;padding:var(--space-2) var(--space-4);border-radius:var(--radius-lg);background:var(--accent);color:var(--white);font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;transform:translateX(-50%);box-shadow:var(--shadow-pop);pointer-events:none}
 .step-copied:empty{padding:0;background:transparent;box-shadow:none}
 .step-copy-hint{margin:0;padding:var(--space-3) var(--space-4) 0;color:var(--text-muted);font-size:var(--text-sm)}
+/* Not a step (Pay lands in): money already there. Muted, no tick; the amount still copies. */
+.step-row.is-quiet .step-label,.step-row.is-quiet .step-amount{color:var(--text-muted);font-weight:var(--weight-regular)}
