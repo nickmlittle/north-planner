@@ -78,10 +78,10 @@ export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick
   const shown = changed ? Math.abs(changed.differencePence) : amountPence ?? 0
   const amount = mode === 'status'
     ? amountText !== undefined && amountText !== null && amountText !== false && <span className="step-amount">{amountText}</span>
-    : amountPence !== undefined && <button type="button" className="step-amount" aria-label={`Copy ${pounds(shown)}`} onClick={() => onCopy?.(shown)}>{changed ? `${changed.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)}</button>
+    : amountPence !== undefined && <button type="button" className="step-amount" data-list-copy aria-label={`Copy ${pounds(shown)}`} onClick={() => onCopy?.(shown)}>{changed ? `${changed.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)}</button>
   const tickedAt = showTickedDay && status.state === 'done' ? ticks?.[stepKey]?.at : undefined
-  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}`} data-payday-account={account}>
-    {mode === 'tick' && <button type="button" className={`step-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={changed ? `${name}: mark the change done` : `${name} done`} disabled={!onTick} onClick={() => onTick?.(stepKey, status.state === 'done' ? null : amountPence ?? 0)}>
+  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}`} data-payday-account={account} data-list-row>
+    {mode === 'tick' && <button type="button" data-list-tick className={`step-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={changed ? `${name}: mark the change done` : `${name} done`} disabled={!onTick} onClick={() => onTick?.(stepKey, status.state === 'done' ? null : amountPence ?? 0)}>
       <span className="step-tick-dot" aria-hidden="true">{status.state === 'done' && <Check/>}{changed && <RefreshCw/>}</span>
     </button>}
     {mode === 'status' && <span className={`step-tick is-${status.state}`} aria-hidden="true"><span className="step-tick-dot">{status.state === 'done' && <Check/>}</span></span>}

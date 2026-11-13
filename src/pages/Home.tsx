@@ -1,6 +1,7 @@
 import { ArrowLeftRight, CalendarCheck, Check, FileText, Inbox, ListPlus, PiggyBank, TrendingUp, TriangleAlert, Upload } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { EmptyState, ListRow, PageHeader, Section, StatStrip, StatTile, StatusChip } from '../components/ui'
+import { EmptyState, ListKeysHint, ListRow, PageHeader, Section, StatStrip, StatTile, StatusChip } from '../components/ui'
+import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate } from '../domain/cardTracker'
 import { homeCount, homeInbox, type HomeTarget, type InboxKind, type InboxTask } from '../domain/homeInbox'
@@ -36,7 +37,7 @@ function TaskRow({ task, onOpen }: { task: InboxTask; onOpen: (target: HomeTarge
   </span>)}{task.note && <span>{task.note}</span>}</span> : task.meta
   return <li><ListRow icon={icons[task.kind]} tone={task.tone ?? 'neutral'} title={task.title} meta={meta}
     trailing={task.chip ? <StatusChip>{task.chip}</StatusChip> : task.trailing && <span className={task.tone === 'critical' ? 'home-figure is-critical' : 'home-figure'}>{task.trailing}</span>}
-    trailingMeta={task.trailingMeta} onOpen={() => onOpen(task.target)}/></li>
+    trailingMeta={task.trailingMeta} onOpen={() => onOpen(task.target)} listRow/></li>
 }
 
 /**
@@ -44,6 +45,7 @@ function TaskRow({ task, onOpen }: { task: InboxTask; onOpen: (target: HomeTarge
  * the order things are due, heads-ups last; Coming up and Done beside it on wide screens. Built by `homeInbox`.
  */
 export function Home({ document, month, onOpen, today = localDate() }: Props) {
+  const todoKeys = useListNavigation({ label: 'To do', keys: { enter: 'Open the task' } })
   const names = shortAccountLabels(document.budget.accounts, document.household.adults)
   const inbox = homeInbox(document, { month, today, nameDestination: destinationNamer(document), nameAccount: id => names.get(id) ?? 'Account' })
   const { strip, todo, headsUp, comingUp, done } = inbox
@@ -61,8 +63,9 @@ export function Home({ document, month, onOpen, today = localDate() }: Props) {
       {strip.card && <StatTile label={strip.card.name} value={<>{strip.card.value} <small className="home-tile-sub">{strip.card.sub}</small></>} detail={strip.card.detail} onOpen={() => onOpen({ view: 'spending', section: 'sort' })} openLabel="Open Spending"/>}
     </StatStrip>
     <div className="home-columns">
-      <Section title="To do" count={count}>
-        {count ? <ul className="home-list" aria-label="To do">
+      <Section title="To do" count={count} aside={count ? <ListKeysHint keys={[['J K', 'move'], ['↵', 'open']]}/> : undefined}>
+        {todoKeys.hint}
+        {count ? <ul className="home-list" aria-label="To do" {...todoKeys.listProps}>
           {todo.map(task => <TaskRow key={task.key} task={task} onOpen={onOpen}/>)}
           {headsUp.length > 0 && <li className="home-list-label" aria-hidden="true">Heads-up</li>}
           {headsUp.map(task => <TaskRow key={task.key} task={task} onOpen={onOpen}/>)}

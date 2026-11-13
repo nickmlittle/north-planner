@@ -209,6 +209,21 @@ North can be driven from the keyboard, as an enhancement: every action stays cli
 
 Hints show where there is a hovering pointer and room: “G M” beside sidebar items without a count, N on Add item, I on Bring in, / in Plan's search. Phones show none.
 
+**Lists.** Every list moves and acts the same way (`src/state/useListNavigation.tsx`). A list is one Tab stop, landing on the last row you were on (else the first); the controls inside a row leave the Tab order because the keys reach them. J or ↓ and K or ↑ move, Home and End jump, ↵ opens, Esc leaves to the list, and the focused row shows the selected surface with an accent bar. Each key clicks the row's own visible control, so nothing is keyboard-only. A visually hidden sentence names the keys once on entering the list, ? lists them while the list is on screen, and desktop headings show them as keys (“J K move · ↵ open”).
+
+| List | ↵ | Also |
+| --- | --- | --- |
+| Home › To do | Open the task | |
+| Plan › items | Edit the item | E edit the amount in place, D duplicate, Delete remove (asks first) |
+| Month › Payday steps (every person's, in order) | | X tick or untick (accepts a change), C copy the amount |
+| Month › Pots | Open the pot | |
+| Month › Cover overspends | | X, C |
+| Spending › To sort | Place it | / pot, A always, S split (its own table keys) |
+| Spending › Set-aside moves | | C |
+| Spending › Transactions | Open the sort sheet | |
+| Spending › Statements, and a statement's Settle up steps | Open the statement | X, C on steps |
+| Settings › sections | Open the section | |
+
 ### Language
 
 Use plain, concise British English and familiar household finance terms. Label actions with verbs (“Edit income”, “Add item”) and name amounts with the glossary below. Explain scope in calendar months. State what needs attention and how to resolve it without blame. Avoid implying a payment has happened or that an account owner necessarily funds every item.

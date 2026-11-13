@@ -10,6 +10,7 @@ import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
 import { Breadcrumb, EmptyState, ListRow, Meter, Section, StatusChip } from '../components/ui'
+import { useListNavigation } from '../state/useListNavigation'
 import { StepCaption, StepGroup, StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
@@ -37,6 +38,7 @@ export function StatementsPanel({ document, setDocument, today, statementKey, on
   // Back from a statement lands on its row.
   const opened = useRef<string | null>(null)
   const list = useRef<HTMLUListElement>(null)
+  const statementKeysNav = useListNavigation({ label: 'Statements', keys: { enter: 'Open the statement' } })
   useEffect(() => {
     if (statementKey) { opened.current = statementKey; return }
     if (!opened.current) return
@@ -47,10 +49,10 @@ export function StatementsPanel({ document, setDocument, today, statementKey, on
   const summaries = statementKeys(tracker).map(key => statementSummary(document, key, today)).filter((row): row is StatementSummary => !!row)
   return <Section title="Statements" count={summaries.length || undefined}>
     {!summaries.length ? <EmptyState title="No statements yet" action={<button type="button" className="secondary-button" onClick={onBringIn}>Bring in</button>}>Bring in transactions and each statement shows here.</EmptyState>
-      : <ul ref={list} className="statements-list" aria-label="Statements">{summaries.map(summary => <li key={summary.key} data-statement={summary.key}>
-        <ListRow title={statementName(summary.closeDate)} meta={`${shortDate(summary.from)} – ${shortDate(summary.closeDate)} · due ${dayDate(summary.dueDate)}`}
+      : <div {...statementKeysNav.listProps}>{statementKeysNav.hint}<ul ref={list} className="statements-list" aria-label="Statements">{summaries.map(summary => <li key={summary.key} data-statement={summary.key}>
+        <ListRow listRow title={statementName(summary.closeDate)} meta={`${shortDate(summary.from)} – ${shortDate(summary.closeDate)} · due ${dayDate(summary.dueDate)}`}
           trailing={signedPounds(summary.totalPence)} trailingMeta={<StatusChip tone={chipTone(summary)}>{statementStatus(summary).text}</StatusChip>} onOpen={() => onOpenStatement(summary.key)}/>
-      </li>)}</ul>}
+      </li>)}</ul></div>}
   </Section>
 }
 
@@ -148,6 +150,7 @@ function SettleSteps({ document, setDocument, summary, plan, done, total, paymen
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const potName = (potId?: string) => document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot'
   const ticks = summary.record?.ticks
+  const stepKeys = useListNavigation({ label: 'Settle-up steps', keys: { x: 'Tick or untick', c: 'Copy the amount' } })
   const setAsidePot = plan.setAside && document.budget.pots.find(pot => pot.id === plan.setAside!.potId)
   const { copy, status: copiedStatus } = useStepCopy()
   const stepLabel = (step: SettleStep) => step.kind === 'out' ? `Out of ${potName(step.potId)}` : step.kind === 'into' ? `Into ${potName(step.potId)}`
@@ -162,7 +165,7 @@ function SettleSteps({ document, setDocument, summary, plan, done, total, paymen
   const payFrom = plan.accounts.find(account => account.accountId === plan.payFromAccountId)
   return <Section title="Settle up" count={`${done} of ${total} done`}>
     {copiedStatus}
-    <div className="settle-up" role="region" aria-label="Settle-up steps">
+    <div className="settle-up" role="region" aria-label="Settle-up steps" {...stepKeys.listProps}>{stepKeys.hint}
       {plan.setAside && setAsidePot && <StepGroup className="settle-account" label={`Move to ${potPhrase(setAsidePot.name)}`} heading="h3" title={`Into ${potPhrase(setAsidePot.name)}`} aside={owners(document, document.budget.accounts.find(account => account.id === plan.payFromAccountId)?.ownerPersonIds ?? [])}>
         <StepRow mode="status" stepKey="set-aside" done={!plan.setAside.toMove} name={plan.setAside.toMove ? `Move the rest to ${potPhrase(setAsidePot.name)}` : `Everything is in ${potPhrase(setAsidePot.name)}`} amountText={plan.setAside.toMove > 0 && signedPounds(plan.setAside.toMovePence)}>
           {plan.setAside.toMove > 0 && <StepCaption>{plural(plan.setAside.toMove, 'transaction')} not moved yet. <button type="button" className="text-button" onClick={onMove}>Move them</button></StepCaption>}

@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
+import { useListNavigation } from '../state/useListNavigation'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { EmptyState, FilterSheet, Kbd, ListRow, StatusChip, useMobilePresentation, type FilterGroup } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
@@ -33,6 +34,7 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<TransactionFilters>(NO_FILTERS)
   const [filtering, setFiltering] = useState(false)
+  const rowKeys = useListNavigation({ label: 'Transactions', keys: { enter: 'Open the sort sheet' } })
   const all = allTransactions(tracker)
   const paid = payments(tracker)
   const where = (transaction: CardTransaction) => { const destination = sortDestination(transaction.sort); return transaction.sort ? destination ? name(destination) : splitLabel(transaction.sort.lines) : 'To sort' }
@@ -90,11 +92,11 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
     <ul>{paid.map(row => <li key={row.id}><span>{row.description}<small>{transactionMeta(document, row)}</small></span><span>{signedPounds(row.amountPence)}</span></li>)}</ul>
   </details></section>
 
-  if (mobile) return <div className="transactions">
+  if (mobile) return <div className="transactions" {...rowKeys.listProps}>{rowKeys.hint}
     {toolbar}{chipRow}{empty}
     {groups.map(group => <section key={group.month} className="transactions-month" aria-label={formatMonth(group.month)}>
       <h3 className="transactions-month-title">{formatMonth(group.month)}</h3>
-      <ul className="transactions-list">{group.rows.map(row => <li key={row.id}><ListRow title={row.description} label={label(row)}
+      <ul className="transactions-list">{group.rows.map(row => <li key={row.id}><ListRow title={row.description} label={label(row)} listRow
         meta={<>{dayDate(row.date)} · {person(row)} · {where(row)}{link(row) && <span className="transactions-link">{link(row)}</span>}</>} trailing={signedPounds(row.amountPence)} trailingMeta={tags(row).length ? <span className="transactions-tags">{tags(row)}</span> : undefined} onOpen={() => onOpen(row.id)}/>
         {splitLines(row).length > 0 && <ul className="transactions-split" aria-label={`${row.description} split`}>{splitLines(row).map((line, index) => <li key={index}><span>{lineName(line)}</span><span>{signedPounds(line.amountPence)}</span></li>)}</ul>}
       </li>)}</ul>
@@ -102,25 +104,18 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
     {paymentsBand}{sheet}
   </div>
 
-  // Desktop rows: ↑/↓ move, Enter (or a click) opens the sort sheet.
-  const onKey = (event: KeyboardEvent<HTMLTableRowElement>, id: string) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      const rows = [...event.currentTarget.closest('table')?.querySelectorAll<HTMLTableRowElement>('tr.transactions-row') ?? []]
-      rows[rows.indexOf(event.currentTarget) + (event.key === 'ArrowDown' ? 1 : -1)]?.focus()
-    } else if (event.key === 'Enter') { event.preventDefault(); onOpen(id) }
-  }
+  // Desktop rows: J/K and ↑/↓ move (useListNavigation), Enter (or a click) opens the sort sheet.
   return <div className="transactions">
     {toolbar}{chipRow}{empty}
-    {groups.length > 0 && <div className="transactions-table-wrap"><table className="transactions-table" aria-label="Transactions">
+    {groups.length > 0 && <div className="transactions-table-wrap" {...rowKeys.listProps}>{rowKeys.hint}<table className="transactions-table" aria-label="Transactions">
       <colgroup><col className="tx-col-date"/><col/><col className="tx-col-card"/><col className="tx-col-amount"/><col className="tx-col-pot"/><col className="tx-col-tags"/></colgroup>
       <thead><tr><th scope="col">Date</th><th scope="col">Merchant</th><th scope="col">Card</th><th scope="col" className="is-num">Amount</th><th scope="col">Pot or account</th><th scope="col">Tags</th></tr></thead>
       {groups.map(group => <tbody key={group.month}>
         <tr className="transactions-band"><th scope="rowgroup" colSpan={6}>{formatMonth(group.month)} <span>· {plural(group.rows.length, 'transaction')} · {signedPounds(group.totalPence)}</span></th></tr>
         {group.rows.flatMap(row => {
           const lines = splitLines(row)
-          return [<tr key={row.id} tabIndex={0} className="transactions-row" aria-label={label(row)}
-            onClick={() => onOpen(row.id)} onKeyDown={event => onKey(event, row.id)}>
+          return [<tr key={row.id} data-list-row data-list-open aria-keyshortcuts="J K Enter" className="transactions-row" aria-label={label(row)}
+            onClick={() => onOpen(row.id)}>
             <td>{dayDate(row.date)}</td>
             <td><span className="transactions-merchant">{row.description}</span>{link(row) && <span className="transactions-link">{link(row)}</span>}</td>
             <td>{cardLabel(document, row)}</td>

@@ -23,6 +23,8 @@ type Props = {
   grouping?: { value: PlanGrouping; onChange: (value: PlanGrouping) => void }
   /** "40 items", or "26 items · £3,767.72" while searching or narrowed to a destination. */
   count: string
+  /** The table's keys ("J K move · ↵ edit"), desktop only. */
+  keys?: ReactNode
   /** Expand all / Collapse all; absent when there are no bands. */
   expand?: { anyOpen: boolean; toggle: () => void }
   /** Arrived from Month's "26 items ›": a removable chip and a way back. */
@@ -38,7 +40,7 @@ type Props = {
  * Plan's one toolbar: search (/), Category | Destination, Filter (Owner, Category) with removable chips and Clear,
  * then the count and Expand all. On phones: search, a Filter icon button and +.
  */
-export function PlanToolbar({ query, onQueryChange, onSearchStart, inputRef, showFilters, owner, onOwnerChange, ownerOrder, category, onCategoryChange, categories, grouping, count, expand, destination, destinationRef, compact = false, onAdd }: Props) {
+export function PlanToolbar({ query, onQueryChange, onSearchStart, inputRef, showFilters, owner, onOwnerChange, ownerOrder, category, onCategoryChange, categories, grouping, count, keys, expand, destination, destinationRef, compact = false, onAdd }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const filterButton = useRef<HTMLButtonElement>(null)
   const activeCount = (owner !== 'All' ? 1 : 0) + (category !== 'All' ? 1 : 0)
@@ -101,7 +103,7 @@ export function PlanToolbar({ query, onQueryChange, onSearchStart, inputRef, sho
       {search}{switcher}{filter}
       {chips.length > 0 && <div className="plan-toolbar-chips" role="group" aria-label="Active filters">{chips}{<button type="button" className="text-button" onClick={clearFilters}>Clear filters</button>}</div>}
       <span className="plan-toolbar-spacer"/>
-      {countLine}{expandButton}
+      {keys}{countLine}{expandButton}
     </div>
     {sheet}
   </div>

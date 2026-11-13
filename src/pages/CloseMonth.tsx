@@ -1,6 +1,7 @@
 import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Clock, Inbox } from 'lucide-react'
 import { ListRow, Section, Sheet } from '../components/ui'
+import { useListNavigation } from '../state/useListNavigation'
 import { StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
@@ -22,6 +23,7 @@ type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<Bu
  * they fold to one line that expands.
  */
 export function CloseSections({ document, setDocument, month, today, onSort, onBringIn, now = () => new Date() }: Props) {
+  const coverKeys = useListNavigation({ label: 'Cover overspends', keys: { x: 'Tick or untick', c: 'Copy the amount' } })
   const plan = closeMonthPlan(document, month, today)
   const [moving, setMoving] = useState<Leftover | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -63,7 +65,7 @@ export function CloseSections({ document, setDocument, month, today, onSort, onB
 
     <Section title="Cover overspends" count={plan.overspends.length}>
       {!plan.overspends.length ? <p className="close-none">No pot went over in {name}.</p>
-        : <ol className="step-list close-covers">{plan.overspends.map(overspend => {
+        : <ol className="step-list close-covers" {...coverKeys.listProps}>{plan.overspends.map(overspend => {
           const caption = <>{destination({ kind: 'pot', potId: overspend.potId })} is {pounds(overspend.overPence)} over · covered from {coverFrom(overspend)}{overspend.cover.source.kind === 'next-month' && <> · Leaves {potName(overspend.potId)} {pounds(overspend.overPence)} short in {nextName}.</>}</>
           return overspend.cover.source.kind === 'next-month'
             ? <StepRow key={overspend.potId} stepKey={overspend.stepKey} mode="status" done name={stepText(overspend)} amountText={pounds(overspend.overPence)} caption={caption}/>
