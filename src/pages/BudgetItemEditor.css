@@ -1,0 +1,50 @@
+/* The item editor (audit 3 PR 17): one short form for adding and editing. Tokens only (styles.tokens.test.ts). */
+.item-editor-sheet{--sheet-width:560px}
+.item-editor{display:grid;gap:var(--space-3);padding-top:var(--space-3)}
+.item-editor-field{display:grid;gap:var(--space-1);min-width:0;color:var(--text);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.item-editor-field input,.item-editor-field select{box-sizing:border-box;width:100%;min-height:var(--control-h);margin:0;font-size:var(--text-md);font-weight:var(--weight-regular)}
+.item-editor-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--space-3);align-items:start}
+.item-editor-pair.is-amount{grid-template-columns:minmax(0,1fr) 140px}
+.item-editor-category{display:grid;gap:var(--space-2);min-width:0}
+.item-editor-hint{margin-top:calc(-1 * var(--space-2));color:var(--text-muted);font-size:var(--text-sm)}
+.item-editor-goes{display:grid;gap:var(--space-2);min-width:0;margin:0;padding:0;border:0}
+.item-editor-goes[tabindex="-1"]:focus{outline:none}
+.item-editor-goes legend{margin-bottom:var(--space-2);padding:0;color:var(--text);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.item-editor-chips{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.item-editor-chip{min-height:32px;margin:0;padding:0 var(--space-3);border:1px solid var(--border-field);border-radius:var(--radius-pill);background:var(--surface);color:var(--text);font:inherit;font-size:var(--text-sm);cursor:pointer}
+.item-editor-chip:hover{border-color:var(--accent)}
+.item-editor-chip[aria-pressed=true]{border-color:var(--accent);background:var(--accent);color:var(--white);font-weight:var(--weight-medium)}
+.item-editor-chip.is-other[aria-expanded=true]{border-color:var(--accent);background:var(--surface-selected)}
+.item-editor-picker{padding:var(--space-3);border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-sunken)}
+.item-editor-picker[tabindex="-1"]:focus{outline:none}
+.item-editor-allocation{display:grid;gap:var(--space-2);font-size:var(--text-sm)}
+.item-editor-allocation label{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;gap:var(--space-2)}
+.item-editor-allocation small{color:var(--text-muted)}
+.item-editor-split{margin:0;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.item-editor-error{margin:calc(-1 * var(--space-2)) 0 0;color:var(--critical);font-size:var(--text-sm)}
+.item-editor-sheet .sheet-footer{display:grid;gap:var(--space-2);justify-content:stretch}
+.item-editor-sheet .sheet-footer .budget-impact-compact{margin:0;font-size:var(--text-sm)}
+.item-editor-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--space-3)}
+.item-editor-actions>*{margin:0}
+.item-editor-secondary,.item-editor-another{display:inline-flex;align-items:center;gap:var(--space-3);margin-right:auto}
+.item-editor-another{gap:var(--space-1);color:var(--text-muted);font-size:var(--text-sm)}
+.item-editor-remove{color:var(--danger)}
+@media(max-width:767px){
+  .sheet-overlay>.sheet.item-editor-sheet{height:100dvh;max-height:100dvh;border-radius:0}
+  .item-editor-pair{grid-template-columns:minmax(0,1fr)}
+  .item-editor-pair.is-amount{grid-template-columns:minmax(0,1fr) 120px}
+  .item-editor-chip{min-height:var(--control-h-touch)}
+  .item-editor-another .kbd{display:none}
+  .item-editor-actions{display:grid;grid-template-columns:1fr 1fr}
+  .item-editor-actions .item-editor-secondary,.item-editor-actions .item-editor-another{grid-column:1 / -1;justify-content:center;margin:0}
+}
+/* The form keeps .budget-v3-panel for the picker's account fields, without the old side panel's box. */
+.item-editor.budget-v3-panel{width:auto;height:auto;overflow:visible;padding:var(--space-3) 0 0;background:none;box-shadow:none}
+.item-editor.budget-v3-panel .item-editor-goes{padding:0;border:0;border-radius:0}
+.item-editor.budget-v3-panel .item-editor-goes>legend{padding:0;color:var(--text);font-weight:var(--weight-medium)}
+/* The impact as one line: scope, then the balance before → after, with Funding changes folded. */
+.item-editor-sheet .sheet-footer .budget-impact,.item-editor-sheet .sheet-footer .budget-impact-plain{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-2);margin:0;padding:0;border:0;background:none;color:var(--text-muted);font-size:var(--text-sm)}
+.item-editor-sheet .sheet-footer .budget-impact p{margin:0}
+.item-editor-sheet .sheet-footer .budget-impact strong{color:var(--text)}
+.item-editor-sheet .sheet-footer .budget-impact details{flex-basis:100%;margin:0}
+.item-editor-sheet .sheet-footer .budget-impact summary{min-height:28px}
