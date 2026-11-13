@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import type { BudgetDestination } from './monthlyBudget'
+import { payLandsIn, type BudgetDestination } from './monthlyBudget'
 import { buildTransferMatrixModel, type MatrixItemRow } from './transferMatrix'
 
 export interface InstructionContribution { readonly personId: string; readonly amountPence: number }
@@ -17,7 +17,10 @@ export interface TransferInstruction {
   readonly kind: 'account-funding' | 'pot-movement'
   /** Null only for a withheld pot movement whose account has no owner. */
   readonly personId: string | null
+  /** Funding: where the person's pay lands, when known (null: steps read as before). Pot movement: the account. */
   readonly source: { readonly kind: 'account'; readonly accountId: string } | null
+  /** Funding into the account the person's pay already lands in: shown, but not a transfer to make or tick. */
+  readonly alreadyThere?: boolean
   readonly destination: Readonly<BudgetDestination>
   readonly amountPence: number
   readonly breakdown: readonly InstructionBreakdown[]
@@ -62,7 +65,7 @@ function breakdown(items: readonly MatrixItemRow[], personId?: string): Instruct
 }
 const sumBreakdown = (items: readonly InstructionBreakdown[]) => items.reduce((sum, item) => sum + item.amountPence, 0)
 
-/** Derived only: no bank execution, source-account inference, automation or completion state. */
+/** Derived only: no bank execution, automation or completion state. A funding step's source is where the person's pay lands, when set. */
 export function buildTransferInstructions(document: BudgetDocument, month: string): TransferInstructions {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Transfer instructions require a calendar month')
   // Reuse the validated, penny-accurate projection; do not allocate or round again.
@@ -78,9 +81,11 @@ export function buildTransferInstructions(document: BudgetDocument, month: strin
     const status = issues.length ? 'needs-review' : 'ready'
     const fundingRequirements: TransferInstruction[] = account.byPerson.flatMap(person => {
       const detail = breakdown(items, person.personId)
+      const from = payLandsIn(document.budget, person.personId, month)
       return person.amountPence > 0 ? [{
         id: JSON.stringify(['account-funding', month, account.accountId, person.personId]), month,
-        kind: 'account-funding' as const, personId: person.personId, source: null,
+        kind: 'account-funding' as const, personId: person.personId, source: from ? { kind: 'account' as const, accountId: from } : null,
+        ...from === account.accountId ? { alreadyThere: true } : {},
         destination: { kind: 'account' as const, accountId: account.accountId }, amountPence: sumBreakdown(detail),
         breakdown: detail, dependsOn: [], status,
       }] : []
@@ -98,7 +103,7 @@ export function buildTransferInstructions(document: BudgetDocument, month: strin
           id: JSON.stringify(['pot-movement', month, account.accountId, allocation.potId, personId]), month,
           kind: 'pot-movement' as const, personId, source: { kind: 'account' as const, accountId: account.accountId },
           destination: { kind: 'pot' as const, potId: allocation.potId }, amountPence: sumBreakdown(detail), breakdown: detail,
-          dependsOn: fundingRequirements.filter(step => account.ownerPersonIds.length <= 1 || step.personId === personId).map(step => step.id), status,
+          dependsOn: fundingRequirements.filter(step => !step.alreadyThere && (account.ownerPersonIds.length <= 1 || step.personId === personId)).map(step => step.id), status,
         }
       })
     })
@@ -106,7 +111,8 @@ export function buildTransferInstructions(document: BudgetDocument, month: strin
   })
   const issues = accounts.flatMap(account => account.issues)
   const ready = accounts.filter(account => account.status === 'ready')
-  const fundingSteps = ready.flatMap(account => account.fundingRequirements)
+  // Money already where it lands isn't a step to take.
+  const fundingSteps = ready.flatMap(account => account.fundingRequirements.filter(step => !step.alreadyThere))
   const potSteps = ready.flatMap(account => account.potMovements)
   return {
     month, accounts, steps: [...fundingSteps, ...potSteps], issues, incomplete: issues.length > 0,

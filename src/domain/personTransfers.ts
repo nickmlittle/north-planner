@@ -7,7 +7,8 @@ export type PersonAmount = { personId: string; amountPence: number }
 export type PersonPotMove = { potId: string; amountPence: number; fromOthers: PersonAmount[] }
 /** Someone else who moves part of this person's funding into pots afterwards. */
 export type MovedOnBy = { personId: string; potIds: string[]; amountPence: number }
-export type PersonTransferRow = { accountId: string; fundingPence: number; potMoves: PersonPotMove[]; movedOnBy: MovedOnBy[] }
+/** `alreadyThere`: the person's pay lands in this account, so its funding is shown but isn't a step. `fromAccountId`: where the funding comes from, when known. */
+export type PersonTransferRow = { accountId: string; fundingPence: number; alreadyThere: boolean; fromAccountId: string | null; potMoves: PersonPotMove[]; movedOnBy: MovedOnBy[] }
 /** `stepCount` is `fundCount` (accounts to fund) plus `moveCount` (pot moves). */
 export type PersonTransferPlan = { personId: string; fundingPence: number; fundCount: number; moveCount: number; stepCount: number; rows: PersonTransferRow[] }
 export type NeedsReviewReason = 'unavailable' | 'unallocated' | 'missing-pot-owner'
@@ -50,6 +51,8 @@ export function personTransferPlans(accounts: readonly TransferAccount[], instru
   const people = personIds.map(personId => {
     const rows = ready.flatMap(account => {
       const fundingPence = accountPeople(account, [personId])[0]!.amountPence
+      const funding = instructionFor(account)!.fundingRequirements.find(step => step.personId === personId)
+      const alreadyThere = !!funding?.alreadyThere, fromAccountId = funding?.source?.accountId ?? null
       const movements = instructionFor(account)!.potMovements.filter(step => step.amountPence > 0 && step.destination.kind === 'pot')
       const potMoves = movements.filter(step => step.personId === personId)
         .map(step => ({ potId: potId(step), amountPence: step.amountPence, fromOthers: contributedBy(step, personId) }))
@@ -61,9 +64,9 @@ export function personTransferPlans(accounts: readonly TransferAccount[], instru
         if (existing) { existing.potIds.push(potId(step)); existing.amountPence += mine }
         else movedOnBy.push({ personId: step.personId, potIds: [potId(step)], amountPence: mine })
       }
-      return fundingPence > 0 || potMoves.length ? [{ accountId: account.accountId, fundingPence, potMoves, movedOnBy }] : []
+      return fundingPence > 0 || potMoves.length ? [{ accountId: account.accountId, fundingPence, alreadyThere, fromAccountId, potMoves, movedOnBy }] : []
     })
-    const fundCount = rows.filter(row => row.fundingPence > 0).length
+    const fundCount = rows.filter(row => row.fundingPence > 0 && !row.alreadyThere).length
     const moveCount = rows.reduce((sum, row) => sum + row.potMoves.length, 0)
     return {
       personId, rows,

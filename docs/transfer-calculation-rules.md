@@ -34,10 +34,20 @@ Zero allocations create no actionable steps. Existing income-policy fields remai
 
 ## Routing and responsibility
 
-1. **Fund accounts:** group contributions by person and destination account, including both direct allocations and its pot allocations. The source is unknown (`null`). Do not assume that salaries arrive in a particular account, that funding an owned account requires an external transfer, or that money already present should be moved again.
+1. **Fund accounts:** group contributions by person and destination account, including both direct allocations and its pot allocations. The source is where that person's pay lands, when it's set (see *Source account*); otherwise it is unknown (`null`) and nothing is assumed about where salaries arrive.
 2. **Distribute pots:** after funding, derive movements from the parent account to each pot. For a joint account, each contributor handles their own shares, including a contributor who is not one of the joint owners. For a sole-owned account, its owner moves the combined pot allocation, retaining every original contributor in the breakdown. An account without an owner has unresolved pot responsibility.
 
-Source accounts, automation and account operating permissions have not been verified. A complete calculated instruction does not mean a bank payment is required, manual, authorised or completed. The app does not execute payments.
+### Source account ("Pay lands in")
+
+Agreed 13 November 2026 (audit 3, decision D9).
+
+- **Where pay lands.** An employment income can name the account it lands in (`landsInAccountId`), shared by every month like its payday. A person's **source** for a month is the landing account of their employment income with the largest amount that month; ties go to the first. With none set, or when that account no longer exists, the source is `null` and the steps read as before.
+- **Already there.** A funding requirement into the person's own source account is money already in place: it is marked `alreadyThere`, shown ("Already in Starling Ada"), but is not a step. It is left out of the actionable `steps`, their funding total, the person's "to fund" count and their progress, and it is not a dependency of the pot moves out of that account. Those pot moves remain steps.
+- **From → to.** Every other funding requirement keeps its amount and reads as a transfer from the source ("Starling Ada → Monzo Joint"), including a cross-person one ("Starling Ada → Nationwide Ben", with Ben's pot move captioned as before).
+- **Ticks.** Step keys don't change, so existing ticks stay on their steps. A tick left on a step that became "already there" is ignored, not deleted, and counts again if the source changes back.
+- The landing account is a reference the app tolerates losing: deleting the account doesn't invalidate the document; the source just falls back to `null`.
+
+Automation and account operating permissions have not been verified. A complete calculated instruction does not mean a bank payment is required, manual, authorised or completed. The app does not execute payments.
 
 Funding dependencies link each joint pot step to that person's account-funding requirement. A sole-owner pot step depends on all contributions to its account. These links describe planning order, not tracked payment completion. The mobile step list orders each person's steps by account, funding first and then that account's pot moves; where a pot move depends on someone else's funding, it says so in a caption rather than reordering across people.
 
