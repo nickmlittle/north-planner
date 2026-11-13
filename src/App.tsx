@@ -11,6 +11,7 @@ import { AccountAccess } from './components/AccountAccess'
 import { DocumentConflict } from './components/DocumentConflict'
 import { AppLayout } from './components/AppLayout'
 import { CommandPalette } from './components/CommandPalette'
+import { UpdateToast } from './components/UpdateToast'
 import { Notice, PageSkeleton } from './components/ui'
 import { saveStatusLabel } from './components/saveStatus'
 import { localDate } from './domain/cardTracker'
@@ -126,7 +127,7 @@ export default function App() {
     void supabase.auth.getSession().then(({ data, error }) => { if (!error) setSession(data.session); setLoading(false) })
     return () => subscription.unsubscribe()
   }, [])
-  if (!supabase) return <LocalApp />
-  if (loading) return <main className="account-screen"><p role="status">Checking your account…</p></main>
-  return session ? <CloudApp key={session.user.id} session={session} /> : <AccountAccess />
+  const screen = !supabase ? <LocalApp /> : loading ? <main className="account-screen"><p role="status">Checking your account…</p></main>
+    : session ? <CloudApp key={session.user.id} session={session} /> : <AccountAccess />
+  return <>{screen}<UpdateToast/></>
 }

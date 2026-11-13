@@ -6,10 +6,19 @@
     <!-- Phones: tints the browser and status bar to the pine header. Desktop keeps the browser default. -->
     <meta name="theme-color" media="(max-width: 767px)" content="#203e32" />
     <meta name="description" content="North Planner — household budgeting and monthly transfers." />
+    <!-- Installable (audit 3 PR 21): the manifest, icons, and standalone on iPhone under the pine header. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/icons/north.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/north-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="North" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet" />
-    <title>North Planner</title>
+    <title>North</title>
   </head>
   <body>
     <div id="root"></div>
