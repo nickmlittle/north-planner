@@ -12,6 +12,7 @@ import { formatMonth } from '../../formatting/month'
 import { destinationNamer } from '../cardLabels'
 import { dayOf, pounds, signedPounds } from '../spendingFormat'
 import './PotsSection.css'
+import { useListNavigation } from '../../state/useListNavigation'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 const whole = (pence: number) => formatGBPWhole(Math.round(pence / 100))
@@ -66,6 +67,7 @@ function spendingRow(document: BudgetDocument, row: DestinationSpending, figures
  */
 export function PotsSection({ document, month, today, onOpenPot, onOpenSpending, title = 'Pots' }: { document: BudgetDocument; month: string; today: string; onOpenPot: (potId: string) => void; onOpenSpending?: () => void; title?: string }) {
   const mobile = useMobilePresentation()
+  const potKeys = useListNavigation({ label: 'Pots', keys: { enter: 'Open the pot' } })
   const [showAll, setShowAll] = useState(false)
   const figures = monthSpending(document, month, today)
   const name = destinationNamer(document)
@@ -106,23 +108,23 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
 
   return <Section title={title} id="month-pots" count={count} aside={!mobile ? aside : undefined}>
     {!groups.length && !quiet.length ? <EmptyState title="No pot spending yet" action={onOpenSpending && <button type="button" className="secondary-button" onClick={onOpenSpending}>Open Spending</button>}>Bring in Amex transactions to see each pot against the plan.</EmptyState>
-      : mobile ? <div className="pots-cards">
+      : mobile ? <div className="pots-cards" {...potKeys.listProps}>{potKeys.hint}
         {groups.map(group => <section key={group.key} className="pots-card" aria-label={group.label}>
           <h3 className="pots-card-title">{group.label}</h3>
           <ul>{group.rows.map(row => <li key={row.key}>{row.potId
-            ? <button type="button" className="pots-card-row" onClick={() => open(row)} aria-label={`${label(row)}: ${cardFigure(row)}. ${row.status}`}>{cardBody(row, pace)}</button>
+            ? <button type="button" className="pots-card-row" data-list-row onClick={() => open(row)} aria-label={`${label(row)}: ${cardFigure(row)}. ${row.status}`}>{cardBody(row, pace)}</button>
             : <div className="pots-card-row">{cardBody(row, pace)}</div>}</li>)}</ul>
         </section>)}
         {more}
       </div>
-      : <div className="pots-table-wrap"><table className="pots-table">
+      : <div className="pots-table-wrap" {...potKeys.listProps}>{potKeys.hint}<table className="pots-table">
         <caption className="visually-hidden">Pots in {formatMonth(month)}: spent, planned, left, pace and balance</caption>
         <thead><tr><th scope="col">Pot</th><th scope="col" className="is-num">Spent</th><th scope="col" className="is-num">Planned</th><th scope="col" className="is-num">Left</th><th scope="col" className="pots-pace">Pace</th><th scope="col" className="is-num">In {bank}</th></tr></thead>
         {groups.map(group => <tbody key={group.key}>
           <tr className="pots-band"><th scope="rowgroup" colSpan={6}>{group.label}</th></tr>
           {/* The name is the row's button (Tab, Enter); a click anywhere on the row opens it too. */}
-          {group.rows.map(row => <tr key={row.key} className={row.potId ? 'is-link' : undefined} onClick={event => { if (!(event.target as HTMLElement).closest('button')) open(row) }}>
-            <th scope="row">{row.potId ? <button type="button" className="pots-name" onClick={() => open(row)} aria-label={`${label(row)}: ${row.spent} spent${row.planned && row.planned !== '—' ? ` of ${row.planned}` : ''}. ${row.status}`}>{row.name}</button> : <span className="pots-name">{row.name}</span>}{row.kind && <span className="pots-kind"> · {row.kind}</span>}</th>
+          {group.rows.map(row => <tr key={row.key} className={row.potId ? 'is-link' : undefined} {...row.potId ? { 'data-list-row': '' } : {}} onClick={event => { if (!(event.target as HTMLElement).closest('button')) open(row) }}>
+            <th scope="row">{row.potId ? <button type="button" className="pots-name" data-list-open onClick={() => open(row)} aria-label={`${label(row)}: ${row.spent} spent${row.planned && row.planned !== '—' ? ` of ${row.planned}` : ''}. ${row.status}`}>{row.name}</button> : <span className="pots-name">{row.name}</span>}{row.kind && <span className="pots-kind"> · {row.kind}</span>}</th>
             <td className="is-num">{row.spent}</td><td className="is-num">{row.planned}</td><td className="is-num">{row.left}</td>
             <td className="pots-pace">{pace(row)}</td><td className="is-num">{row.inBank}</td>
           </tr>)}

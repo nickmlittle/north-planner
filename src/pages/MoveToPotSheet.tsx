@@ -1,3 +1,4 @@
+import { useListNavigation } from '../state/useListNavigation'
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import { ModalDialog } from '../components/ModalDialog'
 import { StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
@@ -87,6 +88,7 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
  * hub account, into the Amex pot. Copy-only steps. Used by the Set aside block and the sheet.
  */
 export function SetAsideSteps({ document, cardId, rows, onCopy }: { document: BudgetDocument; cardId: string; rows: readonly ToMoveRow[]; onCopy: (pence: number) => void }) {
+  const stepKeys = useListNavigation({ label: 'Set-aside moves', keys: { c: 'Copy the amount' } })
   const card = cardTracker(document).cards.find(row => row.id === cardId)
   const pot = document.budget.pots.find(row => row.id === card?.setAside?.potId)
   const plan = moveSteps(document, cardId, rows)
@@ -102,7 +104,7 @@ export function SetAsideSteps({ document, cardId, rows, onCopy }: { document: Bu
   const potStep = total === 0 ? null : step('set-aside', total > 0 ? `Into ${pot.name}` : `Out of ${pot.name}`, Math.abs(total), true)
   const hub = plan.accounts.find(account => account.accountId === plan.accountId)
   const others = plan.accounts.filter(account => account.accountId !== plan.accountId && account.steps.length)
-  return <>
+  return <div className="set-aside-moves" {...stepKeys.listProps}>{stepKeys.hint}
     {total < 0 && hub && <StepGroup heading="h3" title={label(plan.accountId)} aside={owners(document, hub.ownerPersonIds)}>{potStep}</StepGroup>}
     {others.map(account => <StepGroup key={account.accountId} label={`${label(account.accountId)} moves`} heading="h3" title={label(account.accountId)} aside={owners(document, account.ownerPersonIds)}>
       {account.steps.map(row => step(row.key, stepLabel(row), row.amountPence, row.kind === 'out' || row.kind === 'into'))}
@@ -111,5 +113,5 @@ export function SetAsideSteps({ document, cardId, rows, onCopy }: { document: Bu
       footer={hub?.oneOffsPence ? `Includes ${pounds(hub.oneOffsPence)} of one-offs already in ${label(plan.accountId)}` : undefined}>
       {hub?.steps.map(row => step(row.key, stepLabel(row), row.amountPence, true))}{total > 0 && potStep}
     </StepGroup>}
-  </>
+  </div>
 }

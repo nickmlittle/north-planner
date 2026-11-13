@@ -5,7 +5,8 @@ import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { moneyPence } from '../domain/budgetItemDrafts'
 import { updateBudgetAtMonth, type BudgetItem } from '../domain/monthlyBudget'
 import { GroupedTable, GroupedTableBandRow, GroupedTableDisclosure, type GroupedTableGroup } from '../components/GroupedTable'
-import { Kbd } from '../components/ui'
+import { Kbd, ListKeysHint } from '../components/ui'
+import { useListNavigation } from '../state/useListNavigation'
 import { balanceLabel, formatGBP } from '../formatting/money'
 import type { PlanDestination } from '../state/navigation'
 import type { PlanGroup, PlanGrouping, PlanItemLabels, PlanSubgroup } from './planRows'
@@ -44,7 +45,7 @@ type Props = {
   /** Bands by category or by destination; each keeps its own open groups. */
   grouping: PlanGrouping
   /** The toolbar above the table, given the count ("40 items", or with the total while narrowed) and Expand all when there are bands. */
-  renderToolbar?: (controls: { count: string; expand?: { anyOpen: boolean; toggle: () => void } }) => ReactNode
+  renderToolbar?: (controls: { count: string; keys?: ReactNode; expand?: { anyOpen: boolean; toggle: () => void } }) => ReactNode
   /** The month's whole plan, for each group's share of it. */
   planTotalPence: number
   /** Changes when the Owner or Category filter does; closes the quick edit like a search would. */
@@ -65,6 +66,7 @@ type Props = {
 
 /** The Plan's items in one card: collapsible groups with their share of the plan, a Total row, the row menu and the quick amount edit. */
 export function PlanTable({ document, setDocument, month, editScopeLabel, groups, labels, query, planDestination, view, mobilePresentation, scoped, openGroups, onOpenGroupsChange, groupsOpenByDefault, grouping, renderToolbar, planTotalPence, filterKey, editorOpen, empty, onEdit, onRemove, onDuplicate, onQuickEditOpen, onAmountSaved, focusFallback }: Props) {
+  const listKeys = useListNavigation({ label: 'Budget items', keys: { enter: 'Edit the item', e: 'Edit the amount in place', d: 'Duplicate', delete: 'Remove (asks first)' } })
   const [destinationClosed, setDestinationClosed] = useState<Record<string, boolean>>({})
   const [inlineId, setInlineId] = useState<string | null>(null), [inlineValue, setInlineValue] = useState(''), [formError, setFormError] = useState('')
   const [, setImpactRetry] = useState(0)
@@ -188,9 +190,9 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     // Destination bands, or a pot or direct-to-account view, already name the destination, so the line says the category instead.
     const sameDestination = !searchMode && (grouping === 'destination' || (!!planDestination && planDestination.kind !== 'account'))
     const inlineEditable = item.frequency === 'monthly' && item.funding !== 'fixed'
-    return <Fragment key={item.id}><tr className={`budget-v3-item${nested ? ' is-nested' : ''}${editing ? ' is-editing' : ''}`} data-inline-edit={editing ? item.id : undefined} onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
+    return <Fragment key={item.id}><tr className={`budget-v3-item${nested ? ' is-nested' : ''}${editing ? ' is-editing' : ''}`} data-list-row aria-keyshortcuts="J K Enter E D Delete" data-inline-edit={editing ? item.id : undefined} onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
       <th scope="row">
-        <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
+        <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-list-open data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
         <span className="budget-v3-item-meta"><span className="visually-hidden">Funding: </span>{labels.fundingLabel(item)}<span aria-hidden="true"> · </span>{sameDestination
           ? <><span className="visually-hidden">Category: </span>{category}</>
           : <><span className="visually-hidden">Destination: </span>{labels.destinationLabel(item)}</>}</span>
@@ -206,7 +208,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
               else if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); const pence = moneyPence(inlineValue); edit(item, pence === undefined || pence === item.amountPence ? undefined : pence) }
             }}/></span>
         : inlineEditable
-          ? <button type="button" data-amount-trigger={item.id} className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={editing} onClick={event => { inlineTrigger.current = event.currentTarget; setInlineId(item.id); setInlineValue((item.amountPence / 100).toFixed(2)); setSettledValue((item.amountPence / 100).toFixed(2)); setFormError(''); onQuickEditOpen() }}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>
+          ? <button type="button" data-amount-trigger={item.id} data-list-edit className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={editing} onClick={event => { inlineTrigger.current = event.currentTarget; setInlineId(item.id); setInlineValue((item.amountPence / 100).toFixed(2)); setSettledValue((item.amountPence / 100).toFixed(2)); setFormError(''); onQuickEditOpen() }}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>
           : <span className="budget-v3-amount is-static" title={item.funding === 'fixed' ? 'Fixed amounts: edit in the item' : 'Edit this amount in the item'}><span>{pounds(item.amountPence)}</span>{item.funding === 'fixed' ? <Lock aria-hidden="true" className="budget-v3-amount-icon"/> : <span aria-hidden="true" className="budget-v3-amount-icon"/>}</span>}</td>
       {desktop && <td className="plan-actions-cell"><details className="budget-v3-row-menu" onToggle={event => {
         const menu = event.currentTarget
@@ -216,7 +218,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
         menu.dataset.openUp = bottom - menu.getBoundingClientRect().bottom < 120 ? 'true' : 'false'
       }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false; event.currentTarget.querySelector<HTMLElement>('summary')?.focus() } }}>
         <summary aria-label={`More actions for ${item.name}`}><Ellipsis aria-hidden="true"/></summary>
-        <div className="budget-v3-menu-actions"><button type="button" onClick={event => { event.currentTarget.closest('details')!.open = false; closeInline(); onDuplicate(item) }}>Duplicate</button><button type="button" onClick={event => { const menu = event.currentTarget.closest('details')!; menu.open = false; onRemove(item, menu.querySelector('summary')) }}>Remove</button></div>
+        <div className="budget-v3-menu-actions"><button type="button" data-list-duplicate onClick={event => { event.currentTarget.closest('details')!.open = false; closeInline(); onDuplicate(item) }}>Duplicate</button><button type="button" data-list-remove onClick={event => { const menu = event.currentTarget.closest('details')!; menu.open = false; onRemove(item, menu.querySelector('summary')) }}>Remove</button></div>
       </details></td>}
     </tr>{editing && <tr className="budget-v3-inline-row" data-inline-edit={item.id}><td colSpan={colSpan}><form id={`inline-form-${item.id}`} className="plan-inline-form" aria-label={`Quick edit amount for ${item.name}`} onSubmit={event => { event.preventDefault(); commitInline(item) }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}>
       {impactLine(item, impact)}
@@ -231,9 +233,9 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
   }
 
   const count = `${itemCount(shown.length)}${searchMode || planDestination ? ` · ${pounds(sumOf(shown))}` : ''}`
-  const toolbar = renderToolbar?.({ count, expand: banded ? { anyOpen, toggle: () => { if (anyOpen) closeInline(); groups.forEach(group => setGroupOpen(group.key, !anyOpen)) } } : undefined })
+  const toolbar = renderToolbar?.({ count, keys: desktop ? <ListKeysHint keys={[['J K', 'move'], ['↵', 'edit'], ['E', 'amount']]}/> : undefined, expand: banded ? { anyOpen, toggle: () => { if (anyOpen) closeInline(); groups.forEach(group => setGroupOpen(group.key, !anyOpen)) } } : undefined })
   if (empty) return <>{toolbar}{empty}</>
-  return <>{toolbar}<section className="plan-card" aria-label="Budget items">
+  return <>{toolbar}<section className="plan-card" aria-label="Budget items" {...listKeys.listProps}>{listKeys.hint}
     <GroupedTable
       wrapClassName={`budget-v3-table-wrap${desktop ? ' is-flat' : ''}`} className="budget-v3-table"
       regionLabel="Plan table" caption={searchMode ? 'Matching budget items' : `Budget items by ${grouping}`}

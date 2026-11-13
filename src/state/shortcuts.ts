@@ -10,7 +10,8 @@ import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
  * while a modal dialog is open, or when a component has already handled the key (`preventDefault`).
  */
 export type ShortcutGroup = 'Go to' | 'This page' | 'Lists' | 'General'
-export type Shortcut = { keys: string; description: string; group: ShortcutGroup; run: () => void; when?: () => boolean }
+/** `display`: listed in ? but handled elsewhere (a list's own keys), so the global listener ignores it. */
+export type Shortcut = { keys: string; description: string; group: ShortcutGroup; run: () => void; when?: () => boolean; display?: boolean }
 
 /** How long the second key of a sequence ("g", then "m") has to arrive. */
 export const SEQUENCE_MS = 1000
@@ -53,7 +54,7 @@ function onKeyDown(event: KeyboardEvent) {
   if (!key) return
   if (isTyping(event.target) && !key.startsWith('mod+')) return
   if (window.document.querySelector('[aria-modal="true"]')) return
-  const active = entries.map(entry => entry.shortcut()).filter(shortcut => !shortcut.when || shortcut.when())
+  const active = entries.map(entry => entry.shortcut()).filter(shortcut => !shortcut.display && (!shortcut.when || shortcut.when()))
   // The newest registration wins, so a page can take a key from the shell.
   const find = (keys: string) => [...active].reverse().find(shortcut => shortcut.keys === keys)
   const sequence = pending ? `${pending.prefix} ${key}` : null

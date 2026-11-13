@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
@@ -1331,3 +1331,48 @@ it('shows everyone’s steps side by side on desktop, with progress, account ban
   expect(screen.getByRole('region',{name:'Steps by person'})).toBeInTheDocument()
 })
 
+
+describe('keyboard lists', () => {
+  it('moves through Plan items with J and K, edits the amount with E, and duplicates with D', () => {
+    desktop()
+    const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
+    const item=(id:string,name:string,pence:number)=>({id,name,categoryId:'bills',destination:{kind:'account' as const,accountId:'a1'},entryAmountPence:pence,amountPence:pence,frequency:'monthly' as const,funding:'equal' as const})
+    initial.budget.snapshots[month]={items:[item('rent','Rent',10000),item('gas','Gas',5000)]}
+    render(<SeededHarness initial={initial}/>)
+    const table=screen.getByRole('region',{name:'Budget items'})
+    const rows=[...table.querySelectorAll<HTMLElement>('tr[data-list-row]')]
+    expect(rows.map(row=>row.tabIndex)).toEqual([0,-1])
+    expect(within(rows[0]!).getByRole('button',{name:'Edit amount for Rent'}).tabIndex).toBe(-1)
+    rows[0]!.focus()
+    fireEvent.keyDown(rows[0]!,{key:'j'})
+    expect(rows[1]).toHaveFocus()
+    fireEvent.keyDown(rows[1]!,{key:'e'})
+    const amount=screen.getByRole('textbox',{name:'Monthly amount for Gas'})
+    fireEvent.change(amount,{target:{value:'60'}})
+    fireEvent.submit(screen.getByRole('form',{name:'Quick edit amount for Gas'}))
+    expect(screen.getByRole('button',{name:'Edit amount for Gas'})).toHaveTextContent('£60.00')
+    fireEvent.keyDown(screen.getByRole('button',{name:'Edit amount for Gas'}),{key:'k'})
+    expect(table.querySelector('tr[data-list-row]')).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!,{key:'d'})
+    expect(within(screen.getByRole('dialog',{name:'Add item'})).getByLabelText('Name')).toHaveValue('Rent (copy)')
+  })
+
+  it('copies with C and ticks with X on Payday steps', () => {
+    const writeText=vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}})
+    try {
+      render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
+      const steps=[...screen.getByRole('region',{name:'Steps by person'}).querySelectorAll<HTMLElement>('li[data-list-row]')]
+      expect(steps.filter(step=>step.tabIndex===0)).toHaveLength(1)
+      steps[0]!.focus()
+      fireEvent.keyDown(steps[0]!,{key:'j'})
+      expect(steps[1]).toHaveFocus()
+      fireEvent.keyDown(steps[1]!,{key:'c'})
+      expect(writeText).toHaveBeenCalledOnce()
+      fireEvent.keyDown(steps[1]!,{key:'x'})
+      expect(within(steps[1]!).getByRole('button',{name:/ done$/})).toHaveAttribute('aria-pressed','true')
+      fireEvent.keyDown(steps[1]!,{key:'x'})
+      expect(within(steps[1]!).getByRole('button',{name:/ done$/})).toHaveAttribute('aria-pressed','false')
+    } finally { Reflect.deleteProperty(navigator,'clipboard') }
+  })
+})

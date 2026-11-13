@@ -6,6 +6,7 @@ import { stepSummary } from './budgetLabels'
 import { fundStepKey, moveStepKey, personProgress, type StepTick } from '../domain/transferTicks'
 import { Meter } from '../components/ui'
 import { StepCaption, StepGroup, StepRow } from '../components/ui/StepRow'
+import { useListNavigation } from '../state/useListNavigation'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
 const list = (values: string[]) => values.length < 2 ? values.join('') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
@@ -47,6 +48,7 @@ type Props = {
  * band per account: fund it, then move money into its pots, indented. Tick a step once done; the amount copies.
  */
 export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potName, onSeeItems, affectedAccounts, ticks, onTick, onCopy, availableByPerson, accountOwnerLabel, onReview }: Props) {
+  const listKeys = useListNavigation({ label: 'Payday steps', keys: { x: 'Tick or untick (accepts a change)', c: 'Copy the amount' } })
   const name = (personId: string) => adults.find(adult => adult.id === personId)?.name ?? 'Person'
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
   const chosen = selection !== 'both' ? selection : null
@@ -95,7 +97,7 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   return <div className="payday" role="region" aria-label="Steps by person">
     {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
     {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
-    {shown.length > 0 && <div className="payday-people">{shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
+    {shown.length > 0 && <div className="payday-people" {...listKeys.listProps}>{listKeys.hint}{shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
       {personHead(plan)}
       {steps(plan)}
     </section>)}</div>}

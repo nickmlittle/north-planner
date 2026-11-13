@@ -1,0 +1,8 @@
+/* A list row with keyboard focus (audit 3 PR 18): the selected surface and an accent bar, on top of the focus ring. Tokens only. */
+[data-list][tabindex="-1"]:focus{outline:none}
+[data-list-row]{scroll-margin-top:calc(var(--page-sticky-top, 0px) + var(--space-7));scroll-margin-bottom:var(--space-7)}
+[data-list-row]:focus-visible{position:relative;background:var(--surface-selected)}
+[data-list-row]:not(tr):focus-visible::before,tr[data-list-row]:focus-visible>:first-child::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--accent);pointer-events:none}
+tr[data-list-row]:focus-visible{position:static}
+tr[data-list-row]:focus-visible>*{background:var(--surface-selected)}
+tr[data-list-row]:focus-visible>:first-child{position:relative}

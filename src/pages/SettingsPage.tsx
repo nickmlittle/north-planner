@@ -2,6 +2,7 @@ import type { Dispatch, MouseEvent, ReactNode, SetStateAction } from 'react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker } from '../domain/cardTracker'
 import { Breadcrumb, ListRow, PageHeader, Section, useMobilePresentation, useToast } from '../components/ui'
+import { useListNavigation } from '../state/useListNavigation'
 import { AccountStatusPanel } from '../components/AccountStatusPanel'
 import type { SettingsSection } from '../state/navigation'
 import { CardSettings } from './CardSettings'
@@ -56,6 +57,7 @@ function sectionHref(section: SettingsSection) {
 export function SettingsPage({ document, setDocument, month, onMonthChange = () => {}, section = null, onSelectSection = () => {}, setupComplete, status, warning, email, onSignOut }: Props) {
   const mobile = useMobilePresentation()
   const { show, toast } = useToast()
+  const indexKeys = useListNavigation({ label: 'Settings', keys: { enter: 'Open the section' } })
   const tracker = cardTracker(document)
   const { budget, household } = document
   const current: SettingsSection | null = !setupComplete ? 'household' : section ?? (mobile ? null : 'household')
@@ -104,9 +106,9 @@ export function SettingsPage({ document, setDocument, month, onMonthChange = () 
         {setupComplete && <Breadcrumb items={[{ label: 'Settings', onClick: () => onSelectSection(null) }, { label }]}/>}
         <Section title={label} id={`settings-${current}`}>{body(current)}</Section>
       </div>
-      : <ul className="settings-list settings-index" aria-label="Settings sections">
-        {SETTINGS_SECTIONS.map(row => <li key={row.key}><ListRow title={row.label} meta={summaries[row.key]} onOpen={() => onSelectSection(row.key)}/></li>)}
-      </ul>}
+      : <div {...indexKeys.listProps}>{indexKeys.hint}<ul className="settings-list settings-index" aria-label="Settings sections">
+        {SETTINGS_SECTIONS.map(row => <li key={row.key}><ListRow listRow title={row.label} meta={summaries[row.key]} onOpen={() => onSelectSection(row.key)}/></li>)}
+      </ul></div>}
     {toast}
   </div>
 }

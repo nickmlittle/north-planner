@@ -1,0 +1,4 @@
+/* ListKeysHint. Tokens only (styles.tokens.test.ts). */
+.list-keys-hint{display:inline-flex;flex-wrap:wrap;align-items:center;gap:var(--space-1);color:var(--text-muted);font-size:var(--text-sm);white-space:nowrap}
+.list-keys-hint .kbd+.kbd{margin-left:2px}
+@media(max-width:767px),(hover:none){.list-keys-hint{display:none}}

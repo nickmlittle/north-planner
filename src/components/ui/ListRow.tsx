@@ -9,7 +9,7 @@ export type ListRowTone = 'neutral' | 'warning' | 'critical' | 'done'
  * A button with onOpen, a link with href, else plain. 44px on desktop, 56px on phones. `focused` marks the row
  * keyboard list navigation is on (J/K, PR 18). With no icon (Settings lists) or no chevron, those columns go.
  */
-export function ListRow({ icon, tone = 'neutral', title, meta, trailing, trailingMeta, onOpen, href, chevron, focused, label }: {
+export function ListRow({ icon, tone = 'neutral', title, meta, trailing, trailingMeta, onOpen, href, chevron, focused, label, listRow }: {
   icon?: ReactNode
   tone?: ListRowTone
   title: ReactNode
@@ -23,6 +23,8 @@ export function ListRow({ icon, tone = 'neutral', title, meta, trailing, trailin
   focused?: boolean
   /** The row's name when its text reads poorly run together ("TESCO, £62.40, Tue 10 Nov"). */
   label?: string
+  /** A row of a keyboard list (`useListNavigation`): J/K land on it and ↵ opens it. */
+  listRow?: boolean
 }) {
   const showChevron = chevron ?? !!(onOpen || href)
   const body = <>
@@ -32,7 +34,7 @@ export function ListRow({ icon, tone = 'neutral', title, meta, trailing, trailin
     {showChevron && <ChevronRight className="list-row-chevron" aria-hidden="true"/>}
   </>
   const className = `list-row is-${tone}${icon === undefined ? ' no-icon' : ''}${showChevron ? '' : ' no-chevron'}`
-  const state = { ...focused ? { 'data-focused': '' } : {}, ...label ? { 'aria-label': label } : {} }
+  const state = { ...focused ? { 'data-focused': '' } : {}, ...label ? { 'aria-label': label } : {}, ...listRow ? { 'data-list-row': '' } : {} }
   if (href) return <a className={className} href={href} {...state}>{body}</a>
   if (onOpen) return <button type="button" className={className} onClick={onOpen} {...state}>{body}</button>
   return <div className={className} {...state}>{body}</div>
