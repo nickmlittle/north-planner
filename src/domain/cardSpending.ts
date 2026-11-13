@@ -1,6 +1,7 @@
 import type { BudgetDocument } from './budgetDocument'
 import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
+import { monthBills, potBillTotals } from './recurringBills'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -33,7 +34,12 @@ export type DestinationSpending = {
   /** 'joint', a person's id, or 'accounts' (spend sorted straight to an account). */
   group: string
   plannedPence: number
+  /** Card spend sorted here, plus the bills North assumes went out (recurring-bills-rules › Spent). */
   spentPence: number
+  /** The part of Spent that's assumed bills: direct debits and payments on another card whose day has come. */
+  billsPaidPence: number
+  /** This month's bills to the pot that haven't come out yet, tracked or not: "£172.00 of it due". Part of Left. */
+  duePence: number
   /** Taken by the previous month's "next month" covers (R1): "£35.00 taken by October". */
   takenPence: number
   /** Planned − Spent − Taken. Negative is over. */
@@ -51,6 +57,8 @@ export type DestinationSpending = {
 
 export type MonthSpending = {
   month: string
+  /** The day the figures were worked out for (YYYY-MM-DD). */
+  today: string
   /** 'past', 'current' or 'future' against today. */
   when: 'past' | 'current' | 'future'
   /** Day of the month today (current month), else the month's length or 0. */
@@ -105,7 +113,9 @@ export const sortedTo = (tracker: Pick<CardTracker, 'transactions'>) => tracker.
 
 /**
  * Planned vs spent for each destination in a month (§6.5), with pace for steady pots in the current month.
- * Shows pots with a plan that are paced, and anything with spending; accounts show only what was spent on them.
+ * Shows pots with a plan that are paced, pots with a bill this month, and anything with spending; accounts show only
+ * what was spent on them. A pot's Spent includes the bills North assumes went out; its Due is the bills still to come
+ * (recurring-bills-rules › Spent, Due and pace).
  */
 export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, month: string, today: string): MonthSpending {
   const tracker = cardTracker(document)
@@ -116,32 +126,40 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
   const spent = spentByDestination(monthTransactions(tracker, month))
   const taken = new Map<string, number>()
   for (const cover of tracker.months[shiftMonth(month, -1)]?.covers ?? []) if (cover.source.kind === 'next-month') taken.set(`pot:${cover.potId}`, (taken.get(`pot:${cover.potId}`) ?? 0) + cover.amountPence)
-  const keys = new Set([...planned.keys(), ...spent.keys(), ...taken.keys()])
+  const bills = monthBills(document, month, today)
+  const billPots = new Set(bills.flatMap(bill => bill.destination.kind === 'pot' ? [`pot:${bill.destination.potId}`] : []))
+  const keys = new Set([...planned.keys(), ...spent.keys(), ...taken.keys(), ...billPots])
   const rows: DestinationSpending[] = []
   for (const key of keys) {
     const destination = planned.get(key)?.destination ?? spent.get(key)?.destination ?? { kind: 'pot' as const, potId: key.slice(4) }
     if (destination.kind === 'pot' && !document.budget.pots.some(pot => pot.id === destination.potId)) continue
     const plannedPence = destination.kind === 'pot' ? planned.get(key)?.pence ?? 0 : 0
-    const spentPence = spent.get(key)?.pence ?? 0
+    const potBills = destination.kind === 'pot' ? potBillTotals(bills, destination.potId) : undefined
+    const billsPaidPence = potBills?.assumedPaidPence ?? 0
+    const spentPence = (spent.get(key)?.pence ?? 0) + billsPaidPence
     const takenPence = taken.get(key) ?? 0
     const settings = destination.kind === 'pot' ? potSettings(document, destination.potId) : { pace: 'none' as const, carriesOver: false }
-    // A pot shows when it's paced and planned, or anything was spent or taken; accounts only with spending.
-    const shown = spentPence !== 0 || takenPence !== 0 || destination.kind === 'pot' && plannedPence > 0 && settings.pace === 'steady'
+    // A pot shows when it's paced and planned, has a bill this month, or anything was spent or taken; accounts only with spending.
+    const shown = spentPence !== 0 || takenPence !== 0 || !!potBills?.count || destination.kind === 'pot' && plannedPence > 0 && settings.pace === 'steady'
     if (!shown) continue
     const leftPence = plannedPence - spentPence - takenPence
-    const row: DestinationSpending = { destination, key, group: groupOf(document, destination), plannedPence, spentPence, takenPence, leftPence, pace: settings.pace, carriesOver: settings.carriesOver, status: 'left', needsCare: false }
+    const row: DestinationSpending = { destination, key, group: groupOf(document, destination), plannedPence, spentPence, billsPaidPence, duePence: potBills?.duePence ?? 0, takenPence, leftPence, pace: settings.pace, carriesOver: settings.carriesOver, status: 'left', needsCare: false }
     if (destination.kind === 'account' || plannedPence === 0 && !settings.carriesOver) row.status = 'one-offs'
     else if (settings.carriesOver) row.status = 'left'
     else if (leftPence < 0) row.status = 'over'
     else if (settings.pace === 'steady' && when === 'current') {
-      const expected = Math.round(plannedPence * day / length)
+      // Bills come out on their day, not steadily (P4): expect the ones so far, plus the rest of Planned at a steady pace.
+      const billsSoFar = potBills?.soFarPence ?? 0, billsAll = potBills?.allPence ?? 0
+      const steadyPlanned = Math.max(0, plannedPence - billsAll)
+      const expected = billsSoFar + Math.round(steadyPlanned * day / length)
       const ahead = spentPence + takenPence - expected
       row.expectedPence = expected
       row.status = ahead >= Math.max(PACE_AHEAD_MIN_PENCE, plannedPence * PACE_AHEAD_SHARE) ? 'ahead' : 'on-track'
       if (row.status === 'ahead') row.aheadPence = ahead
-      const average = (spentPence + takenPence) / day
+      // "Runs out" is the steady spending only: what isn't an assumed bill, against what's planned beyond the bills.
+      const average = (spentPence - billsPaidPence + takenPence) / day
       if (average > 0) {
-        const runOutDay = Math.ceil(plannedPence / average)
+        const runOutDay = Math.ceil(steadyPlanned / average)
         if (runOutDay < length) row.runsOut = `${month}-${String(Math.max(runOutDay, day)).padStart(2, '0')}`
       }
     }
@@ -152,16 +170,20 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
   const name = (row: DestinationSpending) => row.destination.kind === 'pot' ? document.budget.pots.find(pot => pot.id === (row.destination as { potId: string }).potId)?.name ?? '' : ''
   rows.sort((a, b) => groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group) || Number(a.carriesOver) - Number(b.carriesOver) || name(a).localeCompare(name(b), 'en-GB') || a.key.localeCompare(b.key))
   return {
-    month, when, day, daysInMonth: length, daysLeft: when === 'current' ? length - day : when === 'future' ? length : 0, rows,
+    month, today, when, day, daysInMonth: length, daysLeft: when === 'current' ? length - day : when === 'future' ? length : 0, rows,
     plannedPence: rows.reduce((sum, row) => sum + row.plannedPence, 0), spentPence: rows.reduce((sum, row) => sum + row.spentPence, 0),
     needsCare: rows.filter(row => row.needsCare).length, sortedTo: sortedTo(tracker),
   }
 }
 
-/** Cumulative spend by day for a destination, for the pot chart: [day, pence] from day 1 to `throughDay`. */
-export function cumulativeByDay(tracker: Pick<CardTracker, 'transactions'>, month: string, destination: BudgetDestination, throughDay: number): Array<[number, number]> {
+/**
+ * Cumulative spend by day for a destination, for the pot chart: [day, pence] from day 1 to `throughDay`. `extra` adds
+ * other spending on its date, such as the bills North assumes went out.
+ */
+export function cumulativeByDay(tracker: Pick<CardTracker, 'transactions'>, month: string, destination: BudgetDestination, throughDay: number, extra: ReadonlyArray<{ date: string; destination: BudgetDestination; pence: number }> = []): Array<[number, number]> {
   const key = destinationKey(destination)
   const byDay = new Map<number, number>()
+  for (const row of extra) if (monthOf(row.date) === month && destinationKey(row.destination) === key) byDay.set(Number(row.date.slice(8)), (byDay.get(Number(row.date.slice(8))) ?? 0) + row.pence)
   for (const transaction of monthTransactions(tracker, month)) for (const line of transaction.sort?.lines ?? []) if (destinationKey(line.destination) === key) {
     const day = Number(transaction.date.slice(8))
     byDay.set(day, (byDay.get(day) ?? 0) + line.amountPence)

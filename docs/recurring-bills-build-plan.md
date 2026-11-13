@@ -1,6 +1,6 @@
 # Recurring bills: design and PR build plan
 
-Status: planned, 13 November 2026, with Nick. PR 1 is built; [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
+Status: planned, 13 November 2026, with Nick. PRs 1–2 are built; [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/Wqv1KMXNFrMimWybckZjLw, boards 1–6. The sample household and amounts on it are made up.
 - **Related rules:** [card-tracker-rules](card-tracker-rules.md) (Spent, Left, pace, pot balances, Home), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (snapshots and edit scope), [product-design-spec](product-design-spec.md) (layout, language, glossary).
@@ -40,7 +40,7 @@ Agreed with Nick on 13 Nov 2026. Don't change these without asking.
 
 ### Decisions made while planning (P1–P4)
 
-Ask Nick if any of these look wrong. Each is cheap to change before the PR that builds it.
+Nick confirmed P1, P2 and P4 on 13 November 2026, before PR 2. P3 shipped in PR 1.
 
 - **P1 · Left keeps its meaning.** Left stays Planned − Spent − Taken. Due is shown as a part of Left: "£256.54 left · £172.00 of it due". The canvas's Left tile shows Left after Due instead (§6.1).
 - **P2 · Bills to an account are not added to Spending figures.** Spending gives accounts no Planned, because direct items such as rent aren't tracked there. A recurring bill whose destination is an account still appears in Plan › Dates and Coming up, but adds nothing to Spent and changes no balance.

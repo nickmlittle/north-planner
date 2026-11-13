@@ -116,7 +116,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const card = tracker.cards[0]!
   const openClose = closeDateFor(today, card.closeDay)
   const openStatement = statementSummary(document, `${card.id}:${openClose}`, today)
-  const potPence = setAsidePot ? potBalance(document, setAsidePot.id).balancePence : undefined
+  const potPence = setAsidePot ? potBalance(document, setAsidePot.id, today).balancePence : undefined
   const context = [`${statementName(openClose)} ${pounds(openStatement?.totalPence ?? 0)}`, `closes ${dayDate(openClose)}`, setAsidePot && potPence !== undefined ? `${signedPounds(potPence)} in ${potPhrase(setAsidePot.name)}` : ''].filter(Boolean).join(' · ')
   const toSettle = statementKeys(tracker).map(key => statementSummary(document, key, today)).filter(row => row && !row.open && row.ready && !row.settled).length
   const where = (transaction: CardTransaction) => {

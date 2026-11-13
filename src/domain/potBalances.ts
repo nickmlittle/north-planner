@@ -1,16 +1,18 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, parseStatementKey, type CardTracker } from './cardTracker'
+import { cardTracker, localDate, monthOf, parseStatementKey, shiftMonth, type CardTracker } from './cardTracker'
+import { monthBills, potBillTotals } from './recurringBills'
 import { SETTLE_PAY_KEY, settleIntoKey, settleOutKey, statementShares, statementTransactions } from './cardStatements'
 import { moveTotal, usesSetAside } from './setAside'
 
 /**
  * Every pot's balance, worked out (§6.6, extended for the Amex pot): the balance last checked against the bank,
  * plus every move North knows about since. Card spend doesn't touch a pot until its money moves (to the Amex
- * pot, or at settle up), so what's free is the balance less the spend still waiting to move.
+ * pot, or at settle up), so what's free is the balance less the spend still waiting to move. Bills North assumes
+ * are paid leave the pot on their day; the ones still due this month aren't free either (recurring-bills-rules).
  * Rules: docs/card-tracker-rules.md.
  */
 
-export type BalanceFlow = 'payday' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid'
+export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid'
 export type FlowEntry = { at: string; pence: number; flow: BalanceFlow }
 export type WaitingShare = { statementKey: string; closeDate: string; pence: number }
 
@@ -24,25 +26,36 @@ export type PotBalance = {
   /** Card spend on the pot that hasn't moved out of it yet (to the Amex pot or at settle up), per statement. */
   waiting: WaitingShare[]
   waitingPence: number
-  /** Balance − waiting. */
+  /** This month's bills still to leave the pot itself (due, not on a tracked card). */
+  billsDuePence: number
+  /** Balance − waiting − bills due. */
   freePence?: number
   /** The card's set-aside pot (the Amex pot): it holds money for the bill, so nothing waits on it. */
   setAside: boolean
 }
 
-const FLOW_ORDER: BalanceFlow[] = ['payday', 'covers', 'built-up', 'settled', 'set-aside', 'paid']
+const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid']
 
 /** The card whose set-aside pot this is, if any. */
 export const setAsideCardFor = (tracker: Pick<CardTracker, 'cards'>, potId: string) => tracker.cards.find(card => card.setAside?.potId === potId)
 
+/** Local midnight at the start of a date, as an ISO string: when an assumed bill leaves the pot. */
+export function startOfDay(date: string): string {
+  return new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))).toISOString()
+}
+
 /**
- * Every move in or out of a pot that North knows about: payday Move ticks, Close month covers into it or out of
- * it, built-up money moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into
- * the Amex pot), and paying the card from the Amex pot.
+ * Every move in or out of a pot that North knows about: payday Move ticks, the bills it assumes went out (from
+ * `fromMonth` to today, at the start of each bill's day), Close month covers into it or out of it, built-up money
+ * moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into the Amex pot), and
+ * paying the card from the Amex pot.
  */
-export function potFlows(document: Pick<BudgetDocument, 'card' | 'ticks'>, potId: string): FlowEntry[] {
+export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, potId: string, today: string = localDate(), fromMonth: string = monthOf(today)): FlowEntry[] {
   const tracker = cardTracker(document)
   const flows: FlowEntry[] = []
+  for (let month = fromMonth; month <= monthOf(today); month = shiftMonth(month, 1)) {
+    for (const bill of monthBills(document, month, today)) if (bill.state === 'paid' && !bill.tracked && bill.destination.kind === 'pot' && bill.destination.potId === potId) flows.push({ at: startOfDay(bill.date), pence: -bill.amountPence, flow: 'bills' })
+  }
   for (const steps of Object.values(document.ticks ?? {})) for (const [key, tick] of Object.entries(steps)) if (key.endsWith(`:move:${potId}`)) flows.push({ at: tick.at, pence: tick.amountPence, flow: 'payday' })
   for (const month of Object.values(tracker.months)) for (const cover of month.covers ?? []) {
     // Same key as Close month's cover steps (`coverKey` in monthStages).
@@ -86,18 +99,23 @@ export function waitingShares(tracker: CardTracker, potId: string): WaitingShare
   return waiting
 }
 
-/** A pot's balance: checked + every move since, and what's free once the spend waiting to move is taken off. */
-export function potBalance(document: Pick<BudgetDocument, 'card' | 'ticks'>, potId: string): PotBalance {
+/**
+ * A pot's balance: checked + every move since, and what's free once the spend waiting to move and this month's
+ * bills still due are taken off.
+ */
+export function potBalance(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, potId: string, today: string = localDate()): PotBalance {
   const tracker = cardTracker(document)
   const checked = tracker.pots[potId]?.checkedBalance
   const setAside = !!setAsideCardFor(tracker, potId)
   const totals = new Map<BalanceFlow, number>()
-  if (checked) for (const entry of potFlows(document, potId)) if (entry.at > checked.at) totals.set(entry.flow, (totals.get(entry.flow) ?? 0) + entry.pence)
+  // Bills from the month of the check: a bill on the check's own day went out before it (direct debits leave early).
+  if (checked) for (const entry of potFlows(document, potId, today, monthOf(localDate(new Date(checked.at))))) if (entry.at > checked.at) totals.set(entry.flow, (totals.get(entry.flow) ?? 0) + entry.pence)
   const since = FLOW_ORDER.filter(flow => totals.get(flow)).map(flow => ({ flow, pence: totals.get(flow)! }))
   const waiting = setAside ? [] : waitingShares(tracker, potId)
   const waitingPence = waiting.reduce((sum, row) => sum + row.pence, 0)
+  const billsDuePence = potBillTotals(monthBills(document, monthOf(today), today), potId).assumedDuePence
   const balancePence = checked ? checked.pence + since.reduce((sum, row) => sum + row.pence, 0) : undefined
-  return { potId, ...checked ? { checked, balancePence, freePence: balancePence! - waitingPence } : {}, since, waiting, waitingPence, setAside }
+  return { potId, ...checked ? { checked, balancePence, freePence: balancePence! - waitingPence - billsDuePence } : {}, since, waiting, waitingPence, billsDuePence, setAside }
 }
 
 /** "Check against Monzo": record what's in the pot now. */

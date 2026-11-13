@@ -106,7 +106,7 @@ Zero and unresolved allocations are different states. Do not imply that a missin
 
 #### Pots
 
-The **Pots** section heading says what's spent (“Pots · £272.59 spent of £5,262.33”), and on desktop its aside says when balances were last checked (“Checked against Monzo Sat 31 Oct”, or “Not checked yet”). On desktop it's one table: Pot · Spent · Planned · Left · Pace · In Monzo, with band rows for Joint, each adult and Accounts (one-offs). The Pace cell holds a meter of spent against planned, with a tick where even spending would be, and a status line: “On track”, “£63 ahead · runs out ~Fri 20 Nov” (warning), “£12.50 over · covered when November closes” (critical), “No pace”, plus “£35.00 taken by October” after a next-month cover. Carry-over pots read “Bills · carries over” with Left as “£1,185.02 free”. The set-aside pot reads “Amex · set aside · £336.38 still to move for November”. In Monzo is the worked-out balance, or “—”. Paced pots with a plan always show; others show once something is spent, and “3 more pots with nothing spent ›” shows the rest. On phones each group is a card with three lines a pot: the name and “£143.57 left” (or “£12.50 over”, “£1,185.02 free”), the meter, and the status. Each pot's name opens its page. With nothing planned or spent: “No pot spending yet. Bring in Amex transactions to see each pot against the plan.” with Open Spending.
+The **Pots** section heading says what's spent (“Pots · £272.59 spent of £5,262.33”), and on desktop its aside says when balances were last checked (“Checked against Monzo Sat 31 Oct”, or “Not checked yet”). On desktop it's one table: Pot · Spent · Planned · Left · Pace · In Monzo, with band rows for Joint, each adult and Accounts (one-offs). The Pace cell holds a meter of spent against planned, with a tick where even spending would be, and a status line: “On track”, “£63 ahead · runs out ~Fri 20 Nov” (warning), “£12.50 over · covered when November closes” (critical), “No pace”, plus “£35.00 taken by October” after a next-month cover, and “£30.00 of it due” when the pot's recurring bills haven't all come out yet. Carry-over pots read “Bills · carries over” with Left as “£1,185.02 free”, and “£154.17 due this month” as their status while bills are still to come. Spent includes the bills North assumes went out, and a pot with a bill this month always shows. The set-aside pot reads “Amex · set aside · £336.38 still to move for November”. In Monzo is the worked-out balance, or “—”. Paced pots with a plan always show; others show once something is spent, and “3 more pots with nothing spent ›” shows the rest. On phones each group is a card with three lines a pot: the name and “£143.57 left” (or “£12.50 over”, “£1,185.02 free”), the meter, and the status. Each pot's name opens its page. With nothing planned or spent: “No pot spending yet. Bring in Amex transactions to see each pot against the plan.” with Open Spending.
 
 A **pot's page** (`pot`) has a breadcrumb (“Month › Groceries”), its title and “Joint · monthly · November 2026 · day 12 of 30”, Check against Monzo, and ⋯ › Pot settings (Settings › Accounts & pots). Its sections are:
 - **Lead card:** “Left this month · £143.57 for 18 days” and “About £8 a day · you've averaged £15”, then the chart of spending so far against the planned pace (with an accessible description of the same figures). One warning line under the chart says when it runs out: “At this rate it runs out around Fri 20 Nov, 10 days before the month ends.”
@@ -115,7 +115,7 @@ A **pot's page** (`pot`) has a breadcrumb (“Month › Groceries”), its title
 
 The sort sheet shows “£181.40 left” (or “£12.50 over”) beside each planned pot.
 
-**Carry-over pots** (Bills) lead with **Free in the pot** and how it's worked out: “In Monzo · checked Mon 9 Nov”, the moves since, one “Waiting to settle · October statement” line per unsettled statement, and the Free total. “Check against Monzo” (the pot's bank) asks “What's in Bills now?”. “Annual costs from the Plan” lists the pot's yearly items (“Car insurance £612.00 a year”). The **Amex pot** page is titled “Amex pot”, “Pays the Amex from the November statement”, with its balance line and **Statements it pays** (“November statement · £312.85 moved in · £336.38 still to move · £649.23”).
+**Carry-over pots** (Bills) lead with **Free in the pot** and how it's worked out: “In Monzo · checked Mon 9 Nov”, the moves since (including “Bills paid”), one “Waiting to settle · October statement” line per unsettled statement, “Bills still due this month”, and the Free total. “Check against Monzo” (the pot's bank) asks “What's in Bills now?”. “Annual costs from the Plan” lists the pot's yearly items (“Car insurance £612.00 a year”). The **Amex pot** page is titled “Amex pot”, “Pays the Amex from the November statement”, with its balance line and **Statements it pays** (“November statement · £312.85 moved in · £336.38 still to move · £649.23”).
 
 #### Stages and Close <Month>
 
@@ -257,7 +257,7 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | Word | Means | Not |
 | --- | --- | --- |
 | **Spending** | The tab where card spending is brought in, sorted and settled. | Card tracker, Transactions |
-| **Spent** | Card spend sorted to a pot or account in a month: “£338.60 of £520.00 spent”. | Used, actual |
+| **Spent** | Card spend sorted to a pot or account in a month, plus the recurring bills North assumes went out: “£338.60 of £520.00 spent”. | Used, actual |
 | **Left** | Planned minus Spent for a pot: “£181.40 left”. Negative is “£12.50 over”. | Remaining, balance |
 | **Bring in** | Import the Amex Excel export: “Bring in transactions”, “Last brought in Mon 9 Nov”. | Upload, sync |
 | **Sort** / **To sort** / **Sorted** | Give a transaction a pot or account. “Sorted by rules”. | Assign, categorise |
@@ -266,7 +266,7 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | **Close <Month>** | The month-end step: cover overspends, note leftovers. | Finalise, lock |
 | **Settle up** | Paying a statement. Steps: “Out of Treats”, “Send to Joint Monzo”, “Pay Amex”. | Pay off |
 | **Built up** | The leftover total in a monthly pot. | Surplus, savings |
-| **Free** | A carry-over pot's balance minus card spend not yet settled. | Available (that is income) |
+| **Free** | A carry-over pot's balance minus card spend not yet settled and the bills still due this month. | Available (that is income) |
 | **Pay lands in** | The account a salary arrives in (Settings › Pay & income, or setup's “Where does it land?”). It is the “from” of that person's payday steps: “Starling Ada → Monzo Joint”. | Source account, home account |
 | **Already in** | Funding into the account the pay already lands in: shown on Payday (“Already in Starling Ada · £698.72”), muted, copyable, but not a step and not counted. | Skipped, done |
 | **Set aside** | Moving what was sorted since the last move into the card's pot, so the statement is covered when it comes: “Set aside in the Amex pot”, “Mark moved”. | Reserve, ring-fence |

@@ -9,22 +9,24 @@ Related: [card tracker rules](card-tracker-rules.md) (Spent, Left, pace, pot bal
 | Part | PR | Code |
 | --- | --- | --- |
 | The item's recurring bill, validation, drafts, the editor section, the card-removal warning, fixture bills | 1 | `RecurringBill` in `src/domain/monthlyBudget.ts`, `readBillDraft` in `budgetItemDrafts.ts`, `src/domain/recurringBills.ts`, `src/pages/RecurringBillFields.tsx`, `CardSettings.tsx` |
-| Spent, Due, pace and pot balances | 2 | not started |
+| Spent, Due, pace and pot balances, Due on Month › Pots | 2 | `monthBills`, `potBillTotals` in `src/domain/recurringBills.ts`; `monthSpending` in `cardSpending.ts`; `potFlows`, `potBalance` in `potBalances.ts`; `src/pages/month/PotsSection.tsx` |
 | The pot detail | 3 | not started |
 | Plan › Dates | 4 | not started |
 | Home and the Renewal sheet | 5 | not started |
-
-Until PR 2 ships, a bill's details are stored and edited but don't change any figure.
 
 ## The contract
 
 1. **A plan item can be a recurring bill** (B1). The item editor has a "Recurring bill" checkbox, off by default. Unticked items behave exactly as before. There's no visible "Not a bill" option.
 2. **Paid by** is **Direct debit** or **Card** (B1). Card asks which card: each card North tracks (Amex), or **Another card**, which covers a Monzo virtual or debit card (B2).
-3. **Assumed or seen** (B3). A direct debit, or a payment on another card, is assumed paid on its day at the planned amount. A bill on a tracked card is never assumed: its charge comes in through Bring in and Sort, and its date is only for Due and reminders. *(Figures from PR 2.)*
+3. **Assumed or seen** (B3). A direct debit, or a payment on another card, is assumed paid on its day at the planned amount. A bill on a tracked card is never assumed: its charge comes in through Bring in and Sort, and its date is only for Due and reminders.
 4. **Dates** (B4). A monthly bill has a day: 1st–28th, or **Last day**. A yearly bill has a day and a month, and that date is its **renewal date**. There are no 29th–31st days, and weekends and bank holidays are ignored.
 5. **Renewal reminders** (B6) default to **4 weeks** before, set per item: 2, 4, 6 or 8 weeks, or off. *(Shown on Home from PR 5.)*
-6. **Bills to an account** are listed by date but add nothing to Spending figures (P2).
+6. **Bills to an account** are listed by date but add nothing to Spending figures or balances (P2).
 7. **Yearly bills need a pot that carries over** (P3). The editor warns when the pot doesn't; saving is still allowed.
+8. **Left keeps its meaning** (P1): Planned − Spent − Taken. Due is shown as a part of it: “£256.54 left · £172.00 of it due”.
+9. **Pace allows for bills** (P4).
+
+P1, P2 and P4 were confirmed by Nick on 13 November 2026.
 
 ## The item
 
@@ -50,6 +52,35 @@ A document is invalid when a bill has:
 Older documents have no `bill` and load unchanged, with no version bump.
 
 **Which card is tracked.** A card is tracked when its id is in `card.cards`. A `cardId` that no longer matches a card counts as Another card, so its bill is assumed. The editor opens such a bill with Another card chosen. Removing a card in Settings › Cards names the bills paid on it, in any month, and says North will assume them paid on their day.
+
+## A month's bills
+
+`monthBills(document, month, today)` lists the month's bills from that month's own plan, sorted by date, then name:
+- **Date:** a monthly bill on its day, or the month's last day (the 28th or 29th in February). A yearly bill only in its renewal month.
+- **Amount:** a monthly bill's amount; a yearly bill's full yearly price.
+- **Tracked:** paid by card, on a card in `card.cards`.
+- **State:** **Paid** when the date is on or before today, else **Due**. Every bill in a past month is paid, and every bill in a future month is due. A bill added mid-month whose day has passed shows as paid.
+
+## Spent, Due and pace
+
+In `monthSpending`, for each pot:
+- **Spent** also includes its bills that are paid and not tracked (`billsPaidPence`). Bills to an account are left out.
+- **Due** (`duePence`) is the pot's bills not out yet, tracked or not. A tracked bill leaves Due on its day, whether or not its charge has been sorted yet, so for a few days it can be in neither.
+- **Left** is unchanged: Planned − Spent − Taken.
+- **A pot with any bill in the month shows**, even at £0 spent.
+- **Pace**, in a steady pot in the current month:
+  - expected = the bills dated on or before today + (Planned − all this month's bills) × day ÷ days in month. Bills here are tracked and untracked; Planned − bills never goes below 0.
+  - "Runs out" uses only the spending that isn't an assumed bill, (Spent − assumed bills + Taken) ÷ day, against Planned − all this month's bills.
+  - The pot's chart counts assumed bills on their day.
+- The sort sheet's “£X left” (`leftByDestination`) is unchanged.
+
+**Month › Pots** adds “£30.00 of it due” to a monthly pot's status, and “£154.17 due this month” to a carry-over pot's (in place of “No pace”).
+
+## Pot balances
+
+- **Bills paid** (flow `'bills'`): each untracked bill to a pot, in any month, takes its amount off the balance at the **start of its day** (local midnight). A balance checked on a bill's day already includes it, since direct debits go out early in the morning. Only bills after the check count, as for every flow, from the check's month to today.
+- **Free** = balance − card spend waiting − this month's untracked bills still due (`billsDuePence`). Money about to leave isn't free.
+- “How it's worked out” shows “Bills paid since” and “Bills still due this month”.
 
 ## The item editor
 

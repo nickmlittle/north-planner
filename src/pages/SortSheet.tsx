@@ -31,14 +31,14 @@ type Props = {
 const SHOWN = 6
 
 /** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date() }: Props) {
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today }: Props) {
   // What's left in each planned pot in the transaction's month, so the choice shows its consequence.
   const left = leftByDestination(document, transaction.date.slice(0, 7))
   // Carry-over pots have no "left": once their balance is checked, show what's free in them instead.
   const leftText = (destination: BudgetDestination) => {
     const pence = left.get(destinationKey(destination))
     if (pence !== undefined) return pence < 0 ? `${pounds(-pence)} over` : `${pounds(pence)} left`
-    const free = destination.kind === 'pot' && document.card?.pots[destination.potId]?.carriesOver ? potBalance(document, destination.potId).freePence : undefined
+    const free = destination.kind === 'pot' && document.card?.pots[destination.potId]?.carriesOver ? potBalance(document, destination.potId, today).freePence : undefined
     return free === undefined ? '' : `${signedPounds(free)} free`
   }
   const id = useId()
