@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit 3 · Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="target.css">
+<style>
+  .settings { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start }
+  .subnav { display: grid; gap: 2px; position: sticky; top: 0 }
+  .subnav a { height: 34px; padding: 0 10px; border-radius: 8px; display: flex; align-items: center; color: var(--text); font-weight: 600; text-decoration: none; font-size: 14px }
+  .subnav a.on { background: var(--surface-selected) }
+  .subnav a span { margin-left: auto; color: var(--text-muted); font-weight: 500; font-size: 12px }
+  .pot-row { padding-left: 56px }
+</style>
+</head>
+<body>
+<div class="doc">
+<header>
+  <h1>Settings: one place for everything that rarely changes</h1>
+  <p>Household names and cards (on the Household tab today), income (Plan ⋯ › Edit income), accounts, pots, categories and pot spending settings (Plan ⋯ › Manage) and sorting rules (a Spending tab) all move to one Settings page. Each section is a list with editors that open in the shared sheet. Fixes <a href="../review.md#f08">F08</a>. Briefs: <a href="../prs/08-settings-page.md">PR 08</a>, <a href="../prs/09-settings-budget.md">PR 09</a>.</p>
+  <nav class="toc"><a href="index.html">All mockups</a><a href="01-navigation.html">Navigation</a><a href="02-home.html">Home</a><a href="03-plan.html">Plan</a><a href="04-month.html">Month</a><a href="05-spending.html">Spending</a><a href="07-design-system.html">Design system</a></nav>
+</header>
+<section class="pair">
+  <h2>Desktop · Settings › Accounts &amp; pots</h2>
+  <p class="note">Before: Household is a primary tab with "Continue to Plan". Accounts, pots and categories are a side panel launched from Plan's ⋯, and pot spending settings are two levels inside it. After: Settings, with a section list on the left. Pots sit under their account, and each row shows the settings that matter ("carries over", "pace").</p>
+  <div class="cols">
+    <div><span class="label before">Before · Household</span><img class="shot" src="../screenshots/household-desktop.png" alt="Household today"><br><span class="label before">Before · Manage</span><img class="shot" src="../screenshots/plan-manage-desktop.png" alt="Manage today"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="settings-desktop">
+        <aside class="sidebar">
+          <div class="brand">north.</div>
+          <a class="nav-item"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item"><svg><use href="#i-card"/></svg>Spending<span class="count">4</span></a>
+          <div class="spacer"></div>
+          <div class="foot"><a class="nav-item"><svg><use href="#i-command"/></svg>Search<span class="kbd">⌘K</span></a><a class="nav-item is-current"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a><div class="who"><span class="avatar">N</span>Nick · Saved</div></div>
+        </aside>
+        <main class="page">
+          <div class="page-header"><h1>Settings</h1></div>
+          <div class="settings">
+            <nav class="subnav">
+              <a>Household</a><a>Pay &amp; income <span>2</span></a><a class="on">Accounts &amp; pots <span>4 · 7</span></a><a>Categories <span>6</span></a><a>Cards <span>1</span></a><a>Sorting rules <span>4</span></a><a>Account &amp; sync</a>
+            </nav>
+            <div class="section">
+              <div class="section-head"><h2>Accounts &amp; pots</h2><span class="aside"><span class="btn"><svg><use href="#i-plus"/></svg>Add account</span></span></div>
+              <p style="margin:0;color:var(--text-muted);font-size:13px">Shared by every month.</p>
+              <ul class="list card">
+                <li class="row" style="grid-template-columns:28px 1fr auto 16px"><span class="ic"><svg><use href="#i-card"/></svg></span><div><div class="t">Monzo Joint</div><div class="m">Monzo · Current account · Joint</div></div><div class="r"><small>4 pots</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Bills</div><div class="m">Carries over · build-up flag 2×</div></div><div class="r"><small>£1,240.00 in Monzo</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Groceries</div><div class="m">Monthly · shows pace</div></div><div class="r"><small>£609.75 in Monzo</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Holidays</div><div class="m">Monthly</div></div><div class="r"><small></small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Amex</div><div class="m">Set-aside pot · pays Amex from the November statement</div></div><div class="r"><small>£312.85</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row" style="grid-template-columns:28px 1fr auto 16px"><span class="ic"><svg><use href="#i-card"/></svg></span><div><div class="t">Monzo Joint Savings</div><div class="m">Monzo · Savings account · Joint</div></div><div class="r"><small>1 pot</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Emergency</div><div class="m">Monthly · no pace</div></div><div class="r"><small></small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row" style="grid-template-columns:28px 1fr auto 16px"><span class="ic"><svg><use href="#i-card"/></svg></span><div><div class="t">Starling Ada</div><div class="m">Starling · Current account · Ada</div></div><div class="r"><small>1 pot</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row pot-row" style="grid-template-columns:1fr auto 16px"><div><div class="t">Spending</div><div class="m">Monthly · shows pace</div></div><div class="r"><small></small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+                <li class="row" style="grid-template-columns:28px 1fr auto 16px"><span class="ic"><svg><use href="#i-card"/></svg></span><div><div class="t">Nationwide Ben</div><div class="m">Nationwide · Current account · Ben</div></div><div class="r"><small>1 pot</small></div><span class="go"><svg><use href="#i-more"/></svg></span></li>
+              </ul>
+            </div>
+          </div>
+        </main>
+      </div></div>
+      <ul class="callouts">
+        <li>Each row opens its editor in the shared sheet: today's forms (AccountFields, the pot fields, CardSettings) re-hosted, not rewritten.</li>
+        <li>Pay &amp; income is today's IncomeDialog content as a page section. Plan keeps an "Edit income" link that deep-links here.</li>
+        <li>On phones, Settings is a list of these sections, reached from the account button.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</div>
+<script src="mockup.js"></script>
+</body>
+</html>

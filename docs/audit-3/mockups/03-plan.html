@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit 3 · Plan (job 1: plan the month)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="target.css">
+<style>
+  .summary-row { display: grid; grid-template-columns: 240px 1fr 260px; gap: 28px; align-items: center; padding: 16px 20px }
+  .summary-row .lead .k { font-size: 13px; color: var(--text-muted); font-weight: 600 }
+  .summary-row .lead .v { font-size: 20px; font-weight: 700; color: var(--critical) }
+  .people { display: grid; gap: 10px }
+  .person { display: grid; grid-template-columns: 48px 1fr 120px; gap: 12px; align-items: center; font-size: 13px }
+  .person b { font-weight: 700 }
+  .person .crit-text { text-align: right }
+  .summary-row .tot { font-size: 13px; color: var(--text-muted); text-align: right; display: grid; gap: 4px }
+  .summary-row .tot a { color: var(--accent); font-weight: 600; text-decoration: none }
+  .dialog-scrim { position: absolute; inset: 0; background: #12241c66; display: grid; place-items: center }
+  .dialog { width: 560px; background: var(--surface); border-radius: 14px; box-shadow: 0 16px 60px #12241c40; display: grid }
+  .dialog header { display: flex; align-items: center; padding: 18px 20px 6px }
+  .dialog header h3 { margin: 0; font-size: 20px }
+  .dialog header .context { margin-left: 10px; color: var(--text-muted) }
+  .dialog header .x { margin-left: auto }
+  .dialog .body { padding: 8px 20px 16px; display: grid; gap: 14px }
+  .dialog label { display: grid; gap: 6px; font-size: 13px; font-weight: 600 }
+  .dialog .two { display: grid; grid-template-columns: 1fr 140px; gap: 12px }
+  .dialog .field { width: 100% }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px }
+  .pick { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-field); display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; background: var(--surface) }
+  .pick.on { background: var(--pine); color: #fff; border-color: var(--pine) }
+  .dialog footer { border-top: 1px solid var(--border); padding: 14px 20px; display: grid; gap: 10px }
+  .dialog footer .acts { display: flex; gap: 8px; justify-content: flex-end; align-items: center }
+  .dialog footer .acts .left { margin-right: auto; color: var(--text-muted); font-size: 13px }
+</style>
+</head>
+<body>
+<div class="doc">
+<header>
+  <h1>Plan: adjust the month in fewer steps</h1>
+  <p>Job 1. The page keeps its structure (title, figures, items) but loses about 300px of chrome. Groups start open on desktop. You change an amount inline (<kbd>↵</kbd> saves, <kbd>Esc</kbd> cancels) and see the impact on one line. Add item and Edit item become one editor with the name first. Fixes <a href="../review.md#f06">F06</a>, <a href="../review.md#f15">F15</a>, <a href="../review.md#f16">F16</a>, <a href="../review.md#f14">F14</a>. Briefs: <a href="../prs/16-plan-density.md">PR 16</a>, <a href="../prs/17-item-editor.md">PR 17</a>.</p>
+  <nav class="toc"><a href="index.html">All mockups</a><a href="01-navigation.html">Navigation</a><a href="02-home.html">Home</a><a href="04-month.html">Month</a><a href="05-spending.html">Spending</a><a href="06-settings.html">Settings</a><a href="07-design-system.html">Design system</a></nav>
+</header>
+
+<section class="pair">
+  <h2>Desktop · Plan, with a quick edit in progress</h2>
+  <p class="note">Before: the first item row is at y=620 once you've opened a group, which is a click on every visit. The meter card is 245px, the filters sit in a separate row from the table controls, and the quick-edit panel pushes rows down. After: the first item is at y≈250. Fourteen rows fit on screen, and editing an amount happens inside its row.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/plan-quick-edit-desktop.png" alt="Plan today with quick edit open"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="plan-desktop">
+        <aside class="sidebar">
+          <div class="brand">north.</div>
+          <a class="nav-item"><svg><use href="#i-home"/></svg>Home<span class="count">7</span></a>
+          <a class="nav-item"><svg><use href="#i-month"/></svg>Month<span class="kbd">G M</span></a>
+          <a class="nav-item is-current"><svg><use href="#i-plan"/></svg>Plan<span class="kbd">G P</span></a>
+          <a class="nav-item"><svg><use href="#i-card"/></svg>Spending<span class="kbd">G S</span></a>
+          <div class="spacer"></div>
+          <div class="foot"><a class="nav-item"><svg><use href="#i-command"/></svg>Search<span class="kbd">⌘K</span></a><a class="nav-item"><svg><use href="#i-settings"/></svg>Settings<span class="kbd">G ,</span></a><div class="who"><span class="avatar">N</span>Nick · Saved</div></div>
+        </aside>
+        <main class="page" style="gap:16px">
+          <div class="page-header">
+            <div class="month-title"><span class="chev"><svg><use href="#i-left"/></svg></span><h1>November 2026</h1><span class="caret"><svg><use href="#i-down"/></svg></span><span class="chev"><svg><use href="#i-right"/></svg></span></div>
+            <span class="context">Carried over from October</span>
+            <div class="actions"><span class="btn icon"><svg><use href="#i-more"/></svg></span><span class="btn primary"><svg><use href="#i-plus"/></svg>Add item <span class="k">N</span></span></div>
+          </div>
+          <div class="card summary-row">
+            <div class="lead"><div class="k">Plan</div><div class="v">£1,141.87 over</div><div class="m" style="font-size:13px;color:var(--text-muted)">£7,641.87 planned of £6,500.00</div></div>
+            <div class="people">
+              <div class="person"><b>Ada</b><div class="meter"><i style="width:90%"></i><i class="over" style="left:90%;width:10%"></i></div><span class="crit-text">£429.66 over</span></div>
+              <div class="person"><b>Ben</b><div class="meter"><i style="width:78%"></i><i class="over" style="left:78%;width:22%"></i></div><span class="crit-text">£712.21 over</span></div>
+            </div>
+            <div class="tot"><span>Available £4,000.00 + £2,500.00</span><a href="#">Edit income</a><a href="#">Review Ben's items</a></div>
+          </div>
+          <div class="toolbar">
+            <span class="field" style="width:320px"><svg><use href="#i-search"/></svg>Search items<span class="kbd-chip">/</span></span>
+            <span class="seg"><span class="on">Category</span><span>Destination</span></span>
+            <span class="btn"><svg><use href="#i-filter"/></svg>Filter</span>
+            <span class="grow"></span>
+            <span style="color:var(--text-muted);font-size:13px">40 items</span>
+            <span class="btn quiet">Collapse all</span>
+          </div>
+          <div class="card" style="overflow:hidden">
+            <table class="table">
+              <thead><tr><th style="width:28px"></th><th>Item</th><th style="width:220px">Share of plan</th><th class="num" style="width:150px">Monthly</th><th style="width:44px"></th></tr></thead>
+              <tbody>
+                <tr class="band"><td class="caret">▾</td><td>Home<span class="m">7 items</span></td><td><div style="display:flex;gap:8px;align-items:center"><div class="meter" style="width:120px"><i style="width:10%"></i></div><span class="m" style="margin:0">9.8%</span></div></td><td class="num">£745.20</td><td></td></tr>
+                <tr class="is-focused"><td></td><td class="two"><div class="t">Groceries</div><div class="m">Equal split · Groceries · Monzo Joint</div></td><td class="m">4.3%</td><td class="num"><span class="amount-edit"><span style="color:var(--text-muted)">£</span>350.00</span></td><td></td></tr>
+                <tr><td></td><td colspan="4" style="height:34px;background:var(--surface-selected)"><div class="impact-line">Changes Nov 2026 – Feb 2027 · Plan <strong>£1,141.87 over → £1,166.40 over</strong> · Ada +£12.27 · Ben +£12.26 <span style="margin-left:auto"><kbd>↵</kbd> Save · <kbd>Esc</kbd> Cancel · <kbd>⇧↵</kbd> Open editor</span></div></td></tr>
+                <tr><td></td><td class="two"><div class="t">Rent</div><div class="m">One person · Ada · Bills · Monzo Joint</div></td><td class="m">0.7%</td><td class="num">£52.13</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Council tax</div><div class="m">Custom split · Bills · Monzo Joint</div></td><td class="m">0.8%</td><td class="num">£59.26</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Electricity</div><div class="m">Fixed amounts · Bills · Monzo Joint</div></td><td class="m">0.9%</td><td class="num">£66.39</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Gas</div><div class="m">Income ratio · Bills · Monzo Joint</div></td><td class="m">1.0%</td><td class="num">£73.52</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Water</div><div class="m">Income ratio · Bills · Monzo Joint</div></td><td class="m">1.1%</td><td class="num">£80.65</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Broadband</div><div class="m">Income ratio · Bills · Monzo Joint</div></td><td class="m">1.1%</td><td class="num">£87.78</td><td></td></tr>
+                <tr class="band"><td class="caret">▾</td><td>Utilities<span class="m">7 items</span></td><td><div style="display:flex;gap:8px;align-items:center"><div class="meter" style="width:120px"><i style="width:11%"></i></div><span class="m" style="margin:0">10.7%</span></div></td><td class="num">£814.10</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Mobile plans</div><div class="m">Equal split · Bills · Monzo Joint</div></td><td class="m">1.3%</td><td class="num">£94.91</td><td></td></tr>
+                <tr><td></td><td class="two"><div class="t">Home insurance</div><div class="m">One person · Ben · Bills · Monzo Joint</div></td><td class="m">1.3%</td><td class="num">£102.04</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div></div>
+      <ul class="callouts">
+        <li>Figures in one 84px row: the overall figure, a bar per person, and Edit income and Review as plain links (they were 245px).</li>
+        <li>One toolbar: search with <kbd>/</kbd>, the Category/Destination switch, a single Filter menu for Owner and Category (chips show when a filter is on), and the item count.</li>
+        <li>Groups open by default on desktop. Collapsing is remembered for the session, as now.</li>
+        <li>Rows are 44px with no permanent pencil chips. The amount becomes a field when you click it or press <kbd>E</kbd>. The impact shows on one line under the row, and <kbd>↵</kbd>/<kbd>Esc</kbd> save or cancel.</li>
+        <li>The row ⋯ (Duplicate, Remove) appears on hover or focus, so 40 rows don't show 40 menus.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Desktop · Add item and Edit item are one editor</h2>
+  <p class="note">Before: Add opens a batch table that starts with Category, then owner → account → pot bubbles, with Name further down (10 clicks + 3 fields with the first amount change). Edit is a different single-item form. After: one editor for both, in the order you think: name, amount, where it goes (recent destinations as one-tap chips), then category and funding pre-filled from the last item. <kbd>⌘↵</kbd> saves and starts another.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/plan-add-items-empty-desktop.png" alt="Add items today"></div>
+    <div><span class="label">After</span>
+      <div class="scaler"><div class="artboard desktop" id="plan-editor-desktop" style="display:block">
+        <div class="dialog-scrim">
+          <div class="dialog">
+            <header><h3>Add item</h3><span class="context">November 2026</span><span class="btn icon quiet x"><svg><use href="#i-x"/></svg></span></header>
+            <div class="body">
+              <label>Name<span class="field is-focus">Netflix</span></label>
+              <div class="two"><label>Amount<span class="field" style="color:var(--text)"><span style="color:var(--text-muted)">£</span>15.00</span></label><label>Every<span class="field" style="color:var(--text)">Month<svg style="margin-left:auto"><use href="#i-down"/></svg></span></label></div>
+              <label>Goes to<span class="chips"><span class="pick on">Bills · Monzo Joint</span><span class="pick">Groceries · Monzo Joint</span><span class="pick">Holidays · Monzo Joint</span><span class="pick">Monzo Joint</span><span class="pick">Other…</span></span></label>
+              <div class="two" style="grid-template-columns:1fr 1fr"><label>Category<span class="field" style="color:var(--text)">Lifestyle<svg style="margin-left:auto"><use href="#i-down"/></svg></span></label><label>Funding<span class="field" style="color:var(--text)">Income ratio<svg style="margin-left:auto"><use href="#i-down"/></svg></span></label></div>
+              <div class="m" style="font-size:13px;color:var(--text-muted)">Ada £9.23 · Ben £5.77</div>
+            </div>
+            <footer>
+              <div class="impact-line">Changes Nov 2026 – Feb 2027 · Plan <strong>£1,141.87 over → £1,156.87 over</strong></div>
+              <div class="acts"><span class="left"><kbd>⌘↵</kbd> Add and start another</span><span class="btn">Cancel</span><span class="btn primary">Add item</span></div>
+            </footer>
+          </div>
+        </div>
+      </div></div>
+      <ul class="callouts">
+        <li>The same editor edits an item: it's titled "Edit item", and Duplicate and Remove go in the footer, as now.</li>
+        <li>"Goes to" shows the five destinations used most recently. "Other…" opens today's owner → account → pot picker inline.</li>
+        <li>Category defaults to the open group (or the last one used), and Funding defaults to the last one used.</li>
+        <li>Adding several items is now "Add and start another" (<kbd>⌘↵</kbd>), which keeps the destination and category. The batch table goes.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pair">
+  <h2>Phone · Plan</h2>
+  <p class="note">Before: the first item is at y≈740 after opening a group, because the meter card is 330px. After: a two-line meter, then search, filter and add on one row. The first group starts open, so its items are visible at y≈330.</p>
+  <div class="cols">
+    <div><span class="label before">Before</span><img class="shot" src="../screenshots/plan-group-open-phone.png" alt="Plan today, phone" style="max-width:375px"></div>
+    <div><span class="label">After</span>
+      <div class="scaler" style="max-width:375px"><div class="artboard phone" id="plan-phone">
+        <div class="phone-header">
+          <div class="hbar"><span class="brand">north.</span><span class="icons"><span class="icon-btn"><svg><use href="#i-more"/></svg></span><span class="icon-btn"><svg><use href="#i-user"/></svg></span></span></div>
+          <div class="title"><h1>November 2026</h1><svg style="width:16px;height:16px;stroke:var(--on-pine-muted);fill:none;stroke-width:2"><use href="#i-down"/></svg></div>
+          <div class="sub">Carried over from October</div>
+        </div>
+        <div class="phone-body" style="gap:12px">
+          <div class="card" style="padding:12px 14px;display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><strong class="crit-text" style="font-size:17px">£1,141.87 over</strong><span style="font-size:12px;color:var(--text-muted)">£7,641.87 of £6,500.00</span></div>
+            <div class="person" style="grid-template-columns:34px 1fr 96px"><b>Ada</b><div class="meter"><i style="width:90%"></i><i class="over" style="left:90%;width:10%"></i></div><span class="crit-text">£429.66 over</span></div>
+            <div class="person" style="grid-template-columns:34px 1fr 96px"><b>Ben</b><div class="meter"><i style="width:78%"></i><i class="over" style="left:78%;width:22%"></i></div><span class="crit-text">£712.21 over</span></div>
+          </div>
+          <div class="toolbar"><span class="field" style="flex:1"><svg><use href="#i-search"/></svg>Search</span><span class="btn icon"><svg><use href="#i-filter"/></svg></span><span class="btn icon primary"><svg><use href="#i-plus"/></svg></span></div>
+          <div class="card" style="overflow:hidden">
+            <ul class="list">
+              <li class="group-label" style="background:var(--surface-band);color:var(--text);display:flex;justify-content:space-between"><span>▾ Home · 7</span><span>£745.20</span></li>
+              <li class="row" style="grid-template-columns:1fr auto;min-height:56px"><div><div class="t">Groceries</div><div class="m">Equal split · Groceries</div></div><div class="r">£325.47</div></li>
+              <li class="row" style="grid-template-columns:1fr auto;min-height:56px"><div><div class="t">Rent</div><div class="m">Ada · Bills</div></div><div class="r">£52.13</div></li>
+              <li class="row" style="grid-template-columns:1fr auto;min-height:56px"><div><div class="t">Council tax</div><div class="m">Custom split · Bills</div></div><div class="r">£59.26</div></li>
+              <li class="row" style="grid-template-columns:1fr auto;min-height:56px"><div><div class="t">Electricity</div><div class="m">Fixed amounts · Bills</div></div><div class="r">£66.39</div></li>
+              <li class="group-label" style="background:var(--surface-band);color:var(--text);display:flex;justify-content:space-between"><span>▸ Utilities · 7</span><span>£814.10</span></li>
+            </ul>
+          </div>
+        </div>
+        <nav class="tabbar"><a><span class="pill"><svg><use href="#i-home"/></svg></span>Home</a><a><span class="pill"><svg><use href="#i-month"/></svg></span>Month</a><a class="is-current"><span class="pill"><svg><use href="#i-plan"/></svg></span>Plan</a><a><span class="pill"><svg><use href="#i-card"/></svg></span>Spending</a></nav>
+      </div></div>
+      <ul class="callouts"><li>The Category/Destination switch moves into the Filter sheet on phones. Rows drop the pot's account name when the group already says it.</li></ul>
+    </div>
+  </div>
+</section>
+</div>
+<script src="mockup.js"></script>
+</body>
+</html>

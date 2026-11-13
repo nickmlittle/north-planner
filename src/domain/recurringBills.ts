@@ -100,3 +100,36 @@ export function potBillTotals(bills: readonly MonthBill[], potId: string): PotBi
   }
   return totals
 }
+
+/** A yearly bill's next renewal: the first date with its day and month on or after today (YYYY-MM-DD). */
+export function nextRenewal(bill: Pick<RecurringBill, 'day' | 'month'>, today: string): string {
+  const month = String(bill.month ?? 1).padStart(2, '0')
+  const thisYear = billDate(`${today.slice(0, 4)}-${month}`, bill.day)
+  return thisYear >= today ? thisYear : billDate(`${Number(today.slice(0, 4)) + 1}-${month}`, bill.day)
+}
+
+export type YearlyBill = {
+  itemId: string
+  name: string
+  /** The next renewal (YYYY-MM-DD); absent when the item has no date. */
+  renews?: string
+  paidBy?: BillPaidBy
+  cardId?: string
+  tracked: boolean
+  monthlyPence: number
+  yearlyPence: number
+}
+
+/**
+ * The yearly items a pot sets money aside for, in a month's plan: each one's next renewal, the monthly set-aside and
+ * the yearly price. Soonest renewal first, then the ones with no date, by name.
+ */
+export function yearlyBillsFor(document: Pick<BudgetDocument, 'budget' | 'card'>, potId: string, month: string, today: string): YearlyBill[] {
+  return resolveBudget(document.budget, month).items
+    .filter(item => item.frequency === 'annually' && item.destination.kind === 'pot' && item.destination.potId === potId)
+    .map(item => ({
+      itemId: item.id, name: item.name, monthlyPence: item.amountPence, yearlyPence: item.entryAmountPence, tracked: !!item.bill && billTracked(item.bill, document),
+      ...item.bill ? { renews: nextRenewal(item.bill, today), paidBy: item.bill.paidBy, ...item.bill.cardId ? { cardId: item.bill.cardId } : {} } : {},
+    }))
+    .sort((a, b) => (a.renews ?? '9999').localeCompare(b.renews ?? '9999') || a.name.localeCompare(b.name, 'en-GB'))
+}

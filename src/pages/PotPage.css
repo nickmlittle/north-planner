@@ -18,3 +18,37 @@
 .pot-list>li+li>.list-row{border-top:1px solid var(--border)}
 .pot-credit{color:var(--positive)}
 .pot-none{margin:0;color:var(--text-muted);font-size:var(--text-md)}
+/* Recurring bills on a pot's page (recurring-bills-rules › The pot page, boards 3–4). */
+.pot-lead-bills{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.pot-bills-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-bills-table{width:100%;border-collapse:collapse;font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.pot-bills-table th,.pot-bills-table td{padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.pot-bills-table thead th{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.pot-bills-table tbody th{font-weight:var(--weight-medium)}
+.pot-bills-table td:first-child,.pot-bills-table td:nth-child(3){color:var(--text-muted)}
+.pot-bills-table .is-num{text-align:right}
+.pot-bills-table tbody tr:last-child>*{border-bottom:0}
+.pot-bills-table tr.is-tracked>*{color:var(--text-muted)}
+.pot-bills-table tr.pot-bills-today td,.pot-bills>.pot-bills-today{padding:var(--space-1) var(--space-4);background:var(--surface-selected);color:var(--accent);font-size:var(--text-sm);font-weight:var(--weight-bold)}
+.pot-bill-status{display:inline-flex;align-items:center;min-height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-sunken);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.pot-bill-status.is-paid{background:var(--surface-selected);color:var(--accent)}
+.pot-bill-status.is-due{background:var(--warning-bg);color:var(--warning)}
+.pot-bills-note{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
+.pot-bills{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden}
+.pot-bills>li:not(.pot-bills-today){display:flex;align-items:center;gap:var(--space-3);min-height:56px;padding:var(--space-2) var(--space-4);border-top:1px solid var(--border)}
+.pot-bills>li:first-child{border-top:0}
+.pot-bills-date{display:grid;flex:none;width:36px;color:var(--text-muted);font-size:var(--text-sm);line-height:1.2;text-align:center}
+.pot-bills-date strong{color:var(--text);font-size:var(--text-md)}
+.pot-bills-text{display:grid;flex:1;gap:2px;min-width:0}
+.pot-bills-name{font-weight:var(--weight-medium)}
+.pot-bills-meta{color:var(--text-muted);font-size:var(--text-sm)}
+.pot-bills-end{display:grid;justify-items:end;gap:2px;font-variant-numeric:tabular-nums}
+.pot-bills-amount{font-weight:var(--weight-medium)}
+.pot-bills>li.is-tracked .pot-bills-name,.pot-bills>li.is-tracked .pot-bills-amount{color:var(--text-muted)}
+.pot-bills .pot-bill-status{min-height:0;padding:0;background:none}
+.pot-yearly{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-3);margin:0;padding:0;list-style:none}
+.pot-yearly li{display:grid;gap:var(--space-1);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-yearly-name{font-weight:var(--weight-medium)}
+.pot-yearly-when{color:var(--text-muted);font-size:var(--text-sm)}
+.pot-yearly-amounts{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.pot-yearly-amounts strong{color:var(--text)}
