@@ -29,8 +29,10 @@ export function usePlanView({ budget, month, view, planDestination, planItemId, 
  const planItem=planItemId?items.find(row=>row.id===planItemId):undefined,planItemGroup=planItem&&planGroupKey(planItem,grouping,labels)
  const revealGroup=view==='plan'&&!planDestination?planItemGroup:undefined
  const [revealedGroup,setRevealedGroup]=useState<string|undefined>()
- if(revealGroup!==revealedGroup){setRevealedGroup(revealGroup);if(revealGroup&&!openGroups[revealGroup])setOpenGroups({...openGroups,[revealGroup]:true})}
- return {query,updateSearch,captureBrowseScroll,ownerFilter,setOwnerFilter,categoryFilter,setCategoryFilter,openGroups,setOpenGroups,grouping,chooseGrouping,destinationItems,reviewPerson}
+ if(revealGroup!==revealedGroup){setRevealedGroup(revealGroup);if(revealGroup&&!(openGroups[revealGroup]??!mobilePresentation))setOpenGroups({...openGroups,[revealGroup]:true})}
+ // Desktop opens Plan's groups unless this session closed them; phones keep them closed (D4).
+ const groupsOpenByDefault=!mobilePresentation
+ return {query,updateSearch,captureBrowseScroll,ownerFilter,setOwnerFilter,categoryFilter,setCategoryFilter,openGroups,setOpenGroups,groupsOpenByDefault,grouping,chooseGrouping,destinationItems,reviewPerson}
 }
 
 export type PlanView = ReturnType<typeof usePlanView>

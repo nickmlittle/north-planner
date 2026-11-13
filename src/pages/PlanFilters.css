@@ -1,3 +1,0 @@
-/* Plan's search: the / key hint at the field's right edge (audit 3 PR 07). Tokens only (styles.tokens.test.ts). */
-.budget-v3-search:has(.plan-search-shortcut){position:relative}
-.plan-search-shortcut{position:absolute;right:var(--space-2);bottom:calc((var(--control-h) - 22px) / 2);pointer-events:none}

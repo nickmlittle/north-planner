@@ -5,7 +5,8 @@ import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument
 import { MonthlyBudget } from './MonthlyBudget'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.sessionStorage.clear(); window.localStorage.clear() })
-const expandAll = () => fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
+/** Desktop has Expand all in the toolbar; phones keep it in the Filter sheet. */
+const expandAll = () => { const direct = screen.queryByRole('button', { name: 'Expand all' }); if (direct) { fireEvent.click(direct); return } fireEvent.click(screen.getByRole('button', { name: /^Filter/ })); fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter' })).getByRole('button', { name: 'Expand all' })) }
 
 function withItems(count: number): BudgetDocument {
   const document = newBudgetDocument()
@@ -23,13 +24,13 @@ it('hides search and filters while the month has fewer than five items', () => {
   render(<MonthlyBudget document={withItems(4)} setDocument={vi.fn()} month="2026-11"/>)
   expandAll()
   expect(screen.getByText('Item 3')).toBeVisible()
-  expect(screen.queryByPlaceholderText('Search budget')).not.toBeInTheDocument()
+  expect(screen.queryByPlaceholderText('Search items')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Owner')).not.toBeInTheDocument()
 })
 
 it('shows search with matching owner and category filters from five items', () => {
   render(<MonthlyBudget document={withItems(5)} setDocument={vi.fn()} month="2026-11"/>)
-  expect(screen.getByPlaceholderText('Search budget')).toBeInTheDocument()
+  expect(screen.getByPlaceholderText('Search items')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
   const owner = screen.getByLabelText('Owner'), category = screen.getByLabelText('Category')
   expect(owner).toHaveClass('budget-v3-filter-select')
@@ -56,26 +57,31 @@ const desktop = () => vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matc
 const bandNames = (dataGroup: string) => [...document.querySelectorAll(`tr[data-budget-group="${dataGroup}"] .plan-group-name`)].map(name => name.textContent)
 const itemNames = () => [...document.querySelectorAll('.budget-v3-item-name')].map(button => button.textContent)
 
+/** Desktop: Owner and Category live in the Filter sheet. */
+function filterDesktop(label: 'Owner' | 'Category', value: string) {
+  fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
+  fireEvent.change(within(screen.getByRole('dialog', { name: 'Filter' })).getByLabelText(label), { target: { value } })
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter' })).getByRole('button', { name: 'Done' }))
+}
+
 it('groups the desktop Plan by category only, across owners', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
   expect(screen.getByRole('table', { name: 'Budget items by category' })).toBeInTheDocument()
   expect(bandNames('owner')).toEqual([])
   expect(bandNames('category')).toEqual(['Bills', 'Fun'])
-  expect(itemNames()).toEqual([])
-  expandAll()
+  // Desktop opens every group by default (D4).
   expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone', 'Cinema', 'Books'])
 })
 
 it('narrows the desktop Plan with the Owner and Category filters', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
-  expandAll()
-  fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'Ada' } })
+  filterDesktop('Owner', 'Ada')
   expect(bandNames('category')).toEqual(['Bills', 'Fun'])
   expect(itemNames()).toEqual(['Phone', 'Books'])
-  fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'All' } })
-  fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'fun' } })
+  filterDesktop('Owner', 'All')
+  filterDesktop('Category', 'fun')
   expect(bandNames('category')).toEqual(['Fun'])
   expect(itemNames()).toEqual(['Cinema', 'Books'])
 })
@@ -87,44 +93,63 @@ it('groups phones by category too, with Owner left to the filter', () => {
   expect(screen.getByRole('button', { name: 'Bills, 3 items, £3.00, 60.0% of plan' })).toHaveAttribute('aria-expanded', 'false')
 })
 
-it('starts groups closed with each share of the plan, opens them one at a time or all at once, and totals what is shown', () => {
+it('opens desktop groups by default with each share of the plan, collapses and reopens them, and totals what is shown', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
   const card = screen.getByRole('region', { name: 'Budget items' })
-  expect(within(card).getByText('2 categories · 5 items')).toBeInTheDocument()
+  expect(document.querySelector('.plan-toolbar-count')).toHaveTextContent('5 items')
+  expect(within(card).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['Item', 'Share of plan', 'Monthly', 'Actions'])
   const bills = document.querySelector('tr[data-budget-group="category"]')!
   expect(bills.querySelector('.plan-share')).toHaveTextContent('60.0%')
   expect(bills.querySelector('.plan-group-total')).toHaveTextContent('£3.00')
   expect(card.querySelector('tfoot')).toHaveTextContent('Total 5 items£5.00')
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone', 'Cinema', 'Books'])
   fireEvent.click(screen.getByRole('button', { name: /^Fun,/ }))
-  expect(itemNames()).toEqual(['Cinema', 'Books'])
-  expect(screen.getByRole('button', { name: 'Collapse all' })).toBeInTheDocument()
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone'])
   fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }))
   expect(itemNames()).toEqual([])
+  expect(screen.getByRole('button', { name: 'Expand all' })).toBeInTheDocument()
   fireEvent.click(bills.querySelector('.plan-share-cell')!)
   expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone'])
+})
+
+it('keeps groups closed for the rest of the session, and opens them again in a new one', () => {
+  desktop()
+  const { unmount } = render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }))
+  unmount()
+  const again = render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
+  expect(itemNames()).toEqual([])
+  again.unmount()
+  window.sessionStorage.clear()
+  render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone', 'Cinema', 'Books'])
 })
 
 it('names the owner and category of each desktop search result', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
-  const contexts = (query: string) => { fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: query } }); return [...document.querySelectorAll('.budget-v3-result-context')].map(context => context.textContent) }
+  const contexts = (query: string) => { fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: query } }); return [...document.querySelectorAll('.budget-v3-result-context')].map(context => context.textContent) }
   expect(contexts('Phone')).toEqual(['Ada · Bills'])
   expect(contexts('Cinema')).toEqual(['Joint · Fun'])
 })
 
-it('shows Owner and Category as chips on desktop, filled when active, with Clear filters', () => {
+it('puts Owner and Category in one Filter sheet on desktop, with a count, removable chips and Clear filters', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
-  expandAll()
-  expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Owner')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'Ada' } })
-  expect(screen.getByLabelText('Owner').closest('label')).toHaveClass('is-active')
-  expect(screen.getByLabelText('Category').closest('label')).not.toHaveClass('is-active')
+  filterDesktop('Owner', 'Ada')
+  expect(screen.getByRole('button', { name: 'Filter · 1' })).toHaveAttribute('aria-expanded', 'false')
+  expect(within(screen.getByRole('group', { name: 'Active filters' })).getByRole('button', { name: 'Remove filter: Ada’s accounts' })).toBeInTheDocument()
+  expect(itemNames()).toEqual(['Phone', 'Books'])
+  filterDesktop('Category', 'fun')
+  expect(itemNames()).toEqual(['Books'])
+  fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fun' }))
+  expect(itemNames()).toEqual(['Phone', 'Books'])
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
-  expect(screen.getByLabelText('Owner')).toHaveValue('All')
   expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone', 'Cinema', 'Books'])
+  expect(screen.queryByRole('group', { name: 'Active filters' })).not.toBeInTheDocument()
 })
 
 it('puts phone filters in a sheet behind one Filter button that counts what is active, next to +', () => {
@@ -146,7 +171,7 @@ it('puts phone filters in a sheet behind one Filter button that counts what is a
   fireEvent.click(within(sheet).getByRole('button', { name: 'Clear filters' }))
   fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
   expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
-  const add = document.querySelector<HTMLElement>('.budget-v3-controls .budget-add-button')!
+  const add = document.querySelector<HTMLElement>('.plan-toolbar .plan-toolbar-add')!
   expect(add).toHaveAccessibleName('Add item')
   fireEvent.click(add)
   expect(screen.getByRole('form', { name: 'Add item' })).toBeInTheDocument()
@@ -158,29 +183,28 @@ it('switches between Category and Destination bands, remembers the choice, and k
   const switcher = screen.getByRole('group', { name: 'Group items by' })
   expect(within(switcher).getByRole('button', { name: 'Category' })).toHaveAttribute('aria-pressed', 'true')
   fireEvent.click(screen.getByRole('button', { name: /^Bills,/ }))
+  expect(itemNames()).toEqual(['Cinema', 'Books'])
   fireEvent.click(within(switcher).getByRole('button', { name: 'Destination' }))
   expect(within(switcher).getByRole('button', { name: 'Destination' })).toHaveAttribute('aria-pressed', 'true')
   expect(screen.getByRole('table', { name: 'Budget items by destination' })).toBeInTheDocument()
-  expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent('Destination')
   expect(bandNames('destination')).toHaveLength(2)
-  expect(within(screen.getByRole('region', { name: 'Budget items' })).getByText('2 accounts · 5 items')).toBeInTheDocument()
-  expect(itemNames()).toEqual([])
-  fireEvent.click(document.querySelector<HTMLButtonElement>('tr[data-budget-group="destination"] th button')!)
-  expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema'])
+  expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema', 'Phone', 'Books'])
   // Destination bands name the account, so each item's line names its category instead.
   expect(document.querySelector('.budget-v3-item-meta')).toHaveTextContent('Category: Bills')
+  fireEvent.click(document.querySelector<HTMLButtonElement>('tr[data-budget-group="destination"] th button')!)
+  expect(itemNames()).toEqual(['Phone', 'Books'])
   unmount()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
   expect(screen.getByRole('button', { name: 'Destination' })).toHaveAttribute('aria-pressed', 'true')
-  expect(itemNames()).toEqual(['Rent', 'Gas', 'Cinema'])
+  expect(itemNames()).toEqual(['Phone', 'Books'])
   fireEvent.click(screen.getByRole('button', { name: 'Category' }))
-  expect(itemNames()).toEqual(['Rent', 'Gas', 'Phone'])
+  expect(itemNames()).toEqual(['Cinema', 'Books'])
 })
 
 it('hides the grouping switch while searching', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   expect(screen.queryByRole('group', { name: 'Group items by' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Expand all' })).not.toBeInTheDocument()
 })
@@ -188,10 +212,10 @@ it('hides the grouping switch while searching', () => {
 it('splits an open category by whose account each item goes to, with subtotals and shares', () => {
   desktop()
   render(<MonthlyBudget document={household()} setDocument={vi.fn()} month="2026-11" view="plan"/>)
-  fireEvent.click(screen.getByRole('button', { name: /^Bills,/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Fun,/ }))
   const rows = [...document.querySelectorAll('.plan-card tbody tr')].map(row => row.classList.contains('plan-subgroup') ? `# ${row.textContent}` : row.classList.contains('budget-v3-item') ? `${row.querySelector('.budget-v3-item-name')!.textContent}${row.classList.contains('is-nested') ? ' (nested)' : ''}` : null).filter(Boolean)
   expect(rows).toEqual(['# Joint accounts40.0%£2.00', 'Rent (nested)', 'Gas (nested)', '# Ada’s accounts20.0%£1.00', 'Phone (nested)'])
   // Searching lists matches directly, without the second level.
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   expect(document.querySelector('.plan-subgroup')).toBeNull()
 })

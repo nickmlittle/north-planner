@@ -1,6 +1,9 @@
 const OPEN_GROUPS_KEY = 'north.plan.open'
 
-/** The Plan groups opened in this browser session, by group key. Groups start closed. */
+/**
+ * The Plan groups opened (true) or closed (false) in this browser session, by group key. A group with no entry
+ * takes the default: open on desktop, closed on phones (D4), so a new session starts open again on desktop.
+ */
 export function readOpenPlanGroups(): Record<string, boolean> {
   try {
     const value: unknown = JSON.parse(window.sessionStorage.getItem(OPEN_GROUPS_KEY) ?? '{}')
