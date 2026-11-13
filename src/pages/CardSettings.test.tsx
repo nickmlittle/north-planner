@@ -124,3 +124,16 @@ it('removes a card with no history, and offers only Edit once it has statements'
   fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
   expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Edit'])
 })
+
+it('warns which recurring bills are paid on a card before removing it', () => {
+  const document = household()
+  document.budget.categories = [{ id: 'home', name: 'Home' }]
+  const bill = (id: string, name: string, cardId?: string) => ({ id, name, categoryId: 'home', entryAmountPence: 1000, amountPence: 1000, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId: 'buffer' }, funding: 'equal' as const, bill: { paidBy: 'card' as const, ...cardId ? { cardId } : {}, day: 2 } })
+  document.budget.snapshots = { '2026-10': { items: [bill('tv', 'Streamflix', 'amex'), bill('phone', 'Phone')] }, '2026-12': { items: [bill('tv', 'Streamflix', 'amex'), bill('cover', 'Breakdown cover', 'amex')] } }
+  document.card = { cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }], transactions: [], rules: [], statements: {}, months: {}, pots: {}, imports: [] }
+  expect(decodeBudgetDocument(document)).not.toBeNull()
+  render(<Harness initial={document} onChange={() => {}}/>)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions for Amex' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Remove' }))
+  expect(screen.getByRole('dialog', { name: 'Remove Amex?' })).toHaveTextContent('2 recurring bills are paid on Amex: Streamflix and Breakdown cover. Once it’s removed, North assumes they’re paid on their day.')
+})

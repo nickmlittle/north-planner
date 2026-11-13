@@ -21,6 +21,20 @@
 .item-editor-allocation label{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;gap:var(--space-2)}
 .item-editor-allocation small{color:var(--text-muted)}
 .item-editor-split{margin:0;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.item-editor-bill{display:grid;gap:var(--space-3);margin-top:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.item-editor-bill.is-on{border-color:var(--line-strong)}
+.item-editor-bill-toggle{display:flex;align-items:flex-start;gap:var(--space-3)}
+.item-editor-bill-toggle input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);cursor:pointer}
+.item-editor-bill-toggle span{display:grid;gap:2px}
+.item-editor-bill-toggle label{font-size:var(--text-md);font-weight:var(--weight-medium);cursor:pointer}
+.item-editor-bill-toggle small{color:var(--text-muted);font-size:var(--text-sm)}
+.item-editor-bill-fields{display:grid;gap:var(--space-3);padding-left:var(--space-6)}
+.item-editor-bill-fields .segmented{justify-self:start}
+.item-editor-bill-date{display:grid;grid-template-columns:110px minmax(0,1fr);gap:var(--space-3);align-items:end}
+.item-editor-bill-note{display:flex;align-items:flex-start;gap:var(--space-2);margin:0;padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--text);font-size:var(--text-sm);line-height:1.5}
+.item-editor-bill-note svg{flex:none;width:16px;height:16px;margin-top:2px;color:var(--accent)}
+.item-editor-bill-note.is-warning{background:var(--warning-bg)}
+.item-editor-bill-note.is-warning svg{color:var(--warning)}
 .item-editor-error{margin:calc(-1 * var(--space-2)) 0 0;color:var(--critical);font-size:var(--text-sm)}
 .item-editor-sheet .sheet-footer{display:grid;gap:var(--space-2);justify-content:stretch}
 .item-editor-sheet .sheet-footer .budget-impact-compact{margin:0;font-size:var(--text-sm)}
@@ -34,6 +48,8 @@
   .item-editor-pair{grid-template-columns:minmax(0,1fr)}
   .item-editor-pair.is-amount{grid-template-columns:minmax(0,1fr) 120px}
   .item-editor-chip{min-height:var(--control-h-touch)}
+  .item-editor-bill{padding:var(--space-3)}
+  .item-editor-bill-fields{padding-left:0}
   .item-editor-another .kbd{display:none}
   .item-editor-actions{display:grid;grid-template-columns:1fr 1fr}
   .item-editor-actions .item-editor-secondary,.item-editor-actions .item-editor-another{grid-column:1 / -1;justify-content:center;margin:0}

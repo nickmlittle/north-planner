@@ -143,6 +143,8 @@ Search matches item names, categories, owners and destination account/provider/t
 
 **The item editor.** Adding and editing use one short form in a Sheet (“Add item” or “Edit item”, with the month under the title; full height on phones), in the order people think: **Name** (focused on open); **Amount** and **Every** (Month or Year, with the monthly equivalent for a yearly amount); **Goes to**, up to five chips for the destinations this month's items use most (this device's last-used first, the selected one filled), then **Other…** for the full picker (owner › account › pot, and creating an account or pot inline; on a first run with no accounts it reads **Add an account…**); then **Category** and **Funding** side by side, with the funding-specific fields (one person, fixed amounts, relative weights) under them and one muted line of the split (“Ada £9.23 · Ben £5.77”). Adding remembers this device's last destination, category and funding. The footer states the scope and the plan balance before → after, with Funding changes folded. Adding offers **⌘↵ Add and start another**, which adds the item, keeps Goes to, Category and Funding, clears Name and Amount and confirms in a toast (“Netflix added”); Add item is off until something is entered. Editing has Duplicate (a new item, “Netflix (copy)”) and Remove item (which confirms with its impact). Errors sit under their field, and the first one takes focus. Leaving with unsaved changes asks “Discard this item?”.
 
+**Recurring bill.** Below Funding, a bordered section with a **Recurring bill** checkbox, off by default (“Comes out on a set date, like council tax, insurance or a subscription.”). Ticked, it shows **Paid by** (Direct debit · Card), **Card** (each tracked card, “Amex (tracked in Spending)”, then Another card), then **Comes out on** (1st–28th or Last day) for a monthly item, or **Renews on** (a day and a month) and **Remind me** (2, 4, 6 or 8 weeks before, or Don’t remind me; 4 by default) for a yearly one. One muted line says what North will do: “North marks £52.13 as paid from Bills on the 3rd each month.”, or for a tracked card “You’ll sort the charge from the Amex statement as usual.” A yearly bill in a pot that doesn’t carry over is warned about, and still saves. Rules: [recurring-bills-rules](recurring-bills-rules.md).
+
 ### Spending
 
 The card tracker, built in the `card/` PR series from the [build plan](card-tracker-build-plan.md); behaviour is in [card-tracker-rules](card-tracker-rules.md).
@@ -183,7 +185,7 @@ Settings (at the sidebar foot, <kbd>G</kbd> <kbd>,</kbd>; from the account butto
 
 **Categories.** How Plan groups items: each category with its item count for the month (“7 items in November”), Rename under ⋯, and “Add category”. Names are unique, ignoring case.
 
-**Cards.** One row per card: “Closes on the 24th · due 25 days later · paid from Monzo Joint · Ada ··41001 · Ben ··41009”, with Edit under ⋯ (and Remove while the card has no transactions or statements). “Add a card” is below the list; with none, “No cards yet”. The form, in a Sheet, asks for the name (Amex), the statement closing day and the days until payment is due, both required with no defaults, and previews the result (“Statements run from the 25th to the 24th. The 24 Nov statement is due 19 Dec.”). Paid from defaults to the joint account and the buffer to its main balance. “Whose card is whose” maps each card ending to an adult. Without any accounts it asks for one first.
+**Cards.** One row per card: “Closes on the 24th · due 25 days later · paid from Monzo Joint · Ada ··41001 · Ben ··41009”, with Edit under ⋯ (and Remove while the card has no transactions or statements; its confirm names any recurring bills paid on the card, which North then assumes are paid on their day). “Add a card” is below the list; with none, “No cards yet”. The form, in a Sheet, asks for the name (Amex), the statement closing day and the days until payment is due, both required with no defaults, and previews the result (“Statements run from the 25th to the 24th. The 24 Nov statement is due 19 Dec.”). Paid from defaults to the joint account and the buffer to its main balance. “Whose card is whose” maps each card ending to an adult. Without any accounts it asks for one first.
 
 **Sorting rules.** “The first rule that matches sorts a transaction.” Each rule is a row in plain text (“GREEN GROCER” → Groceries · Monzo Joint, “Only Ben ··41009 · Sorted 3 transactions”) with Edit (in a Sheet), Move up, Move down and Delete under ⋯; <kbd>⌥↑</kbd> and <kbd>⌥↓</kbd> move the row that has focus. Delete confirms. With none: “No sorting rules yet”, and how to make one.
 
@@ -268,6 +270,17 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | **Pay lands in** | The account a salary arrives in (Settings › Pay & income, or setup's “Where does it land?”). It is the “from” of that person's payday steps: “Starling Ada → Monzo Joint”. | Source account, home account |
 | **Already in** | Funding into the account the pay already lands in: shown on Payday (“Already in Starling Ada · £698.72”), muted, copyable, but not a step and not counted. | Skipped, done |
 | **Set aside** | Moving what was sorted since the last move into the card's pot, so the statement is covered when it comes: “Set aside in the Amex pot”, “Mark moved”. | Reserve, ring-fence |
+
+Recurring bills add these words. Their rules are in [recurring-bills-rules](recurring-bills-rules.md).
+
+| Word | Means | Not |
+| --- | --- | --- |
+| **Recurring bill** | A plan item that comes out on a set date. | Scheduled payment, standing item |
+| **Paid by** | Direct debit or Card (then which card). | Payment method |
+| **Paid** | A bill whose day has passed. North assumes it went out unless it's on a tracked card. | Counted, assumed, cleared |
+| **Due** | A bill this month whose day hasn't come yet: “£172.00 of it due”, “Due 22 Nov”, “Due in 5 days”. | Pending, upcoming, outstanding |
+| **Renews** | A yearly bill's date: “Renews 3 Mar”. | Expires, due date |
+| **Via Amex** | A bill on a tracked card, listed for its date only: its spending comes from Sort. | |
 
 **Tone.** Lead with the figure, not the person: “£1,141.87 over”, “Ada £429.66 over”, “Groceries · Monzo Joint £40 ahead of pace”, never “You're both over” or “Ada is over”. A finished section folds to its count (“Payday · 18 of 18 done”) instead of congratulating. Verbs name actions. Nothing says “fits”, “left” or “up to date” when nothing is planned. Empty lists use one EmptyState where the content would be: what's missing, one sentence, one action. A failed save is a critical Notice under the page header on every screen (“Your changes aren't saved. Check your connection, then try again.” with Try again and Details); loading shows the page's skeleton.
 
