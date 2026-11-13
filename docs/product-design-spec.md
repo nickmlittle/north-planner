@@ -76,6 +76,8 @@ Home shows a one-time, dismissible note after the move: “Transfers is now Payd
 
 **Direction:** Keep the primary content reachable above safe areas and persistent controls, allow page scrolling on short screens, and avoid horizontal overflow or clipping at narrow widths and increased text sizes. Preserve logical focus and browser Back/Forward behavior when changing navigation.
 
+
+**Installable.** North is a web app you can add to a phone's home screen (`public/manifest.webmanifest`): it opens standalone at Home, pine, with its icon, the wordmark's “n.” in cream on pine (`public/icons/`, maskable version inside the safe circle). A service worker (`public/sw.js`, production builds only) opens the app offline after one visit: navigations are network-first with the cached shell as fallback, the build's hashed files are all cached on install (`asset-manifest.json`), Google Fonts are stale-while-revalidate, and nothing else, Supabase included, is ever cached. Each build registers a new version; when one is waiting, a toast says “A new version of North is ready · Reload” and nothing reloads by itself.
 ### Home
 
 Home answers “where do we stand, and what do we do next?” in one screen. Its header is the month (“November”; the h1 reads “Home, November”), a stage chip (“In progress · 19 days left”) and today’s date (“Wednesday 11 November”). No actions: Home’s action is its first task. Everything below comes from `domain/homeInbox.ts`, which maps `homeMonths()` and the payday plans into rows and doesn’t recompute stage, settle or pace rules.

@@ -18,6 +18,11 @@ export default tseslint.config(
     },
   },
   {
+    // The service worker runs in its own global scope.
+    files: ['public/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     files: ['src/{domain,engine,simulation,config}/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
