@@ -46,7 +46,7 @@ export function PlanToolbar({ query, onQueryChange, onSearchStart, inputRef, sho
   const activeCount = (owner !== 'All' ? 1 : 0) + (category !== 'All' ? 1 : 0)
   const clearFilters = () => { onOwnerChange('All'); onCategoryChange('All') }
   const categoryName = categories.find(row => row.id === category)?.name ?? 'Category'
-  const switcher = grouping && <Segmented label="Group items by" value={grouping.value} onChange={value => { if (value !== grouping.value) grouping.onChange(value as PlanGrouping) }} options={[{ value: 'category', label: 'Category' }, { value: 'destination', label: 'Destination' }]}/>
+  const switcher = grouping && <Segmented label="Group items by" value={grouping.value} onChange={value => { if (value !== grouping.value) grouping.onChange(value as PlanGrouping) }} options={[{ value: 'category', label: 'Category' }, { value: 'destination', label: 'Destination' }, { value: 'dates', label: 'Dates' }]}/>
   const expandButton = expand && <button type="button" className="text-button plan-toolbar-expand" onClick={expand.toggle}>{expand.anyOpen ? 'Collapse all' : 'Expand all'}</button>
   const chip = (label: string, name: string, onRemove: () => void) => <button key={name} type="button" className="plan-toolbar-chip" aria-label={name} onClick={onRemove}>{label}<X aria-hidden="true"/></button>
   const chips: ReactNode[] = [

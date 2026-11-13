@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
-import { daysInMonth } from './cardTracker'
-import { resolveBudget, type BillDay, type BillPaidBy, type BudgetDestination, type BudgetItem, type RecurringBill } from './monthlyBudget'
+import { addDays, daysInMonth } from './cardTracker'
+import { DEFAULT_REMIND_WEEKS, resolveBudget, type BillDay, type BillPaidBy, type BudgetDestination, type BudgetItem, type RecurringBill } from './monthlyBudget'
 
 /**
  * Recurring bills: plan items that come out on a set date (docs/recurring-bills-rules.md). The details live on the
@@ -132,4 +132,30 @@ export function yearlyBillsFor(document: Pick<BudgetDocument, 'budget' | 'card'>
       ...item.bill ? { renews: nextRenewal(item.bill, today), paidBy: item.bill.paidBy, ...item.bill.cardId ? { cardId: item.bill.cardId } : {} } : {},
     }))
     .sort((a, b) => (a.renews ?? '9999').localeCompare(b.renews ?? '9999') || a.name.localeCompare(b.name, 'en-GB'))
+}
+
+/** When Home starts reminding about a renewal (YYYY-MM-DD), or undefined when the reminder is off. */
+export function reminderFrom(renews: string, bill: Pick<RecurringBill, 'remindWeeks'>): string | undefined {
+  const weeks = bill.remindWeeks ?? DEFAULT_REMIND_WEEKS
+  return weeks ? addDays(renews, -weeks * 7) : undefined
+}
+
+export type DatedItem = { item: BudgetItem; bill: RecurringBill; tracked: boolean }
+export type RenewingItem = DatedItem & { renews: string; remindFrom?: string }
+
+/**
+ * Plan › Dates (board 5): the month's recurring bills by day, the yearly ones by their next renewal, and the yearly
+ * items with no date (nearly every yearly item is a renewal).
+ */
+export function planDates(document: Pick<BudgetDocument, 'card'>, items: readonly BudgetItem[], today: string): { monthly: DatedItem[]; yearly: RenewingItem[]; undated: BudgetItem[] } {
+  const dayOrder = (day: BillDay) => day === 'last' ? 29 : day
+  const monthly = items.filter(item => item.bill && item.frequency === 'monthly').map(item => ({ item, bill: item.bill!, tracked: billTracked(item.bill!, document) }))
+    .sort((a, b) => dayOrder(a.bill.day) - dayOrder(b.bill.day) || a.item.name.localeCompare(b.item.name, 'en-GB'))
+  const yearly = items.filter(item => item.bill && item.frequency === 'annually').map(item => {
+    const renews = nextRenewal(item.bill!, today)
+    const remindFrom = reminderFrom(renews, item.bill!)
+    return { item, bill: item.bill!, tracked: billTracked(item.bill!, document), renews, ...remindFrom ? { remindFrom } : {} }
+  }).sort((a, b) => a.renews.localeCompare(b.renews) || a.item.name.localeCompare(b.item.name, 'en-GB'))
+  const undated = items.filter(item => !item.bill && item.frequency === 'annually').sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
+  return { monthly, yearly, undated }
 }

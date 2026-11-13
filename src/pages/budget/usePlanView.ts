@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlanDestination } from '../../state/navigation'
-import { readOpenPlanGroups, readPlanGrouping, rememberOpenPlanGroups, rememberPlanGrouping } from '../../state/planGroups'
+import { PLAN_GROUPING_EVENT, readOpenPlanGroups, readPlanGrouping, rememberOpenPlanGroups, rememberPlanGrouping, type PlanGroupingChoice } from '../../state/planGroups'
 import { groupPlanItems, matchesPlanDestination, planGroupKey } from '../planRows'
 import { usePlanSearch } from '../usePlanSearch'
 import type { MonthBudget } from './useMonthBudget'
@@ -15,7 +15,8 @@ export function usePlanView({ budget, month, view, planDestination, planItemId, 
  const [ownerFilter,setOwnerFilter]=useState('All')
  const [openGroups,setOpenGroups]=useState(readOpenPlanGroups)
  const [grouping,setGrouping]=useState(readPlanGrouping)
- const chooseGrouping=(value:'category'|'destination')=>{rememberPlanGrouping(value);setGrouping(value)}
+ const chooseGrouping=(value:PlanGroupingChoice)=>{rememberPlanGrouping(value);setGrouping(value)}
+ useEffect(()=>{const show=(event:Event)=>setGrouping((event as CustomEvent<PlanGroupingChoice>).detail);window.addEventListener(PLAN_GROUPING_EVENT,show);return()=>window.removeEventListener(PLAN_GROUPING_EVENT,show)},[])
  useEffect(()=>rememberOpenPlanGroups(openGroups),[openGroups])
  const [categoryFilter,setCategoryFilter]=useState('All')
  const {query,updateSearch,captureBrowseScroll}=usePlanSearch({month,planDestination,mobilePresentation})

@@ -1,6 +1,6 @@
 # Recurring bills: design and PR build plan
 
-Status: planned, 13 November 2026, with Nick. PRs 1–3 are built; [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
+Status: planned, 13 November 2026, with Nick. PRs 1–4 are built; [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/Wqv1KMXNFrMimWybckZjLw, boards 1–6. The sample household and amounts on it are made up.
 - **Related rules:** [card-tracker-rules](card-tracker-rules.md) (Spent, Left, pace, pot balances, Home), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (snapshots and edit scope), [product-design-spec](product-design-spec.md) (layout, language, glossary).

@@ -16,7 +16,7 @@ import type { NavigationState, SettingsSection } from './navigation'
  * how a query ranks them. Pure, so it's tested on its own; the palette only draws and runs them.
  */
 export type CommandGroup = 'Recent' | 'Go to' | 'Actions' | 'Items' | 'Pots' | 'Statements' | 'Months' | 'Transactions'
-export type CommandAction = 'add-item' | 'bring-in' | 'add-transaction' | 'previous-month' | 'next-month' | 'shortcuts'
+export type CommandAction = 'add-item' | 'bills-by-date' | 'bring-in' | 'add-transaction' | 'previous-month' | 'next-month' | 'shortcuts'
 export type CommandTarget =
   | { kind: 'go'; to: Partial<NavigationState>; state?: Record<string, unknown> }
   | { kind: 'action'; action: CommandAction }
@@ -49,6 +49,7 @@ export function buildCommands(document: BudgetDocument, month: string, today: st
   ]
   const actions: Command[] = [
     { id: 'do:add-item', group: 'Actions', title: 'Add item', meta: `Plan · ${monthName}`, keys: 'n', target: { kind: 'action', action: 'add-item' } },
+    { id: 'do:bills-by-date', group: 'Actions', title: 'Bills by date', meta: `Plan · ${monthName}`, target: { kind: 'action', action: 'bills-by-date' } },
     ...hasCard ? [
       { id: 'do:bring-in', group: 'Actions', title: 'Bring in transactions', meta: `The Excel export from ${card}`, keys: 'i', target: { kind: 'action', action: 'bring-in' } } satisfies Command,
       { id: 'do:add-transaction', group: 'Actions', title: 'Add a transaction', meta: 'Spending', target: { kind: 'action', action: 'add-transaction' } } satisfies Command,

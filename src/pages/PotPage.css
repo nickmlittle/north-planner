@@ -52,3 +52,5 @@
 .pot-yearly-when{color:var(--text-muted);font-size:var(--text-sm)}
 .pot-yearly-amounts{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
 .pot-yearly-amounts strong{color:var(--text)}
+.pot-bills-all{display:inline-flex;align-items:center;gap:var(--space-1);font-size:var(--text-sm)}
+.pot-bills-all svg{width:14px;height:14px}

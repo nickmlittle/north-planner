@@ -1,0 +1,24 @@
+/* Plan › Dates (recurring-bills-rules › Plan › Dates, board 5). Tokens only (styles.tokens.test.ts). */
+.plan-dates{display:grid;gap:var(--space-5);min-width:0}
+.plan-dates-prompt{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3);padding:var(--space-3) var(--space-4);border:1px solid var(--warning);border-radius:var(--radius-lg);background:var(--warning-bg)}
+.plan-dates-prompt p{margin:0;flex:1 1 240px}
+.plan-dates-prompt span{color:var(--text-muted)}
+.plan-dates-prompt button{margin:0}
+.plan-dates-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.plan-dates-table{width:100%;border-collapse:collapse;font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.plan-dates-table th,.plan-dates-table td{padding:var(--space-2) var(--space-4);border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;white-space:nowrap}
+.plan-dates-table thead th{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.plan-dates-table tbody tr{cursor:pointer}
+.plan-dates-table tbody tr:hover{background:var(--surface-band-hover)}
+.plan-dates-table tbody tr:last-child>*{border-bottom:0}
+.plan-dates-table td{color:var(--text-muted)}
+.plan-dates-table .plan-dates-day{color:var(--text);font-weight:var(--weight-bold)}
+.plan-dates-table .is-num{color:var(--text);text-align:right}
+.plan-dates-name{margin:0;padding:0;border:0;background:none;color:var(--text);font:inherit;font-weight:var(--weight-medium);text-align:left;cursor:pointer}
+.plan-dates-name:hover{color:var(--accent);text-decoration:underline}
+.plan-dates-sub{display:block;color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.plan-dates-reminder{display:inline-flex;align-items:center;gap:var(--space-1);min-height:24px;padding:0 var(--space-2);border-radius:var(--radius-pill);background:var(--surface-sunken);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.plan-dates-reminder svg{width:12px;height:12px}
+.plan-dates-reminder.is-now{background:var(--warning-bg);color:var(--warning)}
+.plan-dates-list{display:grid;margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);overflow:hidden}
+.plan-dates-list>li+li{border-top:1px solid var(--border)}
