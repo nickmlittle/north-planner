@@ -1,0 +1,30 @@
+/* Plan's figures (audit 3 PR 16). Tokens only (styles.tokens.test.ts). */
+.allocation-meter{display:grid;grid-template-columns:200px minmax(0,1fr) 240px;align-items:center;gap:var(--space-2) var(--space-6);min-height:84px;box-sizing:border-box;padding:var(--space-3) var(--space-5);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.allocation-meter p{margin:0}
+.allocation-meter-lead{display:grid;gap:2px;min-width:0}
+.allocation-meter-eyebrow{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.allocation-meter-balance{color:var(--text);font-size:var(--text-xl);font-weight:var(--weight-bold);line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap}
+.allocation-meter-balance.is-over{color:var(--critical)}
+.allocation-meter-of{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.allocation-meter-track{display:flex;height:8px;border-radius:var(--radius-pill);background:var(--share-track);overflow:hidden}
+.allocation-meter-fill{display:block;flex:none;height:100%;background:var(--pine);transition:width .3s ease}
+.allocation-meter-over{display:block;flex:none;height:100%;background:repeating-linear-gradient(135deg,var(--status-error) 0 5px,var(--status-error-hatch) 5px 8px)}
+.allocation-meter-people{display:grid;gap:var(--space-2);margin:0;padding:0;list-style:none;min-width:0}
+.allocation-meter-person{display:grid;grid-template-columns:48px minmax(0,1fr) 120px;align-items:center;gap:var(--space-3)}
+.allocation-meter-name{font-size:var(--text-md);font-weight:var(--weight-medium)}
+.allocation-meter-person-balance{font-size:var(--text-md);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.allocation-meter-person.is-over .allocation-meter-person-balance{color:var(--critical)}
+.allocation-meter-side{display:grid;justify-items:end;gap:2px;color:var(--text-muted);font-size:var(--text-sm);text-align:right;font-variant-numeric:tabular-nums}
+.allocation-meter-side .text-button,.allocation-meter-links .text-button{min-height:0;padding:0;font-size:var(--text-sm)}
+.allocation-meter-basis{color:var(--text-muted)}
+/* Phones: the balance and planned-of-available on one line, then a thin bar per person. */
+.allocation-meter.is-compact{grid-template-columns:minmax(0,1fr);gap:var(--space-2);min-height:0;padding:var(--space-3) var(--space-4)}
+.allocation-meter-line{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3)}
+.allocation-meter.is-compact .allocation-meter-balance{font-size:var(--text-lg)}
+.allocation-meter.is-compact .allocation-meter-track{height:6px}
+.allocation-meter.is-compact .allocation-meter-people{gap:var(--space-1)}
+.allocation-meter.is-compact .allocation-meter-person{grid-template-columns:40px minmax(0,1fr) auto;gap:var(--space-2)}
+.allocation-meter.is-compact .allocation-meter-name,.allocation-meter.is-compact .allocation-meter-person-balance{font-size:var(--text-sm)}
+.allocation-meter-links{display:flex;justify-content:space-between;gap:var(--space-3)}
+@media(max-width:1099px){.allocation-meter:not(.is-compact){grid-template-columns:180px minmax(0,1fr)}.allocation-meter:not(.is-compact) .allocation-meter-side{grid-column:1 / -1;display:flex;justify-content:flex-start;gap:var(--space-4);text-align:left}}
+@media(prefers-reduced-motion:reduce){.allocation-meter-fill{transition:none}}

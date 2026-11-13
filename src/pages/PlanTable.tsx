@@ -1,12 +1,12 @@
 import { Fragment, useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import { ChevronDown, ChevronRight, Ellipsis, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronRight, Ellipsis, Lock, Pencil } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { budgetImpact, type BudgetImpact } from '../domain/budgetImpact'
 import { moneyPence } from '../domain/budgetItemDrafts'
 import { updateBudgetAtMonth, type BudgetItem } from '../domain/monthlyBudget'
 import { GroupedTable, GroupedTableBandRow, GroupedTableDisclosure, type GroupedTableGroup } from '../components/GroupedTable'
-import { ImpactPreview } from '../components/ImpactPreview'
-import { formatGBP } from '../formatting/money'
+import { Kbd } from '../components/ui'
+import { balanceLabel, formatGBP } from '../formatting/money'
 import type { PlanDestination } from '../state/navigation'
 import type { PlanGroup, PlanGrouping, PlanItemLabels, PlanSubgroup } from './planRows'
 
@@ -15,6 +15,7 @@ const withAmount = (document: BudgetDocument, month: string, itemId: string, pen
 const sumOf = (items: readonly BudgetItem[]) => items.reduce((sum, item) => sum + item.amountPence, 0)
 const itemCount = (count: number) => `${count} ${count === 1 ? 'item' : 'items'}`
 const percent = (value: number) => `${value.toFixed(1)}%`
+const delta = (pence: number) => `${pence < 0 ? '−' : '+'}${pounds(Math.abs(pence))}`
 
 /** A group's share of the whole month's plan: decoration beside the percentage, which carries the value. */
 function ShareBar({ share }: { share: number }) {
@@ -35,12 +36,15 @@ type Props = {
   mobilePresentation: boolean
   /** Phone Plan narrowed to one destination from Transfers. */
   scoped: boolean
-  /** Groups opened while browsing. Groups start closed; Transfers' destination view starts them open and keeps its own. */
+  /** Groups opened or closed while browsing; a group with no entry takes `groupsOpenByDefault`. A destination view starts them open and keeps its own. */
   openGroups: Readonly<Record<string, boolean>>
+  /** Desktop opens groups by default; phones keep them closed (D4). */
+  groupsOpenByDefault: boolean
   onOpenGroupsChange: Dispatch<SetStateAction<Record<string, boolean>>>
   /** Bands by category or by destination; each keeps its own open groups. */
   grouping: PlanGrouping
-  onGroupingChange: (grouping: PlanGrouping) => void
+  /** The toolbar above the table, given the count ("40 items", or with the total while narrowed) and Expand all when there are bands. */
+  renderToolbar?: (controls: { count: string; expand?: { anyOpen: boolean; toggle: () => void } }) => ReactNode
   /** The month's whole plan, for each group's share of it. */
   planTotalPence: number
   /** Changes when the Owner or Category filter does; closes the quick edit like a search would. */
@@ -49,7 +53,8 @@ type Props = {
   editorOpen: boolean
   /** Shown instead of the table, which keeps its open groups meanwhile. */
   empty?: ReactNode
-  onEdit: (item: BudgetItem) => void
+  /** Opens the full editor; `amountPence` carries an amount typed inline (⇧↵). */
+  onEdit: (item: BudgetItem, amountPence?: number) => void
   onRemove: (item: BudgetItem, menu: HTMLElement | null) => void
   /** Desktop row menu: a new item prefilled from this one. Phones duplicate from the editor. */
   onDuplicate: (item: BudgetItem) => void
@@ -59,14 +64,17 @@ type Props = {
 }
 
 /** The Plan's items in one card: collapsible groups with their share of the plan, a Total row, the row menu and the quick amount edit. */
-export function PlanTable({ document, setDocument, month, editScopeLabel, groups, labels, query, planDestination, view, mobilePresentation, scoped, openGroups, onOpenGroupsChange, grouping, onGroupingChange, planTotalPence, filterKey, editorOpen, empty, onEdit, onRemove, onDuplicate, onQuickEditOpen, onAmountSaved, focusFallback }: Props) {
+export function PlanTable({ document, setDocument, month, editScopeLabel, groups, labels, query, planDestination, view, mobilePresentation, scoped, openGroups, onOpenGroupsChange, groupsOpenByDefault, grouping, renderToolbar, planTotalPence, filterKey, editorOpen, empty, onEdit, onRemove, onDuplicate, onQuickEditOpen, onAmountSaved, focusFallback }: Props) {
   const [destinationClosed, setDestinationClosed] = useState<Record<string, boolean>>({})
   const [inlineId, setInlineId] = useState<string | null>(null), [inlineValue, setInlineValue] = useState(''), [formError, setFormError] = useState('')
-  const [impactRetry, setImpactRetry] = useState(0)
+  const [, setImpactRetry] = useState(0)
+  // The impact line follows the typed amount after a short pause, not on every keystroke.
+  const [settledValue, setSettledValue] = useState('')
+  useEffect(() => { const timer = window.setTimeout(() => setSettledValue(inlineValue), 150); return () => window.clearTimeout(timer) }, [inlineValue])
   const inlineTrigger = useRef<HTMLButtonElement | null>(null)
   if (editorOpen && (inlineId || formError)) { setInlineId(null); setFormError('') }
-  // The consequence sits above Save; keep the whole quick-edit form (and so Save) in view as it grows.
-  useEffect(() => { if (inlineId) window.document.getElementById(`inline-form-${inlineId}`)?.scrollIntoView?.({ block: 'nearest' }) }, [inlineId, inlineValue])
+  // Keep the impact line (and so Save) in view.
+  useEffect(() => { if (inlineId) window.document.getElementById(`inline-form-${inlineId}`)?.scrollIntoView?.({ block: 'nearest' }) }, [inlineId])
   useEffect(() => { const timer = window.setTimeout(() => { setInlineId(null); setFormError('') }, 0); return () => window.clearTimeout(timer) }, [month, view, planDestination, filterKey, query])
 
   const searchMode = !!query.trim()
@@ -77,10 +85,10 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
   const colSpan = desktop ? 4 : 2
 
   const destinationGroupKey = (key: string) => `${month}:${planDestination?.kind}:${planDestination?.id}:${key}`
-  const isOpen = (key: string) => !banded || (planDestination ? !destinationClosed[destinationGroupKey(key)] : !!openGroups[key])
+  const isOpen = (key: string) => !banded || (planDestination ? !destinationClosed[destinationGroupKey(key)] : openGroups[key] ?? groupsOpenByDefault)
   const setGroupOpen = (key: string, open: boolean) => {
     if (planDestination) setDestinationClosed(value => ({ ...value, [destinationGroupKey(key)]: !open }))
-    else onOpenGroupsChange(value => { const next = { ...value }; if (open) next[key] = true; else delete next[key]; return next })
+    else onOpenGroupsChange(value => ({ ...value, [key]: open }))
   }
   const anyOpen = banded && groups.some(group => isOpen(group.key))
   const shareOf = (pence: number) => planTotalPence > 0 ? pence / planTotalPence * 100 : 0
@@ -95,9 +103,9 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
       trigger?.focus({ preventScroll: true })
     })
   }
-  const edit = (item: BudgetItem) => { closeInline(); onEdit(item) }
-  const quickImpact = (item: BudgetItem) => {
-    const pence = moneyPence(inlineValue)
+  const edit = (item: BudgetItem, amountPence?: number) => { closeInline(); onEdit(item, amountPence) }
+  const quickImpact = (item: BudgetItem, value = settledValue) => {
+    const pence = moneyPence(value)
     if (pence === undefined || pence === item.amountPence) return undefined
     return budgetImpact(document, withAmount(document, month, item.id, pence), month, [item.id])
   }
@@ -106,7 +114,7 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     const pence = moneyPence(inlineValue)
     if (pence === undefined) { setFormError('Enter £0 or more, with up to two decimal places.'); return }
     if (pence !== item.amountPence) {
-      const preview = quickImpact(item)
+      const preview = quickImpact(item, inlineValue)
       if (preview && 'error' in preview) { setFormError(preview.error); return }
       setDocument(current => withAmount(current, month, item.id, pence))
       onAmountSaved(item.name, preview && 'impact' in preview ? preview.impact : null)
@@ -157,13 +165,30 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
     </tr>
   }
 
+  /** One line under the row being edited: scope, the plan balance before → after, and each person's change. */
+  const impactLine = (item: BudgetItem, impact: ReturnType<typeof quickImpact>) => {
+    const people = impact && 'impact' in impact ? impact.impact.people.filter(person => person.beforePence !== person.afterPence) : []
+    return <span className="plan-inline-impact">
+      <span id={`inline-scope-${item.id}`}>Changes {editScopeLabel}</span>
+      {impact && 'impact' in impact && <>
+        <span> · Plan <strong className={impact.impact.afterBalancePence < 0 ? 'is-over' : undefined}>{balanceLabel(impact.impact.beforeBalancePence)} → {balanceLabel(impact.impact.afterBalancePence)}</strong></span>
+        {people.map(person => <span key={person.personId}> · {document.household.adults.find(adult => adult.id === person.personId)?.name ?? 'Person'} {delta(person.afterPence - person.beforePence)}</span>)}
+        {impact.impact.incomplete && <span> · Some items can’t be funded yet</span>}
+      </>}
+    </span>
+  }
+  /** Leaving the amount and its line without Enter cancels. */
+  const blurInline = (item: BudgetItem, next: EventTarget | null) => { if (!(next instanceof Element && next.closest(`[data-inline-edit="${item.id}"]`))) cancelInline() }
+  const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault()
+
   const itemRows = (item: BudgetItem, nested = false) => {
     const editing = inlineId === item.id
     const impact = editing ? quickImpact(item) : undefined
     const category = labels.categoryName(item) ?? 'Uncategorised'
     // Destination bands, or a pot or direct-to-account view, already name the destination, so the line says the category instead.
     const sameDestination = !searchMode && (grouping === 'destination' || (!!planDestination && planDestination.kind !== 'account'))
-    return <Fragment key={item.id}><tr className={`budget-v3-item${nested ? ' is-nested' : ''}`} onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
+    const inlineEditable = item.frequency === 'monthly' && item.funding !== 'fixed'
+    return <Fragment key={item.id}><tr className={`budget-v3-item${nested ? ' is-nested' : ''}${editing ? ' is-editing' : ''}`} data-inline-edit={editing ? item.id : undefined} onClick={event => { if ((event.target as HTMLElement).closest('button,a,input,select,summary,details,label,form')) return; edit(item) }}>
       <th scope="row">
         <button type="button" className="budget-v3-item-name" title={`Edit details for ${item.name}`} data-budget-item-id={item.id} onClick={() => edit(item)}><span>{item.name}</span></button>
         <span className="budget-v3-item-meta"><span className="visually-hidden">Funding: </span>{labels.fundingLabel(item)}<span aria-hidden="true"> · </span>{sameDestination
@@ -173,10 +198,16 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
       </th>
       {desktop && <td className="plan-share-cell">{!searchMode && <span className="plan-share">{percent(shareOf(item.amountPence))}</span>}</td>}
       <td className="plan-amount-cell">{editing
-        ? <span className="budget-v3-inline-cell budget-money-field"><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-describedby={`inline-scope-${item.id}${formError ? ` inline-error-${item.id}` : ''}`} className="budget-v3-inline-amount" autoFocus inputMode="decimal" value={inlineValue} onChange={event => { setInlineValue(event.target.value); setFormError('') }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}/></span>
-        : item.frequency === 'monthly' && item.funding !== 'fixed'
-          ? <button type="button" data-amount-trigger={item.id} className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={editing} onClick={event => { inlineTrigger.current = event.currentTarget; setInlineId(item.id); setInlineValue((item.amountPence / 100).toFixed(2)); setFormError(''); onQuickEditOpen() }}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>
-          : <span className="budget-v3-amount is-static"><span>{pounds(item.amountPence)}</span><span aria-hidden="true" className="budget-v3-amount-icon"/></span>}</td>
+        ? <span className="plan-inline-field"><span aria-hidden="true">£</span><input id={`inline-amount-${item.id}`} form={`inline-form-${item.id}`} aria-label={`Monthly amount for ${item.name}`} aria-describedby={`inline-scope-${item.id}${formError ? ` inline-error-${item.id}` : ''}`} className="budget-v3-inline-amount" autoFocus onFocus={event => event.currentTarget.select()} inputMode="decimal" value={inlineValue}
+            onChange={event => { setInlineValue(event.target.value); setFormError('') }}
+            onBlur={event => blurInline(item, event.relatedTarget)}
+            onKeyDown={event => {
+              if (event.key === 'Escape') { event.preventDefault(); cancelInline() }
+              else if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); const pence = moneyPence(inlineValue); edit(item, pence === undefined || pence === item.amountPence ? undefined : pence) }
+            }}/></span>
+        : inlineEditable
+          ? <button type="button" data-amount-trigger={item.id} className="budget-v3-amount" aria-label={`Edit amount for ${item.name}`} aria-expanded={editing} onClick={event => { inlineTrigger.current = event.currentTarget; setInlineId(item.id); setInlineValue((item.amountPence / 100).toFixed(2)); setSettledValue((item.amountPence / 100).toFixed(2)); setFormError(''); onQuickEditOpen() }}><span>{pounds(item.amountPence)}</span><Pencil aria-hidden="true" className="budget-v3-amount-icon"/></button>
+          : <span className="budget-v3-amount is-static" title={item.funding === 'fixed' ? 'Fixed amounts: edit in the item' : 'Edit this amount in the item'}><span>{pounds(item.amountPence)}</span>{item.funding === 'fixed' ? <Lock aria-hidden="true" className="budget-v3-amount-icon"/> : <span aria-hidden="true" className="budget-v3-amount-icon"/>}</span>}</td>
       {desktop && <td className="plan-actions-cell"><details className="budget-v3-row-menu" onToggle={event => {
         const menu = event.currentTarget
         if (!menu.open) return
@@ -187,31 +218,27 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
         <summary aria-label={`More actions for ${item.name}`}><Ellipsis aria-hidden="true"/></summary>
         <div className="budget-v3-menu-actions"><button type="button" onClick={event => { event.currentTarget.closest('details')!.open = false; closeInline(); onDuplicate(item) }}>Duplicate</button><button type="button" onClick={event => { const menu = event.currentTarget.closest('details')!; menu.open = false; onRemove(item, menu.querySelector('summary')) }}>Remove</button></div>
       </details></td>}
-    </tr>{editing && <tr className="budget-v3-inline-row"><td colSpan={colSpan}><form id={`inline-form-${item.id}`} aria-label={`Quick edit amount for ${item.name}`} onSubmit={event => { event.preventDefault(); commitInline(item) }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}>
-      <label htmlFor={`inline-amount-${item.id}`} className="visually-hidden">Monthly amount for {item.name}</label>
-      <ImpactPreview key={impactRetry} compact scopeId={`inline-scope-${item.id}`} scopeText={`Changes apply: ${editScopeLabel}.`} result={impact} document={document} onRetry={() => setImpactRetry(value => value + 1)}/>
-      {formError && <p id={`inline-error-${item.id}`} role="alert">{formError}</p>}
-      <div className="budget-v3-inline-controls"><button type="submit" className="primary-button" disabled={!!impact && 'error' in impact}>Save</button><button type="button" className="secondary-button" onClick={cancelInline}>Cancel</button></div>
+    </tr>{editing && <tr className="budget-v3-inline-row" data-inline-edit={item.id}><td colSpan={colSpan}><form id={`inline-form-${item.id}`} className="plan-inline-form" aria-label={`Quick edit amount for ${item.name}`} onSubmit={event => { event.preventDefault(); commitInline(item) }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); cancelInline() } }}>
+      {impactLine(item, impact)}
+      {impact && 'error' in impact && <span className="plan-inline-error" role="alert">{impact.error} <button type="button" className="text-button" onMouseDown={keepFocus} onClick={() => setImpactRetry(value => value + 1)}>Retry</button></span>}
+      {formError && <span id={`inline-error-${item.id}`} className="plan-inline-error" role="alert">{formError}</span>}
+      <span className="plan-inline-keys">
+        <button type="submit" className="text-button" onMouseDown={keepFocus} disabled={!!impact && 'error' in impact}>{desktop && <Kbd>↵</Kbd>}Save</button>
+        <button type="button" className="text-button" onMouseDown={keepFocus} onClick={cancelInline}>{desktop && <Kbd>Esc</Kbd>}Cancel</button>
+        {desktop && <button type="button" className="text-button" onMouseDown={keepFocus} onClick={() => { const pence = moneyPence(inlineValue); edit(item, pence === undefined || pence === item.amountPence ? undefined : pence) }}><Kbd>⇧↵</Kbd>Open editor</button>}
+      </span>
     </form></td></tr>}</Fragment>
   }
 
-  if (empty) return empty
-  return <section className="plan-card" aria-labelledby="plan-card-title">
-    <div className="plan-card-header">
-      <div className="plan-card-heading">
-        <h2 id="plan-card-title">Budget items<span className="plan-card-count" aria-hidden="true"> · {shown.length}</span></h2>
-        <p className="plan-card-summary">{banded ? `${groups.length} ${grouping === 'destination' ? groups.length === 1 ? 'account' : 'accounts' : groups.length === 1 ? 'category' : 'categories'} · ` : ''}{itemCount(shown.length)}</p>
-      </div>
-      {!searchMode && <div className="plan-grouping" role="group" aria-label="Group items by">
-        {(['category', 'destination'] as const).map(value => <button key={value} type="button" aria-pressed={grouping === value} onClick={() => { if (grouping !== value) onGroupingChange(value) }}>{value === 'category' ? 'Category' : 'Destination'}</button>)}
-      </div>}
-      {banded && <button type="button" className="plan-expand-all" onClick={() => { if (anyOpen) closeInline(); groups.forEach(group => setGroupOpen(group.key, !anyOpen)) }}>{anyOpen ? 'Collapse all' : 'Expand all'}</button>}
-    </div>
+  const count = `${itemCount(shown.length)}${searchMode || planDestination ? ` · ${pounds(sumOf(shown))}` : ''}`
+  const toolbar = renderToolbar?.({ count, expand: banded ? { anyOpen, toggle: () => { if (anyOpen) closeInline(); groups.forEach(group => setGroupOpen(group.key, !anyOpen)) } } : undefined })
+  if (empty) return <>{toolbar}{empty}</>
+  return <>{toolbar}<section className="plan-card" aria-label="Budget items">
     <GroupedTable
       wrapClassName={`budget-v3-table-wrap${desktop ? ' is-flat' : ''}`} className="budget-v3-table"
       regionLabel="Plan table" caption={searchMode ? 'Matching budget items' : `Budget items by ${grouping}`}
       columns={desktop ? [
-        { key: 'item', label: !banded ? 'Item' : grouping === 'destination' ? 'Destination' : 'Category' }, { key: 'share', label: 'Share of plan' },
+        { key: 'item', label: 'Item' }, { key: 'share', label: 'Share of plan' },
         { key: 'amount', label: 'Monthly' }, { key: 'actions', label: 'Actions', hiddenLabel: true },
       ] : [
         { key: 'item', label: 'Item' }, { key: 'amount', label: 'Amount' },
@@ -226,5 +253,5 @@ export function PlanTable({ document, setDocument, month, editScopeLabel, groups
           : group.items.map(item => itemRows(item)))}
       </Fragment>)}
     </GroupedTable>
-  </section>
+  </section></>
 }

@@ -1,0 +1,75 @@
+/* Plan's toolbar, rows and inline amount edit (audit 3 PR 16). Tokens only (styles.tokens.test.ts). Loads after styles.css. */
+.plan-toolbar{display:grid;gap:var(--space-2);margin:var(--space-3) 0}
+.plan-toolbar-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);min-width:0}
+.plan-toolbar-search{position:relative;display:flex;align-items:center;flex:1 1 240px;max-width:360px;min-width:0}
+.plan-toolbar-search input{box-sizing:border-box;width:100%;min-height:var(--control-h);margin:0;padding-right:var(--space-6)}
+.plan-toolbar-search .shortcut-hint{position:absolute;right:var(--space-2);pointer-events:none}
+.plan-toolbar-filter{display:inline-flex;align-items:center;gap:var(--space-2);margin:0}
+.plan-toolbar-filter svg{width:16px;height:16px}
+.plan-toolbar-filter.is-active{border-color:var(--accent)}
+.plan-toolbar-badge{min-width:18px;padding:0 var(--space-1);border-radius:var(--radius-pill);background:var(--accent);color:var(--white);font-size:var(--text-sm);text-align:center}
+.plan-toolbar-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.plan-toolbar-chip{display:inline-flex;align-items:center;gap:var(--space-1);min-height:32px;margin:0;padding:0 var(--space-3);border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface-selected);color:var(--text);font:inherit;font-size:var(--text-sm);cursor:pointer}
+.plan-toolbar-chip.is-static{cursor:default}
+.plan-toolbar-chip svg{width:14px;height:14px}
+.plan-toolbar-spacer{flex:1 1 0}
+.plan-toolbar-count{margin:0;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums;white-space:nowrap}
+.plan-toolbar .text-button{min-height:var(--control-h);margin:0;padding:0 var(--space-1);font-size:var(--text-sm)}
+.plan-toolbar-destination{justify-self:start;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3)}
+.plan-toolbar-destination[tabindex="-1"]:focus{outline:none}
+.plan-toolbar-back{display:inline-flex;align-items:center;gap:var(--space-1)}
+.plan-toolbar-back svg{width:16px;height:16px}
+@media(max-width:1099px){.plan-toolbar:not(.is-compact) .plan-toolbar-search{flex-basis:100%;max-width:none}}
+/* Phones: search, the Filter icon and + on one line. */
+.plan-toolbar.is-compact{margin-top:var(--space-3)}
+.plan-toolbar.is-compact .plan-toolbar-row{flex-wrap:nowrap}
+.plan-toolbar.is-compact .plan-toolbar-search{flex:1 1 auto;max-width:none}
+.plan-toolbar.is-compact .plan-toolbar-search input{min-height:var(--control-h-touch);padding-right:var(--space-2)}
+.plan-toolbar.is-compact .plan-toolbar-filter{flex:none;width:var(--control-h-touch);height:var(--control-h-touch);justify-content:center}
+.plan-toolbar.is-compact .plan-toolbar-filter svg{width:20px;height:20px}
+.plan-toolbar-add{flex:none;width:var(--control-h-touch);min-height:var(--control-h-touch);margin:0;padding:0}
+.plan-toolbar-add svg{width:22px;height:22px}
+.budget-filter-sheet .segmented{width:100%}
+.budget-filter-sheet .plan-toolbar-expand{justify-self:start;min-height:var(--control-h-touch)}
+
+/* Rows: 44px, the amount as plain text, the pencil and ⋯ on hover and focus. */
+.plan-card{padding:0;overflow:hidden}
+.plan-card .budget-v3-table .budget-v3-item>th,.plan-card .budget-v3-table .budget-v3-item>td{height:44px;padding-top:var(--space-1);padding-bottom:var(--space-1);vertical-align:middle}
+.plan-card .budget-v3-item-name{line-height:1.3}
+.plan-card .budget-v3-item-meta{margin-top:0;line-height:1.3}
+.plan-card .budget-v3-amount{gap:var(--space-1);padding:2px var(--space-1);border-color:transparent;background:transparent;color:var(--text);font-weight:var(--weight-regular)}
+.plan-card .budget-v3-amount:hover,.plan-card .budget-v3-amount:focus-visible{border-color:var(--border);background:var(--surface)}
+.plan-card .budget-v3-amount-icon{opacity:0}
+.plan-card .budget-v3-item:hover .budget-v3-amount-icon,.plan-card .budget-v3-amount:focus-visible .budget-v3-amount-icon,.plan-card .budget-v3-amount.is-static .budget-v3-amount-icon{opacity:1}
+.plan-card .budget-v3-row-menu summary{opacity:0}
+.plan-card .budget-v3-item:hover .budget-v3-row-menu summary,.plan-card .budget-v3-row-menu summary:focus-visible,.plan-card .budget-v3-row-menu[open] summary{opacity:1}
+@media(hover:none){.plan-card .budget-v3-amount-icon,.plan-card .budget-v3-row-menu summary{opacity:1}}
+
+/* Inline amount edit: a 120px field in the cell, and one impact line under the row. */
+.plan-card .budget-v3-item.is-editing>*{background:var(--surface-selected)}
+.plan-inline-field{display:inline-flex;align-items:center;gap:var(--space-1);width:120px;max-width:100%;color:var(--text-muted)}
+.plan-card .plan-inline-field .budget-v3-inline-amount{box-sizing:border-box;width:100%;min-width:0;min-height:32px;margin:0;padding:var(--space-1) var(--space-2);font-size:var(--text-md);text-align:right;font-variant-numeric:tabular-nums}
+.plan-card .budget-v3-inline-row td{padding:var(--space-2) var(--space-3) var(--space-2) var(--space-6);background:var(--surface-selected)}
+.plan-inline-form{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-4);min-height:22px;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.plan-inline-impact strong{color:var(--text);font-weight:var(--weight-medium)}
+.plan-inline-impact strong.is-over{color:var(--critical)}
+.plan-inline-error{color:var(--critical)}
+.plan-inline-keys{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);margin-left:auto}
+.plan-inline-keys .text-button{display:inline-flex;align-items:center;gap:var(--space-1);min-height:28px;margin:0;padding:0;font-size:var(--text-sm)}
+@media(max-width:767px){
+  .plan-card .budget-v3-table .budget-v3-item>th,.plan-card .budget-v3-table .budget-v3-item>td{height:56px}
+  .plan-card .budget-v3-inline-row td{padding:var(--space-2) var(--space-3)}
+  .plan-inline-keys .text-button{min-height:var(--control-h-touch)}
+}
+/* Desktop: a quiet 32px column header and 40px bands; amounts line up with the band totals (the pencil sits outside). */
+@media(min-width:768px){
+  .plan-card .budget-v3-table thead th{height:32px;padding-top:0;padding-bottom:0}
+  .plan-card .plan-group>th,.plan-card .plan-group>td{height:40px;padding-top:0;padding-bottom:0}
+  .plan-card .plan-group th button{min-height:32px}
+  .plan-card .budget-v3-amount{position:relative}
+  .plan-card .budget-v3-amount-icon{position:absolute;right:calc(-1 * var(--space-4))}
+}
+.plan-card .budget-v3-inline-row form{display:flex;max-width:none}
+.plan-toolbar-clear-search{position:absolute;right:var(--space-1);display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin:0;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);cursor:pointer}
+.plan-toolbar-clear-search:hover{background:var(--surface-sunken);color:var(--text)}
+.plan-toolbar-clear-search svg{width:16px;height:16px}

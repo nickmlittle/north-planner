@@ -23,7 +23,8 @@ function filterValue(label: 'Owner' | 'Category') {
   return value
 }
 const desktop=()=>vi.stubGlobal('matchMedia',vi.fn().mockReturnValue({matches:false,addEventListener:vi.fn(),removeEventListener:vi.fn()}))
-const expandAll=()=>fireEvent.click(screen.getByRole('button',{name:'Expand all'}))
+/** Desktop has Expand all in the toolbar; phones keep it in the Filter sheet. */
+const expandAll = () => { const direct = screen.queryByRole('button', { name: 'Expand all' }); if (direct) { fireEvent.click(direct); return } fireEvent.click(screen.getByRole('button', { name: /^Filter/ })); fireEvent.click(within(screen.getByRole('dialog', { name: 'Filter' })).getByRole('button', { name: 'Expand all' })) }
 /** Income, accounts, pots and categories are edited in Settings; the budget only asks to go there. */
 const openSettings=vi.fn()
 function Harness({ view }: { view?: 'plan' | 'month' } = {}){const [document,setDocument]=useState<BudgetDocument>(()=>{const d=newBudgetDocument();d.household={name:'Home',adults:[{id:'nick',name:'Nick'},{id:'immy',name:'Immy'}]};return d});return <MonthlyBudget document={document} setDocument={setDocument} view={view} onOpenSettings={openSettings}/>}
@@ -73,7 +74,7 @@ it('keeps mobile Plan headings and funding context in a semantic two-column tabl
   expect(screen.queryByLabelText('More actions for Apple TV')).not.toBeInTheDocument()
 })
 it('shows annual entry frequency and the monthly equivalent',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const dialog=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(dialog).getByLabelText('Monthly amount'),{target:{value:'720'}});fireEvent.change(within(dialog).getByLabelText('Frequency'),{target:{value:'annually'}});expect(within(dialog).getByText(/Monthly equivalent:/)).toHaveTextContent('£60.00')})
-it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 matching item · Matching total £8.99')).toBeVisible();expect(document.querySelector('.plan-group')).not.toBeInTheDocument()})
+it('searches destination details in flat results with owner and category context',()=>{render(<Harness/>);addItem();fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'Monzo'}});expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible();expect(document.querySelector('.budget-v3-result-context')).toHaveTextContent('Nick · Subscriptions');expect(screen.getByText('1 item · £8.99')).toBeVisible();expect(document.querySelector('.plan-group')).not.toBeInTheDocument()})
 it('filters by owner and expands or collapses category groups',()=>{render(<Harness/>);addItem();expect(screen.getByText('Apple TV')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:/Subscriptions/}));filterBy('Owner','Immy');expect(screen.queryByText('Apple TV')).not.toBeInTheDocument();expect(screen.getByText(/No items match/)).toBeVisible()})
 it('starts groups closed and keeps the open ones across filters, months and remounts',()=>{
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
@@ -99,7 +100,7 @@ it('shows direct search matches and restores the saved group state when cleared'
   render(<Harness/>);addItem()
   fireEvent.click(screen.getByRole('button',{name:/^Subscriptions,/}))
   expect(screen.queryByText('Apple TV')).not.toBeInTheDocument()
-  const search=screen.getByPlaceholderText('Search budget')
+  const search=screen.getByPlaceholderText('Search items')
   fireEvent.change(search,{target:{value:'Apple TV'}})
   expect(screen.getByText('Apple TV')).toBeVisible()
   expect(screen.queryByRole('button',{name:/^Subscriptions,/})).not.toBeInTheDocument()
@@ -112,7 +113,7 @@ it('restores browsing scroll and keeps changed filters after clearing search',()
   const scrollTo=vi.spyOn(window,'scrollTo').mockImplementation(()=>{})
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{callback(0);return 1})
   render(<Harness/>);addItem()
-  const search=screen.getByPlaceholderText('Search budget')
+  const search=screen.getByPlaceholderText('Search items')
   fireEvent.pointerDown(search)
   fireEvent.change(search,{target:{value:'  Apple TV  '}})
   expect(screen.getByRole('button',{name:'Apple TV'})).toBeVisible()
@@ -169,9 +170,14 @@ it('confirms removal from the selected budget month and returns focus to the row
   expect(screen.queryByText('Apple TV')).not.toBeInTheDocument()
 })
 it('shows explicit budget and income change markers in the month picker',()=>{render(<Harness/>);addItem('Bill');fireEvent.click(screen.getByRole('button',{name:'November 2026'}));const picker=screen.getByRole('dialog',{name:'Choose budget month'});expect(picker).toBeVisible();const current=within(picker).getByRole('button',{current:true});expect(current).toHaveAccessibleName(/^November 2026/);expect(current).toHaveClass('is-selected');expect(within(picker).getByRole('button',{name:/November 2026.*budget updated/})).toBe(current);fireEvent.keyDown(picker,{key:'Escape'});expect(screen.queryByRole('dialog',{name:'Choose budget month'})).not.toBeInTheDocument()})
-it('saves a quick amount only after explicit confirmation',()=>{render(<Harness/>);addItem('Phone', '10', '', 'proportional');fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));const form=screen.getByRole('form',{name:'Quick edit amount for Phone'}),input=screen.getByRole('textbox',{name:'Monthly amount for Phone'});expect(input).toHaveValue('10.00');fireEvent.change(input,{target:{value:'15'}});fireEvent.blur(input);expect(screen.queryByRole('button',{name:'Edit amount for Phone'})).not.toBeInTheDocument();fireEvent.click(within(form).getByRole('button',{name:'Save'}));expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£15.00');expect(screen.getByText('Amount saved.')).toBeVisible()})
+it('saves a quick amount only after explicit confirmation',()=>{render(<Harness/>);addItem('Phone', '10', '', 'proportional');fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));let form=screen.getByRole('form',{name:'Quick edit amount for Phone'}),input=screen.getByRole('textbox',{name:'Monthly amount for Phone'});expect(input).toHaveValue('10.00');fireEvent.change(input,{target:{value:'15'}});
+  // Moving to Save keeps the edit; leaving the row without Enter cancels it.
+  fireEvent.blur(input,{relatedTarget:within(form).getByRole('button',{name:'Save'})});expect(screen.queryByRole('button',{name:'Edit amount for Phone'})).not.toBeInTheDocument()
+  fireEvent.blur(input,{relatedTarget:document.body});expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£10.00')
+  fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));form=screen.getByRole('form',{name:'Quick edit amount for Phone'});input=screen.getByRole('textbox',{name:'Monthly amount for Phone'});fireEvent.change(input,{target:{value:'15'}})
+  fireEvent.submit(form);expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£15.00');expect(screen.getByText('Phone saved')).toBeVisible()})
 it('cancels and validates quick edits without changing the amount',()=>{render(<Harness/>);addItem('Phone','10','','equal');fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));let form=screen.getByRole('form',{name:'Quick edit amount for Phone'});fireEvent.change(screen.getByRole('textbox',{name:'Monthly amount for Phone'}),{target:{value:'-1'}});fireEvent.click(within(form).getByRole('button',{name:'Save'}));expect(within(form).getByRole('alert')).toHaveTextContent('£0 or more');fireEvent.click(within(form).getByRole('button',{name:'Cancel'}));expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£10.00');fireEvent.click(screen.getByRole('button',{name:'Edit amount for Phone'}));form=screen.getByRole('form',{name:'Quick edit amount for Phone'});fireEvent.change(screen.getByRole('textbox',{name:'Monthly amount for Phone'}),{target:{value:'0'}});fireEvent.click(within(form).getByRole('button',{name:'Save'}));expect(screen.getByRole('button',{name:'Edit amount for Phone'})).toHaveTextContent('£0.00')})
-it('uses the full editor for annual amounts and fixed contributions',()=>{const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;initial.budget.snapshots[month]={items:[{id:'annual',name:'Annual bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:12000,amountPence:1000,frequency:'annually',funding:'equal'},{id:'fixed',name:'Fixed bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'fixed',contributions:[{personId:'nick',amountPence:1000}]}]};render(<SeededHarness initial={initial}/>);fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'bill'}});expect(screen.queryByRole('button',{name:'Edit amount for Annual bill'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Edit amount for Fixed bill'})).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Annual bill'}));expect(screen.getByRole('form',{name:'Edit item'})).toBeVisible()})
+it('uses the full editor for annual amounts and fixed contributions',()=>{const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;initial.budget.snapshots[month]={items:[{id:'annual',name:'Annual bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:12000,amountPence:1000,frequency:'annually',funding:'equal'},{id:'fixed',name:'Fixed bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly',funding:'fixed',contributions:[{personId:'nick',amountPence:1000}]}]};render(<SeededHarness initial={initial}/>);fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'bill'}});expect(screen.queryByRole('button',{name:'Edit amount for Annual bill'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Edit amount for Fixed bill'})).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Annual bill'}));expect(screen.getByRole('form',{name:'Edit item'})).toBeVisible()})
 it('opens item editing from the name and dismisses the actions menu with Escape',()=>{
   desktop()
   render(<Harness/>);addItem()
@@ -237,7 +243,7 @@ it('duplicates from the editor, confirming that unsaved changes are left behind'
 })
 it('creates an account and its pot with an item in one save',()=>{render(<Harness/>);fireEvent.click(screen.getAllByRole('button',{name:'Add item'})[0]!);const form=screen.getByRole('form',{name:'Add item'});fireEvent.change(within(form).getByLabelText('Item name'),{target:{value:'Council tax'}});fireEvent.change(within(form).getByLabelText('Monthly amount'),{target:{value:'150'}});fireEvent.change(within(form).getByLabelText('New category'),{target:{value:'Housing'}});createAccountInPicker(form);fireEvent.click(within(form).getByRole('button',{name:'+ Add pot'}));fireEvent.change(within(form).getByLabelText('Pot name'),{target:{value:'Bills'}});fireEvent.click(within(form).getByRole('button',{name:'Use new pot'}));fireEvent.click(within(form).getByRole('button',{name:'Save item'}));expect(screen.getByText('Council tax')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Bills · Monzo Nick')})
 
-it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Everyday')})
+it('searches the account type when its stored name is a custom nickname',()=>{render(<Harness/>);addItem('Groceries','100','Everyday');fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'Current account'}});expect(screen.getByText('Groceries')).toBeVisible();expect(document.querySelector('.budget-v3-table')).toHaveTextContent('Everyday')})
 
 function seededDocument() {
   const d = newBudgetDocument()
@@ -572,7 +578,7 @@ it('prioritises name, amount, destination and funding in the single-item editor'
   const initial=seededDocument(),month=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`
   initial.budget.snapshots[month]={items:[{id:'item1',name:'Groceries',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:12000,amountPence:12000,frequency:'monthly',funding:'equal'}]}
   render(<SeededHarness initial={initial}/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Groceries'}})
+  fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'Groceries'}})
   fireEvent.click(screen.getByRole('button',{name:'Groceries'}))
   const form=screen.getByRole('form',{name:'Edit item'}),details=form.querySelector<HTMLDetailsElement>('.budget-single-details')!
   expect(details.open).toBe(false)
@@ -879,9 +885,9 @@ it('keeps an open group heading in view, operable, as boundaries cross and resul
   billsTop=40;otherTop=120
   fireEvent.scroll(wrap)
   await waitFor(()=>expect(wrap.querySelector('.plan-sticky-band')).not.toBeInTheDocument())
-  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Groceries'}})
-  expect(screen.getByText('1 matching item · Matching total £120.00')).toBeVisible()
-  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'no match'}})
+  fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'Groceries'}})
+  expect(screen.getByText('1 item · £120.00')).toBeVisible()
+  fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'no match'}})
   expect(screen.getByText(/No items match/)).toBeVisible()
   expect(document.querySelector('.budget-v3-sticky-context')).not.toBeInTheDocument()
 })
@@ -897,8 +903,8 @@ it.each([
   render(<SeededHarness initial={initial}/>)
   const summary=screen.getByRole('region',{name:'Plan summary'})
   expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent(text)
-  expect(summary).toHaveTextContent(`£10.00 planned of £${(income/100).toFixed(2)} available`)
-  expect(within(summary).getByRole('meter',{name:'Nick: planned'})).toBeInTheDocument()
+  expect(summary).toHaveTextContent(`£10.00 of £${(income/100).toFixed(2)}`)
+  expect(within(summary).getByRole('meter',{name:`Nick: £10.00 planned of £${(income/100).toFixed(2)} available`})).toBeInTheDocument()
   // Phones keep the card short: no share and no basis; the pencil still edits income.
   expect(summary).not.toHaveTextContent('% planned')
   expect(summary).not.toHaveTextContent('salary')
@@ -972,7 +978,7 @@ it('preserves month, search and owner when switching views',()=>{
   const {rerender}=render(<SeededHarness initial={initial} view="plan"/>)
   fireEvent.click(screen.getByRole('button',{name:'Next month'}))
   const selectedMonth=document.querySelector('.budget-v3-month>button:nth-child(2)')!.textContent
-  fireEvent.change(screen.getByPlaceholderText('Search budget'),{target:{value:'Bill'}})
+  fireEvent.change(screen.getByPlaceholderText('Search items'),{target:{value:'Bill'}})
   filterBy('Owner','Nick')
   rerender(<SeededHarness initial={initial} view="month"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
@@ -985,7 +991,7 @@ it('preserves month, search and owner when switching views',()=>{
   fireEvent.click(within(dialog).getByRole('button',{name:'Done'}))
   expect(trigger).toHaveFocus()
   rerender(<SeededHarness initial={initial} view="plan"/>)
-  expect(screen.getByPlaceholderText('Search budget')).toHaveValue('Bill')
+  expect(screen.getByPlaceholderText('Search items')).toHaveValue('Bill')
   expect(filterValue('Owner')).toBe('Nick')
   expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
   rerender(<SeededHarness initial={initial} view="month"/>)
@@ -1049,14 +1055,14 @@ it('says nothing under the month when it has its own budget, and offers going ba
 
 it('shows scope before full and inline edits and preserves later saved budgets', () => {
   render(<MonthRulesHarness/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByRole('button', { name: 'Rent' }))
   const form = screen.getByRole('form', { name: 'Edit item' })
   expect(form).toHaveTextContent('Changes apply: December 2026–February 2027.')
   fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
   fireEvent.click(screen.getByRole('button', { name: 'Edit amount for Rent' }))
   const amount = screen.getByRole('textbox', { name: 'Monthly amount for Rent' })
-  expect(amount).toHaveAccessibleDescription('Changes apply: December 2026–February 2027.')
+  expect(amount).toHaveAccessibleDescription('Changes December 2026–February 2027')
   fireEvent.change(amount, { target: { value: '120' } })
   fireEvent.click(within(screen.getByRole('form', { name: 'Quick edit amount for Rent' })).getByRole('button', { name: 'Save' }))
   expect(savedBudget().snapshots['2026-12']?.items[0]?.amountPence).toBe(12000)
@@ -1067,7 +1073,7 @@ it('shows scope before full and inline edits and preserves later saved budgets',
 it('confirms the exact item-removal range', () => {
   desktop()
   render(<MonthRulesHarness/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByLabelText('More actions for Rent'))
   fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
   const dialog = screen.getByRole('dialog', { name: 'Remove Rent?' })
@@ -1091,7 +1097,7 @@ it('explains what replaces a cleared budget, including when there is no previous
 it('shows the balance change of a removal directly above its confirm button', () => {
   desktop()
   render(<MonthRulesHarness/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByLabelText('More actions for Rent'))
   fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
   const dialog = screen.getByRole('dialog', { name: 'Remove Rent?' })
@@ -1114,7 +1120,7 @@ it('shows the balance change of clearing a month budget', () => {
 
 it('puts the full editor’s scope and impact in the footer, directly above Save', () => {
   render(<MonthRulesHarness/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByRole('button', { name: 'Rent' }))
   const form = screen.getByRole('form', { name: 'Edit item' })
   const body = form.querySelector<HTMLElement>('.budget-batch-body')!, footer = form.querySelector<HTMLElement>('.budget-batch-footer')!
@@ -1138,7 +1144,7 @@ it('distinguishes an inherited empty snapshot from a missing budget', () => {
 
 it('does not create a new budget boundary when an inherited amount is left unchanged', () => {
   render(<MonthRulesHarness/>)
-  fireEvent.change(screen.getByPlaceholderText('Search budget'), { target: { value: 'Rent' } })
+  fireEvent.change(screen.getByPlaceholderText('Search items'), { target: { value: 'Rent' } })
   fireEvent.click(screen.getByRole('button', { name: 'Edit amount for Rent' }))
   fireEvent.blur(screen.getByRole('textbox', { name: 'Monthly amount for Rent' }))
   expect(Object.keys(savedBudget().snapshots)).toEqual(['2026-11', '2027-03'])
@@ -1174,7 +1180,7 @@ it('marks missing pot responsibility as needing review and withholds its steps',
 
 it.each([
   {sources:[{id:'gift',personId:'nick',name:'Gift',type:'additional' as const,baseAmountPence:5000,changes:{}}],text:'none from salary'},
-  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'(£50.00 salary + £10.00 other)'},
+  {sources:[{id:'job',personId:'nick',name:'Job',type:'employment' as const,baseAmountPence:5000,changes:{}},{id:'gift',personId:'immy',name:'Gift',type:'additional' as const,baseAmountPence:1000,changes:{}}],text:'£50.00 salary + £10.00 other'},
 ])('explains where available money comes from: $text',({sources,text})=>{
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const initial=seededDocument()
@@ -1245,7 +1251,9 @@ it('leads with whoever is over and reviews their items',()=>{
   initial.budget.snapshots[month]={items:[{id:'bill',name:'Bill',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:150000,amountPence:150000,frequency:'monthly',funding:'single',singleFunderId:'nick'},{id:'treat',name:'Treats',categoryId:'bills',destination:{kind:'account',accountId:'a1'},entryAmountPence:400000,amountPence:400000,frequency:'monthly',funding:'single',singleFunderId:'nick'}]}
   render(<SeededHarness initial={initial}/>)
   const summary=screen.getByRole('region',{name:'Plan summary'})
-  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('Nick is £2,500.00 over')
+  // Figure first: the household balance leads, and Nick's own row says he's over.
+  expect(summary.querySelector('.allocation-meter-balance')).toHaveTextContent('£1,500.00 over')
+  expect(within(summary).getAllByRole('listitem')[0]).toHaveTextContent('Nick£2,500.00 over')
   fireEvent.click(within(summary).getByRole('button',{name:'Review Nick’s items'}))
   expect(screen.getByRole('button',{name:/^Remove filter: /})).toBeInTheDocument()
 })
