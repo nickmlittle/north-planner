@@ -64,7 +64,8 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
   const result = inbox(seed())
   it('builds the strip: Plan over in red, Spent with the worst pot, and the open Amex statement', () => {
     expect(result.strip.plan).toEqual({ value: '£1,141.87 over', tone: 'critical', detail: 'Ada £429.66 over · Ben £712.21 over' })
-    expect(result.strip.spent).toMatchObject({ value: '£272.59', sub: 'of £5,262.33', detailTone: 'warning' })
+    // Card spend £272.59, plus the Bills pot's assumed bills by the 11th: council tax, water and the phone (£234.82).
+    expect(result.strip.spent).toMatchObject({ value: '£507.41', sub: 'of £5,262.33', detailTone: 'warning' })
     expect(result.strip.spent!.detail).toMatch(/^Groceries .*£62 ahead of pace$/)
     expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'this statement', detail: '£312.85 set aside · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')

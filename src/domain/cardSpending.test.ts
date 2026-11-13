@@ -162,7 +162,7 @@ describe('carry-over pots', () => {
 
   it('has no figure until the balance has been checked, but knows what’s waiting to settle', async () => {
     const { document, potBalance } = await bills()
-    expect(potBalance(document, 'bills')).toEqual({ potId: 'bills', since: [], setAside: false, waitingPence: 11898, waiting: [
+    expect(potBalance(document, 'bills')).toEqual({ potId: 'bills', since: [], setAside: false, waitingPence: 11898, billsDuePence: 0, waiting: [
       { statementKey: 'amex:2026-10-24', closeDate: '2026-10-24', pence: 8600 },
       { statementKey: 'amex:2026-11-24', closeDate: '2026-11-24', pence: 3298 },
     ] })

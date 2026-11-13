@@ -1,5 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
-import type { BudgetItem, RecurringBill } from './monthlyBudget'
+import { daysInMonth } from './cardTracker'
+import { resolveBudget, type BillDay, type BillPaidBy, type BudgetDestination, type BudgetItem, type RecurringBill } from './monthlyBudget'
 
 /**
  * Recurring bills: plan items that come out on a set date (docs/recurring-bills-rules.md). The details live on the
@@ -22,4 +23,80 @@ export function billsOnCard(document: Pick<BudgetDocument, 'budget'>, cardId: st
   const names = new Map<string, string>()
   for (const items of lists) for (const item of items) if (item.bill?.paidBy === 'card' && item.bill.cardId === cardId) names.set(item.id, item.name)
   return [...names.values()]
+}
+
+/** A bill's date in a month (YYYY-MM-DD): its day, or the month's last day (the 28th or 29th in February). */
+export function billDate(month: string, day: BillDay): string {
+  return `${month}-${String(day === 'last' ? daysInMonth(month) : day).padStart(2, '0')}`
+}
+
+/** `paid` once its day has come (North assumes it went out, unless it's on a tracked card); `due` until then. */
+export type BillState = 'paid' | 'due'
+
+export type MonthBill = {
+  itemId: string
+  name: string
+  destination: BudgetDestination
+  /** YYYY-MM-DD. */
+  date: string
+  /** Monthly: the item's amount. Yearly: the full yearly price, in its renewal month only. */
+  amountPence: number
+  paidBy: BillPaidBy
+  cardId?: string
+  /** On a card North tracks: its charge comes in through Bring in and Sort, so it's never assumed. */
+  tracked: boolean
+  state: BillState
+}
+
+/**
+ * The bills that come out in a month (recurring-bills-rules › A month's bills), from that month's own plan: every
+ * monthly bill, and each yearly bill in its renewal month. Paid when the date is on or before today, so every bill in
+ * a past month is paid and every bill in a future month is due. Sorted by date, then name.
+ */
+export function monthBills(document: Pick<BudgetDocument, 'budget' | 'card'>, month: string, today: string): MonthBill[] {
+  const bills: MonthBill[] = []
+  for (const item of resolveBudget(document.budget, month).items) {
+    const bill = item.bill
+    if (!bill) continue
+    const yearly = item.frequency === 'annually'
+    if (yearly && bill.month !== Number(month.slice(5))) continue
+    const date = billDate(month, bill.day)
+    bills.push({
+      itemId: item.id, name: item.name, destination: item.destination, date, amountPence: yearly ? item.entryAmountPence : item.amountPence,
+      paidBy: bill.paidBy, ...bill.cardId ? { cardId: bill.cardId } : {}, tracked: billTracked(bill, document), state: date <= today ? 'paid' : 'due',
+    })
+  }
+  return bills.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'en-GB'))
+}
+
+/** One pot's bills in a month, as Spending counts them. Bills to an account aren't counted (P2). */
+export type PotBillTotals = {
+  /** Paid and not tracked: what North assumes went out. It counts as Spent and lowers the balance. */
+  assumedPaidPence: number
+  /** Not out yet, tracked or not: "£172.00 of it due". */
+  duePence: number
+  /** Not out yet and not tracked: what's about to leave the pot itself. */
+  assumedDuePence: number
+  /** Every bill dated on or before today, tracked or not (pace). */
+  soFarPence: number
+  /** Every bill this month, tracked or not (pace). */
+  allPence: number
+  count: number
+}
+
+export function potBillTotals(bills: readonly MonthBill[], potId: string): PotBillTotals {
+  const totals: PotBillTotals = { assumedPaidPence: 0, duePence: 0, assumedDuePence: 0, soFarPence: 0, allPence: 0, count: 0 }
+  for (const bill of bills) {
+    if (bill.destination.kind !== 'pot' || bill.destination.potId !== potId) continue
+    totals.count++
+    totals.allPence += bill.amountPence
+    if (bill.state === 'paid') {
+      totals.soFarPence += bill.amountPence
+      if (!bill.tracked) totals.assumedPaidPence += bill.amountPence
+    } else {
+      totals.duePence += bill.amountPence
+      if (!bill.tracked) totals.assumedDuePence += bill.amountPence
+    }
+  }
+  return totals
 }

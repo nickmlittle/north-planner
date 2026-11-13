@@ -125,7 +125,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     const close = closeDateFor(today, card.closeDay)
     const open = statementSummary(document, statementKey(card.id, close), today)
     const pot = card.setAside && document.budget.pots.find(row => row.id === card.setAside!.potId)
-    const balance = pot ? potBalance(document, pot.id).balancePence : undefined
+    const balance = pot ? potBalance(document, pot.id, today).balancePence : undefined
     cardFigure = { name: card.name, value: pounds(open?.totalPence ?? 0), sub: 'this statement', detail: [balance !== undefined ? `${pounds(balance)} set aside` : '', `closes ${dayDate(close)}`].filter(Boolean).join(' · ') }
   }
 

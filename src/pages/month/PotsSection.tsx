@@ -44,20 +44,23 @@ function bankOf(document: BudgetDocument, potId: string) {
 function spendingRow(document: BudgetDocument, row: DestinationSpending, figures: MonthSpending, name: (destination: BudgetDestination) => string): PotRow {
   const potId = row.destination.kind === 'pot' ? row.destination.potId : undefined
   const potName = potId ? document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot' : `${name(row.destination)}`
-  const balance = potId ? potBalance(document, potId) : undefined
+  const balance = potId ? potBalance(document, potId, figures.today) : undefined
   const inBank = balance?.balancePence !== undefined ? signedPounds(balance.balancePence) : '—'
   const taken = row.takenPence ? ` · ${pounds(row.takenPence)} taken by ${monthName(shiftMonth(figures.month, -1))}` : ''
+  // Bills still to come this month: part of Left (recurring-bills-rules › Due).
+  const due = row.duePence > 0 ? ` · ${pounds(row.duePence)} of it due` : ''
   const base = { key: row.key, potId, name: potName, spent: signedPounds(row.spentPence), inBank }
   if (row.status === 'one-offs') return { ...base, kind: row.destination.kind === 'account' ? 'one-offs' : undefined, planned: '—', left: '—', status: row.destination.kind === 'account' ? 'Spent straight from the account' : 'Nothing planned', inBank: row.destination.kind === 'account' ? '' : inBank }
   if (row.carriesOver) {
     const free = balance?.freePence
-    return { ...base, kind: 'carries over', planned: '—', left: free === undefined ? '—' : `${signedPounds(free)} free`, status: free === undefined ? 'Check the balance to see what’s free' : 'No pace' }
+    const dueText = row.duePence > 0 ? `${pounds(row.duePence)} due this month` : ''
+    return { ...base, kind: 'carries over', planned: '—', left: free === undefined ? '—' : `${signedPounds(free)} free`, status: free === undefined ? ['Check the balance to see what’s free', dueText].filter(Boolean).join(' · ') : dueText || 'No pace' }
   }
   const paced = row.pace === 'steady' && row.plannedPence > 0
   const meter = paced ? { value: row.spentPence + row.takenPence, max: row.plannedPence, ...figures.when === 'current' && row.expectedPence !== undefined ? { pace: row.expectedPence / row.plannedPence } : {}, tone: row.status === 'over' ? 'critical' as const : row.status === 'ahead' ? 'warning' as const : 'neutral' as const } : undefined
-  const status = row.status === 'over' ? `${pounds(-row.leftPence)} over${figures.when === 'current' ? ` · covered when ${monthName(figures.month)} closes` : ''}${taken}`
-    : row.status === 'ahead' ? `${whole(row.aheadPence!)} ahead${row.runsOut ? ` · runs out ~${dayDate(row.runsOut)}` : ''}${taken}`
-    : row.status === 'on-track' ? `On track${taken}` : paced ? `${figures.when === 'past' ? 'Ended' : 'Not started'}${taken}` : `No pace${taken}`
+  const status = row.status === 'over' ? `${pounds(-row.leftPence)} over${figures.when === 'current' ? ` · covered when ${monthName(figures.month)} closes` : ''}${taken}${due}`
+    : row.status === 'ahead' ? `${whole(row.aheadPence!)} ahead${row.runsOut ? ` · runs out ~${dayDate(row.runsOut)}` : ''}${taken}${due}`
+    : row.status === 'on-track' ? `On track${taken}${due}` : paced ? `${figures.when === 'past' ? 'Ended' : 'Not started'}${taken}${due}` : due ? `${due.slice(3)}${taken}` : `No pace${taken}`
   return { ...base, planned: pounds(row.plannedPence), left: row.leftPence < 0 ? `−${pounds(-row.leftPence)}` : pounds(row.leftPence), meter, status, ...row.status === 'over' ? { tone: 'critical' as const } : row.status === 'ahead' ? { tone: 'warning' as const } : {} }
 }
 
@@ -80,11 +83,11 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   const items = resolveBudget(document.budget, month).items
   const plannedFor = (potId: string) => items.filter(item => item.destination.kind === 'pot' && item.destination.potId === potId).reduce((sum, item) => sum + item.amountPence, 0)
   const quiet = document.budget.pots.filter(pot => !shownPots.has(pot.id) && pot.id !== setAsidePot?.id)
-  const quietRow = (potId: string): PotRow => { const planned = plannedFor(potId), balance = potBalance(document, potId).balancePence; return { key: `quiet:${potId}`, potId, name: document.budget.pots.find(pot => pot.id === potId)!.name, spent: pounds(0), planned: planned ? pounds(planned) : '—', left: planned ? pounds(planned) : '—', status: 'Nothing spent', inBank: balance === undefined ? '—' : signedPounds(balance) } }
+  const quietRow = (potId: string): PotRow => { const planned = plannedFor(potId), balance = potBalance(document, potId, today).balancePence; return { key: `quiet:${potId}`, potId, name: document.budget.pots.find(pot => pot.id === potId)!.name, spent: pounds(0), planned: planned ? pounds(planned) : '—', left: planned ? pounds(planned) : '—', status: 'Nothing spent', inBank: balance === undefined ? '—' : signedPounds(balance) } }
   const setAsideRow = (): PotRow | null => {
     if (!setAsideCard || !setAsidePot) return null
     const statement = setAsideStatements(document, setAsideCard.id).find(row => row.closeDate.slice(0, 7) === month)
-    const balance = potBalance(document, setAsidePot.id).balancePence
+    const balance = potBalance(document, setAsidePot.id, today).balancePence
     return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, kind: 'set aside', spent: '—', planned: '—', left: '—', status: statement?.toMovePence ? `${pounds(statement.toMovePence)} still to move for ${monthName(month)}` : statement ? 'All moved in' : 'Nothing to move', inBank: balance === undefined ? '—' : signedPounds(balance) }
   }
   const groups = [
