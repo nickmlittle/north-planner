@@ -17,12 +17,16 @@ type Props = {
   onDraftChange?: () => void
   /** True while a saved destination is being changed but no replacement is confirmed yet. */
   onBrowsingChange?: (browsing: boolean) => void
+  /** Open already browsing (the item editor's "Other…"): at the current account's pots, or at the owners. */
+  startBrowsing?: boolean
+  /** "← Keep current" was chosen. */
+  onKeep?: () => void
 }
 
 const newId = () => crypto.randomUUID()
 const normalized = (name: string) => name.trim().toLocaleLowerCase('en-GB')
 
-export function DestinationPicker({ budget, adults, value, onChange, onDraftChange, onBrowsingChange }: Props) {
+export function DestinationPicker({ budget, adults, value, onChange, onDraftChange, onBrowsingChange, startBrowsing = false, onKeep }: Props) {
   // The saved selection (`value`) is only replaced when a new destination is confirmed.
   // Browsing owners/accounts, or staging a new account, is local until then.
   const [draftAccount, setDraftAccount] = useState<BudgetAccount | undefined>(value.stagedAccount)
@@ -32,7 +36,7 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
   const currentAccountId = value.destination?.kind === 'account' ? value.destination.accountId : pots.find(pot => pot.id === currentPotId)?.accountId
   const currentAccount = accounts.find(row => row.id === currentAccountId)
   const currentOwnerKey = currentAccount ? accountOwnerKey(currentAccount) : ''
-  const [step, setStep] = useState<Step>(value.destination ? 'selected' : 'owner')
+  const [step, setStep] = useState<Step>(value.destination ? startBrowsing && currentAccountId ? 'pot' : 'selected' : 'owner')
   const [ownerKey, setOwnerKey] = useState(currentOwnerKey)
   const [accountId, setAccountId] = useState(currentAccountId ?? '')
   const [creation, setCreation] = useState<'account' | 'pot' | null>(null)
@@ -86,7 +90,7 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
     setCreation(null); move('selected')
   }
   const keepCurrent = () => {
-    setOwnerKey(currentOwnerKey); setAccountId(currentAccountId ?? ''); setCreation(null); setPotName(''); move('selected')
+    setOwnerKey(currentOwnerKey); setAccountId(currentAccountId ?? ''); setCreation(null); setPotName(''); move('selected'); onKeep?.()
   }
   const startAccount = () => {
     setAccountDraft({ name: '', provider: '', accountTypeId: '', ownerPersonIds: ownerKey === 'joint' ? adults.map(person => person.id) : ownerKey.startsWith('person:') ? [ownerKey.slice(7)] : [] })
@@ -120,8 +124,8 @@ export function DestinationPicker({ budget, adults, value, onChange, onDraftChan
   ]
 
   return <section className={`destination-picker${step === 'selected' ? ' destination-picker-selected' : ''}`} aria-label="Destination" onChangeCapture={onDraftChange}>
-    <h3 ref={headingRef} tabIndex={-1}>{step === 'selected' ? 'Destination' : step === 'owner' ? 'Choose an owner' : step === 'account' ? 'Choose an account' : 'Choose an account or pot'}</h3>
-    {step === 'selected' ? <div className="destination-picked"><strong>{currentLabel}</strong><button type="button" className="secondary-button" onClick={() => { setOwnerKey(currentOwnerKey); setAccountId(currentAccountId ?? ''); move('pot') }}>Change</button></div> : <>
+    {step === 'selected' ? <div className="destination-picked"><strong>{currentLabel}</strong><span aria-hidden="true"> · </span><button type="button" className="text-button" onClick={() => { setOwnerKey(currentOwnerKey); setAccountId(currentAccountId ?? ''); move('pot') }}>Change</button></div> : <>
+      <h3 ref={headingRef} tabIndex={-1}>{step === 'owner' ? 'Choose an owner' : step === 'account' ? 'Choose an account' : 'Choose an account or pot'}</h3>
       {value.destination && <div className="destination-keep"><button type="button" className="text-button" onClick={keepCurrent}>← Keep current</button><span>{currentLabel}</span></div>}
       {step !== 'owner' && <nav className="destination-crumbs" aria-label="Destination path"><button type="button" onClick={() => { setAccountId(''); setCreation(null); move('owner') }}>Owners</button><span aria-hidden="true">›</span>{step === 'account' ? <strong>{ownerLabel}</strong> : <><button type="button" onClick={() => { setAccountId(''); setCreation(null); move('account') }}>{ownerLabel}</button><span aria-hidden="true">›</span><strong>{account ? labels.get(account.id) : 'Account'}</strong></>}</nav>}
       {step === 'owner' && <div className="destination-bubbles">{ownerChoices.map(choice => <button type="button" {...currentMark(!!value.destination && choice.key === currentOwnerKey)} key={choice.key} onClick={() => chooseOwner(choice.key)}>{choice.label}</button>)}</div>}

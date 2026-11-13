@@ -1,9 +1,14 @@
-import { useId, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import './Sheet.css'
 
 export type SheetSize = 'sm' | 'md' | 'lg' | 'xl'
+
+// Sheets can stack (a confirm over an editor) and close together, so the page scroll lock is counted, and a sheet
+// that closes records where its focus goes for a sheet opened from inside it.
+let scrollLocks = 0, savedOverflow = ''
+const closedTargets = new WeakMap<Element, HTMLElement | null | undefined>()
 
 /**
  * Every overlay: a centred dialog on desktop and tablet, a bottom sheet on phones.
@@ -26,12 +31,12 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
   dismissOnScrim?: boolean
 }) {
   const ref = useRef<HTMLElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
   const titleId = useId(), descriptionId = useId()
   useLayoutEffect(() => {
     const dialog = ref.current!
-    const previous = document.activeElement as HTMLElement | null
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    opener.current = document.activeElement as HTMLElement | null
+    if (scrollLocks++ === 0) { savedOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden' }
     const background: { element: Element; inert: boolean }[] = []
     for (let branch: Element = dialog; branch.parentElement; branch = branch.parentElement) {
       background.push(...[...branch.parentElement.children].filter(element => element !== branch)
@@ -39,22 +44,41 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
       if (branch.parentElement === document.body) break
     }
     background.forEach(({ element }) => element.setAttribute('inert', ''))
+    // Focus that leaves for another modal (a confirm opened over this sheet) is that modal's to keep.
     const keepFocus = (event: FocusEvent) => {
-      if (event.target instanceof Node && !dialog.contains(event.target)) dialog.querySelector<HTMLButtonElement>('button')?.focus()
+      if (!(event.target instanceof Node) || dialog.contains(event.target)) return
+      if (event.target instanceof Element && event.target.closest('[aria-modal="true"]')) return
+      dialog.querySelector<HTMLButtonElement>('button')?.focus()
     }
     document.addEventListener('focusin', keepFocus)
     ;(dialog.querySelector<HTMLElement>('[data-autofocus]') ?? dialog.querySelector<HTMLButtonElement>('button'))?.focus()
     return () => {
       document.removeEventListener('focusin', keepFocus)
       background.forEach(({ element, inert }) => { if (!inert) element.removeAttribute('inert') })
-      document.body.style.overflow = overflow
+      if (--scrollLocks === 0) document.body.style.overflow = savedOverflow
+      const previous = opener.current
       // A closed menu leaves its item connected but hidden; fall back to returnFocusTo then.
       const inClosedDetails = (element: HTMLElement) => { const details = element.closest('details:not([open])'); return !!details && !details.querySelector(':scope > summary')?.contains(element) }
       const visible = (element: HTMLElement | null) => !!element?.isConnected && element !== document.body && !inClosedDetails(element) && (element.checkVisibility?.() ?? true)
-      const target = visible(previous) ? previous : returnFocusTo?.()
+      const own = visible(previous) ? previous : returnFocusTo?.()
+      closedTargets.set(dialog, own)
+      // Opened from inside a sheet that is closing too: go where that sheet sends focus.
+      const from = previous?.closest('.sheet')
+      const target = from && closedTargets.has(from) ? closedTargets.get(from) : own
+      // Another modal still holds focus: leave it; it restores focus when it closes.
+      const active = document.activeElement
+      if (active instanceof Element && !dialog.contains(active) && active.closest('[aria-modal="true"]')) return
       if (target?.isConnected) target.focus({ preventScroll: true })
     }
     // Runs once per open; returnFocusTo is the one passed when the sheet opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // The same commit can remove what focus went back to (an item removed from its own editor). Once the DOM has
+  // settled, lost focus falls back to returnFocusTo.
+  useEffect(() => () => {
+    if (document.activeElement && document.activeElement !== document.body) return
+    const fallback = returnFocusTo?.()
+    if (fallback?.isConnected) fallback.focus({ preventScroll: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return createPortal(<div className="sheet-overlay" onMouseDown={dismissOnScrim ? event => { if (event.target === event.currentTarget) onClose() } : undefined}>

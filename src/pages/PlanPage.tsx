@@ -50,7 +50,7 @@ export function PlanPage({ref,document,setDocument,month,budget,planView,mobileP
  useShortcut({keys:'n',description:'Add item',group:'This page',run:()=>start()})
  /** "Groceries saved", with View affected Payday steps when the change moves money. */
  const saved=(text:string,impact:BudgetImpact|null)=>showToast(text,impact&&onViewAffectedTransfers?{label:'View affected Payday steps',onClick:()=>onViewAffectedTransfers(impact)}:undefined)
- const saveBatch=(batch:BudgetItemBatch)=>{
+ const saveBatch=(batch:BudgetItemBatch,{another}:{another:boolean}={another:false})=>{
   const result=commitItemBatch(document,month,batch)
   if('error' in result)return result.error
   const financial=result.items.some(updated=>{const old=items.find(row=>row.id===updated.id);return !old||old.entryAmountPence!==updated.entryAmountPence||old.frequency!==updated.frequency||old.funding!==updated.funding||old.singleFunderId!==updated.singleFunderId||JSON.stringify(old.destination)!==JSON.stringify(updated.destination)||JSON.stringify(old.contributions)!==JSON.stringify(updated.contributions)||JSON.stringify(old.customShares)!==JSON.stringify(updated.customShares)})
@@ -61,8 +61,9 @@ export function PlanPage({ref,document,setDocument,month,budget,planView,mobileP
   const savedLabels=planItemLabels(result.document,shortAccountLabels(result.document.budget.accounts,adults))
   setOpenGroups(open=>({...open,...Object.fromEntries(result.items.map(row=>[planGroupKey(row,grouping,savedLabels),true]))}))
   const impact=preview&&'impact' in preview&&(preview.impact.accounts.length||preview.impact.beforeBalancePence!==preview.impact.afterBalancePence)?preview.impact:null
-  saved(batch.editingId?`${result.items[0]?.name??'Item'} saved`:`Created ${result.items.length} budget ${result.items.length===1?'item':'items'}.`,impact)
-  setEditor(false)
+  saved(`${result.items[0]?.name??'Item'} ${batch.editingId?'saved':'added'}`,impact)
+  // ⌘↵ "Add and start another" keeps the editor open for the next item.
+  if(!another)setEditor(false)
  }
  const removeItem=(item:BudgetItem,menu?:HTMLElement|null)=>{const next={...document,budget:updateBudgetAtMonth(document.budget,month,old=>old.filter(i=>i.id!==item.id))};setConfirm({title:`Remove ${item.name}?`,body:<ImpactPreview label="Before removing" scopeText={`Changes apply: ${editScopeLabel}.`} result={budgetImpact(document,next,month,[])} document={next}/>,confirmLabel:'Remove item',returnFocusTo:()=>menu?.isConnected?menu:window.document.querySelector<HTMLElement>('.budget-v3-table-wrap'),onConfirm:()=>setDocument(current=>({...current,budget:updateBudgetAtMonth(current.budget,month,old=>old.filter(i=>i.id!==item.id))}))})}
  const searchMode=!!query.trim()

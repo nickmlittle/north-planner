@@ -74,7 +74,8 @@ it('keeps the saved destination while browsing back, until a new one is confirme
   expect(screen.getByTestId('selection').textContent).toBe(saved)
   fireEvent.click(within(picker()).getByRole('button', { name: '← Keep current' }))
   expect(screen.getByTestId('selection').textContent).toBe(saved)
-  expect(within(picker()).getByRole('heading', { name: 'Destination' })).toBeVisible()
+  // Chosen: the destination and Change, with no second "Destination" label.
+  expect(within(picker()).queryByRole('heading')).not.toBeInTheDocument()
   expect(within(picker()).getByText('Bills · Barclays Sam')).toBeVisible()
   fireEvent.click(within(picker()).getByRole('button', { name: 'Change' }))
   fireEvent.click(within(picker()).getByRole('button', { name: 'Use account directly' }))
