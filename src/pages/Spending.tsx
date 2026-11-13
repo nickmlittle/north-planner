@@ -3,21 +3,22 @@ import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { EmptyState, ListRow, PageHeader, Section, StatusChip, Tabs, useMobilePresentation, useStepCopy } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, localDate, type CardTransaction } from '../domain/cardTracker'
-import { allTransactions, checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
+import { checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
 import { statementKeys, statementSummary } from '../domain/cardStatements'
 import { potBalance } from '../domain/potBalances'
 import type { SpendingSection } from '../state/navigation'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { BringInSheet } from './BringInSheet'
 import { dayDate, destinationNamer, shortDate } from './cardLabels'
-import { payments, refundPlan, refundPurchase, refundsOf } from '../domain/cardRefunds'
+import { refundPlan, refundPurchase } from '../domain/cardRefunds'
 import { ManualEntrySheet } from './ManualEntrySheet'
 import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
 import { StatementsPanel } from './StatementsPanel'
 import { SortTable } from './SortTable'
+import { TransactionsTable } from './TransactionsTable'
 import { splitLabel } from '../domain/cardSplits'
-import { cardLabel, dayOf, plural, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
+import { cardLabel, dayOf, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { closeDateFor } from '../domain/cardTracker'
 import './Spending.css'
 import { movedByTransaction, moveState, potPhrase, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
@@ -45,13 +46,6 @@ type Props = {
 }
 
 
-/** Refunds and their purchases point at each other: "Refund of COSTCO £186.40 · 24 Oct", "Refunded −£14.99 · 6 Nov". */
-function transactionLink(document: BudgetDocument, transaction: CardTransaction): string {
-  const tracker = cardTracker(document)
-  const purchase = transaction.refundOf ? tracker.transactions.find(row => row.id === transaction.refundOf!.transactionId) : undefined
-  if (purchase) return `Refund of ${purchase.description} ${signedPounds(purchase.amountPence)} · ${shortDate(purchase.date)}`
-  return transaction.kind === 'purchase' ? refundsOf(tracker, transaction.id).map(row => `Refunded ${signedPounds(row.amountPence)} · ${shortDate(row.date)}`).join(' · ') : ''
-}
 
 /** One transaction: what, when, whose card, how much, and where it went. A button when it can be sorted. */
 export function TransactionRow({ document, transaction, where, tag, moved, action, onSelect }: { document: BudgetDocument; transaction: CardTransaction; where?: string; tag?: string; moved?: MoveState; action?: string; onSelect?: () => void }) {
@@ -176,17 +170,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     </Section>
     {toSort.length > 0 && setAside}
   </div>
-  const all = allTransactions(tracker)
-  const paid = payments(tracker)
-  const allPanel = <>
-    <div className="spending-section-heading"><h2 id="spending-all-title">Transactions</h2><span>{all.length ? plural(all.length, 'transaction') : ''}</span></div>
-    {all.length ? <ul className="spending-list">{all.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction} where={where(transaction)} tag={transaction.sort?.by === 'rule' ? transaction.refundOf && !transaction.sort.ruleId ? 'Refund' : 'Rule' : undefined} moved={movedOf(transaction)} onSelect={() => setSorting(transaction.id)}/></li>)}</ul>
-      : <p className="spending-none">Nothing brought in yet.</p>}
-    {paid.length > 0 && <section className="spending-payments" aria-labelledby="spending-payments-title">
-      <div className="spending-section-heading"><h2 id="spending-payments-title">Payments to {card.name}</h2><span>Never sorted</span></div>
-      <ul className="spending-list">{paid.map(transaction => <li key={transaction.id}><TransactionRow document={document} transaction={transaction}/></li>)}</ul>
-    </section>}
-  </>
+  const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf}/></Section>
 
   return <div className="page-frame spending-page">
     <PageHeader title={tracker.cards.length > 1 ? 'Spending' : card.name} titleText="Spending" context={context} actions={<>

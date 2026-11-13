@@ -1,0 +1,49 @@
+/* Spending › Transactions (audit 3 PR 15). Tokens only (styles.tokens.test.ts). */
+.transactions{display:grid;gap:var(--space-3);min-width:0}
+.transactions-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3)}
+.transactions-search{position:relative;display:flex;align-items:center;flex:1 1 240px;max-width:360px}
+.transactions-search input{width:100%;margin:0;padding-right:var(--space-6)}
+.transactions-search .shortcut-hint{position:absolute;right:var(--space-2)}
+.transactions-filter{display:inline-flex;align-items:center;gap:var(--space-2)}
+.transactions-filter svg{width:16px;height:16px}
+.transactions-filter-count{min-width:18px;padding:0 var(--space-1);border-radius:var(--radius-pill);background:var(--accent);color:var(--white);font-size:var(--text-sm);text-align:center}
+.transactions-count{margin:0 0 0 auto;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.transactions-chips{display:flex;flex-wrap:wrap;gap:var(--space-2);margin:0;padding:0;list-style:none}
+.transactions-chip{display:inline-flex;align-items:center;gap:var(--space-1);min-height:32px;margin:0;padding:0 var(--space-3);border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface-selected);color:var(--text);font:inherit;font-size:var(--text-sm);cursor:pointer}
+.transactions-chip svg{width:14px;height:14px}
+.transactions-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.transactions-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--text-md)}
+.tx-col-date{width:100px}
+.tx-col-card{width:112px}
+.tx-col-amount{width:100px}
+.tx-col-pot{width:28%}
+.tx-col-tags{width:160px}
+.transactions-table th,.transactions-table td{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}
+.transactions-table thead th{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap}
+.transactions-table td:first-child,.transactions-table td:nth-child(3){white-space:nowrap}
+.transactions-table .is-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.transactions-table td.is-credit{color:var(--link)}
+.transactions-band th{padding-block:var(--space-2);background:var(--surface-band);color:var(--text);font-weight:var(--weight-bold)}
+.transactions-band span{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.transactions-row{cursor:pointer}
+.transactions-row:hover,.transactions-row:focus-visible{background:var(--surface-sunken)}
+.transactions-row:focus-visible{outline-offset:-2px}
+.transactions-merchant{display:block;font-weight:var(--weight-medium)}
+.transactions-link{display:block;color:var(--text-muted);font-size:var(--text-sm)}
+.transactions-line td{padding-block:var(--space-1);color:var(--text-muted);font-size:var(--text-sm)}
+.transactions-line td:nth-child(2){padding-left:var(--space-6)}
+.transactions-tags{display:inline-flex;flex-wrap:wrap;gap:var(--space-1)}
+.transactions-table tbody:last-child tr:last-child>*{border-bottom:0}
+.transactions-payments{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.transactions-payments summary{display:flex;justify-content:space-between;gap:var(--space-3);min-height:44px;align-items:center;padding:0 var(--space-4);font-weight:var(--weight-medium);cursor:pointer}
+.transactions-payments summary span{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.transactions-payments ul{margin:0;padding:0 var(--space-4) var(--space-3);list-style:none}
+.transactions-payments li{display:flex;justify-content:space-between;gap:var(--space-3);padding:var(--space-2) 0;border-top:1px solid var(--border);font-variant-numeric:tabular-nums}
+.transactions-payments small{display:block;color:var(--text-muted);font-size:var(--text-sm)}
+.transactions-month{display:grid;gap:var(--space-2)}
+.transactions-month-title{margin:var(--space-2) 0 0;font-size:var(--text-md);font-weight:var(--weight-bold)}
+.transactions-list{margin:0;padding:0;list-style:none;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.transactions-list>li+li>.list-row{border-top:1px solid var(--border)}
+.transactions-split{margin:0;padding:0 var(--space-4) var(--space-2) var(--space-6);list-style:none;color:var(--text-muted);font-size:var(--text-sm)}
+.transactions-split li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0;font-variant-numeric:tabular-nums}
+.list-row-meta .transactions-link{display:block}

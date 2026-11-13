@@ -1152,9 +1152,6 @@ main[tabindex="-1"]:focus{outline:none}
 .spending-page svg{flex:none}
 .bring-in-file svg{width:18px;height:18px}
 .spending-message{margin:0 0 var(--space-3)}
-.spending-section-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:44px}
-.spending-section-heading h2{margin:0;color:var(--pine);font-size:var(--text-lg);font-weight:var(--weight-medium)}
-.spending-section-heading span{color:var(--muted);font-size:var(--text-sm)}
 .spending-list{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card);overflow:hidden}
 .spending-list>li+li{border-top:1px solid var(--line)}
 .spending-row{display:grid;gap:2px;padding:var(--space-3) var(--space-4)}
@@ -1243,8 +1240,6 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .sort-group-heading{margin:0 0 var(--space-2);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .sort-unsort{justify-self:start;min-height:44px}
 
-.spending-section-heading>span{margin-left:auto}
-.spending-section-heading .budget-options-menu{flex:none}
 @media(max-width:640px){.rule-row{flex-wrap:wrap;padding:var(--space-3) var(--space-2) var(--space-1) var(--space-4)}.rule-row-text{flex-basis:100%}.rule-row-actions{width:100%;justify-content:flex-end}}
 .spending-row-lines{display:grid;gap:var(--space-1);margin:0;padding:0 var(--space-4) var(--space-3) var(--space-6);list-style:none;color:var(--muted);font-size:var(--text-sm)}
 .spending-row-lines li{display:flex;justify-content:space-between;gap:var(--space-3)}
@@ -1272,7 +1267,6 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .split-totals li{display:flex;justify-content:space-between;gap:var(--space-3)}
 @media(max-width:640px){.split-line,.split-line.is-item{grid-template-columns:minmax(0,1fr) 110px;grid-auto-flow:dense}.split-line .split-destination,.split-line .split-note{grid-column:1/-1}.split-remove{grid-column:2;justify-self:end}}
 .spending-row-link{flex-basis:100%;color:var(--link);font-weight:var(--weight-medium)}
-.spending-payments{display:grid;gap:var(--space-3);margin-top:var(--space-3)}
 .sort-refund{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
 .sort-refund p{margin:0;color:var(--pine)}
 .sort-option-amount{flex:none;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums}

@@ -1,7 +1,8 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
+import { refundsOf } from '../domain/cardRefunds'
 import { formatGBP } from '../formatting/money'
-import { dayDate } from './cardLabels'
+import { dayDate, shortDate } from './cardLabels'
 import type { StatementSummary } from '../domain/cardStatements'
 import { formatMonth } from '../formatting/month'
 import type { MonthSpending } from '../domain/cardSpending'
@@ -56,3 +57,10 @@ export function closeBlocker(plan: ClosePlan, month: string, today: string): str
   return `Waiting for late ${name} transactions to post.`
 }
 
+/** Refunds and their purchases point at each other: "Refund of COSTCO £186.40 · 24 Oct", "Refunded −£14.99 · 6 Nov". */
+export function transactionLink(document: BudgetDocument, transaction: CardTransaction): string {
+  const tracker = cardTracker(document)
+  const purchase = transaction.refundOf ? tracker.transactions.find(row => row.id === transaction.refundOf!.transactionId) : undefined
+  if (purchase) return `Refund of ${purchase.description} ${signedPounds(purchase.amountPence)} · ${shortDate(purchase.date)}`
+  return transaction.kind === 'purchase' ? refundsOf(tracker, transaction.id).map(row => `Refunded ${signedPounds(row.amountPence)} · ${shortDate(row.date)}`).join(' · ') : ''
+}
