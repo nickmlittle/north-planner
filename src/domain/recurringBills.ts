@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
-import { addDays, daysInMonth } from './cardTracker'
-import { DEFAULT_REMIND_WEEKS, resolveBudget, type BillDay, type BillPaidBy, type BudgetDestination, type BudgetItem, type RecurringBill } from './monthlyBudget'
+import { addDays, daysBetween, daysInMonth } from './cardTracker'
+import { DEFAULT_REMIND_WEEKS, monthlyContributionPence, resolveBudget, updateBudgetAtMonth, type BillDay, type BillPaidBy, type BudgetDestination, type BudgetItem, type RecurringBill } from './monthlyBudget'
 
 /**
  * Recurring bills: plan items that come out on a set date (docs/recurring-bills-rules.md). The details live on the
@@ -158,4 +158,113 @@ export function planDates(document: Pick<BudgetDocument, 'card'>, items: readonl
   }).sort((a, b) => a.renews.localeCompare(b.renews) || a.item.name.localeCompare(b.item.name, 'en-GB'))
   const undated = items.filter(item => !item.bill && item.frequency === 'annually').sort((a, b) => a.name.localeCompare(b.name, 'en-GB'))
   return { monthly, yearly, undated }
+}
+
+// ——— Renewals (recurring-bills-rules › Renewals) ———
+
+/** Who's answered which renewal: item id → the renewal date (YYYY-MM-DD) answered with Same price or Save new price. */
+export type BillRenewals = Record<string, string>
+export type BillsState = { renewals: BillRenewals }
+
+export function validBillsState(value: unknown): value is BillsState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const renewals = (value as { renewals?: unknown }).renewals
+  if (!renewals || typeof renewals !== 'object' || Array.isArray(renewals)) return false
+  return Object.entries(renewals).every(([id, date]) => !!id && typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))
+}
+
+/** How long a renewal that passed unanswered stays on To do, titled "… renewed 6 Dec". */
+export const RENEWAL_LATE_DAYS = 28
+
+/**
+ * Whether an answer covers a renewal. One answer covers its year: a renewal within six months of the answered date
+ * counts as answered, so moving the renewal date while answering doesn't ask again.
+ */
+export function renewalAnswered(answered: string | undefined, date: string): boolean {
+  return !!answered && Math.abs(daysBetween(answered, date)) < 183
+}
+
+/**
+ * The renewal Home is asking about for a yearly bill, if any: one that passed in the last 4 weeks, or the next one
+ * once its reminder has started. Answered or not: the caller checks `renewalAnswered`. None with the reminder off.
+ */
+export function renewalInView(bill: Pick<RecurringBill, 'day' | 'month' | 'remindWeeks'>, today: string): { date: string; late: boolean } | undefined {
+  if ((bill.remindWeeks ?? DEFAULT_REMIND_WEEKS) === 0 || bill.month === undefined) return undefined
+  const next = nextRenewal(bill, today)
+  const previous = billDate(`${Number(next.slice(0, 4)) - 1}-${next.slice(5, 7)}`, bill.day)
+  if (previous < today && daysBetween(previous, today) <= RENEWAL_LATE_DAYS) return { date: previous, late: true }
+  const from = reminderFrom(next, bill)
+  return from && today >= from ? { date: next, late: false } : undefined
+}
+
+export type RenewalInView = { item: BudgetItem; bill: RecurringBill; date: string; late: boolean; tracked: boolean; answered: boolean }
+
+/** Every yearly bill in this month's plan with a renewal in view, soonest first. */
+export function renewalsInView(document: Pick<BudgetDocument, 'budget' | 'card' | 'bills'>, today: string): RenewalInView[] {
+  const rows: RenewalInView[] = []
+  for (const item of resolveBudget(document.budget, today.slice(0, 7)).items) {
+    if (!item.bill || item.frequency !== 'annually') continue
+    const view = renewalInView(item.bill, today)
+    if (!view) continue
+    rows.push({ item, bill: item.bill, ...view, tracked: billTracked(item.bill, document), answered: renewalAnswered(document.bills?.renewals[item.id], view.date) })
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date) || a.item.name.localeCompare(b.item.name, 'en-GB'))
+}
+
+/** How far ahead Home's Coming up lists bills. */
+export const BILLS_AHEAD_DAYS = 7
+
+/** The bills that come out from today to `days` days ahead, across a month end, by date then name. */
+export function billsAhead(document: Pick<BudgetDocument, 'budget' | 'card'>, today: string, days = BILLS_AHEAD_DAYS): MonthBill[] {
+  const until = addDays(today, days)
+  const months = [...new Set([today.slice(0, 7), until.slice(0, 7)])]
+  return months.flatMap(month => monthBills(document, month, today)).filter(bill => bill.date >= today && bill.date <= until)
+}
+
+/** A new yearly price, and optionally a new renewal day and month, from the renewal's month. */
+export type RenewalChange = { entryAmountPence: number; day: BillDay; month: number }
+
+/**
+ * Answer a renewal (recurring-bills-rules › Renewals): Same price records it; with a change, Save new price also edits
+ * the item from the renewal's month, by snapshot rules. Unchanged when the item isn't a yearly bill that month.
+ */
+export function answerRenewal(document: BudgetDocument, itemId: string, date: string, change?: RenewalChange): BudgetDocument {
+  const month = date.slice(0, 7)
+  const item = resolveBudget(document.budget, month).items.find(row => row.id === itemId)
+  if (!item?.bill || item.frequency !== 'annually') return document
+  const answered: BudgetDocument = { ...document, bills: { renewals: { ...document.bills?.renewals, [itemId]: date } } }
+  if (!change) return answered
+  const same = change.entryAmountPence === item.entryAmountPence && change.day === item.bill.day && change.month === item.bill.month
+  if (same) return answered
+  return { ...answered, budget: updateBudgetAtMonth(document.budget, month, items => items.map(row => row.id === itemId && row.bill
+    ? { ...row, entryAmountPence: change.entryAmountPence, amountPence: monthlyContributionPence(change.entryAmountPence, 'annually'), bill: { ...row.bill, day: change.day, month: change.month } }
+    : row)) }
+}
+
+/** Whether Save new price can change the item's price: not when it's split by fixed amounts that must add up to it. */
+export function renewalPriceEditable(item: Pick<BudgetItem, 'funding'>): boolean {
+  return item.funding !== 'fixed'
+}
+
+/** The next renewal after the one being answered, for a chosen day and month (YYYY-MM-DD). */
+export function renewalAfter(date: string, day: BillDay, month: number): string {
+  const mm = String(month).padStart(2, '0'), year = Number(date.slice(0, 4))
+  const same = billDate(`${year}-${mm}`, day)
+  return same > date ? same : billDate(`${year + 1}-${mm}`, day)
+}
+
+/** Undo for an answer: puts back the answer before it and, when the price changed, the renewal month's plan. */
+export function undoRenewalAnswer(before: BudgetDocument, itemId: string, date: string): (current: BudgetDocument) => BudgetDocument {
+  const month = date.slice(0, 7)
+  const answered = before.bills?.renewals[itemId]
+  const snapshot = before.budget.snapshots[month]
+  return current => {
+    const renewals = { ...current.bills?.renewals }
+    if (answered) renewals[itemId] = answered
+    else delete renewals[itemId]
+    const snapshots = { ...current.budget.snapshots }
+    if (snapshot) snapshots[month] = snapshot
+    else delete snapshots[month]
+    return { ...current, bills: { renewals }, budget: { ...current.budget, snapshots } }
+  }
 }

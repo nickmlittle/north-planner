@@ -31,11 +31,13 @@ type Props = { ref?: Ref<PlanPageHandle>; document: BudgetDocument; setDocument:
 export function PlanPage({ref,document,setDocument,month,budget,planView,mobilePresentation,scoped:scopedPlan,planDestination,planItemId,onClearPlanDestination,onReturnToTransfers,hasTransfersOrigin,onViewAffectedTransfers,onEditIncome:openIncome,today=localDate()}:Props) {
  const {resolved,items,adults,incomes,editScopeLabel,labels,shortLabels,total,transferAccounts,available,basisDetail,ownerOrder,meterPeople}=budget
  const {query,updateSearch,captureBrowseScroll,ownerFilter,setOwnerFilter,categoryFilter,setCategoryFilter,openGroups,setOpenGroups,groupsOpenByDefault,grouping,chooseGrouping,destinationItems,reviewPerson}=planView
- // ⌘K's "Add item" from another screen arrives with the editor open (history state northAddItem).
- const [editor,setEditor]=useState(()=>!!window.history.state?.northAddItem),[editingItem,setEditingItem]=useState<BudgetItem>(),[editorTemplate,setEditorTemplate]=useState<BudgetItem>(),[editorSession,setEditorSession]=useState(0)
+ // ⌘K's "Add item" from another screen arrives with the editor open (history state northAddItem), and Home's
+ // Renewal sheet's "Edit the item" with that item's editor open (northEditItem).
+ const [arrivingItem]=useState(()=>{const id=window.history.state?.northEditItem;return typeof id==='string'?items.find(row=>row.id===id):undefined})
+ const [editor,setEditor]=useState(()=>!!window.history.state?.northAddItem||!!arrivingItem),[editingItem,setEditingItem]=useState<BudgetItem|undefined>(arrivingItem),[editorTemplate,setEditorTemplate]=useState<BudgetItem>(),[editorSession,setEditorSession]=useState(0)
  const {show:showToast,toast}=useToast()
  const planFocusItem=useRef<string|null>(planItemId??null)
- useEffect(()=>{if(window.history.state?.northAddItem){const rest={...window.history.state};delete rest.northAddItem;window.history.replaceState(rest,'')}},[])
+ useEffect(()=>{const state=window.history.state;if(state?.northAddItem||state?.northEditItem){const rest={...state};delete rest.northAddItem;delete rest.northEditItem;window.history.replaceState(rest,'')}},[])
  // A later jump to an item (⌘K while on Plan) focuses it too.
  useLayoutEffect(()=>{if(planItemId)planFocusItem.current=planItemId},[planItemId])
  const planDestinationHeading=useRef<HTMLDivElement>(null),previousPlanDestination=useRef<string|null>(null)

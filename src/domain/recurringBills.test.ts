@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { billDraft, commitItemBatch, itemDraft, newBillDraft, newItemDraft, readBillDraft, readItemDraft, type BillDraft } from './budgetItemDrafts'
 import { resolveBudget, validMonthlyBudget, validRecurringBill, type BudgetItem, type RecurringBill } from './monthlyBudget'
-import { billDate, billTracked, billsOnCard, monthBills } from './recurringBills'
+import { answerRenewal, billDate, billTracked, billsAhead, billsOnCard, monthBills, renewalAfter, renewalAnswered, renewalInView, renewalPriceEditable, renewalsInView, undoRenewalAnswer, validBillsState } from './recurringBills'
 import { monthSpending } from './cardSpending'
 import { potBalance, potFlows } from './potBalances'
 
@@ -282,5 +282,102 @@ describe('pot balances with bills', () => {
   it('ignores bills to an account', () => {
     const document = everyMonth(seed(), items => items.map(item => item.name === 'Streaming' ? { ...item, bill: { paidBy: 'direct-debit', day: 3 } } : item))
     expect(potBalance(document, 'bills', '2026-11-11')).toEqual(potBalance(seed(), 'bills', '2026-11-11'))
+  })
+})
+
+describe('renewals', () => {
+  const december = { day: 6, month: 12 } as const
+  it('asks from the reminder until 4 weeks after an unanswered renewal', () => {
+    expect(renewalInView(december, '2026-11-07')).toBeUndefined()
+    expect(renewalInView(december, '2026-11-08')).toEqual({ date: '2026-12-06', late: false })
+    expect(renewalInView(december, '2026-12-06')).toEqual({ date: '2026-12-06', late: false })
+    expect(renewalInView(december, '2026-12-07')).toEqual({ date: '2026-12-06', late: true })
+    expect(renewalInView(december, '2027-01-03')).toEqual({ date: '2026-12-06', late: true })
+    expect(renewalInView(december, '2027-01-04')).toBeUndefined()
+    expect(renewalInView({ ...december, remindWeeks: 2 }, '2026-11-21')).toBeUndefined()
+    expect(renewalInView({ ...december, remindWeeks: 2 }, '2026-11-22')).toEqual({ date: '2026-12-06', late: false })
+  })
+
+  it('never asks with the reminder off', () => {
+    for (const today of ['2026-11-08', '2026-12-06', '2026-12-10']) expect(renewalInView({ ...december, remindWeeks: 0 }, today)).toBeUndefined()
+  })
+
+  it('counts one answer for its year, so moving the date doesn’t ask again', () => {
+    expect(renewalAnswered('2026-12-06', '2026-12-06')).toBe(true)
+    expect(renewalAnswered('2026-12-06', '2026-12-20')).toBe(true)
+    expect(renewalAnswered('2026-12-06', '2027-12-06')).toBe(false)
+    expect(renewalAnswered(undefined, '2026-12-06')).toBe(false)
+  })
+
+  it('lists this month’s yearly bills in view, answered or not', () => {
+    const document = seed()
+    expect(renewalsInView(document, '2026-11-14').map(row => [row.item.name, row.date, row.late, row.tracked, row.answered])).toEqual([['Breakdown cover', '2026-12-06', false, true, false]])
+    const id = named(document, 'Breakdown cover').id
+    expect(renewalsInView({ ...document, bills: { renewals: { [id]: '2026-12-06' } } }, '2026-11-14')[0]!.answered).toBe(true)
+    expect(renewalsInView(document, '2026-12-20').map(row => [row.item.name, row.date, row.late])).toEqual([['Breakdown cover', '2026-12-06', true], ['Home insurance', '2027-01-12', false]])
+  })
+
+  it('Same price records the answer and leaves the plan alone', () => {
+    const document = seed()
+    const id = named(document, 'Home insurance').id
+    const after = answerRenewal(document, id, '2027-01-12')
+    expect(after.bills).toEqual({ renewals: { [id]: '2027-01-12' } })
+    expect(after.budget).toBe(document.budget)
+    expect(answerRenewal(document, id, '2027-01-12', { entryAmountPence: named(document, 'Home insurance').entryAmountPence, day: 12, month: 1 }).budget).toBe(document.budget)
+    expect(decodeBudgetDocument(JSON.parse(JSON.stringify(after)))).not.toBeNull()
+  })
+
+  it('Save new price edits the item from the renewal’s month, with its monthly set-aside', () => {
+    const document = seed()
+    const id = named(document, 'Home insurance').id
+    const after = answerRenewal(document, id, '2027-01-12', { entryAmountPence: 130000, day: 20, month: 2 })
+    const item = (month: string) => resolveBudget(after.budget, month).items.find(row => row.id === id)!
+    expect(item('2026-12')).toEqual(named(document, 'Home insurance'))
+    expect(item('2027-01')).toMatchObject({ entryAmountPence: 130000, amountPence: 10833, bill: { paidBy: 'direct-debit', day: 20, month: 2 } })
+    // By snapshot rules it runs until the plan's next change, in March.
+    expect(item('2027-02').entryAmountPence).toBe(130000)
+    expect(item('2027-03').entryAmountPence).toBe(named(document, 'Home insurance').entryAmountPence)
+    expect(after.bills!.renewals[id]).toBe('2027-01-12')
+    expect(decodeBudgetDocument(JSON.parse(JSON.stringify(after)))).not.toBeNull()
+  })
+
+  it('leaves a monthly bill or an unknown item alone, and won’t reprice fixed amounts', () => {
+    const document = seed()
+    expect(answerRenewal(document, named(document, 'Water').id, '2026-11-05')).toBe(document)
+    expect(answerRenewal(document, 'nope', '2026-12-06')).toBe(document)
+    expect(renewalPriceEditable({ funding: 'fixed' })).toBe(false)
+    expect(renewalPriceEditable({ funding: 'proportional' })).toBe(true)
+  })
+
+  it('undoes an answer, and a new price with it', () => {
+    const document = seed()
+    const id = named(document, 'Home insurance').id
+    const after = answerRenewal(document, id, '2027-01-12', { entryAmountPence: 130000, day: 12, month: 1 })
+    const undone = undoRenewalAnswer(document, id, '2027-01-12')(after)
+    expect(undone.budget.snapshots).toEqual(document.budget.snapshots)
+    expect(undone.bills).toEqual({ renewals: {} })
+    const lastYear: BudgetDocument = { ...document, bills: { renewals: { [id]: '2026-01-12' } } }
+    expect(undoRenewalAnswer(lastYear, id, '2027-01-12')(answerRenewal(lastYear, id, '2027-01-12')).bills!.renewals[id]).toBe('2026-01-12')
+  })
+
+  it('gives the next renewal after the one being answered', () => {
+    expect(renewalAfter('2026-12-06', 6, 12)).toBe('2027-12-06')
+    expect(renewalAfter('2026-12-06', 20, 12)).toBe('2026-12-20')
+    expect(renewalAfter('2026-12-06', 'last', 2)).toBe('2027-02-28')
+  })
+
+  it('validates the answers on a document', () => {
+    expect(validBillsState({ renewals: {} })).toBe(true)
+    expect(validBillsState({ renewals: { a: '2026-12-06' } })).toBe(true)
+    for (const bad of [null, [], {}, { renewals: [] }, { renewals: { a: 6 } }, { renewals: { a: '6 Dec' } }]) expect(validBillsState(bad)).toBe(false)
+    expect(decodeBudgetDocument({ ...seed(), bills: { renewals: { a: 'soon' } } })).toBeNull()
+  })
+})
+
+describe('billsAhead', () => {
+  it('lists the next 7 days of bills across a month end', () => {
+    expect(billsAhead(seed(), '2026-11-11').map(bill => [bill.name, bill.date])).toEqual([['Electricity', '2026-11-18']])
+    expect(billsAhead(seed(), '2026-11-28').map(bill => [bill.name, bill.date])).toEqual([['Council tax', '2026-12-01'], ['Streamflix', '2026-12-02'], ['Water', '2026-12-05']])
+    expect(billsAhead(seed(), '2026-11-30').map(bill => bill.name)).toContain('Breakdown cover')
   })
 })

@@ -1,50 +1,67 @@
-import { ArrowLeftRight, CalendarCheck, Check, FileText, Inbox, ListPlus, PiggyBank, TrendingUp, TriangleAlert, Upload } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ArrowLeftRight, BellRing, CalendarCheck, Check, FileText, Inbox, ListPlus, PiggyBank, TrendingUp, TriangleAlert, Upload } from 'lucide-react'
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { EmptyState, ListKeysHint, ListRow, PageHeader, Section, StatStrip, StatTile, StatusChip } from '../components/ui'
+import { useToast } from '../components/ui/useToast'
 import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate } from '../domain/cardTracker'
-import { homeCount, homeInbox, type HomeTarget, type InboxKind, type InboxTask } from '../domain/homeInbox'
+import { homeCount, homeInbox, type AppHomeTarget, type HomeTarget, type InboxKind, type InboxTask } from '../domain/homeInbox'
+import { resolveBudget } from '../domain/monthlyBudget'
+import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
 import { dayDate, weekday } from '../formatting/date'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationNamer } from './cardLabels'
+import { RenewalSheet } from './RenewalSheet'
 import { WhatMoved } from './WhatMoved'
 import './Home.css'
 
 type Props = {
   document: BudgetDocument
+  /** Answering a renewal (Same price, Save new price) edits the document. */
+  setDocument: Dispatch<SetStateAction<BudgetDocument>>
   /** The month Home summarises: this month, unless a link says otherwise. */
   month: string
   /** Every row and figure opens somewhere: Plan, Month (a pot, Close), Spending (a statement, To sort) or Settings. */
-  onOpen: (target: HomeTarget) => void
+  onOpen: (target: AppHomeTarget) => void
   /** Today; tests pass a fixed one. */
   today?: string
 }
 
 const icons: Record<InboxKind, ReactNode> = {
   plan: <ListPlus/>, settle: <FileText/>, 'final-export': <Upload/>, close: <CalendarCheck/>, fund: <ArrowLeftRight/>, sort: <Inbox/>,
-  'set-aside': <PiggyBank/>, 'bring-in': <Upload/>, 'over-plan': <TriangleAlert/>, 'review-accounts': <TriangleAlert/>, pace: <TrendingUp/>,
+  'set-aside': <PiggyBank/>, 'bring-in': <Upload/>, 'over-plan': <TriangleAlert/>, 'review-accounts': <TriangleAlert/>, pace: <TrendingUp/>, renewal: <BellRing/>,
 }
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 /** "Wednesday 11 November". */
 const longDate = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 
 /** A To do row: the task, what it needs, and its figure, due date or chip. Fund rows show each person's steps. */
-function TaskRow({ task, onOpen }: { task: InboxTask; onOpen: (target: HomeTarget) => void }) {
+function TaskRow({ task, onOpen, onSamePrice }: { task: InboxTask; onOpen: (target: HomeTarget) => void; onSamePrice?: () => void }) {
   const meta = task.progress ? <span className="home-progress">{task.progress.map(row => <span key={row.personId} className="home-progress-person">
     {row.name} {row.done} of {row.total}<span className="home-progress-bar" aria-hidden="true"><span style={{ width: `${row.total ? row.done / row.total * 100 : 0}%` }}/></span>
   </span>)}{task.note && <span>{task.note}</span>}</span> : task.meta
   return <li><ListRow icon={icons[task.kind]} tone={task.tone ?? 'neutral'} title={task.title} meta={meta}
     trailing={task.chip ? <StatusChip>{task.chip}</StatusChip> : task.trailing && <span className={task.tone === 'critical' ? 'home-figure is-critical' : 'home-figure'}>{task.trailing}</span>}
-    trailingMeta={task.trailingMeta} onOpen={() => onOpen(task.target)} listRow/></li>
+    trailingMeta={task.trailingMeta} onOpen={() => onOpen(task.target)} listRow/>
+    {onSamePrice && <div className="home-task-actions"><button type="button" className="secondary-button" onClick={onSamePrice}>Same price</button></div>}</li>
 }
 
 /**
  * Home: where we stand and what to do next. A three-figure strip (Plan, Spent, the card), then one To do list in
  * the order things are due, heads-ups last; Coming up and Done beside it on wide screens. Built by `homeInbox`.
  */
-export function Home({ document, month, onOpen, today = localDate() }: Props) {
+export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, today = localDate() }: Props) {
+  const [renewal, setRenewal] = useState<{ itemId: string; date: string }>()
+  const { show: showToast, toast } = useToast()
+  const onOpen = (target: HomeTarget) => { if (target.view === 'renewal') setRenewal({ itemId: target.itemId, date: target.date }); else onOpenElsewhere(target) }
+  const answered = (text: string, undo: (current: BudgetDocument) => BudgetDocument) => showToast(text, { label: 'Undo', onClick: () => setDocument(undo) })
+  /** "Same price" on a renewal's To do row: answers it without opening the sheet. */
+  const samePrice = (task: InboxTask) => {
+    if (task.target.view !== 'renewal') return undefined
+    const { itemId, date } = task.target
+    return () => { setDocument(current => answerRenewal(current, itemId, date)); answered(`${resolveBudget(document.budget, date.slice(0, 7)).items.find(item => item.id === itemId)?.name ?? 'Renewal'}: same price`, undoRenewalAnswer(document, itemId, date)) }
+  }
   const todoKeys = useListNavigation({ label: 'To do', keys: { enter: 'Open the task' } })
   const names = shortAccountLabels(document.budget.accounts, document.household.adults)
   const inbox = homeInbox(document, { month, today, nameDestination: destinationNamer(document), nameAccount: id => names.get(id) ?? 'Account' })
@@ -66,7 +83,7 @@ export function Home({ document, month, onOpen, today = localDate() }: Props) {
       <Section title="To do" count={count} aside={count ? <ListKeysHint keys={[['J K', 'move'], ['↵', 'open']]}/> : undefined}>
         {todoKeys.hint}
         {count ? <ul className="home-list" aria-label="To do" {...todoKeys.listProps}>
-          {todo.map(task => <TaskRow key={task.key} task={task} onOpen={onOpen}/>)}
+          {todo.map(task => <TaskRow key={task.key} task={task} onOpen={onOpen} onSamePrice={samePrice(task)}/>)}
           {headsUp.length > 0 && <li className="home-list-label" aria-hidden="true">Heads-up</li>}
           {headsUp.map(task => <TaskRow key={task.key} task={task} onOpen={onOpen}/>)}
         </ul> : <EmptyState title="Nothing to do">{`You’re set for ${name}.${next ? ` Next: ${next.title} ${dayDate(next.date)}.` : ''}`}</EmptyState>}
@@ -82,5 +99,9 @@ export function Home({ document, month, onOpen, today = localDate() }: Props) {
         </Section>}
       </div>
     </div>
+    {toast}
+    {renewal && <RenewalSheet document={document} setDocument={setDocument} itemId={renewal.itemId} date={renewal.date} today={today} onClose={() => setRenewal(undefined)}
+      onAnswered={(text, undo) => { setRenewal(undefined); answered(text, undo) }}
+      onEditItem={(itemId, itemMonth) => { setRenewal(undefined); onOpenElsewhere({ view: 'plan', editItemId: itemId, month: itemMonth }) }}/>}
   </div>
 }

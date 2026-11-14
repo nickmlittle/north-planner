@@ -1,5 +1,6 @@
 import { validTransferTicks, type TransferTicks } from './transferTicks'
 import { validCardTracker, type CardTracker } from './cardTracker'
+import { validBillsState, type BillsState } from './recurringBills'
 import { defaultMonthlyBudget, validDestination, validMonthlyBudget, type BudgetDestination, type BudgetItem, type BudgetSnapshot, type IncomePolicyValue, type MonthlyBudget } from './monthlyBudget'
 
 export interface BudgetPerson { id: string; name: string }
@@ -12,6 +13,8 @@ export interface BudgetDocument {
   ticks?: TransferTicks
   /** The card tracker (Spending). Optional like `ticks`: older documents stay valid, with no version bump. */
   card?: CardTracker
+  /** Recurring bills' renewals answered on Home. Optional like `card`: older documents stay valid. */
+  bills?: BillsState
 }
 
 interface V2Line { id: string; category?: string; categoryId?: string; ownerName?: string; name: string; entryAmountPence: number; frequency: 'monthly' | 'annually'; amountPence: number; potId: string; funding: 'proportional' | 'equal' | 'custom' | 'single'; singleFunderId?: string; customShares?: Record<string, number> }
@@ -50,6 +53,7 @@ export function decodeBudgetDocument(raw: unknown): BudgetDocument | null {
   if (budget.incomePolicies.some(policy => [policy.base, ...Object.values(policy.changes)].some(rule => rule.surplusDestination && !validDestination(rule.surplusDestination, budget)))) return null
   if (value.ticks !== undefined && !validTransferTicks(value.ticks)) return null
   if (value.card !== undefined && !validCardTracker(value.card, budget, people)) return null
+  if (value.bills !== undefined && !validBillsState(value.bills)) return null
   return value as BudgetDocument
 }
 

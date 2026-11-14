@@ -1,6 +1,6 @@
 # Recurring bills rules
 
-**Status:** agreed with Nick on 13 November 2026. Being built in the `bills/1`–`bills/5` PR series from the [build plan](recurring-bills-build-plan.md), which holds the full design, the algorithms (§5) and the screens (§6). This document is the contract for what has shipped; keep it current with each PR. Where they disagree, the build plan's decisions (B1–B8, P1–P4) win until this document is updated with Nick.
+**Status:** agreed with Nick on 13 November 2026. Built in the `bills/1`–`bills/5` PR series (all shipped by 14 November 2026) from the [build plan](recurring-bills-build-plan.md), which holds the full design, the algorithms (§5) and the screens (§6). This document is the contract for what has shipped; keep it current with each PR. Where they disagree, the build plan's decisions (B1–B8, P1–P4) win until this document is updated with Nick.
 
 Related: [card tracker rules](card-tracker-rules.md) (Spent, Left, pace, pot balances, Home), [recurring monthly budget rules](recurring-monthly-budget-rules.md) (snapshots and edit scope), [product design spec](product-design-spec.md) (layout, language, glossary).
 
@@ -12,7 +12,7 @@ Related: [card tracker rules](card-tracker-rules.md) (Spent, Left, pace, pot bal
 | Spent, Due, pace and pot balances, Due on Month › Pots | 2 | `monthBills`, `potBillTotals` in `src/domain/recurringBills.ts`; `monthSpending` in `cardSpending.ts`; `potFlows`, `potBalance` in `potBalances.ts`; `src/pages/month/PotsSection.tsx` |
 | The pot page: This month, Bills this month, Yearly bills set aside here | 3 | `nextRenewal`, `yearlyBillsFor` in `recurringBills.ts`; `src/pages/PotBills.tsx`, `SpendingMonth.tsx`, `billLabels.ts` |
 | Plan › Dates, “Bills by date” in ⌘K, All dates in Plan | 4 | `planDates`, `reminderFrom` in `recurringBills.ts`; `src/pages/PlanDates.tsx`, `PlanPage.tsx`, `PlanToolbar.tsx`, `src/state/planGroups.ts`, `commands.ts` |
-| Home and the Renewal sheet | 5 | not started |
+| Renewal reminders on Home, bills in Coming up, the Renewal sheet | 5 | `renewalsInView`, `answerRenewal`, `billsAhead` in `recurringBills.ts`; `document.bills`; `homeInbox.ts`; `src/pages/RenewalSheet.tsx`, `Home.tsx` |
 
 ## The contract
 
@@ -20,7 +20,7 @@ Related: [card tracker rules](card-tracker-rules.md) (Spent, Left, pace, pot bal
 2. **Paid by** is **Direct debit** or **Card** (B1). Card asks which card: each card North tracks (Amex), or **Another card**, which covers a Monzo virtual or debit card (B2).
 3. **Assumed or seen** (B3). A direct debit, or a payment on another card, is assumed paid on its day at the planned amount. A bill on a tracked card is never assumed: its charge comes in through Bring in and Sort, and its date is only for Due and reminders.
 4. **Dates** (B4). A monthly bill has a day: 1st–28th, or **Last day**. A yearly bill has a day and a month, and that date is its **renewal date**. There are no 29th–31st days, and weekends and bank holidays are ignored.
-5. **Renewal reminders** (B6) default to **4 weeks** before, set per item: 2, 4, 6 or 8 weeks, or off. *(Shown on Home from PR 5.)*
+5. **Renewal reminders** (B6) default to **4 weeks** before, set per item: 2, 4, 6 or 8 weeks, or off. They show on Home's To do (§ Renewals).
 6. **Bills to an account** are listed by date but add nothing to Spending figures or balances (P2).
 7. **Yearly bills need a pot that carries over** (P3). The editor warns when the pot doesn't; saving is still allowed.
 8. **Left keeps its meaning** (P1): Planned − Spent − Taken. Due is shown as a part of it: “£256.54 left · £172.00 of it due”.
@@ -92,6 +92,34 @@ A third grouping on Plan's switch, **Category | Destination | Dates**, remembere
 - Every row opens the item editor. Phones list the same rows: “1st · Direct debit · Bills · Monzo Joint” and “Renews 6 Dec · Card · Amex · On Home now”.
 - With no bills: “No recurring bills yet. Tick Recurring bill on an item to give it a date, and it shows here.”
 - The toolbar count reads “10 bills”. ⌘K has **Bills by date**, and a pot's **Bills this month** links to it (“All dates in Plan”).
+
+## Renewals
+
+**When Home asks.** Each yearly bill in this month's plan with its reminder on (`renewalsInView`):
+- From its reminder (2, 4, 6 or 8 weeks before the renewal) until the renewal day, To do shows **“Breakdown cover renews 6 Dec”**, meta “In 3 weeks · £1,395.60 a year · Card · Amex”. The time reads “In 5 days”, “Tomorrow” or “Today” as it nears.
+- If the day passes unanswered, the row stays for **4 weeks** (`RENEWAL_LATE_DAYS`) as **“Breakdown cover renewed 6 Dec”**, in amber, “4 days ago”. After that North stops asking, so a bill given a date long after its renewal doesn't ask about last year.
+- A reminder set to Don't remind me never asks.
+- The task is keyed `renewal:<item>:<date>` and sits after the card tasks, by its date.
+
+**Answering.** The row has **Same price** under it, and opens the **Renewal sheet** (board 2):
+- The sheet's title is “Breakdown cover renews” (or “renewed”), with “6 December 2026 · Card · Amex · Bills” under it.
+- **Planned now**: “£1,395.60 a year · £116.30 a month”.
+- **New price** (the yearly price, filled with the planned one) and **Next renewal** (a day and month, filled with its current date), with the date that gives under it: “6 December 2027”.
+- Once something changes, **From December** shows the pot's new set-aside, “Bills sets aside £116.30 → £118.00 a month”, then the same impact preview as the item editor: the scope (“Changes apply: December 2026–February 2027.”), the plan's balance and each person's and account's funding.
+- One line says how this year's price is paid: “North marks £1,224.48 as paid from Bills on 12 January.”, or for a tracked card “This year’s £1,395.60 comes from Bills when you sort it from the Amex statement.”
+- **Switched provider? Edit the item** opens Plan at the renewal's month with the item editor open.
+- **Same price** and **Save new price** close the sheet with a toast and **Undo**: “Breakdown cover: same price”, “Home insurance saved from January”.
+- An item split by fixed amounts can't be repriced here: the sheet says “… is split by fixed amounts, so change its price in the item editor.” and offers only Same price.
+
+**What an answer saves** (`answerRenewal`):
+- `document.bills.renewals[itemId]` = the renewal's date. It's optional on the document, like `card`, so older documents load unchanged.
+- One answer covers its year: a renewal within six months of the answered date counts as answered, so moving the date while answering doesn't ask again.
+- Save new price also edits the item **from the renewal's month**, by snapshot rules (until the plan's next change, as the scope line says): the yearly price, the monthly set-aside (price ÷ 12) and the renewal day and month. The renewal's own month then counts the new price as paid.
+- Once answered, the row moves to Done as “Breakdown cover price checked”, which reopens the sheet.
+
+## Home › Coming up
+
+Recurring bills in the next **7 days** (`billsAhead`, `BILLS_AHEAD_DAYS`), today included and across a month end, join Coming up: “Electricity · £66.39”, meta “Direct debit · Bills”. Bills to an account show too. A pot's bill opens that pot's page for the bill's month. A yearly bill whose renewal is asking on To do isn't repeated here.
 
 ## Pot balances
 

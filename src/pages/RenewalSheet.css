@@ -1,0 +1,22 @@
+/* The Renewal sheet (recurring bills, board 2). Tokens only (styles.tokens.test.ts). */
+.renewal-body{display:grid;gap:var(--space-4)}
+.renewal-body p{margin:0}
+.renewal-planned{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface-field)}
+.renewal-planned>span{color:var(--text-muted);font-size:var(--text-sm)}
+.renewal-planned strong{font-size:var(--text-lg);font-variant-numeric:tabular-nums}
+.renewal-planned small{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.renewal-field{display:grid;gap:var(--space-1);min-width:0;font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.renewal-field input,.renewal-field select{box-sizing:border-box;width:100%;min-height:var(--control-h);margin:0;font-size:var(--text-md);font-weight:var(--weight-regular)}
+.renewal-field small{color:var(--text-muted);font-weight:var(--weight-regular)}
+.renewal-date{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:var(--space-2)}
+.renewal-when{display:grid;gap:var(--space-1)}
+.renewal-next{color:var(--text-muted);font-size:var(--text-sm)}
+.renewal-error{color:var(--critical);font-size:var(--text-sm)}
+.renewal-impact{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);background:var(--surface-band)}
+.renewal-impact>strong{color:var(--accent);font-size:var(--text-sm)}
+.renewal-impact-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--space-2);font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.renewal-impact-row s{color:var(--text-muted)}
+.renewal-impact .budget-impact,.renewal-impact .budget-impact-plain{margin:0;padding:0;border:0;background:none}
+.renewal-note{display:flex;gap:var(--space-2);align-items:flex-start;color:var(--text-muted);font-size:var(--text-sm);line-height:1.5}
+.renewal-note svg{flex:none;width:16px;height:16px;margin-top:2px}
+.renewal-edit{justify-self:start;min-height:var(--control-h);padding:0;border:0;background:none;font-size:var(--text-sm);cursor:pointer}

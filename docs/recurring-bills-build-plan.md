@@ -1,6 +1,6 @@
 # Recurring bills: design and PR build plan
 
-Status: planned, 13 November 2026, with Nick. PRs 1–4 are built; [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
+Status: planned, 13 November 2026, with Nick. All five PRs are built (14 November 2026); [recurring-bills-rules](recurring-bills-rules.md) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins; §6.1 lists the differences.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/Wqv1KMXNFrMimWybckZjLw, boards 1–6. The sample household and amounts on it are made up.
 - **Related rules:** [card-tracker-rules](card-tracker-rules.md) (Spent, Left, pace, pot balances, Home), [recurring-monthly-budget-rules](recurring-monthly-budget-rules.md) (snapshots and edit scope), [product-design-spec](product-design-spec.md) (layout, language, glossary).
@@ -153,7 +153,7 @@ It returns `{ itemId, name, destination, date, amountPence, paidBy, cardId?, tra
   - Title "<Name> renews 6 Dec". Meta "In 3 weeks · £96.00 a year · Card · Amex".
   - Its target opens the Renewal sheet (§6, board 2).
   - It goes once `bills.renewals[itemId] === date`.
-  - If the date passes unanswered, the task stays, titled "<Name> renewed 6 Dec", until it's answered.
+  - If the date passes unanswered, the task stays, titled "<Name> renewed 6 Dec", until it's answered. *As built (PR 5): for up to 4 weeks, so a bill dated long after its renewal doesn't ask about last year; and one answer covers renewals within six months of it, so moving the date while answering doesn't ask again.*
   - With `remindWeeks: 0` there's no task.
 - **Coming up:** monthly and yearly bills in the next **7 days** (`BILLS_AHEAD_DAYS`), "Energy · £140.00", meta "Direct debit · Bills". Renewals don't repeat here while their To do task shows.
 

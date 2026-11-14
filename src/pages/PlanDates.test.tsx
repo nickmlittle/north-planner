@@ -103,3 +103,15 @@ describe('Plan › Dates', () => {
     expect(screen.getByText('4 yearly items have no renewal date.')).toBeInTheDocument()
   })
 })
+
+describe('Edit the item from the Renewal sheet', () => {
+  it('arrives on Plan with that item’s editor open, once', () => {
+    const document = seed()
+    const id = resolveBudget(document.budget, '2026-11').items.find(item => item.name === 'Breakdown cover')!.id
+    window.history.replaceState({ northEditItem: id }, '')
+    render(<Harness initial={document}/>)
+    const editor = screen.getByRole('dialog', { name: 'Edit item' })
+    expect(within(editor).getByDisplayValue('Breakdown cover')).toBeInTheDocument()
+    expect(window.history.state?.northEditItem).toBeUndefined()
+  })
+})

@@ -70,20 +70,21 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'this statement', detail: '£312.85 set aside · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')
   })
-  it('lists seven rows in order: settle, close, fund, sort, set aside, over plan, then the pace heads-up', () => {
+  it('lists eight rows in order: settle, close, fund, sort, set aside, a renewal, over plan, then the pace heads-up', () => {
     expect(result.todo.map(row => [row.kind, row.title, row.meta, row.trailing ?? row.chip, row.trailingMeta])).toEqual([
       ['settle', 'Settle the October statement', 'All 12 sorted · matches Amex’s summary', '£646.88', 'due Wed 18 Nov'],
       ['close', 'Close October', 'Groceries £88.58 over · 3 pots with money left', 'Ended 31 Oct', undefined],
       ['fund', 'Fund November', 'Ada 0 of 9 · Ben 0 of 9', '18 steps', undefined],
       ['sort', 'Sort 4 Amex transactions', 'Brought in Mon 9 Nov', '£195.79', undefined],
       ['set-aside', 'Set aside in the Amex pot', '3 transactions sorted since the last move', '£140.59', undefined],
+      ['renewal', 'Breakdown cover renews 6 Dec', 'In 3 weeks · £1,395.60 a year · Card · Amex', undefined, undefined],
       ['over-plan', 'Bring the plan back to Available', 'Ada £429.66 over · Ben £712.21 over', '£1,141.87 over', undefined],
     ])
     expect(result.todo.find(row => row.kind === 'over-plan')).toMatchObject({ tone: 'critical', target: { view: 'plan', reviewPersonId: 'ben' } })
     expect(result.todo.filter(row => row.tone === 'critical')).toHaveLength(1)
     expect(titles(result.headsUp)).toEqual([expect.stringMatching(/^Groceries .*£62 ahead of pace$/)])
     expect(result.headsUp[0]).toMatchObject({ meta: 'At this rate it runs out around Fri 20 Nov', trailing: '£143.57 left', tone: 'warning' })
-    expect(homeCount(result)).toBe(7)
+    expect(homeCount(result)).toBe(8)
   })
   it('opens each row in the right place', () => {
     const target = (kind: string) => result.todo.find(row => row.kind === kind)!.target
@@ -91,11 +92,13 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     expect(target('close')).toEqual({ view: 'month', month: '2026-10', close: true })
     expect(target('fund')).toEqual({ view: 'month', month: '2026-11' })
     expect(target('sort')).toEqual({ view: 'spending', section: 'sort' })
+    expect(target('renewal')).toEqual({ view: 'renewal', itemId: expect.any(String), date: '2026-12-06' })
     expect(result.headsUp[0]!.target).toMatchObject({ view: 'month', month: '2026-11', potId: expect.any(String) })
   })
-  it('keeps the open November statement out of To do and puts its dates in Coming up, with paydays', () => {
+  it('keeps the open November statement out of To do and puts its dates in Coming up, with paydays and the week’s bills', () => {
     expect(result.todo.some(row => row.title.includes('November statement'))).toBe(false)
     expect(result.comingUp.map(row => [row.date, row.title, row.meta])).toEqual([
+      ['2026-11-18', 'Electricity · £66.39', 'Direct debit · Bills'],
       ['2026-11-24', 'November statement closes', '£649.23 so far'],
       ['2026-11-27', 'Ada’s pay arrives', 'December’s money'],
       ['2026-11-30', 'Ben’s pay arrives', 'December’s money'],
@@ -182,5 +185,35 @@ describe('homeInbox task kinds', () => {
     expect(inbox(document, '2026-11-20').comingUp.some(row => row.title.startsWith('December budget'))).toBe(false)
     document.budget.snapshots['2026-12'] = { items: [...resolveBudget(document.budget, month).items, { ...resolveBudget(document.budget, month).items[0]!, id: 'new-item', name: 'Gym' }] }
     expect(inbox(document, '2026-11-20').comingUp.find(row => row.title === 'December budget: new items')).toMatchObject({ date: '2026-12-01', meta: 'Gym' })
+  })
+})
+
+describe('homeInbox renewals and bills', () => {
+  const breakdown = (document: BudgetDocument) => resolveBudget(document.budget, month).items.find(item => item.name === 'Breakdown cover')!.id
+  const renewals = (document: BudgetDocument, today: string) => inbox(document, today, today.slice(0, 7)).todo.filter(row => row.kind === 'renewal')
+
+  it('asks once the reminder starts, and keeps asking after the date until answered', () => {
+    expect(renewals(seed(), '2026-11-07')).toEqual([])
+    expect(renewals(seed(), '2026-12-05')[0]).toMatchObject({ title: 'Breakdown cover renews 6 Dec', meta: 'Tomorrow · £1,395.60 a year · Card · Amex', due: '2026-12-06' })
+    expect(renewals(seed(), '2026-12-10')[0]).toMatchObject({ title: 'Breakdown cover renewed 6 Dec', meta: '4 days ago · £1,395.60 a year · Card · Amex', tone: 'warning' })
+  })
+
+  it('moves an answered renewal to Done, and never asks with the reminder off', () => {
+    const document = seed()
+    const answered = { ...document, bills: { renewals: { [breakdown(document)]: '2026-12-06' } } }
+    expect(renewals(answered, '2026-11-14')).toEqual([])
+    expect(inbox(answered, '2026-11-14').done.find(row => row.kind === 'renewal')).toMatchObject({ title: 'Breakdown cover price checked', meta: 'Renews 6 Dec' })
+    const off = { ...document, budget: { ...document.budget, snapshots: Object.fromEntries(Object.entries(document.budget.snapshots).map(([key, snapshot]) => [key, { ...snapshot, items: snapshot.items.map(item => item.bill?.month ? { ...item, bill: { ...item.bill, remindWeeks: 0 as const } } : item) }])) } }
+    expect(renewals(off, '2026-11-14')).toEqual([])
+  })
+
+  it('lists the week’s bills in Coming up, but not a renewal already asking on To do', () => {
+    const coming = (document: BudgetDocument) => inbox(document, '2026-11-30', '2026-11').comingUp.filter(row => row.key.startsWith('bill:'))
+    expect(coming(seed()).map(row => [row.date, row.title, row.meta])).toEqual([
+      ['2026-12-01', 'Council tax · £59.26', 'Direct debit · Bills'], ['2026-12-02', 'Streamflix · £73.52', 'Card · Amex · Bills'], ['2026-12-05', 'Water · £80.65', 'Direct debit · Bills'],
+    ])
+    expect(coming(seed())[0]!.target).toEqual({ view: 'month', month: '2026-12', potId: 'bills' })
+    const document = seed()
+    expect(coming({ ...document, bills: { renewals: { [breakdown(document)]: '2026-12-06' } } }).map(row => row.title)).toContain('Breakdown cover · £1,395.60')
   })
 })
