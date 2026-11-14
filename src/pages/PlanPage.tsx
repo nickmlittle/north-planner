@@ -12,6 +12,8 @@ import { PLAN_FILTER_MIN_ITEMS } from './planListConfig'
 import { BudgetItemEditor } from './BudgetItemEditor'
 import { PlanToolbar } from './PlanToolbar'
 import { PlanTable } from './PlanTable'
+import { PlanDates } from './PlanDates'
+import { localDate } from '../domain/cardTracker'
 import { groupPlanItems, planDestinationLabel as destinationFilterLabel, planGroupKey, planItemLabels } from './planRows'
 import { shortAccountLabels } from './budgetLabels'
 import type { MonthBudget } from './budget/useMonthBudget'
@@ -23,10 +25,10 @@ import { useShortcut } from '../state/shortcuts'
 /** What the shared title bar can ask of Plan. */
 export type PlanPageHandle = { addItem: () => void }
 
-type Props = { ref?: Ref<PlanPageHandle>; document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; budget: MonthBudget; planView: PlanView; mobilePresentation: boolean; scoped: boolean; planDestination?: PlanDestination | null; planItemId?: string; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; hasTransfersOrigin?: boolean; onViewAffectedTransfers?: (impact: BudgetImpact) => void; onEditIncome: () => void }
+type Props = { ref?: Ref<PlanPageHandle>; document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; budget: MonthBudget; planView: PlanView; mobilePresentation: boolean; scoped: boolean; planDestination?: PlanDestination | null; planItemId?: string; onClearPlanDestination?: () => void; onReturnToTransfers?: () => void; hasTransfersOrigin?: boolean; onViewAffectedTransfers?: (impact: BudgetImpact) => void; onEditIncome: () => void; today?: string }
 
 /** Plan: the meter, search and filters, the grouped items, and adding and editing them. Rendered inside MonthlyBudget's frame. */
-export function PlanPage({ref,document,setDocument,month,budget,planView,mobilePresentation,scoped:scopedPlan,planDestination,planItemId,onClearPlanDestination,onReturnToTransfers,hasTransfersOrigin,onViewAffectedTransfers,onEditIncome:openIncome}:Props) {
+export function PlanPage({ref,document,setDocument,month,budget,planView,mobilePresentation,scoped:scopedPlan,planDestination,planItemId,onClearPlanDestination,onReturnToTransfers,hasTransfersOrigin,onViewAffectedTransfers,onEditIncome:openIncome,today=localDate()}:Props) {
  const {resolved,items,adults,incomes,editScopeLabel,labels,shortLabels,total,transferAccounts,available,basisDetail,ownerOrder,meterPeople}=budget
  const {query,updateSearch,captureBrowseScroll,ownerFilter,setOwnerFilter,categoryFilter,setCategoryFilter,openGroups,setOpenGroups,groupsOpenByDefault,grouping,chooseGrouping,destinationItems,reviewPerson}=planView
  // ⌘K's "Add item" from another screen arrives with the editor open (history state northAddItem).
@@ -89,6 +91,7 @@ export function PlanPage({ref,document,setDocument,month,budget,planView,mobileP
  const showPlanFilters=items.length>=PLAN_FILTER_MIN_ITEMS||searchMode||ownerFilter!=='All'||categoryFilter!=='All'
  const destination=planDestination?{label:planDestinationLabel,onClear:onClearPlanDestination,onBack:onReturnToTransfers,backLabel:hasTransfersOrigin?'Back to Month':'View Month'}:undefined
  const renderToolbar=items.length||planDestination?({count,keys,expand}:{count:string;keys?:ReactNode;expand?:{anyOpen:boolean;toggle:()=>void}})=><PlanToolbar query={query} onQueryChange={updateSearch} onSearchStart={captureBrowseScroll} inputRef={searchRef} showFilters={showPlanFilters} owner={ownerFilter} onOwnerChange={setOwnerFilter} ownerOrder={ownerOrder} category={categoryFilter} onCategoryChange={setCategoryFilter} categories={document.budget.categories} grouping={searchMode?undefined:{value:grouping,onChange:chooseGrouping}} count={count} keys={keys} expand={expand} destination={destination} destinationRef={planDestinationHeading} compact={mobilePresentation} onAdd={mobilePresentation&&!scopedPlan?()=>start():undefined}/>:undefined
+ const datesCount=(()=>{const n=matchingItems.filter(item=>item.bill).length;return `${n} ${n===1?'bill':'bills'}`})()
  const firstRun=!Object.keys(document.budget.snapshots).length&&document.budget.importedBaseline===undefined
  const clearAll=()=>{updateSearch('');setOwnerFilter('All');setCategoryFilter('All')}
  const firstRunEmpty=<div className="budget-first-run"><EmptyState heading="h2" title="Start your plan" action={<><button type="button" className="primary-button" onClick={()=>start()}>Add your first budget item</button>{!incomes.length&&<button type="button" className="secondary-button" onClick={openIncome}>Add income</button>}</>}>Add rent, bills, savings: anything you pay each month.{!incomes.length&&<> <span className="budget-first-run-income">No income yet, so there’s nothing to split.</span></>}</EmptyState></div>
@@ -99,8 +102,8 @@ export function PlanPage({ref,document,setDocument,month,budget,planView,mobileP
  return <>
  <PageFrameRegions contentWidth="wide" summary={<div ref={meterRef}><AllocationMeter label="Plan summary" compact={mobilePresentation} availablePence={available} plannedPence={total} people={meterPeople} basis={basisDetail} onEditIncome={openIncome} onReview={reviewPerson}/></div>}>
  <section className="budget-v3-workspace" id="budget-plan-panel" aria-label="Budget planning">{planItemId&&!items.some(item=>item.id===planItemId)&&<p role="status">That budget item is no longer available for {monthLabel(month)}.</p>}
- <PlanTable document={document} setDocument={setDocument} month={month} editScopeLabel={editScopeLabel} groups={planGroups} labels={labels} query={query} planDestination={planDestination} view="plan" mobilePresentation={mobilePresentation} scoped={scopedPlan} openGroups={openGroups} onOpenGroupsChange={setOpenGroups} groupsOpenByDefault={groupsOpenByDefault} grouping={grouping} renderToolbar={renderToolbar} planTotalPence={total} filterKey={`${ownerFilter}\u0000${categoryFilter}\u0000${grouping}`} editorOpen={editor} empty={planEmpty}
-  onEdit={(item,amountPence)=>start(amountPence===undefined?item:{...item,entryAmountPence:amountPence,amountPence})} onRemove={removeItem} onDuplicate={duplicate} onQuickEditOpen={()=>{}} onAmountSaved={(name,impact)=>saved(`${name} saved`,impact)} focusFallback={()=>searchRef.current?.focus({preventScroll:true})}/>
+ {grouping==='dates'&&!searchMode&&items.length>0?<>{renderToolbar?.({count:datesCount})}<PlanDates document={document} month={month} items={matchingItems} labels={labels} today={today} onEdit={item=>start(item)}/></>:<PlanTable document={document} setDocument={setDocument} month={month} editScopeLabel={editScopeLabel} groups={planGroups} labels={labels} query={query} planDestination={planDestination} view="plan" mobilePresentation={mobilePresentation} scoped={scopedPlan} openGroups={openGroups} onOpenGroupsChange={setOpenGroups} groupsOpenByDefault={groupsOpenByDefault} grouping={grouping} renderToolbar={renderToolbar} planTotalPence={total} filterKey={`${ownerFilter}\u0000${categoryFilter}\u0000${grouping}`} editorOpen={editor} empty={planEmpty}
+  onEdit={(item,amountPence)=>start(amountPence===undefined?item:{...item,entryAmountPence:amountPence,amountPence})} onRemove={removeItem} onDuplicate={duplicate} onQuickEditOpen={()=>{}} onAmountSaved={(name,impact)=>saved(`${name} saved`,impact)} focusFallback={()=>searchRef.current?.focus({preventScroll:true})}/>}
  {toast}</section>
  </PageFrameRegions>
  {confirm&&<ConfirmDialog title={confirm.title} confirmLabel={confirm.confirmLabel} danger returnFocusTo={confirm.returnFocusTo} onCancel={()=>setConfirm(null)} onConfirm={()=>{confirm.onConfirm();setConfirm(null)}}>{confirm.body}</ConfirmDialog>}

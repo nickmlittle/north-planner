@@ -1,6 +1,9 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
 import type { DestinationSpending } from '../domain/cardSpending'
+import { ChevronRight } from 'lucide-react'
 import { cardTracker } from '../domain/cardTracker'
+import { navigateTo } from '../state/navigation'
+import { showPlanGrouping } from '../state/planGroups'
 import { yearlyBillsFor, type MonthBill } from '../domain/recurringBills'
 import { Section, StatStrip, StatTile, useMobilePresentation } from '../components/ui'
 import { formatMonth } from '../formatting/month'
@@ -42,7 +45,8 @@ export function BillsThisMonth({ document, bills, month, today }: { document: Bu
   const label = (bill: MonthBill) => `${bill.name}, ${pounds(bill.amountPence)}, ${dayDate(bill.date)}, ${paidByLabel(bill, cards)}, ${billStatus(bill, today, cards)}`
   const status = (bill: MonthBill) => <span className={`pot-bill-status is-${bill.tracked ? 'tracked' : bill.state}`}>{billStatus(bill, today, cards)}</span>
   const total = bills.reduce((sum, bill) => sum + bill.amountPence, 0)
-  return <Section title="Bills this month" count={`${bills.length} · ${pounds(total)}`}>
+  const allDates = <button type="button" className="text-button pot-bills-all" onClick={() => { showPlanGrouping('dates'); navigateTo({ view: 'plan', month }) }}>All dates in Plan<ChevronRight aria-hidden="true"/></button>
+  return <Section title="Bills this month" count={`${bills.length} · ${pounds(total)}`} aside={allDates}>
     {mobile ? <ul className="pot-bills" aria-label={`Bills in ${formatMonth(month)}`}>
       {lines.map(line => line.kind === 'today'
         ? <li key="today" className="pot-bills-today">Today · {shortDate(today)}</li>

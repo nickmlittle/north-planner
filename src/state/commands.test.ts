@@ -21,7 +21,7 @@ describe('command palette sources', () => {
     expect(count('Items')).toBe(40)
     expect(count('Months')).toBe(9)
     expect(count('Statements')).toBe(2)
-    expect(all.filter(command => command.group === 'Actions').map(command => command.title)).toEqual(['Add item', 'Bring in transactions', 'Add a transaction', 'Previous month', 'Next month', 'Keyboard shortcuts'])
+    expect(all.filter(command => command.group === 'Actions').map(command => command.title)).toEqual(['Add item', 'Bills by date', 'Bring in transactions', 'Add a transaction', 'Previous month', 'Next month', 'Keyboard shortcuts'])
     const groceries = all.find(command => command.id.startsWith('item:') && command.title === 'Groceries')!
     expect(groceries.meta).toBe('£325.47 · Home · Groceries · Monzo Joint')
     expect(groceries.target).toEqual({ kind: 'go', to: { view: 'plan', month: '2026-11', planDestination: null }, state: { northPlanItem: groceries.id.slice(5) } })

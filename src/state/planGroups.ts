@@ -17,11 +17,20 @@ export function rememberOpenPlanGroups(value: Record<string, boolean>) {
 
 const GROUPING_KEY = 'north.plan.grouping'
 
-/** Whether this device bands the Plan by category (the default) or by destination. */
-export function readPlanGrouping(): 'category' | 'destination' {
-  try { return window.localStorage.getItem(GROUPING_KEY) === 'destination' ? 'destination' : 'category' } catch { return 'category' }
+export type PlanGroupingChoice = 'category' | 'destination' | 'dates'
+/** ⌘K's "Bills by date" asks a Plan that's already open to switch (and remembers it for one that isn't). */
+export const PLAN_GROUPING_EVENT = 'north:plan-grouping'
+
+/** Whether this device bands the Plan by category (the default) or by destination, or shows its Dates. */
+export function readPlanGrouping(): PlanGroupingChoice {
+  try { const value = window.localStorage.getItem(GROUPING_KEY); return value === 'destination' || value === 'dates' ? value : 'category' } catch { return 'category' }
 }
 
-export function rememberPlanGrouping(value: 'category' | 'destination') {
+export function showPlanGrouping(value: PlanGroupingChoice) {
+  rememberPlanGrouping(value)
+  window.dispatchEvent(new CustomEvent(PLAN_GROUPING_EVENT, { detail: value }))
+}
+
+export function rememberPlanGrouping(value: PlanGroupingChoice) {
   try { window.localStorage.setItem(GROUPING_KEY, value) } catch { /* Per-device convenience only. */ }
 }

@@ -9,7 +9,8 @@ export type PlanSubgroup = { name: string; key: string; items: BudgetItem[] }
 /** `subgroups` is empty when every item would share one, so the group lists its items directly. */
 export type PlanGroup = { name: string; key: string; items: BudgetItem[]; subgroups: PlanSubgroup[] }
 /** How the Plan bands its items: by what they are for, or by where the money goes. */
-export type PlanGrouping = 'category' | 'destination'
+/** Dates (recurring bills by day and renewal) has its own view; its search results group by category. */
+export type PlanGrouping = 'category' | 'destination' | 'dates'
 export type PlanFilterValues = { query: string; owner: string; category: string }
 
 /** Owner bands, and Owner filter options, in household order. */

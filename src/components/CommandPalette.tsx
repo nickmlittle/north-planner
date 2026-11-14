@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { buildCommands, OPEN_COMMAND_PALETTE, rankCommands, readRecentCommands, rememberCommand, type Command, type CommandAction } from '../state/commands'
 import { navigateTo } from '../state/navigation'
+import { showPlanGrouping } from '../state/planGroups'
 import { keyLabels, useShortcut, useShortcuts, type Shortcut } from '../state/shortcuts'
 import { Kbd, Sheet } from './ui'
 import './CommandPalette.css'
@@ -28,6 +29,7 @@ export function CommandPalette({ document, month, today }: { document: BudgetDoc
   const act = (action: CommandAction) => {
     const go = (found: Shortcut | undefined, fallback: () => void) => { if (found) found.run(); else fallback() }
     if (action === 'add-item') go(shortcut('n', 'Add item'), () => navigateTo({ view: 'plan', month }, { historyState: { northAddItem: true } }))
+    else if (action === 'bills-by-date') { showPlanGrouping('dates'); navigateTo({ view: 'plan', month }) }
     else if (action === 'bring-in') go(shortcut('i'), () => navigateTo({ view: 'spending', section: 'sort' }, { historyState: { northBringIn: true } }))
     else if (action === 'add-transaction') go(shortcut('n', 'Add a transaction'), () => navigateTo({ view: 'spending', section: 'sort' }, { historyState: { northAddTransaction: true } }))
     else if (action === 'previous-month') go(shortcut('['), () => navigateTo({ month: shiftMonth(month, -1) }))

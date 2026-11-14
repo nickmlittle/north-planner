@@ -11,7 +11,7 @@ Related: [card tracker rules](card-tracker-rules.md) (Spent, Left, pace, pot bal
 | The item's recurring bill, validation, drafts, the editor section, the card-removal warning, fixture bills | 1 | `RecurringBill` in `src/domain/monthlyBudget.ts`, `readBillDraft` in `budgetItemDrafts.ts`, `src/domain/recurringBills.ts`, `src/pages/RecurringBillFields.tsx`, `CardSettings.tsx` |
 | Spent, Due, pace and pot balances, Due on Month › Pots | 2 | `monthBills`, `potBillTotals` in `src/domain/recurringBills.ts`; `monthSpending` in `cardSpending.ts`; `potFlows`, `potBalance` in `potBalances.ts`; `src/pages/month/PotsSection.tsx` |
 | The pot page: This month, Bills this month, Yearly bills set aside here | 3 | `nextRenewal`, `yearlyBillsFor` in `recurringBills.ts`; `src/pages/PotBills.tsx`, `SpendingMonth.tsx`, `billLabels.ts` |
-| Plan › Dates | 4 | not started |
+| Plan › Dates, “Bills by date” in ⌘K, All dates in Plan | 4 | `planDates`, `reminderFrom` in `recurringBills.ts`; `src/pages/PlanDates.tsx`, `PlanPage.tsx`, `PlanToolbar.tsx`, `src/state/planGroups.ts`, `commands.ts` |
 | Home and the Renewal sheet | 5 | not started |
 
 ## The contract
@@ -82,6 +82,16 @@ For a pot with bills in the month (boards 3–4):
 - **This month** (carry-over pots): Planned · Spent · Left tiles. Spent says what it's made of, “£234.82 direct debits and cards, on their day · £19.99 sorted from Amex”, and Left has “£154.17 of it due” under it (P1). A monthly pot keeps its lead card and adds the same line under it: “£30.00 of it due · £181.90 sorted from Amex”.
 - **Bills this month**: every bill by date, with how it's paid (“Direct debit”, “Card · Amex”, “Card”), the amount and its status: **Paid**, **Via Amex** (muted: listed for its date only), or **Due tomorrow**, **Due in 5 days** within a week, else **Due 22 Nov**. In the current month a **Today · Fri 13 Nov** line sits before the first bill still to come. Desktop is a table; phones list each bill with its day, name and how it's paid, then the amount and status. A note under it says Amex bills come in when you sort the statement.
 - **Yearly bills set aside here** replaces “Annual costs from the Plan”: every yearly item to the pot, soonest renewal first, with “Renews 6 Dec · Card · Amex” (or “No renewal date”), the monthly set-aside and the yearly price.
+
+## Plan › Dates
+
+A third grouping on Plan's switch, **Category | Destination | Dates**, remembered on the device like the others (board 5). It shows the month's items after Plan's filters. Searching shows the usual flat results.
+- **Every month**: each monthly bill by day (1st…28th, then Last day), with Paid by, Goes to (“Bills · Monzo Joint”) and the amount. The heading counts “£462.51 a month”.
+- **Once a year**: each yearly bill by its next renewal, with the pot under its name, Paid by, the reminder and the yearly price with “£109.17 a month” under it. The reminder reads **Showing on Home** once the renewal is within its warning time, **From 15 Dec** before then, or **Off**. The heading counts “£5,411.28 a year · £450.94 a month set aside”.
+- **Yearly items with no date** get a prompt above the tables, “1 yearly item has no renewal date. TV licence”, and **Add dates** opens the first in the item editor.
+- Every row opens the item editor. Phones list the same rows: “1st · Direct debit · Bills · Monzo Joint” and “Renews 6 Dec · Card · Amex · On Home now”.
+- With no bills: “No recurring bills yet. Tick Recurring bill on an item to give it a date, and it shows here.”
+- The toolbar count reads “10 bills”. ⌘K has **Bills by date**, and a pot's **Bills this month** links to it (“All dates in Plan”).
 
 ## Pot balances
 
