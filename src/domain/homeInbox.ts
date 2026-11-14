@@ -14,7 +14,8 @@ import { personProgress } from './transferTicks'
 import { moneyArrives } from './workingDays'
 import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
-import { dayDate } from '../formatting/date'
+import { dayDate, shortDate } from '../formatting/date'
+import { billsAhead, renewalsInView } from './recurringBills'
 
 /**
  * Home as an inbox (audit 3 PR 10): a three-figure strip, one To do list ordered by when it matters, heads-ups,
@@ -24,12 +25,17 @@ import { dayDate } from '../formatting/date'
 
 /** Where a row opens. */
 export type HomeTarget =
-  | { view: 'plan'; reviewPersonId?: string }
+  | { view: 'plan'; reviewPersonId?: string; editItemId?: string; month?: string }
   | { view: 'month'; month: string; potId?: string; close?: boolean }
   | { view: 'spending'; section: 'sort' | 'statements'; statementKey?: string; bringIn?: boolean }
   | { view: 'settings'; section: 'accounts' }
+  /** Home's own Renewal sheet for a yearly bill's renewal on `date`. */
+  | { view: 'renewal'; itemId: string; date: string }
 
-export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'set-aside' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace'
+/** Where Home sends a row it doesn't open itself (it opens the Renewal sheet). */
+export type AppHomeTarget = Exclude<HomeTarget, { view: 'renewal' }>
+
+export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'set-aside' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace' | 'renewal'
 export type InboxTask = {
   key: string
   kind: InboxKind
@@ -79,7 +85,7 @@ export const COMING_UP_DAYS = 45
 export const FUND_AHEAD_DAYS = 7
 
 /** The To do order: by due date first, then the everyday card work, then plan fixes. */
-const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, 'set-aside': 5, 'bring-in': 6, 'over-plan': 7, 'review-accounts': 8, pace: 9 }
+const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, 'set-aside': 5, 'bring-in': 6, 'over-plan': 7, 'review-accounts': 8, pace: 9, renewal: 6 }
 const order = (a: InboxTask, b: InboxTask) => RANK[a.kind] - RANK[b.kind] || (a.due ?? '').localeCompare(b.due ?? '') || a.key.localeCompare(b.key)
 
 /** The payday steps for a month, per person: the same plans and ticks as Month. */
@@ -224,6 +230,18 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     todo.push({ key: 'review-accounts', kind: 'review-accounts', title: `${plural(count, 'account')} ${count === 1 ? 'needs' : 'need'} review`, meta: `${current.plans.needsReview.map(row => nameAccount(row.accountId)).join(' · ')}. Their steps wait until it’s fixed.`, target: { view: 'month', month } })
   }
 
+  // ——— Renewals: a yearly bill renewing within its reminder, or passed unanswered in the last 4 weeks ———
+  const paidBy = (bill: { paidBy: 'direct-debit' | 'card'; cardId?: string }, tracked: boolean) => bill.paidBy === 'direct-debit' ? 'Direct debit'
+    : tracked ? `Card · ${tracker.cards.find(row => row.id === bill.cardId)?.name ?? 'card'}` : 'Card'
+  const renewals = renewalsInView(document, today)
+  for (const row of renewals) {
+    const target: HomeTarget = { view: 'renewal', itemId: row.item.id, date: row.date }
+    const key = `renewal:${row.item.id}:${row.date}`
+    if (row.answered) { done.push({ key, kind: 'renewal', title: `${row.item.name} price checked`, meta: `Renews ${shortDate(row.date)}`, target }); continue }
+    todo.push({ key, kind: 'renewal', title: `${row.item.name} ${row.late ? 'renewed' : 'renews'} ${shortDate(row.date)}`,
+      meta: [renewalWhen(row.date, today), `${pounds(row.item.entryAmountPence)} a year`, paidBy(row.bill, row.tracked)].join(' · '), due: row.date, target, ...row.late ? { tone: 'warning' as const } : {} })
+  }
+
   // ——— Heads-up: pots over or ahead of pace this month ———
   for (const row of care) headsUp.push({
     key: `pace:${row.key}`, kind: 'pace', tone: 'warning',
@@ -259,11 +277,28 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     const added = nextBudget.items.filter(item => !before.some(old => old.id === item.id))
     comingUp.push({ key: `budget:${next}`, date: firstDayOf(next), title: `${monthName(next)} budget: ${added.length ? 'new items' : 'changes'}`, meta: added.length ? [...added.slice(0, 3).map(item => item.name), ...added.length > 3 ? [`${added.length - 3} more`] : []].join(', ') : 'Changes apply from this month', target: { view: 'plan' } })
   }
+  // Bills in the next 7 days, less a renewal already asking on To do.
+  const asking = new Set(renewals.filter(row => !row.answered).map(row => `${row.item.id}:${row.date}`))
+  for (const bill of billsAhead(document, today)) {
+    if (asking.has(`${bill.itemId}:${bill.date}`)) continue
+    comingUp.push({ key: `bill:${bill.itemId}:${bill.date}`, date: bill.date, title: `${bill.name} · ${pounds(bill.amountPence)}`, meta: `${paidBy(bill, bill.tracked)} · ${shortName(bill.destination)}`,
+      ...bill.destination.kind === 'pot' ? { target: { view: 'month' as const, month: monthOf(bill.date), potId: bill.destination.potId } } : {} })
+  }
   comingUp.sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
 
   const daysLeft = daysBetween(today, lastDayOf(monthOf(today)))
   const stage = month === monthOf(today) ? `In progress · ${plural(daysLeft, 'day')} left` : month < monthOf(today) ? 'Ended' : 'Upcoming'
   return { strip: { plan, ...spent ? { spent } : {}, ...cardFigure ? { card: cardFigure } : {} }, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun }
+}
+
+/** "In 3 weeks", "In 5 days", "Tomorrow", "Today", "6 days ago". */
+function renewalWhen(date: string, today: string) {
+  const days = daysBetween(today, date)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days === -1) return 'Yesterday'
+  if (days < 0) return `${-days} days ago`
+  return days < 14 ? `In ${days} days` : `In ${Math.floor(days / 7)} weeks`
 }
 
 /** "Groceries £88.58 over · 3 pots with money left", or what's still missing before it can close. */
