@@ -15,6 +15,7 @@ import { dayOf, pounds, signedPounds, statementName, transactionMeta } from './s
 import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills'
 import { spentParts } from './billLabels'
 import { FreshnessLine } from './Freshness'
+import { SetAsideCheckLead } from './SetAsideCheckLead'
 import { merchantBreakdown, type MerchantRow } from '../domain/merchants'
 import { addRule, ruleSuggestions, rulesFor, type RuleSuggestion } from '../domain/cardSorting'
 import './PotPage.css'
@@ -156,7 +157,7 @@ function CarryOver({ document, potId, today }: { document: BudgetDocument; potId
 /** Spending › Transactions from a pot page: one transaction in view, or every transaction on this pot. */
 export type OpenTransactions = (target: { transactionId?: string; destinationKey?: string }) => void
 
-type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void; onOpenTransactions?: OpenTransactions; onSort?: () => void; onOpenRules?: () => void }
+type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void; onOpenTransactions?: OpenTransactions; onSort?: () => void; onOpenRules?: () => void; onOpenStatement?: (statementKey: string) => void }
 
 /** The pot page's header: "Month › Groceries", its kind, Check against Monzo and ⋯ › See in Spending, Pot settings. */
 function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSettings, onSeeInSpending }: { title: string; context: ReactNode; bank: string; onBack: () => void; month: string; onCheck: () => void; onOpenSettings?: () => void; onSeeInSpending?: () => void }) {
@@ -172,20 +173,26 @@ function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSetting
     </>}/></>
 }
 
-/** The Amex pot: what's in it, and for each statement it pays what it costs and what's still to move. */
-function SetAsidePot({ document, setDocument, potId, onBack, month, today, onOpenSettings }: DetailProps) {
+/**
+ * The Amex pot: the check (should hold against what's in it, with extra or short evened up), then for each statement
+ * it pays what it costs and what's still to move.
+ */
+function SetAsidePot({ document, setDocument, potId, onBack, month, today, onOpenSettings, onOpenStatement }: DetailProps) {
   const pot = document.budget.pots.find(row => row.id === potId)!
   const card = cardTracker(document).cards.find(row => row.setAside?.potId === potId)!
   const bank = bankOf(document, potId)
   const [checking, setChecking] = useState(false)
+  const balance = potBalance(document, potId, today)
   const statements = setAsideStatements(document, card.id).filter(row => row.paidPence !== row.totalPence || row.totalPence === 0 && row.movedPence !== 0)
   const title = /\bpot$/i.test(pot.name.trim()) ? pot.name.trim() : `${pot.name.trim()} pot`
   return <div className="pot-detail">
     <PotHeader title={title} context={`Pays the ${card.name} from the ${statementName(card.setAside!.fromCloseDate)}`} bank={bank} month={month} onBack={onBack} onCheck={() => setChecking(true)} onOpenSettings={onOpenSettings}/>
-    <BalanceLine document={document} potId={potId} today={today}/>
+    <SetAsideCheckLead document={document} setDocument={setDocument} cardId={card.id} today={today} bank={bank} onCheck={() => setChecking(true)} onOpenStatement={onOpenStatement}/>
+    {balance.checked && balance.since.length > 0 && <details className="pot-balance-how"><summary>How “In {bank} now” is worked out</summary><BalanceSums document={document} balance={balance} bank={bank}/></details>}
     <Section title="Statements it pays">
       {statements.length ? <ul className="pot-list" aria-label="Statements it pays">{statements.map(row => <li key={row.statementKey}>
-        <ListRow title={statementName(row.closeDate)} meta={`${signedPounds(row.movedPence)} moved in${row.toMovePence ? ` · ${signedPounds(row.toMovePence)} still to move` : ' · all moved'}${row.paidPence ? ` · paid ${pounds(row.paidPence)}` : ''}`} trailing={signedPounds(row.totalPence)}/>
+        <ListRow title={statementName(row.closeDate)} meta={`${signedPounds(row.movedPence)} moved in${row.toMovePence ? ` · ${signedPounds(row.toMovePence)} still to move` : ' · all moved'}${row.paidPence ? ` · paid ${pounds(row.paidPence)}` : ''}`} trailing={signedPounds(row.totalPence)}
+          {...onOpenStatement ? { onOpen: () => onOpenStatement(row.statementKey), label: `${statementName(row.closeDate)}, ${signedPounds(row.totalPence)}, open it in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">Nothing to pay from {potPhrase(pot.name)} yet.</p>}
     </Section>
     {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}
@@ -245,7 +252,7 @@ function SortsItselfHere({ document, setDocument, destination, potName, onOpenRu
  * A pot's page (Month › Groceries): what's left this month and how fast, with the pace chart and one run-out line;
  * the balance in one line with the sums folded; then its transactions.
  */
-export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort, onOpenRules }: DetailProps) {
+export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort, onOpenRules, onOpenStatement }: DetailProps) {
   const pot = document.budget.pots.find(row => row.id === potId)
   const [checking, setChecking] = useState(false)
   // A brand picked in Where it went: the transactions list shows only its rows.
@@ -262,7 +269,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const owners = document.budget.accounts.find(account => account.id === pot?.accountId)?.ownerPersonIds ?? []
   const ownerLabel = owners.length > 1 ? 'Joint' : document.household.adults.find(person => person.id === owners[0])?.name ?? 'Pot'
   if (!pot) return <p className="pot-none">That pot no longer exists. <button type="button" className="text-button" onClick={onBack}>Back to Month</button></p>
-  if (cardTracker(document).cards.some(card => card.setAside?.potId === potId)) return <SetAsidePot document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={onBack} onOpenSettings={onOpenSettings}/>
+  if (cardTracker(document).cards.some(card => card.setAside?.potId === potId)) return <SetAsidePot document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={onBack} onOpenSettings={onOpenSettings} onOpenStatement={onOpenStatement}/>
   const bank = bankOf(document, potId)
   const carriesOver = row?.carriesOver || !row && !!document.card?.pots[potId]?.carriesOver
   const steady = row?.pace === 'steady' && !row.carriesOver && row.plannedPence > 0

@@ -6,6 +6,7 @@ import { monthSpending, needsALook, type DestinationSpending, type MonthSpending
 import { cardTracker, destinationKey, shiftMonth } from '../../domain/cardTracker'
 import { resolveBudget, type BudgetDestination } from '../../domain/monthlyBudget'
 import { potBalance, setAsideStatements } from '../../domain/potBalances'
+import { setAsideCheck } from '../../domain/setAsideCheck'
 import { formatMonth } from '../../formatting/month'
 import { destinationNamer } from '../cardLabels'
 import { dayOf, pounds, signedPounds } from '../spendingFormat'
@@ -92,7 +93,10 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
     if (!setAsideCard || !setAsidePot) return null
     const statement = setAsideStatements(document, setAsideCard.id).find(row => row.closeDate.slice(0, 7) === month)
     const balance = potBalance(document, setAsidePot.id, today).balancePence
-    return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, kind: 'set aside', spent: '—', planned: '—', left: '—', status: statement?.toMovePence ? `${pounds(statement.toMovePence)} still to move for ${monthName(month)}` : statement ? 'All moved in' : 'Nothing to move', inBank: balance === undefined ? '—' : signedPounds(balance) }
+    // Checking the Amex pot: extra or short takes over the status, since it's what needs doing.
+    const check = setAsideCheck(document, setAsideCard.id, today)
+    const gap = check?.state === 'extra' ? `${pounds(check.gapPence!)} extra` : check?.state === 'short' ? `${pounds(-check.gapPence!)} short` : ''
+    return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, kind: 'set aside', spent: '—', planned: '—', left: '—', status: gap || (statement?.toMovePence ? `${pounds(statement.toMovePence)} still to move for ${monthName(month)}` : statement ? 'All moved in' : 'Nothing to move'), inBank: balance === undefined ? '—' : signedPounds(balance), ...gap ? { tone: 'warning' as const } : {} }
   }
   const groups = [
     { key: 'joint', label: 'Joint' },

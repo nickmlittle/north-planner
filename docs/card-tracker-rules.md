@@ -25,6 +25,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot 3: every pot's balance worked out, Check balances, the Amex pot's page | A3 | `src/domain/potBalances.ts`, `src/pages/CheckBalancesSheet.tsx`, `SpendingMonth.tsx` |
 | Amex pot 4: settling a statement from the Amex pot | A4 | `settleSteps`, `settleStepDone`, `refreshSettled` in `cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
 | Amex pot check 1: should hold, the check, extra and top-ups, covering a bill | C1 | `src/domain/setAsideCheck.ts`, the `gap` flow in `potBalances.ts`, `GapMove` in `cardTracker.ts` |
+| Amex pot check 2: the check on the Amex pot's page, Month's Amex row | C2 | `src/pages/SetAsideCheckLead.tsx`, `SetAsidePot` in `SpendingMonth.tsx`, `src/pages/month/PotsSection.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -253,6 +254,13 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **The steps** (`gapSteps`): extra is Out of the Amex pot, then Send to the buffer's account when it's another account, then Into the buffer pot when it's a pot. A top-up runs the other way and ends Into the Amex pot.
 - **Covering a bill** (`billCover`): for an unpaid statement paid from a checked pot, Holds less what has moved in for the card's other unpaid statements, against the statement's purchases and refunds. The difference is to spare or short.
 - **Order:** press Moved before checking the pot against the bank. A check made after a transfer but before Moved counts the transfer twice, and it reads as extra.
+- **The Amex pot's page** (`amex-check/2`, `SetAsideCheckLead`): the check leads the page, above Statements it pays.
+    - **Unchecked:** "Should hold £312.85", what that means, and **Check against Monzo**.
+    - **Checked:** "Checked against Monzo · Sat 14 Nov", then "Matches", "£5.80 extra" or "£9.20 short" (toned), over the sums Should hold and In Monzo now.
+    - **Extra:** "Move it to Monzo Joint." (the buffer's name), the banking steps (`gapSteps`, tap to copy), **Moved £5.80**, and a hint for money moved early: leave it, it matches once the purchase arrives and is marked moved. Moved records a `GapMove`; the message "Moved £5.80 to Monzo Joint. The Amex pot matches." offers Undo.
+    - **Short:** "Did a transfer not happen? Make it now, then check the Amex pot again.", a line for each closed statement with no Pay tick (**Open the November statement**), **Recent moves** ("Fri 6 Nov · £312.85", "7 transactions · Groceries £230.25, Spending £55.10, Bills £15.00 and 1 more", each with Undo, which is `undoMove`), then "Or top up the Amex pot from Monzo Joint." with its steps and **Topped up £9.20**.
+    - "How In Monzo now is worked out" folds the pot's sums once anything has moved since the check. Each statement it pays opens on Spending.
+- **Month's Amex row** (`amex-check/2`): when the check has a gap, "£5.80 extra" or "£9.20 short" (toned) takes the place of what's still to move.
 
 ## Links between Spending and Month
 
