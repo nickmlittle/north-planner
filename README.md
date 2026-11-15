@@ -8,6 +8,7 @@
 - [Card tracker rules](docs/card-tracker-rules.md): the contract for what has shipped of the Spending tab.
 - [Recurring bills build plan](docs/recurring-bills-build-plan.md): the agreed design and PR plan for recurring bills (paid by direct debit or card, assumed on their day, Due, renewal reminders, Plan › Dates).
 - [Recurring bills rules](docs/recurring-bills-rules.md): the contract for what has shipped of recurring bills.
+- [Spending ↔ Month link build plan](docs/spending-month-link-build-plan.md): the agreed design and PR plan for linking Spending and Month both ways (pot links, freshness, Needs a look, Where it went, pace in the pot picker, pot rules).
 
 North is a household budget planner. Set up a household, add recurring income sources, then plan budget items by category, funding rule, and destination account or pot. A new budget starts with no accounts, categories, pots, items, or income sources.
 
