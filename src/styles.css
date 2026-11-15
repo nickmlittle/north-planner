@@ -1093,6 +1093,8 @@ div.spending-pot{padding-right:var(--space-4)}
 .pot-chart-today{stroke:var(--charcoal);stroke-width:1}
 .pot-chart-runout{stroke:var(--status-error);stroke-width:2;stroke-dasharray:2 4}
 .pot-chart-dot{fill:var(--pine);stroke:none}
+.pot-chart-expected{fill:var(--surface);stroke:var(--line-strong);stroke-width:2}
+.pot-chart text.pot-chart-expected-label{fill:var(--text);font-weight:var(--weight-medium)}
 .pot-chart text{fill:var(--muted);stroke:none;font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .pot-chart .pot-chart-warn{fill:var(--status-error)}
 .pot-chart-legend{display:flex;gap:var(--space-4);margin-top:var(--space-1);color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}

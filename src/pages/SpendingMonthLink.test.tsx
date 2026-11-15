@@ -187,3 +187,55 @@ describe('Spending → Month (F1)', () => {
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /in Month$/ })).toBeNull()
   })
 })
+
+/** PR 2: Where it went (F4) and the "by today" marker on the pace chart. */
+describe('Where it went (F4)', () => {
+  const withLidl = () => {
+    const document = household()
+    document.card!.transactions.push(tx('lidl', '2026-11-07', 'LIDL FOOTS CRAY', 903, { merchant: 'LIDL FOOTS CRAY', sort: to({ kind: 'pot', potId: 'groceries' }, 903) }))
+    return document
+  }
+  const open = (document: BudgetDocument) => render(<PotDetail document={document} setDocument={() => {}} potId="groceries" month="2026-11" today={TODAY} onBack={() => {}}/>)
+  const listed = () => within(screen.getByRole('list', { name: 'Transactions' })).getAllByRole('listitem').map(row => row.textContent!.split(/[A-Z][a-z]{2} \d/)[0])
+
+  it('shows the pot’s card spend by brand, adding up to its transactions', () => {
+    open(withLidl())
+    const bars = within(screen.getByRole('list', { name: 'Where it went' })).getAllByRole('button')
+    expect(bars.map(bar => bar.getAttribute('aria-label'))).toEqual(['Tesco, £208.57, 2 transactions', 'Lidl, £9.03'])
+    expect(bars[0]).toHaveTextContent('Tesco · 2 transactions£208.57')
+    expect(bars.every(bar => bar.getAttribute('aria-pressed') === 'false')).toBe(true)
+  })
+
+  it('shows only a brand’s transactions when its bar is tapped, and all again with Show all', () => {
+    open(withLidl())
+    expect(listed()).toEqual(['TESCO STORES', 'LIDL FOOTS CRAY', 'TESCO STORES'])
+    fireEvent.click(screen.getByRole('button', { name: 'Tesco, £208.57, 2 transactions' }))
+    expect(screen.getByRole('button', { name: 'Tesco, £208.57, 2 transactions' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { level: 2, name: /^Transactions/ })).toHaveTextContent('Tesco only')
+    expect(listed()).toEqual(['TESCO STORES', 'TESCO STORES'])
+    fireEvent.click(screen.getByRole('button', { name: 'Show all' }))
+    expect(listed()).toHaveLength(3)
+    // Tapping the picked bar again also shows them all.
+    fireEvent.click(screen.getByRole('button', { name: 'Lidl, £9.03' }))
+    expect(listed()).toEqual(['LIDL FOOTS CRAY'])
+    fireEvent.click(screen.getByRole('button', { name: 'Lidl, £9.03' }))
+    expect(listed()).toHaveLength(3)
+  })
+
+  it('has no Where it went for a pot with no card spend', () => {
+    const document = household()
+    document.card!.transactions = []
+    open(document)
+    expect(screen.queryByRole('list', { name: 'Where it went' })).toBeNull()
+  })
+
+  it('marks what the plan expects by today on the pace chart, this month only', () => {
+    // £450 planned, day 14 of 30: £210 by today.
+    const { unmount } = open(withLidl())
+    expect(screen.getByRole('img', { name: /^Groceries spending so far/ })).toHaveTextContent('£210 by today')
+    expect(window.document.querySelector('.pot-chart-expected')).not.toBeNull()
+    unmount()
+    render(<PotDetail document={withLidl()} setDocument={() => {}} potId="groceries" month="2026-11" today="2026-12-02" onBack={() => {}}/>)
+    expect(screen.queryByText(/by today$/)).toBeNull()
+  })
+})

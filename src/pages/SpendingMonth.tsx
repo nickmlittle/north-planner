@@ -15,6 +15,7 @@ import { dayOf, pounds, signedPounds, statementName, transactionMeta } from './s
 import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills'
 import { spentParts } from './billLabels'
 import { FreshnessLine } from './Freshness'
+import { merchantBreakdown, type MerchantRow } from '../domain/merchants'
 import './PotPage.css'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -54,6 +55,12 @@ function PaceChart({ document, month, row, figures, label }: { document: BudgetD
   const path = `M${x(0)} ${y(0)} ` + points.map(([day, pence]) => `H${x(day).toFixed(1)} V${y(pence).toFixed(1)}`).join(' ')
   const last = points.at(-1) ?? [0, 0]
   const runOut = row.runsOut && row.status === 'ahead' ? Number(row.runsOut.slice(8)) : undefined
+  // Where the plan says spend should be today ("£210 by today"), so the gap to the Spent dot reads as ahead or behind
+  // (F4). The label sits on the side away from the Spent line, and turns back from the right edge.
+  const expected = figures.when === 'current' && row.expectedPence !== undefined && row.expectedPence > 0 ? { x: x(through), y: y(row.expectedPence) } : undefined
+  const spentAbove = last[1] >= (row.expectedPence ?? 0)
+  const labelY = expected ? Math.max(22, Math.min(124, spentAbove ? expected.y + 16 : expected.y - 8)) : 0
+  const labelRight = expected ? expected.x <= 220 : true
   return <figure className="pot-chart">
     <svg viewBox="0 0 330 160" role="img" aria-label={label}>
       <path className="pot-chart-grid" d="M10 130 H310"/>
@@ -61,7 +68,9 @@ function PaceChart({ document, month, row, figures, label }: { document: BudgetD
       <path className="pot-chart-spent" d={path}/>
       {figures.when === 'current' && <path className="pot-chart-today" d={`M${x(through)} 14 V134`}/>}
       {runOut && <path className="pot-chart-runout" d={`M${x(last[0])} ${y(last[1])} L${x(runOut)} ${y(row.plannedPence)}`}/>}
+      {expected && <circle className="pot-chart-expected" cx={expected.x} cy={expected.y} r="3.5"/>}
       <circle className="pot-chart-dot" cx={x(last[0])} cy={y(last[1])} r="4"/>
+      {expected && <text className="pot-chart-expected-label" x={labelRight ? expected.x + 7 : expected.x - 7} y={labelY} textAnchor={labelRight ? 'start' : 'end'}>{whole(row.expectedPence!)} by today</text>}
       <text x="12" y={Math.max(22, y(row.plannedPence) - 4)}>{whole(row.plannedPence)}</text>
       <text x="10" y="150">1 {shortDate(`${month}-01`).split(' ')[1]}</text>
       {figures.when === 'current' && through > 4 && through < figures.daysInMonth - 4 && <text x={x(through)} y="150" textAnchor="middle">Today</text>}
@@ -181,16 +190,38 @@ function SetAsidePot({ document, setDocument, potId, onBack, month, today, onOpe
 }
 
 /**
+ * Where it went (F4): the pot's card spend by brand, up to five bars then Other. Tapping a bar shows only those
+ * transactions in the list below; tapping it again (or Show all) shows them all.
+ */
+function WhereItWent({ rows, selected, onSelect }: { rows: MerchantRow[]; selected: string | null; onSelect: (brand: string | null) => void }) {
+  const max = Math.max(1, ...rows.map(row => row.pence))
+  return <Section title="Where it went" aside={selected && <button type="button" className="text-button" onClick={() => onSelect(null)}>Show all</button>}>
+    <ul className="pot-merchants" aria-label="Where it went">{rows.map(row => <li key={row.brand}>
+      <button type="button" className="pot-merchant" aria-pressed={selected === row.brand} aria-label={`${row.brand}, ${signedPounds(row.pence)}${row.count > 1 ? `, ${row.count} transactions` : ''}`} onClick={() => onSelect(selected === row.brand ? null : row.brand)}>
+        <span className="pot-merchant-top"><span className="pot-merchant-name">{row.brand}{row.count > 1 && <span className="pot-merchant-count"> · {row.count} transactions</span>}</span><span className="pot-merchant-amount">{signedPounds(row.pence)}</span></span>
+        <span className="pot-merchant-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, row.pence) / max * 100}%` }}/></span>
+      </button>
+    </li>)}</ul>
+  </Section>
+}
+
+/**
  * A pot's page (Month › Groceries): what's left this month and how fast, with the pace chart and one run-out line;
  * the balance in one line with the sums folded; then its transactions.
  */
 export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort }: DetailProps) {
   const pot = document.budget.pots.find(row => row.id === potId)
   const [checking, setChecking] = useState(false)
+  // A brand picked in Where it went: the transactions list shows only its rows.
+  const [brand, setBrand] = useState<string | null>(null)
   const figures = monthSpending(document, month, today)
   const destination: BudgetDestination = { kind: 'pot', potId }
   const row = figures.rows.find(item => item.key === `pot:${potId}`)
   const transactions = destinationTransactions(cardTracker(document), month, destination)
+  const breakdown = merchantBreakdown(transactions, destination)
+  const merchants = [...breakdown.rows, ...breakdown.other ? [breakdown.other] : []]
+  const picked = merchants.find(row => row.brand === brand)
+  const shownTransactions = picked ? transactions.filter(transaction => picked.transactionIds.includes(transaction.id)) : transactions
   const bills = monthBills(document, month, today).filter(bill => bill.destination.kind === 'pot' && bill.destination.potId === potId)
   const owners = document.budget.accounts.find(account => account.id === pot?.accountId)?.ownerPersonIds ?? []
   const ownerLabel = owners.length > 1 ? 'Joint' : document.household.adults.find(person => person.id === owners[0])?.name ?? 'Pot'
@@ -227,8 +258,9 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
     </>}
     {carriesOver && bills.length > 0 && <BillsThisMonth document={document} bills={bills} month={month} today={today}/>}
     <YearlyBillsSetAside document={document} potId={potId} month={month} today={today}/>
-    <Section title="Transactions" aside={seeInSpending && transactions.length > 0 && <button type="button" className="text-button" onClick={seeInSpending}>See in Spending</button>}>
-      {transactions.length ? <ul className="pot-list" aria-label="Transactions">{transactions.map(transaction => <li key={transaction.id}>
+    {merchants.length > 0 && <WhereItWent rows={merchants} selected={picked ? picked.brand : null} onSelect={setBrand}/>}
+    <Section title="Transactions" count={picked ? `${picked.brand} only` : undefined} aside={seeInSpending && transactions.length > 0 && <button type="button" className="text-button" onClick={seeInSpending}>See in Spending</button>}>
+      {transactions.length ? <ul className="pot-list" aria-label="Transactions">{shownTransactions.map(transaction => <li key={transaction.id}>
         <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}
           {...onOpenTransactions ? { onOpen: () => onOpenTransactions({ transactionId: transaction.id }), label: `${transaction.description}, ${signedPounds(lineAmount(transaction))}, ${transactionMeta(document, transaction)}, open in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">No transactions in {monthName(month)}.</p>}
