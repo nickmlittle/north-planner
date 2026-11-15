@@ -1161,4 +1161,5 @@ div.spending-pot{padding-right:var(--space-4)}
 .check-balances-note{grid-column:1/-1;color:var(--status-ok);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .check-balances-note:empty{display:none}
 .check-balances-note.is-different{color:var(--status-review)}
+.check-balances-warn{grid-column:1/-1;color:var(--muted);font-size:var(--text-sm)}
 .check-balances-same{grid-column:2;justify-self:end;font-size:var(--text-sm)}

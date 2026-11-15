@@ -3,6 +3,7 @@ import { budgetTransfers } from './budgetTransfers'
 import { monthSpending, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { toMove } from './setAside'
+import { setAsideCheck } from './setAsideCheck'
 import { potBalance } from './potBalances'
 import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
 import { moneyArrives } from './workingDays'
@@ -220,7 +221,7 @@ export const previousMonth = (month: string) => shiftMonth(month, -1)
 
 // ——— Home: one card per month that isn't finished (§7.1) ———
 
-export type HomeTask = { key: string; done: boolean; kind: 'sorted' | 'close' | 'settle' | 'bring-in' | 'final-export' | 'transfers' | 'closes-soon' | 'move'; statementKey?: string; amountPence?: number; count?: number; cardId?: string; dueDate?: string; month: string }
+export type HomeTask = { key: string; done: boolean; kind: 'sorted' | 'close' | 'settle' | 'bring-in' | 'final-export' | 'transfers' | 'closes-soon' | 'move' | 'gap'; statementKey?: string; amountPence?: number; count?: number; cardId?: string; dueDate?: string; month: string }
 export type HomeMonth =
   | { role: 'current'; month: string; status: MonthStatus; figures: MonthSpending; tasks: HomeTask[]; lastImportAt?: string }
   | { role: 'previous'; month: string; status: MonthStatus; tasks: HomeTask[]; overspends: number; leftovers: number }
@@ -274,6 +275,9 @@ export function homeMonths(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
     // Money sorted since the last move, for the set-aside pot (the Amex pot).
     const rows = toMove(document, card.id)
     if (rows.length) tasks.push({ key: `move:${card.id}`, kind: 'move', month: current, done: false, cardId: card.id, count: rows.length, amountPence: rows.reduce((sum, row) => sum + row.pence, 0) })
+    // Checking the Amex pot: extra to move out, or short (amountPence is the gap: + extra, − short).
+    const gap = setAsideCheck(document, card.id, today)?.gapPence
+    if (gap) tasks.push({ key: `gap:${card.id}`, kind: 'gap', month: current, done: false, cardId: card.id, amountPence: gap })
     const close = closeDateFor(today, card.closeDay)
     if (addDays(today, 1) === close) tasks.push({ key: `closes:${card.id}`, kind: 'closes-soon', month: current, done: false, statementKey: statementKey(card.id, close) })
   }

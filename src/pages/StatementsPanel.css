@@ -36,3 +36,5 @@
 .statement-breakdown summary::-webkit-details-marker{display:none}
 .statement-breakdown summary::before{content:"▸";color:var(--text-muted)}
 .statement-breakdown details[open] summary::before{content:"▾"}
+.settle-cover.is-covered{color:var(--positive);font-weight:var(--weight-medium)}
+.settle-cover.is-short{color:var(--warning);font-weight:var(--weight-medium)}

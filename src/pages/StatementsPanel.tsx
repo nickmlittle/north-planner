@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { Clock, FileUp, Inbox, PiggyBank } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { allSettleSteps, paymentMatchingPay, setSettleTick, settleStepDone, settleSteps, settleWithoutFinal, shareSteps, statementKeys, statementShares, statementSummary, type SettleAccount, type SettleStep, type StatementSummary } from '../domain/cardStatements'
 import { setAsideStatements } from '../domain/potBalances'
 import { potPhrase } from '../domain/setAside'
+import { billCover } from '../domain/setAsideCheck'
+import { capitalise } from '../formatting/paceLabels'
 import { MoveToPotSheet } from './MoveToPotSheet'
 import { cardTracker } from '../domain/cardTracker'
 import { formatMonth } from '../formatting/month'
@@ -116,7 +118,7 @@ function StatementDetail({ document, setDocument, today, statementKey, onBack, o
       </ul>
     </Section>
       : plan && steps.length > 0 && done === steps.length && !expanded ? <Section title="Settle up" collapsed={{ summary: `${done} of ${steps.length} done`, onExpand: () => setExpanded(true) }}/>
-      : plan && <SettleSteps document={document} setDocument={setDocument} summary={summary} plan={plan} done={done} total={steps.length} payment={payment.find(row => row.matches)?.row} onMove={() => setMoving(true)} now={now}/>}
+      : plan && <SettleSteps document={document} setDocument={setDocument} summary={summary} plan={plan} done={done} total={steps.length} payment={payment.find(row => row.matches)?.row} onMove={() => setMoving(true)} now={now} today={today}/>}
     {(summary.byMonth.length > 0 || shareAccounts.length > 0) && <div className="statement-breakdown">
       {summary.byMonth.length > 0 && <details>
         <summary><span>Which months it counts in</span><span className="statement-breakdown-summary">{summary.byMonth.map(row => `${monthName(row.month)} ${signedPounds(row.pence)}`).join(' · ')}</span></summary>
@@ -144,7 +146,7 @@ function owners(document: BudgetDocument, ownerPersonIds: readonly string[]) {
 }
 
 /** The Settle up steps, inline on the statement: one column per account, ticked like payday, then pay the card. */
-function SettleSteps({ document, setDocument, summary, plan, done, total, payment, onMove, now }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; summary: StatementSummary; plan: NonNullable<ReturnType<typeof settleSteps>>; done: number; total: number; payment?: StatementSummary['payments'][number]; onMove: () => void; now: () => Date }) {
+function SettleSteps({ document, setDocument, summary, plan, done, total, payment, onMove, now, today }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; summary: StatementSummary; plan: NonNullable<ReturnType<typeof settleSteps>>; done: number; total: number; payment?: StatementSummary['payments'][number]; onMove: () => void; now: () => Date; today: string }) {
   const card = cardTracker(document).cards.find(row => row.id === summary.cardId)!
   const labels = shortAccountLabels(document.budget.accounts, document.household.adults)
   const label = (accountId: string) => labels.get(accountId) ?? 'Account'
@@ -161,8 +163,19 @@ function SettleSteps({ document, setDocument, summary, plan, done, total, paymen
   const row = (step: SettleStep, caption?: string) => <StepRow key={step.key} stepKey={step.key} name={stepLabel(step)} amountPence={step.amountPence} ticks={ticks} onTick={tick} onCopy={pence => void copy(pence)}
     indent={step.kind === 'out' || step.kind === 'into'} emphasis={step === plan.pay ? 'pay' : undefined} showTickedDay changedNote={moveNote(step.amountPence)} caption={caption}>
     {step === plan.pay && payment && <StepCaption>{card.name} shows a payment of {pounds(-payment.amountPence)} on {shortDate(payment.date)}. {settleStepDone(plan, ticks, step) ? '' : <button type="button" className="text-button" onClick={() => tick(plan.pay.key, plan.pay.amountPence)}>Tick Pay {card.name}</button>}</StepCaption>}
+    {step === plan.pay && coverLine}
   </StepRow>
   const payFrom = plan.accounts.find(account => account.accountId === plan.payFromAccountId)
+  // Paid from the Amex pot, once everything is moved and before Pay: does the pot cover the bill? (Checking the Amex pot.)
+  let coverLine: ReactNode = null
+  if (plan.setAside && setAsidePot && !plan.setAside.toMove && !settleStepDone(plan, ticks, plan.pay)) {
+    const cover = billCover(document, summary.key, today)
+    const phrase = potPhrase(setAsidePot.name)
+    const bank = document.budget.accounts.find(account => account.id === setAsidePot.accountId)?.provider?.trim() || 'the bank'
+    coverLine = !cover ? <p className="step-caption settle-cover">Check {phrase} against {bank} to see if it covers the bill.</p>
+      : cover.coverPence >= 0 ? <p className="step-caption settle-cover is-covered">{capitalise(phrase)} covers the {pounds(cover.billPence)} bill{cover.coverPence ? ` · ${pounds(cover.coverPence)} to spare` : ''}.</p>
+      : <p className="step-caption settle-cover is-short">{pounds(-cover.coverPence)} short of the bill: top up {phrase} before you pay.</p>
+  }
   return <Section title="Settle up" count={`${done} of ${total} done`}>
     {copiedStatus}
     <div className="settle-up" role="region" aria-label="Settle-up steps" {...stepKeys.listProps}>{stepKeys.hint}

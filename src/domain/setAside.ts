@@ -124,6 +124,9 @@ export function moveTotal(move: SetAsideMove, setAsidePotId?: string): number {
   return move.transactions.flatMap(row => row.lines).filter(line => !(line.destination.kind === 'pot' && line.destination.potId === setAsidePotId)).reduce((sum, line) => sum + line.amountPence, 0)
 }
 
+/** "Amex pot" as a title, without doubling pot: "Amex" → "Amex pot", "Amex pot" stays. */
+export const potTitle = (name: string) => /\bpot$/i.test(name.trim()) ? name.trim() : `${name.trim()} pot`
+
 /** "the Amex pot", or "the Amex savings pot" when the name already ends in pot. */
 export function potPhrase(name: string): string {
   return /\bpot$/i.test(name.trim()) ? `the ${name.trim()}` : `the ${name.trim()} pot`

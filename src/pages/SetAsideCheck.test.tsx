@@ -8,6 +8,7 @@ import type { BudgetDestination } from '../domain/monthlyBudget'
 import { checkPotBalance } from '../domain/potBalances'
 import { recordMove } from '../domain/setAside'
 import { MonthPage } from './MonthPage'
+import { Spending } from './Spending'
 import { PotDetail } from './SpendingMonth'
 
 afterEach(cleanup)
@@ -130,5 +131,81 @@ describe('Month’s Amex row', () => {
     cleanup()
     render(<MonthPage document={household()} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={() => {}} onSort={() => {}} today={TODAY}/>)
     expect(screen.getByRole('button', { name: /^Amex · set aside: .*£60.00 still to move for November$/ })).toBeInTheDocument()
+  })
+})
+
+describe('Check balances, for the Amex pot', () => {
+  function MonthHarness({ initial, onChange = () => {}, onOpenPot = () => {} }: { initial: BudgetDocument; onChange?: (document: BudgetDocument) => void; onOpenPot?: (potId: string | null) => void }) {
+    const [document, setDocument] = useState(initial)
+    return <MonthPage document={document} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={onOpenPot} onSort={() => {}} today={TODAY}
+      setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  }
+  const open = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Check balances' }))
+    return screen.getByRole('dialog', { name: 'Check balances' })
+  }
+
+  it('holds the Amex pot against what it should hold, warns while anything is still to move, and offers to open it', () => {
+    const onOpenPot = vi.fn()
+    let saved: BudgetDocument | undefined
+    render(<MonthHarness initial={household()} onChange={next => { saved = next }} onOpenPot={onOpenPot}/>)
+    const dialog = open()
+    const amex = within(dialog).getByLabelText(/^Amex/)
+    expect(amex).toHaveAccessibleName(/Should hold £109\.20 · not checked yet$/)
+    expect(amex).toHaveAccessibleDescription(/£60.00 sorted and still to move\. Moved it in Monzo already\? Press Moved first, or it counts twice\./)
+    fireEvent.change(amex, { target: { value: '109.20' } })
+    expect(within(dialog).getByText('Matches')).toBeInTheDocument()
+    fireEvent.change(amex, { target: { value: '100' } })
+    expect(within(dialog).getByText('£9.20 short')).toBeInTheDocument()
+    fireEvent.change(amex, { target: { value: '115' } })
+    expect(within(dialog).getByText('£5.80 extra')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save 1 balance' }))
+    expect(saved!.card!.pots['amex-pot']!.checkedBalance!.pence).toBe(11500)
+    expect(screen.getByRole('status')).toHaveTextContent('1 balance checked. The Amex pot has £5.80 extra.')
+    fireEvent.click(screen.getByRole('button', { name: 'Open Amex pot' }))
+    expect(onOpenPot).toHaveBeenCalledWith('amex-pot')
+  })
+
+  it('offers Same as North for the Amex pot only when it already holds what it should', () => {
+    render(<MonthHarness initial={household(10920)}/>)
+    let dialog = open()
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Same as North' })[0]!)
+    expect(within(dialog).getByLabelText(/^Amex/)).toHaveValue('109.20')
+    cleanup()
+    render(<MonthHarness initial={household(11500)}/>)
+    dialog = open()
+    expect(within(dialog).queryByRole('button', { name: 'Same as North' })).toBeNull()
+  })
+})
+
+describe('settling up from the Amex pot', () => {
+  /** Everything on November is moved in and the statement is ready to settle on 30 Nov. */
+  const ready = (potPence?: number) => {
+    let document = recordMove(household(), 'amex', ['fuel'], new Date('2026-11-11T09:00:00Z'), 'm2')
+    document.card!.statements[NOV] = { cardId: 'amex', closeDate: '2026-11-24', settleWithoutFinalAt: '2026-11-26T09:00:00Z' }
+    if (potPence !== undefined) document = checkPotBalance(document, 'amex-pot', potPence, new Date('2026-11-27T09:00:00Z'))
+    return document
+  }
+  const settle = (document: BudgetDocument) => {
+    const Harness = () => { const [current, setCurrent] = useState(document); return <Spending document={current} setDocument={setCurrent} view="statements" onSelectView={() => {}} onOpenCardSettings={() => {}} statementKey={NOV} onOpenStatement={() => {}} today="2026-11-30"/> }
+    render(<Harness/>)
+    return screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' }).closest('li')!
+  }
+
+  it('says whether the pot covers the bill before Pay', () => {
+    expect(settle(ready(17500))).toHaveTextContent('The Amex pot covers the £169.20 bill · £5.80 to spare.')
+    cleanup()
+    expect(settle(ready(16920))).toHaveTextContent('The Amex pot covers the £169.20 bill.')
+    cleanup()
+    expect(settle(ready(16000))).toHaveTextContent('£9.20 short of the bill: top up the Amex pot before you pay.')
+    cleanup()
+    expect(settle(ready())).toHaveTextContent('Check the Amex pot against Monzo to see if it covers the bill.')
+  })
+
+  it('says nothing once Pay is ticked', () => {
+    const pay = settle(ready(17500))
+    fireEvent.click(within(pay).getByRole('button', { name: 'Pay Amex from the Amex pot done' }))
+    expect(screen.queryByText(/covers the £169.20 bill/)).toBeNull()
   })
 })
