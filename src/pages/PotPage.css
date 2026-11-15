@@ -54,3 +54,14 @@
 .pot-yearly-amounts strong{color:var(--text)}
 .pot-bills-all{display:inline-flex;align-items:center;gap:var(--space-1);font-size:var(--text-sm)}
 .pot-bills-all svg{width:14px;height:14px}
+/* Where it went (Spending ↔ Month link F4): a pot's card spend by brand, one bar each, tap to show only those. */
+.pot-merchants{display:grid;margin:0;padding:var(--space-2) 0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-merchant{display:grid;gap:var(--space-1);width:100%;min-height:44px;margin:0;padding:var(--space-2) var(--space-4);border:0;background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.pot-merchant:hover{background:var(--surface-sunken)}
+.pot-merchant[aria-pressed="true"]{background:var(--surface-selected)}
+.pot-merchant-top{display:flex;justify-content:space-between;gap:var(--space-3);font-size:var(--text-md)}
+.pot-merchant-name{min-width:0;font-weight:var(--weight-medium)}
+.pot-merchant-count{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.pot-merchant-amount{flex:none;font-variant-numeric:tabular-nums}
+.pot-merchant-bar{display:block;height:6px;border-radius:var(--radius-pill);background:var(--surface-sunken);overflow:hidden}
+.pot-merchant-bar>span{display:block;height:100%;border-radius:var(--radius-pill);background:var(--accent)}
