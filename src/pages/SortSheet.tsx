@@ -31,7 +31,10 @@ type Props = {
 /** How many suggestions show before "All pots and accounts". */
 const SHOWN = 6
 
-/** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
+/**
+ * Sort one transaction: choose a pot (the suggestion is chosen to start), see what placing it there would change, then
+ * Place (board M2). "Always" makes a rule in place. A split refund's parts still place with one tap.
+ */
 export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today = localDate(), onOpenMonth }: Props) {
   // Left and pace for each pot in the transaction's month, so the choice shows its consequence (link F5).
   const pace = pickerPace(document, transaction.date.slice(0, 7), today)
@@ -48,6 +51,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const [changeRule, setChangeRule] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [filter, setFilter] = useState('')
+  const [picked, setPicked] = useState<BudgetDestination | undefined>()
   const reason = (value: SuggestionReason) => value === 'last-used' ? 'Used last time' : value === 'own' ? `${person ?? 'Their'}’s card` : value === 'joint' ? 'Joint' : value === 'joint-account' ? 'One-offs' : 'Buffer'
   const merchant = transaction.merchant || normaliseDescription(transaction.description)
   // A refund goes back against its purchase (§6.4): the same pot, the matching line of a split, or spread across it.
@@ -61,9 +65,11 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
     onSorted(`Sorted to ${label}.`)
   }
   const options = suggestions(document, transaction).filter(row => !sameDestination(row.destination, refundBack)).slice(0, refundBack ? SHOWN - 1 : SHOWN)
-  // One tap places, so the impact line is for the suggestion: what placing it there would change.
-  const suggestion = refundBack ?? options[0]?.destination
-  const impact = suggestion ? placeImpact(document, transaction, suggestion, today) : undefined
+  // Choose, then Place (board M2): the chosen pot starts as where it is now, else the suggestion. The impact line
+  // above Place says what placing it there would change.
+  const chosen = picked ?? current ?? refundBack ?? options[0]?.destination
+  const impact = chosen ? placeImpact(document, transaction, chosen, today) : undefined
+  const unchanged = !!chosen && sameDestination(chosen, current) && transaction.sort?.lines.length === 1 && !always && !(rule && changeRule)
 
   const place = (destination: BudgetDestination) => {
     if (purchase && !always) { placeRefund(plan?.kind === 'single' && plan.lineIndex !== undefined && sameDestination(destination, plan.destination) ? { lineIndex: plan.lineIndex } : { destination }, name(destination)); return }
@@ -83,8 +89,8 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
     onSorted(message, tipped)
   }
   const option = (destination: BudgetDestination, sub?: string) => {
-    const selected = sameDestination(destination, current)
-    return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected} onClick={() => place(destination)}>
+    const selected = sameDestination(destination, chosen)
+    return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected} onClick={() => setPicked(destination)}>
       <span className="sort-option-text"><span className="sort-option-name">{name(destination)}</span>{sub && <span className="sort-option-sub">{sub}</span>}</span>
       {(() => { const { text, tone } = pace(destination); return text && <span className={`sort-option-left${tone ? ` is-${tone}` : ''}`}>{text}</span> })()}
       {selected && <Check aria-hidden="true"/>}
@@ -92,7 +98,14 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   }
   const groups = destinationGroups(document).map(group => ({ ...group, options: group.options.filter(row => !filter.trim() || row.label.toLocaleLowerCase('en-GB').includes(filter.trim().toLocaleLowerCase('en-GB'))) })).filter(group => group.options.length)
 
-  return <ModalDialog title={`Sort ${transaction.description}`} onClose={onClose} className="sort-sheet">
+  const footer = <>
+    {impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`} id={`${id}-impact`}>{impact.text}</p>}
+    <button type="button" className="primary-button sort-place" disabled={!chosen || unchanged} aria-describedby={impact?.text ? `${id}-impact` : undefined} onClick={() => { if (chosen) place(chosen) }}>
+      {!chosen ? 'Choose a pot or account' : unchanged ? `Already in ${name(chosen)}` : `Place in ${name(chosen)}`}
+    </button>
+  </>
+
+  return <ModalDialog title={`Sort ${transaction.description}`} onClose={onClose} className="sort-sheet" footer={footer}>
     <p className="sort-sheet-summary"><strong>{signedPounds(transaction.amountPence)}</strong><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span></p>
     {placedPot && onOpenMonth && <button type="button" className="text-button sort-open-month" onClick={() => onOpenMonth(placedPot.id, transaction.date.slice(0, 7))}>Open {placedPot.name} in Month<ChevronRight aria-hidden="true"/></button>}
     {purchase ? null : rule ? <div className="sort-rule-note">
@@ -116,7 +129,6 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
         <li><button type="button" className="sort-option" onClick={() => placeRefund({ spread: true }, 'each part of the split')}><span className="sort-option-text"><span className="sort-option-name">Spread across the split</span><span className="sort-option-sub">In proportion to each line</span></span></button></li>
       </ul>}
     </div>}
-    {impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`}>{impact.text}</p>}
     <ul className="sort-options" aria-label="Suggested pots and accounts">{refundBack && option(refundBack, 'Suggested · Where the purchase went')}{options.map((row, index) => option(row.destination, `${index === 0 && !refundBack ? 'Suggested · ' : ''}${reason(row.reason)}`))}</ul>
     <button type="button" className="text-button sort-all-toggle" aria-expanded={showAll} aria-controls={`${id}-all`} onClick={() => setShowAll(value => !value)}>{showAll ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}All pots and accounts</button>
     {showAll && <div id={`${id}-all`} className="sort-all">

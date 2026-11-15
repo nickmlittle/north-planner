@@ -86,7 +86,7 @@ The pot page shows spending by merchant, so "it's Tesco" is visible at a glance.
 Sorting shows the consequence before you commit.
 
 - **Options:** each pot shows Left and pace ("£130.00 left · £110 ahead", "£20.00 left · £150 ahead", "£150.00 over"). The phone sort sheet already shows "£X left", so this adds pace. On desktop the native select gets the same text after the pot name (decision L6).
-- **Impact line:** once a pot is chosen and before it's placed: "Groceries: On track → £110 ahead · runs out ~Fri 20 Nov". Phone: the sort sheet places with one tap, so the line is for the suggested pot, above the options (as built in `link/4`; M2's Place button would add a tap to every sort). Desktop: under the row, while it's focused.
+- **Impact line:** once a pot is chosen and before it's placed: "Groceries: On track → £110 ahead · runs out ~Fri 20 Nov". Phone: above the Place button. (`link/4` kept one-tap placing with the line for the suggestion; the follow-up `link/6` added M2's choose-then-Place.) Desktop: under the row, while it's focused.
 - **Toast after placing:** only when a pot tips into ahead or over: "Groceries is now £110 ahead of pace", with Open Groceries and Undo.
 
 ### F6 · Sorts itself here (D2, M1)

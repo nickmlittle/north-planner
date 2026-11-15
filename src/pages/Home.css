@@ -1,5 +1,8 @@
 /* Home (audit 3 PR 10): the strip, To do, Coming up and Done. Tokens only (styles.tokens.test.ts). */
 .home-page{display:grid;align-content:start;gap:var(--space-5)}
+/* Rows take their content's height. In the fixed-height desktop frame a taller page scrolls; without this the strip
+   (overflow hidden, so no minimum height) was squeezed and its tiles clipped. */
+.home-page{grid-auto-rows:max-content}
 .home-page>.page-header{margin:0}
 .home-page .stat-strip{background:var(--card)}
 .home-tile-sub{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}

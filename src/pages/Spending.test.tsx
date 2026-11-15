@@ -199,7 +199,12 @@ it('places a transaction with one tap on a suggestion', () => {
     'Groceries · JointJointnothing planned',
     'JointOne-offs',
   ])
+  // Choose, then Place (board M2): tapping an option chooses it and says what placing it would change.
+  expect(options[0]).toHaveAttribute('aria-pressed', 'true')
   fireEvent.click(options[1]!)
+  expect(options[1]).toHaveAttribute('aria-pressed', 'true')
+  expect(saved).toBeUndefined()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Place in Eating out · Joint' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(saved!.card!.transactions.find(row => row.id === 'new')!.sort).toMatchObject({ lines: [{ amountPence: 11281, destination: { kind: 'pot', potId: 'eating' } }], by: 'person' })
   expect(screen.getByRole('status')).toHaveTextContent('Sorted to Eating out · Joint.')
@@ -216,6 +221,7 @@ it('makes a rule in place with Always, and it sorts the others from that merchan
   fireEvent.change(within(dialog).getByLabelText('Matching text'), { target: { value: 'train tickets' } })
   fireEvent.click(within(dialog).getByLabelText('Only on Ada’s card'))
   fireEvent.click(within(dialog).getByRole('button', { name: /^Treats · Ada/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Place in Treats · Ada' }))
   expect(saved!.card!.rules[1]).toMatchObject({ contains: 'TRAIN TICKETS', cardSuffix: '41001', destination: { kind: 'pot', potId: 'treats' } })
   expect(saved!.card!.transactions.find(row => row.id === 'again')!.sort).toMatchObject({ by: 'rule', ruleId: saved!.card!.rules[1]!.id })
   expect(screen.getByRole('status')).toHaveTextContent('Sorted to Treats · Ada. New rule for “TRAIN TICKETS”, which sorted 1 more.')
@@ -233,6 +239,7 @@ it('checks rule sorts, and offers to change the rule when one is re-sorted', () 
   expect(within(dialog).getByText('Sorted by your rule “GREEN GROCER”.')).toBeInTheDocument()
   fireEvent.click(within(dialog).getByLabelText('Change the rule too'))
   fireEvent.click(within(dialog).getByRole('button', { name: /^Eating out · Joint/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Place in Eating out · Joint' }))
   expect(saved!.card!.rules[0]!.destination).toEqual({ kind: 'pot', potId: 'eating' })
   expect(saved!.card!.transactions.find(row => row.id === 'grocer')!.sort?.by).toBe('person')
   cleanup()
@@ -408,7 +415,7 @@ it('sends a refund back to the purchase’s pot, in the month it arrived, and li
   expect(within(dialog).getByText('Matches BOOK NOOK £30.00 on 20 Oct. It counts in November, the month it arrived.')).toBeInTheDocument()
   const first = within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!
   expect(first).toHaveTextContent('Treats · AdaSuggested · Where the purchase went')
-  fireEvent.click(first)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Place in Treats · Ada' }))
   expect(saved!.card!.transactions.find(row => row.id === 'shop-refund')).toMatchObject({ refundOf: { transactionId: 'shop' }, sort: { lines: [{ amountPence: -1250, destination: { kind: 'pot', potId: 'treats' } }] } })
   fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
   expect(screen.getByRole('button', { name: /^BOOK NOOK, −£12.50, .*Refund of BOOK NOOK £30.00 · 20 Oct/ })).toBeInTheDocument()
