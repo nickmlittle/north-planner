@@ -18,6 +18,17 @@
 .pot-list>li+li>.list-row{border-top:1px solid var(--border)}
 .pot-credit{color:var(--positive)}
 .pot-none{margin:0;color:var(--text-muted);font-size:var(--text-md)}
+/* Checking the Amex pot (card-tracker-rules › Checking the Amex pot): should hold against what's in it. */
+.pot-check.is-extra,.pot-check.is-short{border-color:var(--warning)}
+.pot-check.is-extra .pot-lead-value,.pot-check.is-short .pot-lead-value{color:var(--warning)}
+.pot-check.is-matches .pot-lead-value{color:var(--positive)}
+.pot-check:not(.is-extra):not(.is-short) .carry-over-sums>div:last-child{border-bottom:0}
+.pot-check-act{display:grid;gap:var(--space-2);margin-top:var(--space-3)}
+.pot-check-say{color:var(--text);font-size:var(--text-md)}
+.pot-check-hint{color:var(--text-muted);font-size:var(--text-sm)}
+.pot-check-heading{margin:var(--space-2) 0 0;color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.pot-check-steps .step-list{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden}
+.pot-check-moves{display:grid;gap:var(--space-2)}
 /* Recurring bills on a pot's page (recurring-bills-rules › The pot page, boards 3–4). */
 .pot-lead-bills{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
 .pot-bills-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
