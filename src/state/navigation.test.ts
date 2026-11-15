@@ -109,6 +109,11 @@ it('opens Close <Month> on Month, and Settings at a section', () => {
   expect(window.location.search).not.toContain('close')
   navigateTo({ view: 'settings', section: 'rules' })
   expect(window.location.search).toContain('view=settings&month=2026-10&section=rules')
+  // Home is today's month: it doesn't follow the month last viewed, unless asked for one.
   navigateTo({ view: 'home' })
+  expect(window.location.search).toBe('?view=home')
+  navigateTo({ view: 'month' })
+  expect(window.location.search).toBe('?view=month')
+  navigateTo({ view: 'home', month: '2026-10' })
   expect(window.location.search).toBe('?view=home&month=2026-10')
 })

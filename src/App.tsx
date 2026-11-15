@@ -56,7 +56,15 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
   const view: PlannerView = setupComplete ? navigation.view : 'settings'
   useEffect(() => setPageTitle(documentTitle(navigation, document, document.workflow.setupComplete)))
   const counts = useNavCounts(document)
-  const selectView = (nextView: PlannerView) => { if (nextView !== view && (setupComplete || nextView === 'settings')) navigateTo({ view: nextView }) }
+  /**
+   * The nav (and G shortcuts). Another screen opens fresh; the current screen's own tab goes back to its top level,
+   * off a pot's page, Close <Month>, a statement, a transaction or a Plan filter.
+   */
+  const selectView = (nextView: PlannerView) => {
+    if (!setupComplete && nextView !== 'settings') return
+    if (nextView !== view) navigateTo({ view: nextView })
+    else navigateTo({ pot: null, close: false, statement: null, transaction: null, planDestination: null })
+  }
   /** "See items" in the payday steps: Plan filtered to that account, with Back returning to the same step. */
   const seeTransferItems = (accountId: string) => {
     const origin = { key: crypto.randomUUID(), month: navigation.month, accountId }, destination: PlanDestination = { kind: 'account', id: accountId }

@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { homeCount, homeInbox } from './homeInbox'
+import { monthSpending } from './cardSpending'
+import { paceHeadline } from '../formatting/paceLabels'
 import { resolveBudget } from './monthlyBudget'
 import { orderTransferAccounts, personTransferPlans } from './personTransfers'
 import { buildTransferInstructions } from './transferInstructions'
@@ -81,7 +83,7 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     expect(result.strip.plan).toEqual({ value: '£1,141.87 over', tone: 'critical', detail: 'Ada £429.66 over · Ben £712.21 over' })
     // Card spend £272.59, plus the Bills pot's assumed bills by the 11th: council tax, water and the phone (£234.82).
     expect(result.strip.spent).toMatchObject({ value: '£507.41', sub: 'of £5,262.33', detailTone: 'warning' })
-    expect(result.strip.spent!.detail).toMatch(/^Groceries .*£62 ahead of pace$/)
+    expect(result.strip.spent!.detail).toMatch(/^Groceries .*£63 ahead of pace$/)
     expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'this statement', detail: '£312.85 set aside · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')
   })
@@ -97,7 +99,7 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     ])
     expect(result.todo.find(row => row.kind === 'over-plan')).toMatchObject({ tone: 'critical', target: { view: 'plan', reviewPersonId: 'ben' } })
     expect(result.todo.filter(row => row.tone === 'critical')).toHaveLength(1)
-    expect(titles(result.headsUp)).toEqual([expect.stringMatching(/^Groceries .*£62 ahead of pace$/)])
+    expect(titles(result.headsUp)).toEqual([expect.stringMatching(/^Groceries .*£63 ahead of pace$/)])
     expect(result.headsUp[0]).toMatchObject({ meta: 'Mostly Green Grocer £107.00 · runs out ~Fri 20 Nov', trailing: '£143.57 left', tone: 'warning' })
     expect(homeCount(result)).toBe(8)
   })
@@ -230,5 +232,26 @@ describe('homeInbox renewals and bills', () => {
     expect(coming(seed())[0]!.target).toEqual({ view: 'month', month: '2026-12', potId: 'bills' })
     const document = seed()
     expect(coming({ ...document, bills: { renewals: { [breakdown(document)]: '2026-12-06' } } }).map(row => row.title)).toContain('Breakdown cover · £1,395.60')
+  })
+})
+
+describe('homeInbox defects from audit 4', () => {
+  it('lists a statement’s settle task once when two unsettled months have spend on it', () => {
+    // The seed's November statement (25 Oct–24 Nov) holds late-October spend too. On 4 Dec, October (to settle) and
+    // November (closing) both raise its settle task.
+    const document = seed()
+    document.card!.statements['amex:2026-11-24']!.finalImportAt = '2026-11-25T09:00:00.000Z'
+    const result = inbox(document, '2026-12-04', '2026-12')
+    expect(titles(result.todo).filter(title => title === 'Settle the November statement')).toHaveLength(1)
+    const keys = [...result.todo, ...result.headsUp, ...result.done].map(row => row.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+  it('words a pace gap as Month does: whole pounds rounded, not cut off', () => {
+    const document = seed()
+    const row = monthSpending(document, month, '2026-11-11').rows.find(each => each.status === 'ahead')!
+    const headline = paceHeadline(row)
+    const result = inbox(document)
+    expect(result.strip.spent!.detail).toBe(`Groceries ${headline} of pace`)
+    expect(titles(result.headsUp)).toEqual([`Groceries ${headline} of pace`])
   })
 })

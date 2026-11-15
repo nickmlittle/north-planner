@@ -101,7 +101,8 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   const fresh = next.view !== undefined && next.view !== current.view
   const state: NavigationState = { ...current, ...fresh ? { section: null, pot: null, statement: null, transaction: null, close: false, planDestination: null } : {}, ...next }
   const url = new URL(window.location.href)
-  const keepMonth = next.month !== undefined || url.searchParams.has('month')
+  // Home is always today's month unless asked for another: it doesn't follow the month last viewed on Month or Plan.
+  const keepMonth = next.month !== undefined || url.searchParams.has('month') && state.view !== 'home'
   for (const key of [...LEGACY_PARAMS, 'view', 'month', 'section', 'pot', 'statement', 'transaction', 'close', 'planDestination']) url.searchParams.delete(key)
   url.searchParams.set('view', state.view)
   if (keepMonth) url.searchParams.set('month', state.month)
