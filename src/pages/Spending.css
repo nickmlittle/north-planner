@@ -59,3 +59,11 @@
   .spending-page>.tabs .tab[aria-selected=true]{border-bottom-color:var(--cream);color:var(--cream)}
   .spending-page>.tabs .tab-count{background:var(--on-pine-faint);color:var(--cream)}
 }
+/* "November so far" (Spending ↔ Month link F3): this month's pots over or ahead of pace, each opening its page. */
+.spending-so-far{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);margin:0 0 var(--space-3)}
+.spending-so-far-label{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.spending-so-far ul{display:flex;flex-wrap:wrap;gap:var(--space-2);margin:0;padding:0;list-style:none}
+.spending-so-far-chip{display:inline-flex;align-items:center;min-height:32px;margin:0;padding:0 var(--space-3);border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);color:var(--text);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);cursor:pointer}
+.spending-so-far-chip:hover{background:var(--surface-sunken)}
+.spending-so-far-chip.is-warning{border-color:var(--warning);color:var(--warning)}
+.spending-so-far-chip.is-critical{border-color:var(--critical);color:var(--critical)}

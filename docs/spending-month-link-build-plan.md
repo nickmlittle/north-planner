@@ -1,6 +1,6 @@
 # Spending ↔ Month link: design and PR build plan
 
-Status: planned, 15 November 2026, with Nick. PR 1 (`link/1-links`) and PR 2 (`link/2-where-it-went`) are built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
+Status: planned, 15 November 2026, with Nick. PRs 1–3 (`link/1-links`, `link/2-where-it-went`, `link/3-needs-a-look`) are built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/B98PWR9ZRecPSKRsEk55BF. Boards D1, D2, D4, M1, M2 and M3 are the source for this plan. The canvas was drawn for "lines" on an account; read "line" there as "pot" (decision L1).
 - **Working doc** (private to the owner): https://claude.ai/artifact/QUKqHuCUVd9oaRKWmr33bx. It holds the household setup checklist with real figures.
@@ -105,7 +105,7 @@ Five PRs on `link/<n>-<slug>` branches, in this order. Each one is squash-merged
 | --- | --- | --- | --- | --- | --- |
 | 1 | `link/1-links` | F1 links both ways, F2 freshness line | `state/navigation.ts` (a `transaction` param, and pot or account filters through history state), `App.tsx` (wire `onOpenMonth`, add `onOpenTransactions`), `Spending.tsx`, `TransactionsTable.tsx`, `SpendingMonth.tsx`, `month/PotsSection.tsx`, `MonthPage.tsx` | URL round-trip; Transactions opens filtered and focused; the account row opens Spending; the freshness text and its 0-to-sort case | M |
 | 2 | `link/2-where-it-went` | F4 merchant bars, plus the "by today" marker on the chart | new `domain/merchants.ts` (`brandOf`, `merchantBreakdown`), `SpendingMonth.tsx`, `PotPage.css` | brand cases (both Tesco forms, Amazon aliases, B&M); totals match Spent with splits and refunds | S |
-| 3 | `link/3-needs-a-look` | F3 on Month, Home and the Spending header, plus shared pace wording | new `pages/paceLabels.ts`, `domain/cardSpending.ts` (`needsALook` with its reason), new `month/NeedsALook.tsx`, `homeInbox.ts`, `Spending.tsx` | the 50% reason threshold; phone groups don't repeat these pots; Home's second line; one wording across screens | M |
+| 3 | `link/3-needs-a-look` | F3 on Month, Home and the Spending header, plus shared pace wording | new `formatting/paceLabels.ts` (planned as `pages/`, moved so Home's domain code can use it), `domain/cardSpending.ts` (`needsALook` with its reason), new `month/NeedsALook.tsx`, `homeInbox.ts`, `Spending.tsx` | the 50% reason threshold; phone groups don't repeat these pots; Home's second line; one wording across screens | M |
 | 4 | `link/4-sort-pace` | F5 pace in the picker, the impact line and the toast | `domain/cardSpending.ts` (`paceIfPlaced`), `SortSheet.tsx`, `SortTable.tsx`, `useToast` | impact for on track → ahead, → over, no plan, carry-over pots and refunds; the toast only when a pot tips | M |
 | 5 | `link/5-pot-rules` | F6 rules and suggestions on the pot page | `domain/cardSorting.ts` (`rulesFor`, `ruleSuggestions`), `SpendingMonth.tsx` | the 2-or-more threshold; split rules left out; "also sorted N" message | S |
 

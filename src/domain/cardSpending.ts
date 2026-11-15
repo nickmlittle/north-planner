@@ -2,6 +2,7 @@ import type { BudgetDocument } from './budgetDocument'
 import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
 import { monthBills, potBillTotals } from './recurringBills'
+import { merchantBreakdown } from './merchants'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -192,6 +193,36 @@ export function cumulativeByDay(tracker: Pick<CardTracker, 'transactions'>, mont
   let total = 0
   for (let day = 1; day <= throughDay; day++) { total += byDay.get(day) ?? 0; points.push([day, total]) }
   return points
+}
+
+/** Why a pot needs a look: one brand is at least half of Spent ("Mostly Tesco"), else its biggest transaction. */
+export type LookReason = { kind: 'mostly' | 'biggest'; name: string; pence: number }
+export type LookRow = { row: DestinationSpending; reason?: LookReason }
+
+/** The share of Spent one brand needs to be the reason ("Mostly Tesco"), as a fraction (decision L4). */
+export const MOSTLY_SHARE = 0.5
+
+/** The reason line for a pot: from its card spend this month (`merchantBreakdown`). None with no card spend on it. */
+export function lookReason(document: Pick<BudgetDocument, 'card'>, month: string, row: Pick<DestinationSpending, 'destination' | 'spentPence'>): LookReason | undefined {
+  const transactions = destinationTransactions(cardTracker(document), month, row.destination)
+  const { rows } = merchantBreakdown(transactions, row.destination)
+  const top = rows[0]
+  if (top && top.pence > 0 && row.spentPence > 0 && top.pence >= row.spentPence * MOSTLY_SHARE) return { kind: 'mostly', name: top.brand, pence: top.pence }
+  const key = destinationKey(row.destination)
+  const lineOf = (transaction: CardTransaction) => (transaction.sort?.lines ?? []).filter(line => destinationKey(line.destination) === key).reduce((sum, line) => sum + line.amountPence, 0)
+  const biggest = [...transactions].sort((a, b) => lineOf(b) - lineOf(a))[0]
+  return biggest && lineOf(biggest) > 0 ? { kind: 'biggest', name: biggest.description, pence: lineOf(biggest) } : undefined
+}
+
+/**
+ * Needs a look (Spending ↔ Month link F3): the month's pots that are over or ahead of pace, each with its reason.
+ * Over first, then ahead; the bigger gap first within each.
+ */
+export function needsALook(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, figures: MonthSpending): LookRow[] {
+  const gap = (row: DestinationSpending) => row.status === 'over' ? -row.leftPence : row.aheadPence ?? 0
+  return figures.rows.filter(row => row.needsCare && row.destination.kind === 'pot')
+    .sort((a, b) => Number(b.status === 'over') - Number(a.status === 'over') || gap(b) - gap(a) || a.key.localeCompare(b.key))
+    .map(row => { const reason = lookReason(document, figures.month, row); return reason ? { row, reason } : { row } })
 }
 
 /** A destination's transactions in a month, newest first. */

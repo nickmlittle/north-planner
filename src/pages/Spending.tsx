@@ -2,7 +2,10 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { EmptyState, ListRow, PageHeader, Section, StatusChip, Tabs, useMobilePresentation, useStepCopy } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, localDate, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, localDate, monthOf, type CardTransaction } from '../domain/cardTracker'
+import { monthSpending, needsALook, type LookRow } from '../domain/cardSpending'
+import { paceHeadline } from '../formatting/paceLabels'
+import { formatMonth } from '../formatting/month'
 import { checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
 import { statementKeys, statementSummary } from '../domain/cardStatements'
 import { potBalance } from '../domain/potBalances'
@@ -36,8 +39,8 @@ type Props = {
   onOpenCardSettings: () => void
   /** Settings › Sorting rules. */
   onOpenRules?: () => void
-  /** A pot's page on Month, for a month: from a transaction's pot (Spending ↔ Month link F1). */
-  onOpenMonth?: (potId: string, month: string) => void
+  /** A pot's page on Month (or Month itself, with no pot), for a month: from a transaction's pot and the "so far" chips. */
+  onOpenMonth?: (potId: string | null, month: string) => void
   /** Transactions: the row to bring into view (from a pot page). */
   transactionId?: string | null
   /** A statement's detail on Statements. */
@@ -120,6 +123,25 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const openStatement = statementSummary(document, `${card.id}:${openClose}`, today)
   const potPence = setAsidePot ? potBalance(document, setAsidePot.id, today).balancePence : undefined
   const context = [`${statementName(openClose)} ${pounds(openStatement?.totalPence ?? 0)}`, `closes ${dayDate(openClose)}`, setAsidePot && potPence !== undefined ? `${signedPounds(potPence)} in ${potPhrase(setAsidePot.name)}` : ''].filter(Boolean).join(' · ')
+  // "November so far" (F3): this month's pots over or ahead of pace, one chip each; pots that share a name share a chip.
+  const soFarMonth = monthOf(today)
+  const soFar = [...needsALook(document, monthSpending(document, soFarMonth, today)).reduce((groups, item) => {
+    const potName = item.row.destination.kind === 'pot' ? document.budget.pots.find(pot => pot.id === (item.row.destination as { potId: string }).potId)?.name ?? 'Pot' : 'Pot'
+    return groups.set(potName, [...groups.get(potName) ?? [], item])
+  }, new Map<string, LookRow[]>())]
+  const chipText = (potName: string, items: LookRow[]) => {
+    if (items.length === 1) return `${potName} ${paceHeadline(items[0]!.row)}`
+    const over = items.filter(({ row }) => row.status === 'over').length
+    return `${potName} · ${over === items.length ? `${items.length} over` : over === 0 ? `${items.length} ahead` : `${items.length} to look at`}`
+  }
+  const soFarRow = soFar.length > 0 && onOpenMonth && <div className="spending-so-far">
+    <span className="spending-so-far-label">{formatMonth(soFarMonth).split(' ')[0]} so far</span>
+    <ul aria-label={`${formatMonth(soFarMonth).split(' ')[0]} so far`}>{soFar.map(([potName, items]) => {
+      const tone = items.some(({ row }) => row.status === 'over') ? 'critical' : 'warning'
+      const potId = items.length === 1 && items[0]!.row.destination.kind === 'pot' ? items[0]!.row.destination.potId : null
+      return <li key={potName}><button type="button" className={`spending-so-far-chip is-${tone}`} onClick={() => onOpenMonth(potId, soFarMonth)}>{chipText(potName, items)}</button></li>
+    })}</ul>
+  </div>
   const toSettle = statementKeys(tracker).map(key => statementSummary(document, key, today)).filter(row => row && !row.open && row.ready && !row.settled).length
   const where = (transaction: CardTransaction) => {
     const destination = sortDestination(transaction.sort)
@@ -190,6 +212,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       { id: 'transactions', label: 'Transactions' },
       { id: 'statements', label: 'Statements', ...toSettle ? { badge: <StatusChip tone="warning">{toSettle} to settle</StatusChip> } : {} },
     ]}>
+      {/* Under the tabs, so phones keep the tab bar clear where it tucks under the pine header. */}
+      {soFarRow}
       {view === 'sort' ? sortPanel : view === 'transactions' ? allPanel
         : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>}
     </Tabs>

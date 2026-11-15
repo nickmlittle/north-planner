@@ -19,7 +19,8 @@ it('shows what’s due on a pot with bills, and on a monthly pot as part of Left
   render(<PotsSection document={document} month="2026-11" today={TODAY} onOpenPot={() => {}}/>)
   // Bills: electricity and broadband are still to come.
   expect(screen.getByRole('button', { name: /^Bills · carries over: .+ free\. £154\.17 due this month$/ })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /^Groceries: .+ left\. .+ · £30\.00 of it due$/ })).toBeInTheDocument()
+  // Groceries is ahead of pace, so on phones it sits in Needs a look, which keeps its Due.
+  expect(screen.getByRole('button', { name: /^Groceries · Joint: .+ ahead\..* · £30\.00 of it due$/ })).toBeInTheDocument()
 })
 
 it('shows the bills paid and still due in how a pot’s balance is worked out', () => {

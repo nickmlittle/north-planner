@@ -459,13 +459,18 @@ function monthHousehold(): BudgetDocument {
 it('shows planned vs spent for each pot this month, grouped like Plan, with pace', () => {
   render(<MonthHarness initial={monthHousehold()}/>)
   expect(screen.getByRole('heading', { level: 2, name: 'Pots£727.92 spent of £870.00' })).toBeInTheDocument()
-  // Phones: a card per group, three lines a pot.
-  expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Joint', 'Ada', 'Accounts'])
-  expect(screen.getByRole('button', { name: 'Groceries: £181.39 left. £131 ahead · runs out ~Thu 19 Nov' })).toBeInTheDocument()
+  // Phones: pots over or ahead of pace lead in Needs a look, over first, and leave their groups (decision L5).
+  const look = within(screen.getByRole('region', { name: 'Needs a look' })).getAllByRole('button')
+  expect(look.map(button => button.getAttribute('aria-label'))).toEqual([
+    'Treats · Ada: £12.50 over. Mostly Book Nook £212.50. Covered when November closes',
+    'Groceries · Joint: £131 ahead. Mostly Green Grocer £263.71. Runs out ~Thu 19 Nov',
+  ])
+  // Then a card per group, three lines a pot. Ada's only pot is in Needs a look, so Ada has no card.
+  expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Joint', 'Accounts'])
   expect(screen.getByRole('button', { name: 'Eating out: £86.00 left. On track' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Treats: £12.50 over. £12.50 over · covered when November closes' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Groceries:/ })).toBeNull()
   expect(within(screen.getByRole('region', { name: 'Accounts' })).getByText(/one-offs/).closest('.pots-card-row')).toHaveTextContent('£112.81 spent')
-  expect(window.document.querySelector('.pots-status.is-warning')).toHaveTextContent('£131 ahead · runs out ~Thu 19 Nov')
+  expect(window.document.querySelector('.needs-look-status.is-warning')).toHaveTextContent('£131 ahead')
 })
 
 it('shows the pots as one aligned table on desktop', () => {
@@ -484,7 +489,7 @@ it('shows the pots as one aligned table on desktop', () => {
 
 it('opens a steady pot: what’s left a day, the pace chart, when it runs out, and its transactions', () => {
   render(<MonthHarness initial={monthHousehold()}/>)
-  fireEvent.click(screen.getByRole('button', { name: /^Groceries:/ }))
+  fireEvent.click(screen.getByRole('button', { name: /^Groceries · Joint:/ }))
   expect(screen.getByRole('heading', { level: 1, name: 'Groceries' })).toBeInTheDocument()
   expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' })).toBeInTheDocument()
   expect(screen.getByText('Joint · monthly · November 2026 · day 12 of 30')).toBeInTheDocument()

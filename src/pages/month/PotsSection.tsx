@@ -2,22 +2,21 @@ import { useState, type ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { EmptyState, Meter, Section, useMobilePresentation } from '../../components/ui'
 import type { BudgetDocument } from '../../domain/budgetDocument'
-import { monthSpending, type DestinationSpending, type MonthSpending } from '../../domain/cardSpending'
+import { monthSpending, needsALook, type DestinationSpending, type MonthSpending } from '../../domain/cardSpending'
 import { cardTracker, destinationKey, shiftMonth } from '../../domain/cardTracker'
 import { resolveBudget, type BudgetDestination } from '../../domain/monthlyBudget'
 import { potBalance, setAsideStatements } from '../../domain/potBalances'
-import { dayDate } from '../../formatting/date'
-import { formatGBPWhole } from '../../formatting/money'
 import { formatMonth } from '../../formatting/month'
 import { destinationNamer } from '../cardLabels'
 import { dayOf, pounds, signedPounds } from '../spendingFormat'
 import { FreshnessLine } from '../Freshness'
 import type { OpenTransactions } from '../SpendingMonth'
+import { paceStatus } from '../../formatting/paceLabels'
+import { NeedsALook } from './NeedsALook'
 import './PotsSection.css'
 import { useListNavigation } from '../../state/useListNavigation'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
-const whole = (pence: number) => formatGBPWhole(Math.round(pence / 100))
 
 /** One row of the table: a pot (or an account's one-offs), the set-aside pot, or a pot with nothing spent. */
 type PotRow = {
@@ -62,9 +61,7 @@ function spendingRow(document: BudgetDocument, row: DestinationSpending, figures
   }
   const paced = row.pace === 'steady' && row.plannedPence > 0
   const meter = paced ? { value: row.spentPence + row.takenPence, max: row.plannedPence, ...figures.when === 'current' && row.expectedPence !== undefined ? { pace: row.expectedPence / row.plannedPence } : {}, tone: row.status === 'over' ? 'critical' as const : row.status === 'ahead' ? 'warning' as const : 'neutral' as const } : undefined
-  const status = row.status === 'over' ? `${pounds(-row.leftPence)} over${figures.when === 'current' ? ` · covered when ${monthName(figures.month)} closes` : ''}${taken}${due}`
-    : row.status === 'ahead' ? `${whole(row.aheadPence!)} ahead${row.runsOut ? ` · runs out ~${dayDate(row.runsOut)}` : ''}${taken}${due}`
-    : row.status === 'on-track' ? `On track${taken}${due}` : paced ? `${figures.when === 'past' ? 'Ended' : 'Not started'}${taken}${due}` : due ? `${due.slice(3)}${taken}` : `No pace${taken}`
+  const status = row.status === 'over' || row.status === 'ahead' || row.status === 'on-track' ? `${paceStatus(row, figures)}${taken}${due}` : paced ? `${figures.when === 'past' ? 'Ended' : 'Not started'}${taken}${due}` : due ? `${due.slice(3)}${taken}` : `No pace${taken}`
   return { ...base, planned: pounds(row.plannedPence), left: row.leftPence < 0 ? `−${pounds(-row.leftPence)}` : pounds(row.leftPence), meter, status, ...row.status === 'over' ? { tone: 'critical' as const } : row.status === 'ahead' ? { tone: 'warning' as const } : {} }
 }
 
@@ -77,6 +74,9 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   const potKeys = useListNavigation({ label: 'Pots', keys: { enter: 'Open the pot' } })
   const [showAll, setShowAll] = useState(false)
   const figures = monthSpending(document, month, today)
+  // Pots over or ahead of pace lead (F3). On phones they leave their groups; desktop's table keeps every pot.
+  const look = needsALook(document, figures)
+  const lookPots = new Set(mobile ? look.flatMap(({ row }) => row.destination.kind === 'pot' ? [row.destination.potId] : []) : [])
   const name = destinationNamer(document)
   const tracker = cardTracker(document)
   const setAsideCard = tracker.cards.find(card => card.setAside)
@@ -99,7 +99,7 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
     ...document.household.adults.map(person => ({ key: person.id, label: person.name })),
     { key: 'accounts', label: 'Accounts' },
   ].map(group => {
-    const rows = figures.rows.filter(row => row.group === group.key).map(row => spendingRow(document, row, figures, name))
+    const rows = figures.rows.filter(row => row.group === group.key && !(row.destination.kind === 'pot' && lookPots.has(row.destination.potId))).map(row => spendingRow(document, row, figures, name))
     const extra = setAsidePot && ownerGroup(setAsidePot.id) === group.key ? setAsideRow() : null
     const hidden = showAll ? quiet.filter(pot => ownerGroup(pot.id) === group.key).map(pot => quietRow(pot.id)) : []
     return { ...group, rows: [...rows, ...extra ? [extra] : [], ...hidden] }
@@ -119,8 +119,9 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   const more = !showAll && quiet.length > 0 && <button type="button" className="text-button pots-more" onClick={() => setShowAll(true)}>{quiet.length} more {quiet.length === 1 ? 'pot' : 'pots'} with nothing spent<ChevronRight aria-hidden="true"/></button>
 
   return <Section title={title} id="month-pots" count={count} aside={!mobile ? aside : undefined}>
-    {!groups.length && !quiet.length ? <EmptyState title="No pot spending yet" action={onOpenSpending && <button type="button" className="secondary-button" onClick={onOpenSpending}>Open Spending</button>}>Bring in Amex transactions to see each pot against the plan.</EmptyState>
+    {!groups.length && !quiet.length && !look.length ? <EmptyState title="No pot spending yet" action={onOpenSpending && <button type="button" className="secondary-button" onClick={onOpenSpending}>Open Spending</button>}>Bring in Amex transactions to see each pot against the plan.</EmptyState>
       : mobile ? <div className="pots-cards" {...potKeys.listProps}>{potKeys.hint}
+        <NeedsALook document={document} items={look} figures={figures} mobile onOpenPot={onOpenPot}/>
         {groups.map(group => <section key={group.key} className="pots-card" aria-label={group.label}>
           <h3 className="pots-card-title">{group.label}</h3>
           <ul>{group.rows.map(row => <li key={row.key}>{opens(row)
@@ -129,7 +130,7 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
         </section>)}
         {more}
       </div>
-      : <div className="pots-table-wrap" {...potKeys.listProps}>{potKeys.hint}<table className="pots-table">
+      : <><NeedsALook document={document} items={look} figures={figures} mobile={false} onOpenPot={onOpenPot}/><div className="pots-table-wrap" {...potKeys.listProps}>{potKeys.hint}<table className="pots-table">
         <caption className="visually-hidden">Pots in {formatMonth(month)}: spent, planned, left, pace and balance</caption>
         <thead><tr><th scope="col">Pot</th><th scope="col" className="is-num">Spent</th><th scope="col" className="is-num">Planned</th><th scope="col" className="is-num">Left</th><th scope="col" className="pots-pace">Pace</th><th scope="col" className="is-num">In {bank}</th></tr></thead>
         {groups.map(group => <tbody key={group.key}>
@@ -141,7 +142,7 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
             <td className="pots-pace">{pace(row)}</td><td className="is-num">{row.inBank}</td>
           </tr>)}
         </tbody>)}
-      </table>{more}</div>}
+      </table>{more}</div></>}
   </Section>
 }
 
