@@ -9,6 +9,7 @@ import { closeMonthPlan, homeMonths, moneyArrivesDates, type HomeMonth, type Hom
 import { orderTransferAccounts, personTransferPlans } from './personTransfers'
 import { potBalance } from './potBalances'
 import { potPhrase } from './setAside'
+import { gapDestination } from './setAsideCheck'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
 import { personProgress } from './transferTicks'
 import { moneyArrives } from './workingDays'
@@ -185,6 +186,21 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         const phrase = potPhrase(pot?.name ?? owner?.name ?? 'card')
         const amount = task.amountPence ?? 0
         todo.push({ key: task.key, kind: 'set-aside', title: amount < 0 ? `Take money back out of ${phrase}` : `Set aside in ${phrase}`, meta: `${plural(task.count ?? 0, 'transaction')} sorted since the last move`, trailing: pounds(Math.abs(amount)), target: { view: 'spending', section: 'sort' } })
+        return
+      }
+      case 'gap': {
+        // Checking the Amex pot (card-tracker-rules): extra to move to the card's buffer, or short of what it should hold.
+        const owner = tracker.cards.find(row => row.id === task.cardId)
+        const pot = document.budget.pots.find(row => row.id === owner?.setAside?.potId)
+        if (!owner || !pot) return
+        const phrase = potPhrase(pot.name)
+        const gap = task.amountPence ?? 0
+        const checked = potBalance(document, pot.id, today).checked
+        const buffer = gapDestination(owner)
+        // What to do first (phones cut the meta short), then when it was checked.
+        todo.push({ key: task.key, kind: 'set-aside', tone: 'warning', title: gap > 0 ? `Move extra out of ${phrase}` : `${capitalise(phrase)} is short`,
+          meta: [gap > 0 ? `To ${buffer.kind === 'account' ? nameAccount(buffer.accountId) : nameDestination(buffer)}` : 'Less than it should hold', checked ? `checked ${dayDate(localDate(new Date(checked.at)))}` : ''].filter(Boolean).join(' · '),
+          trailing: pounds(Math.abs(gap)), target: { view: 'month', month: task.month, potId: pot.id } })
         return
       }
       case 'transfers':

@@ -25,7 +25,7 @@ import { splitLabel } from '../domain/cardSplits'
 import { cardLabel, dayOf, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { closeDateFor } from '../domain/cardTracker'
 import './Spending.css'
-import { movedByTransaction, moveState, potPhrase, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
+import { movedByTransaction, moveState, potPhrase, potTitle, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
 import { MoveToPotSheet, SetAsideSteps } from './MoveToPotSheet'
 import { markSetAsideMoved } from './setAsideMove'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
@@ -90,10 +90,12 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const [checking, setChecking] = useState(false)
   const [message, setMessageText] = useState('')
   const [undoId, setUndoId] = useState<string | null>(null)
+  // After Check balances: the Amex pot, when its check has a gap, for Open Amex pot.
+  const [gapPot, setGapPot] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
   const [checkingBalances, setCheckingBalances] = useState(false)
   const { copy, status: copiedStatus } = useStepCopy()
-  const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
+  const setMessage = (text: string) => { setMessageText(text); setUndoId(null); setGapPot(null) }
   // A placing that tips a pot into ahead or over gets a toast: Open the pot in Month, or Undo (link F5).
   const { show: showToast, toast } = useToast()
   // Mounted from the first tip on, so the page keeps one status line until then.
@@ -210,7 +212,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   </div>
   const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>
 
-  const messageLine = <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}</p>
+  const messageLine = <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}{gapPot && onOpenMonth && <> <button type="button" className="text-button" onClick={() => onOpenMonth(gapPot, monthOf(today))}>Open {potTitle(document.budget.pots.find(pot => pot.id === gapPot)?.name ?? 'Amex')}</button></>}</p>
 
   return <div className="page-frame spending-page">
     <PageHeader title={tracker.cards.length > 1 ? 'Spending' : card.name} titleText="Spending" context={context} actions={<>
@@ -237,7 +239,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}
-    {checkingBalances && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setCheckingBalances(false)} onSaved={text => { setCheckingBalances(false); setMessage(text) }}/>}
+    {checkingBalances && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setCheckingBalances(false)} onSaved={(text, potId) => { setCheckingBalances(false); setMessage(text); setGapPot(potId ?? null) }}/>}
     {tipShown && toast}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}
   </div>

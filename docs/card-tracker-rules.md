@@ -26,6 +26,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot 4: settling a statement from the Amex pot | A4 | `settleSteps`, `settleStepDone`, `refreshSettled` in `cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
 | Amex pot check 1: should hold, the check, extra and top-ups, covering a bill | C1 | `src/domain/setAsideCheck.ts`, the `gap` flow in `potBalances.ts`, `GapMove` in `cardTracker.ts` |
 | Amex pot check 2: the check on the Amex pot's page, Month's Amex row | C2 | `src/pages/SetAsideCheckLead.tsx`, `SetAsidePot` in `SpendingMonth.tsx`, `src/pages/month/PotsSection.tsx` |
+| Amex pot check 3: Check balances, settle up's cover line, Home | C3 | `src/pages/CheckBalancesSheet.tsx`, `SettleSteps` in `StatementsPanel.tsx`, `gap` in `homeMonths` and `homeInbox` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -261,6 +262,9 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
     - **Short:** "Did a transfer not happen? Make it now, then check the Amex pot again.", a line for each closed statement with no Pay tick (**Open the November statement**), **Recent moves** ("Fri 6 Nov · £312.85", "7 transactions · Groceries £230.25, Spending £55.10, Bills £15.00 and 1 more", each with Undo, which is `undoMove`), then "Or top up the Amex pot from Monzo Joint." with its steps and **Topped up £9.20**.
     - "How In Monzo now is worked out" folds the pot's sums once anything has moved since the check. Each statement it pays opens on Spending.
 - **Month's Amex row** (`amex-check/2`): when the check has a gap, "£5.80 extra" or "£9.20 short" (toned) takes the place of what's still to move.
+- **Check balances** (`amex-check/3`): the Amex pot's row reads "Should hold £312.85 · checked Sat 31 Oct". A typed figure says Matches, "£5.80 extra" or "£9.20 short" against what it should hold. While anything sorted is still to move, the row adds "£140.59 sorted and still to move. Moved it in Monzo already? Press Moved first, or it counts twice." Same as North shows only when the pot already holds what it should. Saving says "1 balance checked. The Amex pot has £5.80 extra." (or "is £9.20 short."), with **Open Amex pot** on Month and Spending.
+- **Settle up** (`amex-check/3`, `billCover`): on a statement paid from the pot, once nothing is left to move and until Pay is ticked, the Pay step says "The Amex pot covers the £169.20 bill · £5.80 to spare.", "£9.20 short of the bill: top up the Amex pot before you pay." or, before any check, "Check the Amex pot against Monzo to see if it covers the bill."
+- **Home** (`amex-check/3`): with a gap, To do has "Move extra out of the Amex pot" (£5.80, "To Monzo Joint · checked Sat 14 Nov") or "The Amex pot is short" (£9.20, "Less than it should hold · checked Sat 14 Nov"), toned, opening the Amex pot's page. It's the `gap:<cardId>` task in `homeMonths`.
 
 ## Links between Spending and Month
 

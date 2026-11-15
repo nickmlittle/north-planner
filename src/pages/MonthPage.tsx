@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type Dispatch, type ReactNode, type 
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { lastDayOf, localDate, monthOf } from '../domain/cardTracker'
 import { monthSpending } from '../domain/cardSpending'
+import { potTitle } from '../domain/setAside'
 import { closeMonth, closeMonthPlan, moneyArrivesDates, monthStage, type MonthStage } from '../domain/monthStages'
 import { budgetDateMarkers, incomeDateMarkers } from '../domain/monthlyBudget'
 import { formatMonth } from '../formatting/month'
@@ -62,6 +63,8 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   const [checking, setChecking] = useState(false)
   const [bringingIn, setBringingIn] = useState(false)
   const [message, setMessage] = useState('')
+  // After Check balances: the Amex pot, when its check has a gap, for Open Amex pot.
+  const [gapPot, setGapPot] = useState<string | null>(null)
   const [byAccount, setByAccount] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   // A finished payday folds after Pots; opening it keeps it open for this month.
@@ -125,7 +128,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   </div>
   return <div ref={frame} className="page-frame monthly-budget-page budget-view-transfers month-page">
     {header}
-    {message && <p className="budget-manage-message month-message" role="status">{message}</p>}
+    {message && <p className="budget-manage-message month-message" role="status">{message}{gapPot && <> <button type="button" className="text-button" onClick={() => { setGapPot(null); onOpenPot(gapPot) }}>Open {potTitle(document.budget.pots.find(pot => pot.id === gapPot)?.name ?? 'Amex')}</button></>}</p>}
     {blocker && <p className="month-close-blocker">{blocker}</p>}
     {changed.length > 0 && <p className="month-changed">Changed since closed: {changed.map(row => `${destination(row.destination)} ${pounds(row.closedPence)} → ${pounds(row.nowPence)}`).join(', ')}.</p>}
     {closeSections ? <>
@@ -143,7 +146,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
     {notesOpen && <Sheet title="How funding is worked out" onClose={() => setNotesOpen(false)} footer={<button type="button" className="primary-button" onClick={() => setNotesOpen(false)}>Done</button>}>
       <TransferCalculationNotes/>
     </Sheet>}
-    {checking && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setChecking(false)} onSaved={text => { setChecking(false); setMessage(text) }}/>}
+    {checking && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setChecking(false)} onSaved={(text, potId) => { setChecking(false); setMessage(text); setGapPot(potId ?? null) }}/>}
     {bringingIn && <BringInSheet document={document} setDocument={setDocument} onClose={() => setBringingIn(false)} onSort={() => { setBringingIn(false); onSort() }}/>}
   </div>
 }

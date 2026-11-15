@@ -60,6 +60,21 @@ function withCard(): BudgetDocument {
   return document
 }
 
+describe('the Amex pot’s check on Home', () => {
+  // The seed's Amex pot holds what's moved in (£312.85); a check on 10 Nov says otherwise.
+  const checked = (pence: number) => { const document = seed(); document.card!.pots['amex-pot'] = { checkedBalance: { pence, at: '2026-11-10T09:00:00.000Z' } }; return document }
+  const row = (document: BudgetDocument) => inbox(document).todo.find(item => item.key === 'gap:amex')
+  it('asks for the extra to move to the buffer', () => {
+    expect(row(checked(31285 + 580))).toMatchObject({ kind: 'set-aside', tone: 'warning', title: 'Move extra out of the Amex pot', meta: 'To Account · checked Tue 10 Nov', trailing: '£5.80', target: { view: 'month', month: '2026-11', potId: 'amex-pot' } })
+  })
+  it('says when the pot is short', () => {
+    expect(row(checked(31285 - 920))).toMatchObject({ title: 'The Amex pot is short', meta: 'Less than it should hold · checked Tue 10 Nov', trailing: '£9.20' })
+  })
+  it('has nothing to say when it matches', () => {
+    expect(row(checked(31285))).toBeUndefined()
+  })
+})
+
 describe('homeInbox on the seed (Wed 11 Nov)', () => {
   const result = inbox(seed())
   it('builds the strip: Plan over in red, Spent with the worst pot, and the open Amex statement', () => {
