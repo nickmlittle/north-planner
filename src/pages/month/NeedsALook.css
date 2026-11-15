@@ -1,0 +1,22 @@
+/* Needs a look (Spending ↔ Month link F3): pots over or ahead of pace, with their reason. Tokens only. */
+.needs-look{display:grid;gap:var(--space-2);margin-bottom:var(--space-3)}
+.needs-look-title{margin:0;font-size:var(--text-md);font-weight:var(--weight-bold)}
+.needs-look-count{margin-left:var(--space-1);color:var(--text-muted);font-weight:var(--weight-regular)}
+.needs-look-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--space-3);margin:0;padding:0;list-style:none}
+.needs-look-card{display:grid;align-content:start;gap:var(--space-2);box-sizing:border-box;width:100%;height:100%;min-height:44px;margin:0;padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.needs-look-card:hover{background:var(--surface-sunken)}
+.needs-look-card:focus-visible{outline-offset:2px}
+.needs-look-top{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3)}
+.needs-look-name{min-width:0;font-weight:var(--weight-medium)}
+.needs-look-owner{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.needs-look-status{flex:none;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.needs-look-status.is-warning{color:var(--warning)}
+.needs-look-status.is-critical{color:var(--critical)}
+.needs-look-card .meter{display:block}
+.needs-look-why{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--space-1) var(--space-3);color:var(--text-muted);font-size:var(--text-sm)}
+.needs-look-reason{color:var(--text)}
+/* Phones: one card, a row per pot, like a group. */
+.needs-look.is-phone .needs-look-list{display:block;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.needs-look.is-phone .needs-look-card{min-height:64px;border:0;border-radius:0;background:transparent}
+.needs-look.is-phone li+li .needs-look-card{border-top:1px solid var(--border)}
+.needs-look.is-phone .needs-look-card:focus-visible{outline-offset:-2px}

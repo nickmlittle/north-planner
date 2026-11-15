@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
-import { monthSpending, type DestinationSpending } from './cardSpending'
+import { monthSpending, needsALook, type DestinationSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { transactionsToSort } from './cardSorting'
 import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey } from './cardTracker'
@@ -16,6 +16,7 @@ import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { dayDate, shortDate } from '../formatting/date'
 import { billsAhead, renewalsInView } from './recurringBills'
+import { capitalise, paceDetail, reasonText } from '../formatting/paceLabels'
 
 /**
  * Home as an inbox (audit 3 PR 10): a three-figure strip, one To do list ordered by when it matters, heads-ups,
@@ -243,10 +244,11 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   }
 
   // ——— Heads-up: pots over or ahead of pace this month ———
-  for (const row of care) headsUp.push({
+  // The second line says why (F3): "Mostly Tesco £303.38 · runs out ~Sat 21 Nov".
+  for (const { row, reason } of figures ? needsALook(document, figures) : []) headsUp.push({
     key: `pace:${row.key}`, kind: 'pace', tone: 'warning',
     title: row.leftPence < 0 ? `${nameDestination(row.destination)} ${pounds(-row.leftPence)} over` : `${nameDestination(row.destination)} ${roundPounds(row.aheadPence ?? 0)} ahead of pace`,
-    meta: row.leftPence < 0 ? `Covered when ${monthName(month)} closes` : row.runsOut ? `At this rate it runs out around ${dayDate(row.runsOut)}` : 'Spending faster than planned',
+    meta: capitalise([reason ? reasonText(reason) : '', paceDetail(row, figures!)].filter(Boolean).join(' · ')) || 'Spending faster than planned',
     ...row.leftPence >= 0 ? { trailing: `${pounds(row.leftPence)} left` } : {},
     target: { view: 'month', month, ...row.destination.kind === 'pot' ? { potId: row.destination.potId } : {} },
   })

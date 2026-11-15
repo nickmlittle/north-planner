@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { emptyCardTracker, type CardTransaction } from '../domain/cardTracker'
+import { monthSpending, needsALook } from '../domain/cardSpending'
 import type { SpendingSection } from '../state/navigation'
 import { FreshnessLine } from './Freshness'
 import { freshness } from './spendingFormat'
@@ -42,7 +43,7 @@ function household(): BudgetDocument {
   return document
 }
 
-function SpendingHarness({ initial = household(), view = 'transactions', onOpenMonth = () => {}, transactionId = null }: { initial?: BudgetDocument; view?: SpendingSection; onOpenMonth?: (potId: string, month: string) => void; transactionId?: string | null }) {
+function SpendingHarness({ initial = household(), view = 'transactions', onOpenMonth = () => {}, transactionId = null }: { initial?: BudgetDocument; view?: SpendingSection; onOpenMonth?: (potId: string | null, month: string) => void; transactionId?: string | null }) {
   const [document, setDocument] = useState(initial)
   const [section, setSection] = useState<SpendingSection>(view)
   return <Spending document={document} setDocument={setDocument} view={section} onSelectView={setSection} onOpenCardSettings={() => {}} onOpenMonth={onOpenMonth} transactionId={transactionId} today={TODAY}/>
@@ -237,5 +238,89 @@ describe('Where it went (F4)', () => {
     unmount()
     render(<PotDetail document={withLidl()} setDocument={() => {}} potId="groceries" month="2026-11" today="2026-12-02" onBack={() => {}}/>)
     expect(screen.queryByText(/by today$/)).toBeNull()
+  })
+})
+
+/** PR 3: Needs a look (F3) on Month, Home and Spending's header, with one pace wording. */
+describe('Needs a look (F3)', () => {
+  /** Groceries ahead and mostly Tesco; Holidays ahead with no brand at half; two Treats pots over. */
+  function lookHousehold(): BudgetDocument {
+    const document = household()
+    document.budget.accounts.push({ id: 'ada-own', name: 'Ada', provider: 'Starling', ownerPersonIds: ['ada'] }, { id: 'ben-own', name: 'Ben', provider: 'Starling', ownerPersonIds: ['ben'] })
+    document.budget.pots.push({ id: 'holidays', name: 'Holidays', accountId: 'joint' }, { id: 'treats-ada', name: 'Treats', accountId: 'ada-own' }, { id: 'treats-ben', name: 'Treats', accountId: 'ben-own' })
+    const item = (id: string, potId: string, pence: number) => ({ id, name: id, categoryId: 'c', entryAmountPence: pence, amountPence: pence, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId }, funding: 'equal' as const })
+    document.budget.snapshots['2026-11']!.items.push(item('h', 'holidays', 60000), item('ta', 'treats-ada', 10000), item('tb', 'treats-ben', 10000))
+    const pot = (potId: string, pence: number) => to({ kind: 'pot', potId }, pence)
+    document.card!.transactions.push(
+      tx('tesco-3', '2026-11-10', 'TESCO STORE 3180 SIDCUP', 9481, { merchant: 'TESCO STORE SIDCUP', sort: pot('groceries', 9481) }),
+      tx('lidl', '2026-11-07', 'LIDL FOOTS CRAY', 903, { sort: pot('groceries', 903) }),
+      tx('airbnb', '2026-11-02', 'AIRBNB', 18000, { sort: pot('holidays', 18000) }),
+      tx('train', '2026-11-03', 'TRAINLINE', 12000, { sort: pot('holidays', 12000) }),
+      tx('hotel', '2026-11-04', 'HOTEL CHOCOLAT', 10000, { sort: pot('holidays', 10000) }),
+      tx('book-a', '2026-11-05', 'BOOK NOOK', 15000, { sort: pot('treats-ada', 15000) }),
+      tx('book-b', '2026-11-05', 'GAME SHOP', 15000, { personId: 'ben', sort: pot('treats-ben', 15000) }),
+    )
+    return document
+  }
+  const month = (props: { onOpenPot?: (potId: string | null) => void } = {}) => <MonthPage document={lookHousehold()} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={props.onOpenPot ?? (() => {})} onSort={() => {}} today={TODAY}/>
+
+  it('puts over first, then the bigger gap, each with its reason: mostly one brand, else the biggest transaction', () => {
+    const document = lookHousehold()
+    const rows = needsALook(document, monthSpending(document, '2026-11', TODAY))
+    expect(rows.map(({ row, reason }) => [row.key, row.status, reason])).toEqual([
+      ['pot:treats-ada', 'over', { kind: 'mostly', name: 'Book Nook', pence: 15000 }],
+      ['pot:treats-ben', 'over', { kind: 'mostly', name: 'Game Shop', pence: 15000 }],
+      ['pot:holidays', 'ahead', { kind: 'biggest', name: 'AIRBNB', pence: 18000 }],
+      ['pot:groceries', 'ahead', { kind: 'mostly', name: 'Tesco', pence: 30338 }],
+    ])
+  })
+
+  it('leads phone Month with Needs a look, and those pots leave their groups', () => {
+    const onOpenPot = vi.fn()
+    render(month({ onOpenPot }))
+    const cards = within(screen.getByRole('region', { name: 'Needs a look' })).getAllByRole('button')
+    expect(cards.map(card => card.getAttribute('aria-label'))).toEqual([
+      'Treats · Ada: £50.00 over. Mostly Book Nook £150.00. Covered when November closes',
+      'Treats · Ben: £50.00 over. Mostly Game Shop £150.00. Covered when November closes',
+      'Holidays · Joint: £120 ahead. Biggest: AIRBNB £180.00. Runs out ~Sat 21 Nov',
+      'Groceries · Joint: £102 ahead. Mostly Tesco £303.38. Runs out ~Sat 21 Nov',
+    ])
+    expect(screen.getByRole('heading', { level: 3, name: 'Needs a look 4' })).toBeInTheDocument()
+    expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Accounts'])
+    fireEvent.click(cards[3]!)
+    expect(onOpenPot).toHaveBeenCalledWith('groceries')
+  })
+
+  it('puts a strip of cards above the desktop table, which keeps every pot', () => {
+    desktop()
+    render(month())
+    const strip = screen.getByRole('region', { name: 'Needs a look' })
+    expect(within(strip).getAllByRole('button')).toHaveLength(4)
+    expect(within(strip).getByRole('button', { name: /^Groceries · Joint/ })).toHaveTextContent('Groceries · Joint£102 aheadMostly Tesco £303.38Runs out ~Sat 21 Nov')
+    const table = screen.getByRole('table')
+    expect(within(table).getByRole('button', { name: /^Groceries:/ }).closest('tr')).toHaveTextContent('£102 ahead · runs out ~Sat 21 Nov')
+    expect(within(table).getAllByRole('button', { name: /^Treats:/ })).toHaveLength(2)
+  })
+
+  it('has no Needs a look when every pot is on track', () => {
+    render(<MonthPage document={household()} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={() => {}} onSort={() => {}} today={TODAY}/>)
+    expect(screen.queryByRole('region', { name: 'Needs a look' })).toBeNull()
+  })
+
+  it('shows November so far in Spending’s header, opening the pot, or Month for pots that share a name', () => {
+    const onOpenMonth = vi.fn()
+    render(<SpendingHarness initial={lookHousehold()} view="sort" onOpenMonth={onOpenMonth}/>)
+    const chips = within(screen.getByRole('list', { name: 'November so far' })).getAllByRole('button')
+    expect(chips.map(chip => chip.textContent)).toEqual(['Treats · 2 over', 'Holidays £120 ahead', 'Groceries £102 ahead'])
+    expect(chips[0]).toHaveClass('is-critical')
+    fireEvent.click(chips[2]!)
+    expect(onOpenMonth).toHaveBeenLastCalledWith('groceries', '2026-11')
+    fireEvent.click(chips[0]!)
+    expect(onOpenMonth).toHaveBeenLastCalledWith(null, '2026-11')
+  })
+
+  it('has no so-far chips when nothing needs a look', () => {
+    render(<SpendingHarness view="sort"/>)
+    expect(screen.queryByRole('list', { name: 'November so far' })).toBeNull()
   })
 })

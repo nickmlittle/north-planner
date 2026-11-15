@@ -88,7 +88,7 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
    */
   const openTransactions = ({ transactionId, destinationKey }: { transactionId?: string; destinationKey?: string }) =>
     navigateTo({ view: 'spending', section: 'transactions', statement: null, transaction: transactionId ?? null }, destinationKey ? { historyState: transactionFilterState([destinationKey]) } : {})
-  const openPotInMonth = (pot: string, month: string) => navigateTo({ view: 'month', month, pot, close: false })
+  const openPotInMonth = (pot: string | null, month: string) => navigateTo({ view: 'month', month, pot, close: false })
   const loading = () => <PageSkeleton/>
   // A save that failed (or a conflict to resolve) is news on every screen, not only in the sidebar. Local-only never shows it.
   const saveLabel = saveStatusLabel(status, error)
