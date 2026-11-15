@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { newBudgetDocument, type BudgetDocument } from './budgetDocument'
-import { cumulativeByDay, destinationTransactions, leftByDestination, monthSpending, potSettings, savePotSettings } from './cardSpending'
+import { cumulativeByDay, destinationTransactions, leftByDestination, monthSpending, paceIfPlaced, potSettings, savePotSettings } from './cardSpending'
+import { impactText, impactTone, optionPaceText, tippedText } from '../formatting/paceLabels'
 import { emptyCardTracker, type CardTransaction, type SplitLine } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 
@@ -184,5 +185,91 @@ describe('carry-over pots', () => {
   it('lists the pot’s annual costs from the Plan', async () => {
     const { document, annualCosts } = await bills()
     expect(annualCosts(document, 'bills', '2026-11')).toEqual([{ id: 'car-ins', name: 'Car insurance', yearlyPence: 61200, monthlyPence: 5100 }])
+  })
+})
+
+describe('pace if placed (Spending ↔ Month link F5)', () => {
+  const today = '2026-11-12'
+  const unsorted = (document: BudgetDocument) => document.card!.transactions.find(row => !row.sort && row.kind === 'purchase')!
+
+  it('tips an on-track pot into ahead, with the run-out date', () => {
+    const document = household()
+    const impact = paceIfPlaced(document, unsorted(document), pot('eating'), today)
+    expect(impact).toMatchObject({ before: { status: 'on-track', spentPence: 6400 }, after: { status: 'ahead', spentPence: 11400, aheadPence: 5400, runsOut: '2026-11-16' }, same: false, tipped: true })
+    expect(impactText('Eating out', impact)).toBe('Eating out: On track → £54 ahead · runs out ~Mon 16 Nov')
+    expect(impactTone(impact)).toBe('warning')
+    expect(tippedText('Eating out', impact)).toBe('Eating out is now £54 ahead of pace')
+    // The document itself is untouched.
+    expect(unsorted(document).sort).toBeUndefined()
+  })
+
+  it('tips into over, and says when it’s covered', () => {
+    const document = household()
+    const big = { ...unsorted(document), amountPence: 10000 }
+    document.card!.transactions = document.card!.transactions.map(row => row.id === big.id ? big : row)
+    const impact = paceIfPlaced(document, big, pot('fuel'), today)
+    expect(impact).toMatchObject({ before: { status: 'left', leftPence: 6180 }, after: { status: 'over', leftPence: -3820 }, tipped: true })
+    expect(impactText('Fuel', impact)).toBe('Fuel: £61.80 left → £38.20 over · covered when November closes')
+    expect(impactTone(impact)).toBe('critical')
+    expect(tippedText('Fuel', impact)).toBe('Fuel is now £38.20 over')
+  })
+
+  it('doesn’t tip a pot that’s already ahead or over, and shows Left when the pace doesn’t move', () => {
+    const document = household()
+    const ahead = paceIfPlaced(document, unsorted(document), pot('groceries'), today)
+    expect(ahead).toMatchObject({ before: { status: 'ahead', aheadPence: 13060 }, after: { status: 'ahead', aheadPence: 18060 }, tipped: false })
+    expect(impactText('Groceries', ahead)).toBe('Groceries: £131 ahead → £181 ahead · runs out ~Tue 17 Nov')
+    expect(tippedText('Groceries', ahead)).toBe('')
+    expect(paceIfPlaced(document, unsorted(document), pot('treats'), today)).toMatchObject({ before: { status: 'over' }, after: { status: 'over' }, tipped: false })
+    const small = { ...unsorted(document), amountPence: 100 }
+    document.card!.transactions = document.card!.transactions.map(row => row.id === small.id ? small : row)
+    const steady = paceIfPlaced(document, small, pot('eating'), today)
+    expect(steady).toMatchObject({ after: { status: 'on-track' }, tipped: false })
+    expect(impactText('Eating out', steady)).toBe('Eating out: £86.00 left → £85.00 left')
+    expect(impactTone(steady)).toBeUndefined()
+  })
+
+  it('lets a refund bring a pot back, never tipping it', () => {
+    const document = household()
+    const refund = tx('2026-11-11', null, { amountPence: -10000 })
+    document.card!.transactions.push(refund)
+    const impact = paceIfPlaced(document, refund, pot('groceries'), today)
+    expect(impact).toMatchObject({ before: { status: 'ahead' }, after: { status: 'on-track', spentPence: 23860 }, tipped: false })
+    expect(impactText('Groceries', impact)).toBe('Groceries: £131 ahead → On track')
+  })
+
+  it('says a pot has nothing planned, and has nothing for an account or the pot it’s already in', () => {
+    const document = household()
+    document.budget.pots.push({ id: 'gifts', name: 'Gifts', accountId: 'joint' })
+    expect(impactText('Gifts', paceIfPlaced(document, unsorted(document), pot('gifts'), today))).toBe('Gifts has nothing planned in November')
+    expect(impactText('Joint', paceIfPlaced(document, unsorted(document), joint, today))).toBe('')
+    const placed = document.card!.transactions.find(row => row.sort?.lines[0]?.destination.kind === 'pot' && row.sort.lines[0].destination.potId === 'eating')!
+    const same = paceIfPlaced(document, placed, pot('eating'), today)
+    expect(same).toMatchObject({ same: true, tipped: false })
+    expect(impactText('Eating out', same)).toBe('')
+  })
+
+  it('shows what’s free in a carry-over pot once its balance is checked', () => {
+    const document = household()
+    expect(impactText('Bills', paceIfPlaced(document, unsorted(document), pot('bills'), today))).toBe('')
+    document.card!.pots.bills = { carriesOver: true, checkedBalance: { pence: 30000, at: '2026-11-01T09:00:00.000Z' } }
+    const impact = paceIfPlaced(document, unsorted(document), pot('bills'), today)
+    expect(impact.freeAfter).toBe(impact.freeBefore! - 5000)
+    expect(impactText('Bills', impact)).toMatch(/^Bills: £[\d,.]+ free → £[\d,.]+ free$/)
+    expect(impact.tipped).toBe(false)
+  })
+
+  it('words each picker option', () => {
+    const month = monthSpending(household(), '2026-11', today)
+    const row = (key: string) => month.rows.find(item => item.key === key)
+    expect(optionPaceText(row('pot:groceries'))).toBe('£181.40 left · £131 ahead')
+    expect(optionPaceText(row('pot:eating'))).toBe('£86.00 left')
+    expect(optionPaceText(row('pot:treats'))).toBe('£12.50 over')
+    expect(optionPaceText(row('pot:fuel'))).toBe('£61.80 left')
+    expect(optionPaceText(row('pot:bills'))).toBe('')
+    expect(optionPaceText(row('pot:bills'), 8000)).toBe('£80.00 free')
+    expect(optionPaceText(row('account:joint'))).toBe('')
+    expect(optionPaceText({ destination: pot('gifts'), status: 'one-offs', leftPence: 0, carriesOver: false })).toBe('nothing planned')
+    expect(optionPaceText(undefined)).toBe('')
   })
 })

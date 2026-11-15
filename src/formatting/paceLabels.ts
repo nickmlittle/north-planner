@@ -1,4 +1,4 @@
-import type { DestinationSpending, LookReason, MonthSpending } from '../domain/cardSpending'
+import type { DestinationSpending, LookReason, MonthSpending, PlacedPace } from '../domain/cardSpending'
 import { dayDate } from './date'
 import { formatGBP, formatGBPWhole } from './money'
 import { formatMonth } from './month'
@@ -44,3 +44,53 @@ export const reasonText = (reason: LookReason) => reason.kind === 'mostly' ? `Mo
 
 /** Sentence case for the start of a line: "Runs out ~Sat 21 Nov". */
 export const capitalise = (text: string) => text ? `${text[0]!.toUpperCase()}${text.slice(1)}` : text
+
+// ——— Sorting (Spending ↔ Month link F5): the picker, the impact line and the toast ———
+
+const leftText = (pence: number) => pence < 0 ? overText(-pence) : `${pounds(pence)} left`
+const freeText = (pence: number) => `${pence < 0 ? '−' : ''}${pounds(Math.abs(pence))} free`
+
+/**
+ * A pot option's suffix in the picker: "£130.00 left · £110 ahead", "£150.00 over", "£130.00 left", "nothing planned".
+ * Carry-over pots show what's free once their balance is checked ("£80.00 free"), else nothing.
+ */
+export function optionPaceText(row: Pick<DestinationSpending, 'destination' | 'status' | 'leftPence' | 'aheadPence' | 'carriesOver'> | undefined, freePence?: number): string {
+  if (!row) return freePence === undefined ? '' : freeText(freePence)
+  if (row.carriesOver) return freePence === undefined ? '' : freeText(freePence)
+  if (row.destination.kind === 'account') return ''
+  if (row.status === 'one-offs') return 'nothing planned'
+  if (row.status === 'over') return overText(-row.leftPence)
+  return row.status === 'ahead' ? `${leftText(row.leftPence)} · ${aheadText(row.aheadPence ?? 0)}` : leftText(row.leftPence)
+}
+
+/** A pot's state on one side of the arrow: "On track", "£110 ahead", "£150.00 over", or "£130.00 left" without pace. */
+const stateText = (row: Pick<DestinationSpending, 'status' | 'leftPence' | 'aheadPence'>) => row.status === 'left' ? leftText(row.leftPence) : paceHeadline(row)
+
+/**
+ * What placing a transaction would change, before it's placed: "Groceries: On track → £110 ahead · runs out ~Fri 20 Nov",
+ * "Groceries: £130.00 left → £80.00 left" when the pace doesn't move, "Spending has nothing planned in November" for a
+ * pot with no plan. Nothing for an account, or when it's already there.
+ */
+export function impactText(name: string, impact: PlacedPace): string {
+  const { before, after, figures } = impact
+  if (impact.same || impact.destination.kind === 'account') return ''
+  if (impact.freeBefore !== undefined && impact.freeAfter !== undefined) return `${name}: ${freeText(impact.freeBefore)} → ${freeText(impact.freeAfter)}`
+  if (!after || after.carriesOver) return ''
+  if (after.status === 'one-offs') return `${name} has nothing planned in ${monthName(figures.month)}`
+  const leftBefore = before ? before.leftPence : after.plannedPence - after.takenPence
+  let from = before && before.status !== 'one-offs' ? stateText(before) : leftText(leftBefore)
+  let to = stateText(after)
+  // The pace doesn't move ("On track → On track"): show what's left instead.
+  if (from === to) { from = leftText(leftBefore); to = leftText(after.leftPence) }
+  return `${name}: ${from} → ${[to, paceDetail(after, figures)].filter(Boolean).join(' · ')}`
+}
+
+/** The impact line's tone: warning once ahead, critical once over. */
+export const impactTone = (impact: PlacedPace): 'warning' | 'critical' | undefined => impact.after?.status === 'over' ? 'critical' : impact.after?.status === 'ahead' ? 'warning' : undefined
+
+/** The toast when placing tips a pot: "Groceries is now £110 ahead of pace", "Groceries is now £150.00 over". */
+export function tippedText(name: string, impact: PlacedPace): string {
+  const after = impact.after
+  if (!impact.tipped || !after) return ''
+  return after.status === 'over' ? `${name} is now ${overText(-after.leftPence)}` : `${name} is now ${aheadText(after.aheadPence ?? 0)} of pace`
+}

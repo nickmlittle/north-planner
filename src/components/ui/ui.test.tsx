@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import { Breadcrumb, EmptyState, ListRow, Meter, MonthTitle, PageHeader, Section, StatStrip, StatTile, StatusChip, Tabs, useToast } from '.'
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -102,5 +102,20 @@ it('useToast announces politely and clears after 2.5s', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
   expect(screen.getByRole('status')).toHaveTextContent('Copied £2,215.45')
   act(() => { vi.advanceTimersByTime(2500) })
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+})
+
+it('useToast carries two actions for 8s, and either one closes it', () => {
+  vi.useFakeTimers()
+  const open = vi.fn(), undo = vi.fn()
+  function Harness() { const { show, toast } = useToast(); return <><button type="button" onClick={() => show('Groceries is now £110 ahead of pace', [{ label: 'Open Groceries', onClick: open }, { label: 'Undo', onClick: undo }])}>Place</button>{toast}</> }
+  render(<Harness/>)
+  fireEvent.click(screen.getByRole('button', { name: 'Place' }))
+  expect(screen.getByRole('status')).toHaveClass('has-action')
+  expect(within(screen.getByRole('status')).getAllByRole('button').map(button => button.textContent)).toEqual(['Open Groceries', 'Undo'])
+  act(() => { vi.advanceTimersByTime(7999) })
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(undo).toHaveBeenCalled()
+  expect(open).not.toHaveBeenCalled()
   expect(screen.getByRole('status')).toBeEmptyDOMElement()
 })
