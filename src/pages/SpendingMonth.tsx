@@ -16,6 +16,7 @@ import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills
 import { spentParts } from './billLabels'
 import { FreshnessLine } from './Freshness'
 import { merchantBreakdown, type MerchantRow } from '../domain/merchants'
+import { addRule, ruleSuggestions, rulesFor, type RuleSuggestion } from '../domain/cardSorting'
 import './PotPage.css'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -153,7 +154,7 @@ function CarryOver({ document, potId, today }: { document: BudgetDocument; potId
 /** Spending › Transactions from a pot page: one transaction in view, or every transaction on this pot. */
 export type OpenTransactions = (target: { transactionId?: string; destinationKey?: string }) => void
 
-type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void; onOpenTransactions?: OpenTransactions; onSort?: () => void }
+type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void; onOpenTransactions?: OpenTransactions; onSort?: () => void; onOpenRules?: () => void }
 
 /** The pot page's header: "Month › Groceries", its kind, Check against Monzo and ⋯ › See in Spending, Pot settings. */
 function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSettings, onSeeInSpending }: { title: string; context: ReactNode; bank: string; onBack: () => void; month: string; onCheck: () => void; onOpenSettings?: () => void; onSeeInSpending?: () => void }) {
@@ -206,10 +207,43 @@ function WhereItWent({ rows, selected, onSelect }: { rows: MerchantRow[]; select
 }
 
 /**
+ * Sorts itself here (Spending ↔ Month link F6): the rules that send transactions to this pot, each opening Settings ›
+ * Sorting rules, and a "Make rule" for a merchant sorted here by hand twice or more (decision L7). Nothing to show, no
+ * section.
+ */
+function SortsItselfHere({ document, setDocument, destination, potName, onOpenRules }: { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; destination: BudgetDestination; potName: string; onOpenRules?: () => void }) {
+  const [message, setMessage] = useState('')
+  const tracker = cardTracker(document)
+  const rules = rulesFor(tracker, destination)
+  const suggested = ruleSuggestions(tracker, destination)
+  if (!rules.length && !suggested.length) return null
+  const holder = (suffix: string) => {
+    const personId = tracker.cards.flatMap(card => card.cardholders).find(row => row.suffix === suffix)?.personId
+    return document.household.adults.find(person => person.id === personId)?.name
+  }
+  const make = (suggestion: RuleSuggestion) => {
+    const at = new Date()
+    const draft = { contains: suggestion.contains, destination }
+    const { alsoSorted } = addRule(document, draft, at)
+    setDocument(current => addRule(current, draft, at).document)
+    setMessage(`Rule added.${alsoSorted ? ` It also sorted ${alsoSorted} more.` : ''}`)
+  }
+  return <Section title="Sorts itself here" aside={onOpenRules && <button type="button" className="text-button" onClick={onOpenRules}>Sorting rules</button>}>
+    <ul className="pot-list" aria-label="Sorts itself here">
+      {rules.map(rule => { const person = rule.cardSuffix ? holder(rule.cardSuffix) : undefined; return <li key={rule.id}><ListRow title={rule.contains} meta={`Your rule${rule.cardSuffix ? ` · only on ${person ? `${person}’s` : 'one'} card` : ''}`}
+        {...onOpenRules ? { onOpen: onOpenRules, label: `${rule.contains}, your rule, open Sorting rules` } : {}}/></li> })}
+      {suggested.map(suggestion => <li key={suggestion.contains}><ListRow title={suggestion.merchant} meta={`Sorted here ${suggestion.count} times · a rule for “${suggestion.contains}”`}
+        trailing={<button type="button" className="secondary-button pot-make-rule" aria-label={`Make rule: “${suggestion.contains}” to ${potName}`} onClick={() => make(suggestion)}>Make rule</button>}/></li>)}
+    </ul>
+    <p className="pot-rules-message" role="status">{message}</p>
+  </Section>
+}
+
+/**
  * A pot's page (Month › Groceries): what's left this month and how fast, with the pace chart and one run-out line;
  * the balance in one line with the sums folded; then its transactions.
  */
-export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort }: DetailProps) {
+export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort, onOpenRules }: DetailProps) {
   const pot = document.budget.pots.find(row => row.id === potId)
   const [checking, setChecking] = useState(false)
   // A brand picked in Where it went: the transactions list shows only its rows.
@@ -265,6 +299,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
           {...onOpenTransactions ? { onOpen: () => onOpenTransactions({ transactionId: transaction.id }), label: `${transaction.description}, ${signedPounds(lineAmount(transaction))}, ${transactionMeta(document, transaction)}, open in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">No transactions in {monthName(month)}.</p>}
     </Section>
+    <SortsItselfHere document={document} setDocument={setDocument} destination={destination} potName={pot.name} {...onOpenRules ? { onOpenRules } : {}}/>
     {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}
   </div>
 }

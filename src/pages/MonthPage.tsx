@@ -41,6 +41,8 @@ type Props = {
   onSort: () => void
   /** Settings › Accounts & pots, from a pot page's ⋯. */
   onOpenPotSettings?: () => void
+  /** Settings › Sorting rules, from a pot page's Sorts itself here (Spending ↔ Month link F6). */
+  onOpenRules?: () => void
   /** Spending › Transactions, from a pot page or an account's one-offs (Spending ↔ Month link F1). */
   onOpenTransactions?: OpenTransactions
   /** Today, for pace and the month's stage; tests pass a fixed one. */
@@ -54,7 +56,7 @@ const chipTone: Record<MonthStage, 'neutral' | 'positive' | 'warning'> = { upcom
  * (while steps are left), then Pots. Ended: Close <Month> inline, with its button as the header's primary. A pot's
  * page takes the sections' place.
  */
-export function MonthPage({ document, setDocument, month, onMonthChange, payday, onOpenPlan, onOpenPotSettings, onOpenTransactions, potId = null, closing = false, onOpenPot, onSort, today = localDate() }: Props) {
+export function MonthPage({ document, setDocument, month, onMonthChange, payday, onOpenPlan, onOpenPotSettings, onOpenRules, onOpenTransactions, potId = null, closing = false, onOpenPot, onSort, today = localDate() }: Props) {
   const [checking, setChecking] = useState(false)
   const [bringingIn, setBringingIn] = useState(false)
   const [message, setMessage] = useState('')
@@ -117,7 +119,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   const paydayFolded = <Section title="Payday" id="month-payday" collapsed={{ summary: `${funding.done} of ${funding.total} done${ticked ? ` · last ticked ${dayOf(ticked)}` : ''}`, onExpand: () => setExpandedMonth(month) }}/>
   const closeSections = closePlan && <CloseSections document={document} setDocument={setDocument} month={month} today={today} onSort={onSort} onBringIn={() => setBringingIn(true)}/>
   if (potId) return <div ref={frame} className="page-frame monthly-budget-page month-page is-pot">
-    <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)} onOpenSettings={onOpenPotSettings} onOpenTransactions={onOpenTransactions} onSort={onSort}/>
+    <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)} onOpenSettings={onOpenPotSettings} onOpenTransactions={onOpenTransactions} onSort={onSort} onOpenRules={onOpenRules}/>
   </div>
   return <div ref={frame} className="page-frame monthly-budget-page budget-view-transfers month-page">
     {header}

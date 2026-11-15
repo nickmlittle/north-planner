@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { bufferOf, cardTracker, destinationKey, normaliseDescription, sameDestination, type CardTracker, type CardTransaction, type SortRule, type SplitLine, type TransactionSort } from './cardTracker'
+import { bufferOf, cardTracker, defaultRuleText, destinationKey, merchantKey, normaliseDescription, sameDestination, type CardTracker, type CardTransaction, type SortRule, type SplitLine, type TransactionSort } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 
 /** The first rule, in list order, whose text appears in the normalised description (and whose card matches, if it names one). */
@@ -181,3 +181,49 @@ export const ruleUses = (tracker: Pick<CardTracker, 'transactions'>, ruleId: str
 /** A sort's single destination, or undefined for a split. */
 export const sortDestination = (sort: TransactionSort | undefined) => sort?.lines.length === 1 ? sort.lines[0]!.destination : undefined
 export const destinationsOf = (sort: TransactionSort | undefined) => [...new Map((sort?.lines ?? []).map(line => [destinationKey(line.destination), line.destination])).values()]
+
+// ——— A pot's rules and suggestions (Spending ↔ Month link F6: "Sorts itself here") ———
+
+/** The single-pot rules that send transactions to a destination, A to Z. Split rules aren't listed. */
+export function rulesFor(tracker: Pick<CardTracker, 'rules'>, destination: BudgetDestination): SortRule[] {
+  return tracker.rules.filter(rule => !rule.split && sameDestination(rule.destination, destination)).sort((a, b) => a.contains.localeCompare(b.contains, 'en-GB'))
+}
+
+/** How many hand sorts of one merchant into a pot earn a "Make rule" (decision L7). */
+export const SUGGEST_AFTER = 2
+
+export type RuleSuggestion = {
+  /** The rule it would make: `defaultRuleText` of the merchant ("TESCO"). */
+  contains: string
+  /** The merchant sorted here most often under that text, the shorter name on a tie ("TESCO STORES"). */
+  merchant: string
+  /** Hand sorts here. */
+  count: number
+}
+
+/**
+ * Merchants sorted into a destination by hand at least `SUGGEST_AFTER` times, with no rule matching them yet: each one
+ * a "Make rule". Merchants group by the rule they'd make, so "TESCO STORES" and "TESCO STORE 3180" count together. A
+ * merchant hand-sorted elsewhere as often as here isn't suggested: a rule would send those the wrong way. Only whole
+ * purchases count: refunds follow their purchase, and splits aren't one pot.
+ */
+export function ruleSuggestions(tracker: Pick<CardTracker, 'rules' | 'transactions'>, destination: BudgetDestination): RuleSuggestion[] {
+  const key = destinationKey(destination)
+  const groups = new Map<string, { here: number; elsewhere: number; merchants: Map<string, number> }>()
+  for (const transaction of tracker.transactions) {
+    const lines = transaction.sort?.lines ?? []
+    if (transaction.kind !== 'purchase' || transaction.sort?.by !== 'person' || lines.length !== 1 || matchRule(tracker.rules, transaction)) continue
+    const merchant = transaction.merchant || merchantKey(transaction.description)
+    const contains = normaliseDescription(defaultRuleText(merchant))
+    if (!contains) continue
+    const group = groups.get(contains) ?? { here: 0, elsewhere: 0, merchants: new Map<string, number>() }
+    if (destinationKey(lines[0]!.destination) === key) {
+      group.here++
+      group.merchants.set(merchant, (group.merchants.get(merchant) ?? 0) + 1)
+    } else group.elsewhere++
+    groups.set(contains, group)
+  }
+  return [...groups].filter(([, group]) => group.here >= SUGGEST_AFTER && group.here > group.elsewhere)
+    .map(([contains, group]) => ({ contains, merchant: [...group.merchants].sort((a, b) => b[1] - a[1] || a[0].length - b[0].length || a[0].localeCompare(b[0], 'en-GB'))[0]![0], count: group.here }))
+    .sort((a, b) => b.count - a.count || a.contains.localeCompare(b.contains, 'en-GB'))
+}

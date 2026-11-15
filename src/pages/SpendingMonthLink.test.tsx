@@ -387,3 +387,52 @@ describe('Pace where you sort (F5)', () => {
     expect(screen.getByText('Groceries is now £59 ahead of pace')).toBeInTheDocument()
   })
 })
+
+/** PR 5: Sorts itself here (F6), the pot page's rules and suggestions. */
+describe('Sorts itself here (F6)', () => {
+  function PotHarness({ initial, onOpenRules }: { initial: BudgetDocument; onOpenRules?: () => void }) {
+    const [document, setDocument] = useState(initial)
+    return <PotDetail document={document} setDocument={setDocument} potId="groceries" month="2026-11" today={TODAY} onBack={() => {}} {...onOpenRules ? { onOpenRules } : {}}/>
+  }
+
+  it('suggests a rule for a merchant sorted here by hand twice, and makes it', () => {
+    const document = household()
+    // Waiting in To sort: the new rule sorts it too.
+    document.card!.transactions.push(tx('express', '2026-11-14', 'TESCO EXPRESS', 450))
+    render(<PotHarness initial={document}/>)
+    const section = screen.getByRole('list', { name: 'Sorts itself here' })
+    expect(within(section).getByText('TESCO STORES')).toBeInTheDocument()
+    expect(within(section).getByText('Sorted here 2 times · a rule for “TESCO”')).toBeInTheDocument()
+    fireEvent.click(within(section).getByRole('button', { name: 'Make rule: “TESCO” to Groceries' }))
+    expect(screen.getByText('Rule added. It also sorted 1 more.')).toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: 'Sorts itself here' })).getByText('TESCO')).toBeInTheDocument()
+    expect(screen.getByText('Your rule')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Make rule/ })).toBeNull()
+    // The waiting Tesco now counts on the pot.
+    expect(within(screen.getByRole('list', { name: 'Transactions' })).getByText('TESCO EXPRESS')).toBeInTheDocument()
+  })
+
+  it('lists the pot’s rules, opening Sorting rules, with a card-only rule saying whose card', () => {
+    const onOpenRules = vi.fn()
+    const document = household()
+    document.card!.rules = [
+      { id: 'tesco', contains: 'TESCO', destination: { kind: 'pot', potId: 'groceries' }, createdAt: 'x' },
+      { id: 'lidl', contains: 'LIDL', cardSuffix: '41001', destination: { kind: 'pot', potId: 'groceries' }, createdAt: 'x' },
+      { id: 'amazon', contains: 'AMAZON', destination: { kind: 'account', accountId: 'joint' }, createdAt: 'x' },
+    ]
+    render(<PotHarness initial={document} onOpenRules={onOpenRules}/>)
+    const rows = within(screen.getByRole('list', { name: 'Sorts itself here' })).getAllByRole('button')
+    expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['LIDL, your rule, open Sorting rules', 'TESCO, your rule, open Sorting rules'])
+    expect(screen.getByText('Your rule · only on Ada’s card')).toBeInTheDocument()
+    fireEvent.click(rows[1]!)
+    fireEvent.click(screen.getByRole('button', { name: 'Sorting rules' }))
+    expect(onOpenRules).toHaveBeenCalledTimes(2)
+  })
+
+  it('has no section with no rules and nothing sorted here twice', () => {
+    const document = household()
+    document.card!.transactions = document.card!.transactions.filter(row => row.id !== 'tesco-2')
+    render(<PotHarness initial={document}/>)
+    expect(screen.queryByRole('list', { name: 'Sorts itself here' })).toBeNull()
+  })
+})
