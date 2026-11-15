@@ -1,6 +1,6 @@
 # Spending ↔ Month link: design and PR build plan
 
-Status: planned, 15 November 2026, with Nick. No PRs built yet. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
+Status: planned, 15 November 2026, with Nick. PR 1 (`link/1-links`) is built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/B98PWR9ZRecPSKRsEk55BF. Boards D1, D2, D4, M1, M2 and M3 are the source for this plan. The canvas was drawn for "lines" on an account; read "line" there as "pot" (decision L1).
 - **Working doc** (private to the owner): https://claude.ai/artifact/QUKqHuCUVd9oaRKWmr33bx. It holds the household setup checklist with real figures.
@@ -51,8 +51,8 @@ Six features, each on desktop and phone. The canvas boards each one comes from a
 
 ### F1 · Links both ways (D1, D2, M1)
 
-- **Spending → Month:** a transaction's pot is a link to that pot's page, for the transaction's month. Desktop: the Pot or account cell. Phone: the pot in the row's meta line, plus "Open Groceries in Month" in the sort sheet once it's placed.
-- **Month → Spending:** each transaction on a pot page opens in Spending › Transactions with that row in focus. The pot page header gets "See in Spending": Transactions filtered to that pot. An account row ("Monzo Joint · one-offs") opens Transactions filtered to that account.
+- **Spending → Month:** a transaction's pot is a link to that pot's page, for the transaction's month. Desktop: the Pot or account cell. Phone: "Open Groceries in Month" in the sort sheet once it's placed. (As built: a phone row is one button, so the link can't sit inside it.)
+- **Month → Spending:** each transaction on a pot page opens in Spending › Transactions with that row in focus. "See in Spending" (the Transactions section's aside and the pot page's ⋯) opens Transactions filtered to that pot. An account row ("Monzo Joint · one-offs") opens Transactions filtered to that account.
 - **Links survive Back:** both ways use the same history entries as the rest of the app, so Back returns to the row you came from.
 
 ### F2 · Freshness line (D1, M3)

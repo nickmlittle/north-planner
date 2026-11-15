@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest'
-import { currentMonth, hasLegacyParams, navigateTo, parseNavigation, rewriteLegacyLink } from './navigation'
+import { currentMonth, hasLegacyParams, navigateTo, parseNavigation, rewriteLegacyLink, transactionFilterFromState, transactionFilterState } from './navigation'
 
 afterEach(() => window.history.replaceState(null, '', '/'))
 
-const none = { section: null, pot: null, statement: null, close: false, planDestination: null }
+const none = { section: null, pot: null, statement: null, transaction: null, close: false, planDestination: null }
 
 it('parses each destination and its details', () => {
   expect(parseNavigation('?view=month&month=2026-02')).toEqual({ ...none, view: 'month', month: '2026-02' })
@@ -86,6 +86,19 @@ it('starts a new screen fresh, and keeps details on the same screen', () => {
   expect(parseNavigation(window.location.search).planDestination).toEqual({ kind: 'pot', id: 'bills:main' })
   navigateTo({ view: 'month' })
   expect(window.location.search).not.toContain('planDestination')
+})
+
+it('brings a transaction into view on Transactions only, and carries a pot filter in history state', () => {
+  window.history.replaceState(null, '', '/?view=month&month=2026-11&pot=groceries')
+  navigateTo({ view: 'spending', section: 'transactions', transaction: 'tx-1' }, { historyState: transactionFilterState(['pot:groceries']) })
+  expect(window.location.search).toBe('?view=spending&month=2026-11&section=transactions&transaction=tx-1')
+  expect(parseNavigation(window.location.search)).toMatchObject({ view: 'spending', section: 'transactions', transaction: 'tx-1', pot: null })
+  expect(transactionFilterFromState()).toEqual(['pot:groceries'])
+  expect(parseNavigation('?view=spending&section=sort&transaction=tx-1').transaction).toBeNull()
+  navigateTo({ section: 'sort', transaction: null })
+  expect(window.location.search).not.toContain('transaction=')
+  window.history.replaceState({ northTransactionFilter: 'pot:groceries' }, '')
+  expect(transactionFilterFromState()).toEqual([])
 })
 
 it('opens Close <Month> on Month, and Settings at a section', () => {

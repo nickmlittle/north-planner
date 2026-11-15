@@ -27,9 +27,10 @@ export function hasLiveTransfersOrigin(destination: PlanDestination | null): boo
 
 /**
  * Where the app is. `section`: Spending's tab or a Settings area. `pot` and `close`: a pot's page or Close <Month>,
- * on Month. `statement`: a statement's page, on Spending. `planDestination`: Plan filtered to one destination.
+ * on Month. `statement`: a statement's page, on Spending. `transaction`: the row Spending › Transactions brings into
+ * view (a pot page's transaction). `planDestination`: Plan filtered to one destination.
  */
-export type NavigationState = { view: PlannerView; month: string; section: SpendingSection | SettingsSection | null; pot: string | null; statement: string | null; close: boolean; planDestination: PlanDestination | null }
+export type NavigationState = { view: PlannerView; month: string; section: SpendingSection | SettingsSection | null; pot: string | null; statement: string | null; transaction: string | null; close: boolean; planDestination: PlanDestination | null }
 const spendingSections: readonly SpendingSection[] = ['sort', 'transactions', 'statements']
 const settingsSections: readonly SettingsSection[] = ['household', 'income', 'accounts', 'categories', 'cards', 'rules', 'account']
 const views: readonly PlannerView[] = ['home', 'month', 'plan', 'spending', 'settings']
@@ -58,7 +59,7 @@ export const hasLegacyParams = (search: string) => { const params = new URLSearc
 
 /** A link's screen and its details, from today's params or any older form (plan §2.1's redirect table). */
 function parseLocation(params: URLSearchParams): Omit<NavigationState, 'month'> {
-  const none = { section: null, pot: null, statement: null, close: false, planDestination: null }
+  const none = { section: null, pot: null, statement: null, transaction: null, close: false, planDestination: null }
   const view = params.get('view')
   const spendingView = params.get('spendingView')
   if (view === 'household') return { ...none, view: 'settings', section: 'household' }
@@ -76,7 +77,7 @@ function parseLocation(params: URLSearchParams): Omit<NavigationState, 'month'> 
   if (view === 'plan') return { ...none, view, planDestination: parsePlanDestination(params.get('planDestination')) }
   if (view === 'spending') {
     const tab = spendingSections.includes(section as SpendingSection) ? section as SpendingSection : 'sort'
-    return { ...none, view, section: tab, statement: tab === 'statements' ? params.get('statement') || null : null }
+    return { ...none, view, section: tab, statement: tab === 'statements' ? params.get('statement') || null : null, transaction: tab === 'transactions' ? params.get('transaction') || null : null }
   }
   if (view === 'settings') return { ...none, view, section: settingsSections.includes(section as SettingsSection) ? section as SettingsSection : null }
   // Opening the app lands on Home.
@@ -98,16 +99,17 @@ export const spendingSection = (state: NavigationState): SpendingSection => spen
 export function navigateTo(next: Partial<NavigationState>, { replace = false, historyState = null }: { replace?: boolean; historyState?: unknown } = {}) {
   const current = parseNavigation(window.location.search)
   const fresh = next.view !== undefined && next.view !== current.view
-  const state: NavigationState = { ...current, ...fresh ? { section: null, pot: null, statement: null, close: false, planDestination: null } : {}, ...next }
+  const state: NavigationState = { ...current, ...fresh ? { section: null, pot: null, statement: null, transaction: null, close: false, planDestination: null } : {}, ...next }
   const url = new URL(window.location.href)
   const keepMonth = next.month !== undefined || url.searchParams.has('month')
-  for (const key of [...LEGACY_PARAMS, 'view', 'month', 'section', 'pot', 'statement', 'close', 'planDestination']) url.searchParams.delete(key)
+  for (const key of [...LEGACY_PARAMS, 'view', 'month', 'section', 'pot', 'statement', 'transaction', 'close', 'planDestination']) url.searchParams.delete(key)
   url.searchParams.set('view', state.view)
   if (keepMonth) url.searchParams.set('month', state.month)
   if (state.view === 'spending') {
     const tab = spendingSection(state)
     url.searchParams.set('section', tab)
     if (tab === 'statements' && state.statement) url.searchParams.set('statement', state.statement)
+    if (tab === 'transactions' && state.transaction) url.searchParams.set('transaction', state.transaction)
   }
   if (state.view === 'settings' && state.section && settingsSections.includes(state.section as SettingsSection)) url.searchParams.set('section', state.section)
   if (state.view === 'month' && state.pot) url.searchParams.set('pot', state.pot)
@@ -118,6 +120,16 @@ export function navigateTo(next: Partial<NavigationState>, { replace = false, hi
   if (target === `${window.location.pathname}${window.location.search}${window.location.hash}` && historyState === null) return
   window.history[replace ? 'replaceState' : 'pushState'](historyState, '', target)
   window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
+/**
+ * Spending › Transactions opened already filtered (Month's "See in Spending" and its account rows): the pot or
+ * account keys (`destinationKey`) ride in history state, so Back and Forward keep them and a shared link doesn't.
+ */
+export const transactionFilterState = (destinationKeys: string[]) => ({ northTransactionFilter: destinationKeys })
+export function transactionFilterFromState(): string[] {
+  const value = window.history.state?.northTransactionFilter as unknown
+  return Array.isArray(value) ? value.filter((key): key is string => typeof key === 'string') : []
 }
 
 /** An old link, rewritten in place to today's params; history state (Back to Month, the review person) is kept. */

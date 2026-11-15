@@ -1,0 +1,7 @@
+/* The freshness line (Spending ↔ Month link F2): plain text with an inline "3 to sort ›". Tokens only. */
+.freshness{display:inline;color:inherit}
+.freshness .freshness-sort{display:inline-flex;align-items:center;gap:2px;min-height:0;margin:calc(var(--space-3) * -1) 0;padding:var(--space-3) 0;font:inherit;vertical-align:baseline}
+.freshness .freshness-sort svg{width:14px;height:14px}
+.pot-freshness{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
+/* In the pine phone header the link takes the header's ink, underlined, so it reads as a link on the dark band. */
+.page-header-mobile .freshness .freshness-sort{color:var(--white);text-decoration:underline;text-underline-offset:3px}

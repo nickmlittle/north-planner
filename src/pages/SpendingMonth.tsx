@@ -14,6 +14,7 @@ import { dayDate, shortDate } from './cardLabels'
 import { dayOf, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
 import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills'
 import { spentParts } from './billLabels'
+import { FreshnessLine } from './Freshness'
 import './PotPage.css'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -140,16 +141,22 @@ function CarryOver({ document, potId, today }: { document: BudgetDocument; potId
   </>
 }
 
-type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void }
+/** Spending › Transactions from a pot page: one transaction in view, or every transaction on this pot. */
+export type OpenTransactions = (target: { transactionId?: string; destinationKey?: string }) => void
 
-/** The pot page's header: "Month › Groceries", its kind, Check against Monzo and ⋯ › Pot settings. */
-function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSettings }: { title: string; context: ReactNode; bank: string; onBack: () => void; month: string; onCheck: () => void; onOpenSettings?: () => void }) {
+type DetailProps = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; potId: string; month: string; today: string; onBack: () => void; onOpenSettings?: () => void; onOpenTransactions?: OpenTransactions; onSort?: () => void }
+
+/** The pot page's header: "Month › Groceries", its kind, Check against Monzo and ⋯ › See in Spending, Pot settings. */
+function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSettings, onSeeInSpending }: { title: string; context: ReactNode; bank: string; onBack: () => void; month: string; onCheck: () => void; onOpenSettings?: () => void; onSeeInSpending?: () => void }) {
   // Phones move the header into the app header, which has no breadcrumb; the way back sits on the pine band instead.
   const mobile = useMobilePresentation()
   return <>{mobile && <Breadcrumb items={[{ label: 'Month', onClick: onBack }, { label: title }]}/>}<PageHeader titleText={title} title={title} monthLabel={formatMonth(month)} context={context} breadcrumb={mobile ? undefined : [{ label: 'Month', onClick: onBack }, { label: title }]}
     actions={<>
       <button type="button" className="secondary-button" onClick={onCheck}>Check against {bank}</button>
-      {onOpenSettings && <BudgetOptionsMenu label={`More ${title} options`} options={[{ label: 'Pot settings', onSelect: onOpenSettings }]}/>}
+      {(onOpenSettings || onSeeInSpending) && <BudgetOptionsMenu label={`More ${title} options`} options={[
+        ...onSeeInSpending ? [{ label: 'See in Spending', onSelect: onSeeInSpending }] : [],
+        ...onOpenSettings ? [{ label: 'Pot settings', onSelect: onOpenSettings }] : [],
+      ]}/>}
     </>}/></>
 }
 
@@ -177,7 +184,7 @@ function SetAsidePot({ document, setDocument, potId, onBack, month, today, onOpe
  * A pot's page (Month › Groceries): what's left this month and how fast, with the pace chart and one run-out line;
  * the balance in one line with the sums folded; then its transactions.
  */
-export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings }: DetailProps) {
+export function PotDetail({ document, setDocument, potId, month, today = localDate(), onBack, onOpenSettings, onOpenTransactions, onSort }: DetailProps) {
   const pot = document.budget.pots.find(row => row.id === potId)
   const [checking, setChecking] = useState(false)
   const figures = monthSpending(document, month, today)
@@ -198,9 +205,11 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const chartLabel = row ? `${pot.name} spending ${figures.when === 'current' ? 'so far' : `in ${monthName(month)}`} against the plan: ${pounds(row.spentPence)} spent${figures.when === 'current' ? ` by day ${figures.day}` : ''}${row.expectedPence !== undefined ? `, against ${pounds(row.expectedPence)} at the planned pace` : ''}, of ${pounds(row.plannedPence)} planned.${row.runsOut && row.status === 'ahead' ? ` Runs out around ${dayDate(row.runsOut)}.` : ''}` : ''
   const lineAmount = (transaction: CardTransaction) => transaction.sort!.lines.filter(line => line.destination.kind === 'pot' && line.destination.potId === potId).reduce((sum, line) => sum + line.amountPence, 0)
   const context = `${ownerLabel} · ${carriesOver ? 'carries over' : 'monthly'} · ${formatMonth(month)}${figures.when === 'current' ? ` · day ${figures.day} of ${figures.daysInMonth}` : ''}`
+  // Month → Spending (F1): the pot's transactions, filtered; or one of them, in view.
+  const seeInSpending = onOpenTransactions && (() => onOpenTransactions({ destinationKey: `pot:${potId}` }))
 
   return <div className="pot-detail">
-    <PotHeader title={pot.name} context={context} bank={bank} month={month} onBack={onBack} onCheck={() => setChecking(true)} onOpenSettings={onOpenSettings}/>
+    <PotHeader title={pot.name} context={context} bank={bank} month={month} onBack={onBack} onCheck={() => setChecking(true)} onOpenSettings={onOpenSettings} onSeeInSpending={seeInSpending}/>
     {carriesOver ? <><CarryOver document={document} potId={potId} today={today}/>{row && bills.length > 0 && <PotMonthFigures document={document} row={row}/>}</>
       : !row ? <><p className="pot-none">Nothing planned or spent in {monthName(month)}.</p><BalanceLine document={document} potId={potId} today={today}/></> : <>
       <section className="pot-lead" aria-labelledby="pot-lead-label">
@@ -211,15 +220,17 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
         {bills.length > 0 && <p className="pot-lead-bills">{[row.duePence ? `${pounds(row.duePence)} of it due` : '', spentParts(document, row)].filter(Boolean).join(' · ')}</p>}
         {steady && figures.when !== 'future' && <PaceChart document={document} month={month} row={row} figures={figures} label={chartLabel}/>}
         {row.status === 'ahead' && row.runsOut && <p className="pot-runout">At this rate it runs out around {dayDate(row.runsOut)}, {daysBetween(row.runsOut, `${month}-${String(figures.daysInMonth).padStart(2, '0')}`)} days before the month ends.</p>}
+        {figures.when !== 'future' && <p className="pot-freshness"><FreshnessLine document={document} onSort={onSort}/></p>}
       </section>
       {bills.length > 0 && <BillsThisMonth document={document} bills={bills} month={month} today={today}/>}
       <Section title="Balance"><BalanceLine document={document} potId={potId} today={today}/></Section>
     </>}
     {carriesOver && bills.length > 0 && <BillsThisMonth document={document} bills={bills} month={month} today={today}/>}
     <YearlyBillsSetAside document={document} potId={potId} month={month} today={today}/>
-    <Section title="Transactions">
+    <Section title="Transactions" aside={seeInSpending && transactions.length > 0 && <button type="button" className="text-button" onClick={seeInSpending}>See in Spending</button>}>
       {transactions.length ? <ul className="pot-list" aria-label="Transactions">{transactions.map(transaction => <li key={transaction.id}>
-        <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}/>
+        <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}
+          {...onOpenTransactions ? { onOpen: () => onOpenTransactions({ transactionId: transaction.id }), label: `${transaction.description}, ${signedPounds(lineAmount(transaction))}, ${transactionMeta(document, transaction)}, open in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">No transactions in {monthName(month)}.</p>}
     </Section>
     {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}

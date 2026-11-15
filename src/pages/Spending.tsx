@@ -36,8 +36,10 @@ type Props = {
   onOpenCardSettings: () => void
   /** Settings › Sorting rules. */
   onOpenRules?: () => void
-  /** Month's pots (or one pot's page). Unused since the side rail went (audit 3 PR 13). */
-  onOpenMonth?: (potId?: string) => void
+  /** A pot's page on Month, for a month: from a transaction's pot (Spending ↔ Month link F1). */
+  onOpenMonth?: (potId: string, month: string) => void
+  /** Transactions: the row to bring into view (from a pot page). */
+  transactionId?: string | null
   /** A statement's detail on Statements. */
   statementKey?: string | null
   onOpenStatement?: (key: string | null) => void
@@ -71,7 +73,7 @@ export function TransactionRow({ document, transaction, where, tag, moved, actio
  * Spending: the card's own workspace. One header (the card, its open statement, Bring in), three tabs (To sort,
  * Transactions, Statements), and setting money aside as the last step of sorting.
  */
-export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenRules = () => {}, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
+export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenRules = () => {}, onOpenMonth, transactionId = null, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
   const compact = useMobilePresentation()
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -171,7 +173,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     </Section>
     {toSort.length > 0 && setAside}
   </div>
-  const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf}/></Section>
+  const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>
 
   return <div className="page-frame spending-page">
     <PageHeader title={tracker.cards.length > 1 ? 'Spending' : card.name} titleText="Spending" context={context} actions={<>
@@ -191,7 +193,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       {view === 'sort' ? sortPanel : view === 'transactions' ? allPanel
         : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>}
     </Tabs>
-    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
+    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}

@@ -1,6 +1,7 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
 import { refundsOf } from '../domain/cardRefunds'
+import { transactionsToSort } from '../domain/cardSorting'
 import { formatGBP } from '../formatting/money'
 import { dayDate, shortDate } from './cardLabels'
 import type { StatementSummary } from '../domain/cardStatements'
@@ -63,4 +64,17 @@ export function transactionLink(document: BudgetDocument, transaction: CardTrans
   const purchase = transaction.refundOf ? tracker.transactions.find(row => row.id === transaction.refundOf!.transactionId) : undefined
   if (purchase) return `Refund of ${purchase.description} ${signedPounds(purchase.amountPence)} · ${shortDate(purchase.date)}`
   return transaction.kind === 'purchase' ? refundsOf(tracker, transaction.id).map(row => `Refunded ${signedPounds(row.amountPence)} · ${shortDate(row.date)}`).join(' · ') : ''
+}
+
+/**
+ * How far pace can see (Spending ↔ Month link, design rule 1): the newest card transaction brought in, and how many
+ * are still waiting to be sorted. Null without a card. "Amex sorted to Fri 13 Nov", 3 to sort; "Amex not brought in yet".
+ */
+export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: string; toSort: number; broughtIn: boolean } | null {
+  const tracker = cardTracker(document)
+  if (!tracker.cards.length) return null
+  const card = tracker.cards.length === 1 ? tracker.cards[0]!.name : 'Cards'
+  const newest = tracker.transactions.filter(row => row.kind !== 'payment').reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
+  if (!newest) return { lead: `${card} not brought in yet`, toSort: 0, broughtIn: false }
+  return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, broughtIn: true }
 }

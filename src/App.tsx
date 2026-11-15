@@ -18,7 +18,7 @@ import { localDate } from './domain/cardTracker'
 import { formatMonth } from './formatting/month'
 import { documentTitle } from './state/documentTitle'
 import { useNavCounts } from './state/navCounts'
-import { hasLiveTransfersOrigin, markStepsOrigin, navigateTo, parseNavigation, rewriteLegacyLink, spendingSection, stepsReturnFromState, transfersOriginState, type PlanDestination, type PlannerView, type SettingsSection } from './state/navigation'
+import { hasLiveTransfersOrigin, markStepsOrigin, navigateTo, parseNavigation, rewriteLegacyLink, spendingSection, stepsReturnFromState, transactionFilterState, transfersOriginState, type PlanDestination, type PlannerView, type SettingsSection } from './state/navigation'
 
 const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })))
 const MonthlyBudget = lazy(() => import('./pages/MonthlyBudget').then(module => ({ default: module.MonthlyBudget })))
@@ -82,6 +82,13 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
     if (target.view === 'settings') { navigateTo({ view: 'settings', section: target.section }); return }
     navigateTo({ view: 'spending', section: target.section, statement: target.statementKey ?? null }, target.bringIn ? { historyState: { northBringIn: true } } : {})
   }
+  /**
+   * Spending ↔ Month (link plan F1). Month → Spending: Transactions with one row in view, or filtered to a pot or
+   * account. Spending → Month: a pot's page for the transaction's month. Both push history, so Back returns.
+   */
+  const openTransactions = ({ transactionId, destinationKey }: { transactionId?: string; destinationKey?: string }) =>
+    navigateTo({ view: 'spending', section: 'transactions', statement: null, transaction: transactionId ?? null }, destinationKey ? { historyState: transactionFilterState([destinationKey]) } : {})
+  const openPotInMonth = (pot: string, month: string) => navigateTo({ view: 'month', month, pot, close: false })
   const loading = () => <PageSkeleton/>
   // A save that failed (or a conflict to resolve) is news on every screen, not only in the sidebar. Local-only never shows it.
   const saveLabel = saveStatusLabel(status, error)
@@ -98,11 +105,11 @@ function BudgetApp({ document, setDocument, status, error, email, onSignOut }: {
       : view === 'settings'
       ? <Suspense fallback={loading()}><SettingsPage document={document} setDocument={setDocument} month={navigation.month} section={setupComplete ? navigation.section as SettingsSection | null : 'household'} onSelectSection={section => navigateTo({ view: 'settings', section })} onMonthChange={month => navigateTo({ month })} setupComplete={setupComplete} status={status} warning={error} email={email} onSignOut={onSignOut}/></Suspense>
       : view === 'spending'
-      ? <Suspense fallback={loading()}><Spending document={document} setDocument={setDocument} view={spendingSection(navigation)} onSelectView={section => navigateTo({ view: 'spending', section, statement: null })} onOpenCardSettings={() => navigateTo({ view: 'settings', section: 'cards' })} onOpenRules={() => navigateTo({ view: 'settings', section: 'rules' })} onOpenMonth={pot => navigateTo({ view: 'month', pot: pot ?? null })} statementKey={navigation.statement} onOpenStatement={statement => navigateTo({ view: 'spending', section: 'statements', statement })}/></Suspense>
+      ? <Suspense fallback={loading()}><Spending document={document} setDocument={setDocument} view={spendingSection(navigation)} onSelectView={section => navigateTo({ view: 'spending', section, statement: null, transaction: null })} onOpenCardSettings={() => navigateTo({ view: 'settings', section: 'cards' })} onOpenRules={() => navigateTo({ view: 'settings', section: 'rules' })} onOpenMonth={openPotInMonth} transactionId={navigation.transaction} statementKey={navigation.statement} onOpenStatement={statement => navigateTo({ view: 'spending', section: 'statements', statement })}/></Suspense>
       : view === 'home'
       ? <Suspense fallback={loading()}><Home document={document} setDocument={setDocument} month={navigation.month} onOpen={openFromHome}/></Suspense>
       : <Suspense fallback={loading()}><MonthlyBudget reviewPersonId={reviewPersonId} document={document} setDocument={setDocument} saveStatus={status} accountBacked={!!onSignOut} view={view === 'month' ? 'month' : 'plan'} month={navigation.month} onMonthChange={month => navigateTo({ month, pot: null, close: false })} onSeeTransferItems={seeTransferItems} planDestination={navigation.planDestination} onClearPlanDestination={clearPlanDestination} onViewAffectedTransfers={viewAffectedTransfers} affectedTransfers={affectedTransfers} stepsReturn={view === 'month' ? stepsReturnFromState() : null} onReturnToTransfers={returnToMonth} onOpenPlan={() => navigateTo({ view: 'plan' })} hasTransfersOrigin={hasLiveTransfersOrigin(navigation.planDestination)} planItemId={view === 'plan' && typeof window.history.state?.northPlanItem === 'string' ? window.history.state.northPlanItem : undefined}
-          potId={navigation.pot} closing={navigation.close} onOpenPot={pot => navigateTo({ view: 'month', pot, close: false })} onOpenClose={close => navigateTo({ view: 'month', close, pot: null })} onOpenSort={() => navigateTo({ view: 'spending', section: 'sort' })} onOpenSettings={section => navigateTo({ view: 'settings', section, month: navigation.month })}/></Suspense>}
+          potId={navigation.pot} closing={navigation.close} onOpenPot={pot => navigateTo({ view: 'month', pot, close: false })} onOpenClose={close => navigateTo({ view: 'month', close, pot: null })} onOpenSort={() => navigateTo({ view: 'spending', section: 'sort' })} onOpenTransactions={openTransactions} onOpenSettings={section => navigateTo({ view: 'settings', section, month: navigation.month })}/></Suspense>}
     {setupComplete && <CommandPalette document={document} month={navigation.month} today={localDate()}/>}
   </AppLayout>
 }

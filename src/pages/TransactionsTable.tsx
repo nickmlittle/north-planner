@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useListNavigation } from '../state/useListNavigation'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { EmptyState, FilterSheet, Kbd, ListRow, StatusChip, useMobilePresentation, type FilterGroup } from '../components/ui'
@@ -7,12 +7,13 @@ import { payments } from '../domain/cardRefunds'
 import { allTransactions, sortDestination } from '../domain/cardSorting'
 import { splitLabel } from '../domain/cardSplits'
 import { statementKeys } from '../domain/cardStatements'
-import { cardTracker, parseStatementKey, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, monthOf, parseStatementKey, type CardTransaction } from '../domain/cardTracker'
 import type { MoveState } from '../domain/setAside'
 import { formatMonth } from '../formatting/month'
 import { dayDate, destinationGroups, destinationNamer } from './cardLabels'
 import { cardLabel, plural, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { activeCount, filterTransactions, groupByMonth, NO_FILTERS, STATUS_LABELS, type TransactionFilters, type TransactionStatus } from './transactionFilters'
+import { transactionFilterFromState } from '../state/navigation'
 import './TransactionsTable.css'
 
 type Props = {
@@ -21,13 +22,17 @@ type Props = {
   onOpen: (transactionId: string) => void
   onBringIn: () => void
   movedOf: (transaction: CardTransaction) => MoveState | undefined
+  /** A transaction to bring into view and focus: one opened from a pot page on Month (F1). */
+  focusId?: string | null
+  /** A pot's page on Month, for the transaction's month (F1). */
+  onOpenMonth?: (potId: string, month: string) => void
 }
 
 /**
  * Spending › Transactions: every purchase and refund, findable in seconds. Search (/) and one Filter menu (pot or
  * account, person, statement, status) over a table grouped by month on desktop, a list on phones. Any row re-sorts.
  */
-export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Props) {
+export function TransactionsTable({ document, onOpen, onBringIn, movedOf, focusId = null, onOpenMonth }: Props) {
   const mobile = useMobilePresentation()
   const tracker = cardTracker(document)
   const name = destinationNamer(document)
@@ -36,9 +41,19 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
   const [query, setQuery] = useState(arriving)
   const [arrived, setArrived] = useState(arriving)
   if (arriving && arriving !== arrived) { setArrived(arriving); setQuery(arriving) }
-  const [filters, setFilters] = useState<TransactionFilters>(NO_FILTERS)
+  // Month's "See in Spending" arrives filtered to that pot or account (history state northTransactionFilter).
+  const [filters, setFilters] = useState<TransactionFilters>(() => { const destinations = transactionFilterFromState(); return destinations.length ? { ...NO_FILTERS, destinations } : NO_FILTERS })
   const [filtering, setFiltering] = useState(false)
   const rowKeys = useListNavigation({ label: 'Transactions', keys: { enter: 'Open the sort sheet' } })
+  // A pot page's transaction arrives in view, focused and marked, so it's easy to find among the month's rows. After
+  // useListNavigation's effect, which makes the rows focusable.
+  useEffect(() => {
+    if (!focusId) return
+    const target = [...window.document.querySelectorAll<HTMLElement>('[data-transaction]')].find(element => element.dataset.transaction === focusId)
+    const row = target?.matches('[data-list-row]') ? target : target?.querySelector<HTMLElement>('[data-list-row]')
+    row?.scrollIntoView?.({ block: 'center' })
+    row?.focus({ preventScroll: true })
+  }, [focusId])
   const all = allTransactions(tracker)
   const paid = payments(tracker)
   const where = (transaction: CardTransaction) => { const destination = sortDestination(transaction.sort); return transaction.sort ? destination ? name(destination) : splitLabel(transaction.sort.lines) : 'To sort' }
@@ -61,7 +76,15 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
   const label = (transaction: CardTransaction) => [transaction.description, signedPounds(transaction.amountPence), transactionMeta(document, transaction), link(transaction), where(transaction), ...tagsOf(transaction).map(tag => tag.text.toLowerCase())].filter(Boolean).join(', ')
   const splitLines = (transaction: CardTransaction) => transaction.sort && transaction.sort.lines.length > 1 ? transaction.sort.lines : []
   const lineName = (line: NonNullable<CardTransaction['sort']>['lines'][number]) => `${name(line.destination)}${line.item ? ` · ${line.item}` : ''}${line.note ? ` · ${line.note}` : ''}`
-  const pot = (transaction: CardTransaction) => transaction.sort ? where(transaction) : <StatusChip tone="warning">To sort</StatusChip>
+  /** The Pot or account cell: a pot links to its page on Month (F1); the row's own click still opens the sort sheet. */
+  const pot = (transaction: CardTransaction) => {
+    if (!transaction.sort) return <StatusChip tone="warning">To sort</StatusChip>
+    const destination = sortDestination(transaction.sort)
+    const potName = destination?.kind === 'pot' ? document.budget.pots.find(row => row.id === destination.potId)?.name : undefined
+    if (destination?.kind !== 'pot' || !potName || !onOpenMonth) return where(transaction)
+    return <button type="button" className="text-button transactions-pot-link" aria-label={`Open ${potName} in Month`} onClick={event => { event.stopPropagation(); onOpenMonth(destination.potId, monthOf(transaction.date)) }}>{where(transaction)}</button>
+  }
+  const arrivedClass = (transaction: CardTransaction) => transaction.id === focusId ? ' is-arrived' : ''
 
   // Filters: pot or account (grouped like the sort sheet), person, statement, status.
   const filterGroups: FilterGroup[] = [
@@ -100,7 +123,7 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
     {toolbar}{chipRow}{empty}
     {groups.map(group => <section key={group.month} className="transactions-month" aria-label={formatMonth(group.month)}>
       <h3 className="transactions-month-title">{formatMonth(group.month)}</h3>
-      <ul className="transactions-list">{group.rows.map(row => <li key={row.id}><ListRow title={row.description} label={label(row)} listRow
+      <ul className="transactions-list">{group.rows.map(row => <li key={row.id} data-transaction={row.id} className={arrivedClass(row).trim() || undefined}><ListRow title={row.description} label={label(row)} listRow
         meta={<>{dayDate(row.date)} · {person(row)} · {where(row)}{link(row) && <span className="transactions-link">{link(row)}</span>}</>} trailing={signedPounds(row.amountPence)} trailingMeta={tags(row).length ? <span className="transactions-tags">{tags(row)}</span> : undefined} onOpen={() => onOpen(row.id)}/>
         {splitLines(row).length > 0 && <ul className="transactions-split" aria-label={`${row.description} split`}>{splitLines(row).map((line, index) => <li key={index}><span>{lineName(line)}</span><span>{signedPounds(line.amountPence)}</span></li>)}</ul>}
       </li>)}</ul>
@@ -118,7 +141,7 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf }: Prop
         <tr className="transactions-band"><th scope="rowgroup" colSpan={6}>{formatMonth(group.month)} <span>· {plural(group.rows.length, 'transaction')} · {signedPounds(group.totalPence)}</span></th></tr>
         {group.rows.flatMap(row => {
           const lines = splitLines(row)
-          return [<tr key={row.id} data-list-row data-list-open aria-keyshortcuts="J K Enter" className="transactions-row" aria-label={label(row)}
+          return [<tr key={row.id} data-list-row data-list-open data-transaction={row.id} aria-keyshortcuts="J K Enter" className={`transactions-row${arrivedClass(row)}`} aria-label={label(row)}
             onClick={() => onOpen(row.id)}>
             <td>{dayDate(row.date)}</td>
             <td><span className="transactions-merchant">{row.description}</span>{link(row) && <span className="transactions-link">{link(row)}</span>}</td>
