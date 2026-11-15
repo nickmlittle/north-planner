@@ -97,12 +97,14 @@ function CheckBalance({ potName, bank, onSave, onClose }: { potName: string; ban
 }
 
 /** What moved money in or out of a pot, for its sums: "Moved in on payday since". */
-function flowLabel(flow: BalanceFlow, document: BudgetDocument, setAside: boolean): string {
+function flowLabel(flow: BalanceFlow, document: BudgetDocument, setAside: boolean, pence: number): string {
   const card = cardTracker(document).cards.find(row => row.setAside) ?? cardTracker(document).cards[0]
-  const pot = document.budget.pots.find(row => row.id === card?.setAside?.potId)
+  const phrase = potPhrase(document.budget.pots.find(row => row.id === card?.setAside?.potId)?.name ?? 'Amex')
   return {
     payday: 'Moved in on payday', bills: 'Bills paid', covers: 'Overspend covers', 'built-up': 'Built-up money moved out', settled: 'Settled up',
-    'set-aside': setAside ? 'Moved in from pots' : `Moved to ${potPhrase(pot?.name ?? 'Amex')}`, paid: `Paid to ${card?.name ?? 'the card'}`,
+    'set-aside': setAside ? 'Moved in from pots' : `Moved to ${phrase}`, paid: `Paid to ${card?.name ?? 'the card'}`,
+    // Checking the Amex pot: extra moved out of it to the buffer, or a top-up from the buffer.
+    gap: setAside ? (pence < 0 ? 'Extra moved out' : 'Topped up') : pence > 0 ? `Extra from ${phrase}` : `Topped up ${phrase}`,
   }[flow]
 }
 
@@ -117,7 +119,7 @@ function BalanceSums({ document, balance, bank }: { document: BudgetDocument; ba
   const held = balance.waiting.length > 0 || balance.billsDuePence > 0
   return <dl className="carry-over-sums">
     {balance.checked ? <div><dt>In {bank} · checked {dayOf(balance.checked.at)}</dt><dd>{signedPounds(balance.checked.pence)}</dd></div> : <div><dt>Not checked yet</dt><dd>—</dd></div>}
-    {balance.since.map(row => <div key={row.flow}><dt>{flowLabel(row.flow, document, balance.setAside)} since</dt><dd>{row.pence > 0 ? '+' : ''}{signedPounds(row.pence)}</dd></div>)}
+    {balance.since.map(row => <div key={row.flow}><dt>{flowLabel(row.flow, document, balance.setAside, row.pence)} since</dt><dd>{row.pence > 0 ? '+' : ''}{signedPounds(row.pence)}</dd></div>)}
     {balance.balancePence !== undefined && balance.since.length > 0 && held && <div className="is-subtotal"><dt>In {bank} now</dt><dd>{signedPounds(balance.balancePence)}</dd></div>}
     {balance.waiting.map(row => <div key={row.statementKey}><dt>{waitingLabel(row.statementKey, row.closeDate)}</dt><dd>{signedPounds(-row.pence)}</dd></div>)}
     {balance.billsDuePence > 0 && <div><dt>Bills still due this month</dt><dd>{signedPounds(-balance.billsDuePence)}</dd></div>}

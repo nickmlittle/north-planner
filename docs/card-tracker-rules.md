@@ -24,6 +24,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot 2: Move sheet, Spending callout, Undo, moved tags, Home task | A2 | `src/pages/MoveToPotSheet.tsx`, `Spending.tsx`, `HomeMonths.tsx`, `homeMonths` in `monthStages.ts` |
 | Amex pot 3: every pot's balance worked out, Check balances, the Amex pot's page | A3 | `src/domain/potBalances.ts`, `src/pages/CheckBalancesSheet.tsx`, `SpendingMonth.tsx` |
 | Amex pot 4: settling a statement from the Amex pot | A4 | `settleSteps`, `settleStepDone`, `refreshSettled` in `cardStatements.ts`, `src/pages/StatementsPanel.tsx` |
+| Amex pot check 1: should hold, the check, extra and top-ups, covering a bill | C1 | `src/domain/setAsideCheck.ts`, the `gap` flow in `potBalances.ts`, `GapMove` in `cardTracker.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -240,6 +241,18 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **The Amex pot's page** (pot detail for the set-aside pot): its balance, and each statement it pays (`setAsideStatements`): the total, what's moved in, what's still to move (sorted or not) and what's been paid.
 - **Settling up from the pot** (§6.8 for statements paid from it): `settleSteps` gives no account steps; its `setAside` says what's still to move for the statement. The steps are **Move the rest to the Amex pot** (`settle:move`, done once nothing sorted on the statement is left to move; "Move them" opens the Move sheet for just this statement) and **Pay Amex from the Amex pot** (`settle:pay`, ticked as before, from the pot's account). `settleStepDone` decides each step, so a statement is settled when everything on it is in the pot and Pay is ticked. A move that finishes the last step records `settledAt` (`refreshSettled`). The statement detail shows "£312.85 of £649.23 is in the Amex pot · £140.59 sorted and still to move" with "Move it", and Shares are still shown per account, gathered in the pot's account.
 - **On screen:** while anything is left to move, Spending shows "£140.59 to move to the Amex pot · 3 transactions sorted since the last move" on every section, and Home's current month has the task "Move £140.59 to the Amex pot". The **Move sheet** lists the moves to make per account (tap an amount to copy it), then "What it covers": every transaction to move, all ticked, a re-sort tagged "Changed since moved" with its change. Unticking one takes it out of the moves and leaves it for next time. **Moved £X** records it; the message offers **Undo**. All transactions tags each row on a pot statement **Moved** or **Changed since moved**.
+
+## Checking the Amex pot
+
+**Status:** agreed with Nick on 15 November 2026, from the [Amex pot check build plan](amex-pot-check-build-plan.md) (decisions R1–R5, Q1–Q5). Built in the `amex-check/1`–`3` PR series (C1–C3 in the table above); this section grows with each PR.
+
+- **Should hold** (`shouldHold`, `src/domain/setAsideCheck.ts`): what has moved into the card's set-aside pot for the statements paid from it that have no Pay tick yet. It's Σ every moved line of their transactions, refunds negative, lines sorted to the pot itself included (a purchase sorted to the Amex pot is paid from what's in it). It comes from the moves alone, never from a balance check, so extra money can't hide in a checked balance.
+- **Holds:** the pot's balance (`potBalance`): the last check plus every flow since.
+- **The check** (`setAsideCheck`): gap = Holds − Should hold, exact to the penny (Q2). It **matches** at £0, has **extra** above and is **short** below; it's **unchecked** until the pot is checked against the bank. Moves and payments shift both figures together, so a gap only opens with something North doesn't know about: a transfer not made or rounded up, money moved before the purchase reached North, a fee. The check also carries what's still to move (the Move sheet's total), the closed statements with money in and no Pay tick (`unpaidClosed`: a bill paid but not ticked reads short) and the card's last five moves, newest first (`recentMoves`).
+- **Evening it up** (`GapMove` in `card.gapMoves`, `recordGapMove`, `undoGapMove`): extra moved out of the pot (positive) or a top-up into it (negative), to or from the card's buffer (`gapDestination`: Buffer for overspends, else the pay-from account's main balance, never the Amex pot itself; Q1). The destination is stored as it was when recorded. It's the `gap` flow: out of the Amex pot, and into the buffer when that's a pot. The sums say "Extra moved out" or "Topped up" on the Amex pot, and "Extra from the Amex pot" on the buffer pot.
+- **The steps** (`gapSteps`): extra is Out of the Amex pot, then Send to the buffer's account when it's another account, then Into the buffer pot when it's a pot. A top-up runs the other way and ends Into the Amex pot.
+- **Covering a bill** (`billCover`): for an unpaid statement paid from a checked pot, Holds less what has moved in for the card's other unpaid statements, against the statement's purchases and refunds. The difference is to spare or short.
+- **Order:** press Moved before checking the pot against the bank. A check made after a transfer but before Moved counts the transfer twice, and it reads as extra.
 
 ## Links between Spending and Month
 

@@ -12,7 +12,7 @@ import { moveTotal, usesSetAside } from './setAside'
  * Rules: docs/card-tracker-rules.md.
  */
 
-export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid'
+export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid' | 'gap'
 export type FlowEntry = { at: string; pence: number; flow: BalanceFlow }
 export type WaitingShare = { statementKey: string; closeDate: string; pence: number }
 
@@ -34,7 +34,7 @@ export type PotBalance = {
   setAside: boolean
 }
 
-const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid']
+const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid', 'gap']
 
 /** The card whose set-aside pot this is, if any. */
 export const setAsideCardFor = (tracker: Pick<CardTracker, 'cards'>, potId: string) => tracker.cards.find(card => card.setAside?.potId === potId)
@@ -47,8 +47,8 @@ export function startOfDay(date: string): string {
 /**
  * Every move in or out of a pot that North knows about: payday Move ticks, the bills it assumes went out (from
  * `fromMonth` to today, at the start of each bill's day), Close month covers into it or out of it, built-up money
- * moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into the Amex pot), and
- * paying the card from the Amex pot.
+ * moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into the Amex pot),
+ * paying the card from the Amex pot, and evening the Amex pot up after a check (extra out to the buffer, or a top-up).
  */
 export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, potId: string, today: string = localDate(), fromMonth: string = monthOf(today)): FlowEntry[] {
   const tracker = cardTracker(document)
@@ -78,6 +78,10 @@ export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'tic
     if (moveCard?.setAside?.potId === potId) { const total = moveTotal(move, potId); if (total) flows.push({ at: move.at, pence: total, flow: 'set-aside' }); continue }
     const out = move.transactions.flatMap(row => row.lines).filter(line => line.destination.kind === 'pot' && line.destination.potId === potId).reduce((sum, line) => sum + line.amountPence, 0)
     if (out) flows.push({ at: move.at, pence: -out, flow: 'set-aside' })
+  }
+  for (const gap of tracker.gapMoves ?? []) {
+    if (tracker.cards.find(row => row.id === gap.cardId)?.setAside?.potId === potId) flows.push({ at: gap.at, pence: -gap.pence, flow: 'gap' })
+    else if (gap.destination.kind === 'pot' && gap.destination.potId === potId) flows.push({ at: gap.at, pence: gap.pence, flow: 'gap' })
   }
   return flows
 }
