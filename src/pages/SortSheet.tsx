@@ -25,13 +25,15 @@ type Props = {
   now?: () => Date
   /** For "£X left" against this month's plan. */
   today?: string
+  /** A placed transaction's pot, on Month, for the transaction's month (Spending ↔ Month link F1). */
+  onOpenMonth?: (potId: string, month: string) => void
 }
 
 /** How many suggestions show before "All pots and accounts". */
 const SHOWN = 6
 
 /** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today }: Props) {
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today, onOpenMonth }: Props) {
   // What's left in each planned pot in the transaction's month, so the choice shows its consequence.
   const left = leftByDestination(document, transaction.date.slice(0, 7))
   // Carry-over pots have no "left": once their balance is checked, show what's free in them instead.
@@ -47,6 +49,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const person = document.household.adults.find(adult => adult.id === transaction.personId)?.name
   const rule = transaction.sort?.by === 'rule' ? tracker.rules.find(row => row.id === transaction.sort?.ruleId) : undefined
   const current = sortDestination(transaction.sort)
+  const placedPot = current?.kind === 'pot' ? document.budget.pots.find(pot => pot.id === current.potId) : undefined
   const [always, setAlways] = useState(false)
   const [ruleText, setRuleText] = useState(defaultRuleText(transaction.merchant))
   const [onlyThisCard, setOnlyThisCard] = useState(false)
@@ -95,6 +98,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
 
   return <ModalDialog title={`Sort ${transaction.description}`} onClose={onClose} className="sort-sheet">
     <p className="sort-sheet-summary"><strong>{signedPounds(transaction.amountPence)}</strong><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span></p>
+    {placedPot && onOpenMonth && <button type="button" className="text-button sort-open-month" onClick={() => onOpenMonth(placedPot.id, transaction.date.slice(0, 7))}>Open {placedPot.name} in Month<ChevronRight aria-hidden="true"/></button>}
     {purchase ? null : rule ? <div className="sort-rule-note">
       <p>Sorted by your rule “{rule.contains}”{rule.cardSuffix ? ` on ${person ?? 'this'}’s card` : ''}.</p>
       {rule.destination && <label className="spending-check"><input type="checkbox" checked={changeRule} onChange={event => setChangeRule(event.target.checked)}/>Change the rule too</label>}

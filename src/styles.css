@@ -1010,6 +1010,8 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .sort-sheet-summary{display:grid;gap:2px;margin:0}
 .sort-sheet-summary strong{color:var(--pine);font-size:var(--text-xl)}
 .sort-sheet-summary span{color:var(--muted);font-size:var(--text-sm)}
+.sort-open-month{display:inline-flex;align-items:center;gap:2px;justify-self:start;font-size:var(--text-sm)}
+.sort-open-month svg{width:16px;height:16px}
 .sort-rule-note,.sort-always{display:grid;gap:var(--space-1);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
 .sort-rule-note p{margin:0;color:var(--pine)}
 .sort-always-fields{display:grid;gap:var(--space-2);padding-bottom:var(--space-2)}
