@@ -347,7 +347,7 @@ describe('Pace where you sort (F5)', () => {
     const onOpenMonth = vi.fn()
     render(<SpendingHarness initial={tipping()} view="sort" onOpenMonth={onOpenMonth}/>)
     fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
-    fireEvent.click(within(within(screen.getByRole('dialog')).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!)
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Place in Groceries · Joint' }))
     expect(screen.getByText('Groceries is now £59 ahead of pace')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Open Groceries' }))
     expect(onOpenMonth).toHaveBeenCalledWith('groceries', '2026-11')
@@ -357,7 +357,7 @@ describe('Pace where you sort (F5)', () => {
   it('puts a tipping placing back in To sort with Undo', () => {
     render(<SpendingHarness initial={tipping()} view="sort"/>)
     fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
-    fireEvent.click(within(within(screen.getByRole('dialog')).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!)
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Place in Groceries · Joint' }))
     expect(screen.queryByRole('button', { name: /^TESCO STORES, £60\.00/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ })).toBeInTheDocument()
@@ -369,6 +369,7 @@ describe('Pace where you sort (F5)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^CORNER SHOP/ }))
     const dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /^Groceries · Joint/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Place in Groceries · Joint' }))
     expect(screen.queryByText(/of pace/)).toBeNull()
     expect(screen.getAllByRole('status')).toHaveLength(1)
   })
@@ -434,5 +435,33 @@ describe('Sorts itself here (F6)', () => {
     document.card!.transactions = document.card!.transactions.filter(row => row.id !== 'tesco-2')
     render(<PotHarness initial={document}/>)
     expect(screen.queryByRole('list', { name: 'Sorts itself here' })).toBeNull()
+  })
+})
+
+/** Follow-up: choose, then Place, in the sort sheet (board M2). */
+describe('Choose, then Place', () => {
+  it('starts on the suggestion, and the impact line and Place follow the pot you choose', () => {
+    const document = household()
+    document.budget.pots.push({ id: 'treats', name: 'Treats', accountId: 'joint' })
+    document.card!.transactions.push(tx('big', '2026-11-14', 'TESCO STORES', 6000))
+    render(<SpendingHarness initial={document} view="sort"/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
+    const dialog = screen.getByRole('dialog')
+    const place = () => within(dialog).getAllByRole('button').find(button => button.classList.contains('sort-place'))!
+    expect(place()).toHaveTextContent('Place in Groceries · Joint')
+    expect(place()).toHaveAccessibleDescription('Groceries: On track → £59 ahead · runs out ~Tue 24 Nov')
+    fireEvent.click(within(dialog).getAllByRole('button', { name: /^Treats · Joint/ })[0]!)
+    expect(place()).toHaveTextContent('Place in Treats · Joint')
+    expect(within(dialog).getByText('Treats has nothing planned in November')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/^Groceries:/)).toBeNull()
+  })
+
+  it('says it’s already there, with Place off, until something would change', () => {
+    render(<SpendingHarness/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £72\.76/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Already in Groceries · Joint' })).toBeDisabled()
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Joint/ }))
+    expect(within(dialog).getByRole('button', { name: 'Place in Joint' })).toBeEnabled()
   })
 })
