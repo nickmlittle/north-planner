@@ -17,7 +17,7 @@ import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { dayDate, shortDate } from '../formatting/date'
 import { billsAhead, renewalsInView } from './recurringBills'
-import { capitalise, paceDetail, reasonText } from '../formatting/paceLabels'
+import { aheadText, capitalise, overText, paceDetail, reasonText } from '../formatting/paceLabels'
 
 /**
  * Home as an inbox (audit 3 PR 10): a three-figure strip, one To do list ordered by when it matters, heads-ups,
@@ -79,8 +79,6 @@ const pounds = (pence: number) => formatGBP(pence / 100)
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 const plural = (count: number, word: string) => `${count} ${count === 1 ? word : `${word}s`}`
 const statementName = (closeDate: string) => `${monthName(closeDate.slice(0, 7))} statement`
-/** "£62" for a pace gap: pounds without pence reads quicker in a heads-up. */
-const roundPounds = (pence: number) => pounds(pence).replace(/\.\d\d$/, '')
 /** How far ahead Coming up looks. */
 export const COMING_UP_DAYS = 45
 /** Next month's payday steps join To do this many days before its money arrives. */
@@ -126,7 +124,8 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   const worst = [...care].sort((a, b) => (a.leftPence < 0 ? a.leftPence : -(a.aheadPence ?? 0)) - (b.leftPence < 0 ? b.leftPence : -(b.aheadPence ?? 0)))[0]
   // The strip is short: the pot's own name ("Groceries"), without its account.
   const shortName = (destination: BudgetDestination) => nameDestination(destination).split(' · ')[0]!
-  const careText = (row: DestinationSpending) => row.leftPence < 0 ? `${shortName(row.destination)} ${pounds(-row.leftPence)} over` : `${shortName(row.destination)} ${roundPounds(row.aheadPence ?? 0)} ahead of pace`
+  // Pace in Month's words (paceLabels): "£85 ahead" rounds to the pound, "£52.93 over" is to the penny.
+  const careText = (row: DestinationSpending) => `${shortName(row.destination)} ${row.leftPence < 0 ? overText(-row.leftPence) : `${aheadText(row.aheadPence ?? 0)} of pace`}`
   const spent: StripFigure | undefined = figures && { value: pounds(figures.spentPence), sub: `of ${pounds(figures.plannedPence)}`, detail: worst ? careText(worst) : 'On track', ...worst ? { detailTone: 'warning' as const } : {} }
   let cardFigure: HomeInbox['strip']['card']
   if (card) {
@@ -209,7 +208,14 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         return
     }
   }
-  for (const row of months) if (row.role !== 'settled') for (const task of row.tasks) mapTask(task, row.role)
+  // A statement's settle task comes from every unsettled month with spend on it (October and November both sit on the
+  // 25 Oct–24 Nov statement), so each task is listed once, from the oldest month.
+  const mapped = new Set<string>()
+  for (const row of months) if (row.role !== 'settled') for (const task of row.tasks) {
+    if (mapped.has(task.key)) continue
+    mapped.add(task.key)
+    mapTask(task, row.role)
+  }
 
   // ——— Sort: anything waiting to be sorted ———
   const toSort = transactionsToSort(tracker)
@@ -263,7 +269,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   // The second line says why (F3): "Mostly Tesco £303.38 · runs out ~Sat 21 Nov".
   for (const { row, reason } of figures ? needsALook(document, figures) : []) headsUp.push({
     key: `pace:${row.key}`, kind: 'pace', tone: 'warning',
-    title: row.leftPence < 0 ? `${nameDestination(row.destination)} ${pounds(-row.leftPence)} over` : `${nameDestination(row.destination)} ${roundPounds(row.aheadPence ?? 0)} ahead of pace`,
+    title: `${nameDestination(row.destination)} ${row.leftPence < 0 ? overText(-row.leftPence) : `${aheadText(row.aheadPence ?? 0)} of pace`}`,
     meta: capitalise([reason ? reasonText(reason) : '', paceDetail(row, figures!)].filter(Boolean).join(' · ')) || 'Spending faster than planned',
     ...row.leftPence >= 0 ? { trailing: `${pounds(row.leftPence)} left` } : {},
     target: { view: 'month', month, ...row.destination.kind === 'pot' ? { potId: row.destination.potId } : {} },

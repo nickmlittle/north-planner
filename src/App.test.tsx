@@ -591,3 +591,24 @@ it('opens ⌘K anywhere, jumps to an item, and runs Add item from another screen
   expect(window.location.search).toContain('view=plan')
   expect(await screen.findByRole('dialog', { name: 'Add item' })).toBeInTheDocument()
 })
+
+it('takes the current screen’s tab back to its top level, and opens Home on today’s month', async () => {
+  const seeded = decodeBudgetDocument(JSON.parse(readFileSync(resolve(process.cwd(), 'docs/fixtures/plan-transfers-baseline.json'), 'utf8')))!
+  localStorage.setItem(budgetStorageKey, JSON.stringify(seeded))
+  window.history.replaceState(null, '', '/?view=month&month=2026-11&pot=groceries')
+  render(<App />)
+  const nav = () => within(screen.getByRole('navigation', { name: 'Mobile navigation' }))
+  expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
+  // Month's own tab, on a pot's page: back to the month's pots, still November.
+  fireEvent.click(nav().getByRole('button', { name: 'Month' }))
+  expect(window.location.search).toBe('?view=month&month=2026-11')
+  await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument())
+  // Home doesn't follow the month last viewed.
+  fireEvent.click(nav().getByRole('button', { name: /^Home(, \d+ to do)?$/ }))
+  expect(window.location.search).toBe('?view=home')
+  // Spending's own tab, on a statement: back to Statements.
+  window.history.pushState(null, '', '/?view=spending&section=statements&statement=amex%3A2026-10-24')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  fireEvent.click(await waitFor(() => nav().getByRole('button', { name: /^Spending/ })))
+  expect(window.location.search).toBe('?view=spending&section=statements')
+})
