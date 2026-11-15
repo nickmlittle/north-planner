@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { emptyCardTracker, type CardTransaction } from '../domain/cardTracker'
 import { monthSpending, needsALook } from '../domain/cardSpending'
@@ -322,5 +322,68 @@ describe('Needs a look (F3)', () => {
   it('has no so-far chips when nothing needs a look', () => {
     render(<SpendingHarness view="sort"/>)
     expect(screen.queryByRole('list', { name: 'November so far' })).toBeNull()
+  })
+})
+
+/** PR 4: pace in the pot picker, the impact line and the toast (F5). */
+describe('Pace where you sort (F5)', () => {
+  // Groceries is on track on the 14th (£208.57 of £450.00, £210.00 expected). This £60.00 shop tips it £59 ahead.
+  const tipping = () => {
+    const document = household()
+    document.card!.transactions.push(tx('big', '2026-11-14', 'TESCO STORES', 6000))
+    return document
+  }
+
+  it('shows Left and pace on each pot, and what placing the suggestion would change, on phones', () => {
+    render(<SpendingHarness initial={tipping()} view="sort"/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
+    const dialog = screen.getByRole('dialog')
+    const suggested = within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')
+    expect(suggested[0]).toHaveTextContent(/^Groceries · JointSuggested.*£241\.43 left$/)
+    expect(within(dialog).getByText('Groceries: On track → £59 ahead · runs out ~Tue 24 Nov')).toHaveClass('sort-impact', 'is-warning')
+  })
+
+  it('says when a placing tips a pot, with Open and Undo', () => {
+    const onOpenMonth = vi.fn()
+    render(<SpendingHarness initial={tipping()} view="sort" onOpenMonth={onOpenMonth}/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
+    fireEvent.click(within(within(screen.getByRole('dialog')).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!)
+    expect(screen.getByText('Groceries is now £59 ahead of pace')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Groceries' }))
+    expect(onOpenMonth).toHaveBeenCalledWith('groceries', '2026-11')
+    expect(screen.queryByText(/ahead of pace/)).toBeNull()
+  })
+
+  it('puts a tipping placing back in To sort with Undo', () => {
+    render(<SpendingHarness initial={tipping()} view="sort"/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
+    fireEvent.click(within(within(screen.getByRole('dialog')).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!)
+    expect(screen.queryByRole('button', { name: /^TESCO STORES, £60\.00/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('button', { name: /^TESCO STORES, £60\.00/ })).toBeInTheDocument()
+    expect(screen.getByText('TESCO STORES is back in To sort.')).toBeInTheDocument()
+  })
+
+  it('has no toast when the pot stays on track', () => {
+    render(<SpendingHarness view="sort"/>)
+    fireEvent.click(screen.getByRole('button', { name: /^CORNER SHOP/ }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Groceries · Joint/ }))
+    expect(screen.queryByText(/of pace/)).toBeNull()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+  })
+
+  it('puts Left and pace in the desktop select, and the impact under the focused row', () => {
+    desktop()
+    render(<SpendingHarness initial={tipping()} view="sort"/>)
+    const select = screen.getByLabelText('Pot for TESCO STORES')
+    expect(within(select).getByRole('option', { name: 'Groceries · Joint · £241.43 left' })).toBeInTheDocument()
+    expect(screen.queryByText(/→/)).toBeNull()
+    const row = window.document.querySelector<HTMLElement>('tr[data-transaction="big"]')!
+    act(() => row.focus())
+    const impact = screen.getByText('Groceries: On track → £59 ahead · runs out ~Tue 24 Nov')
+    expect(select).toHaveAttribute('aria-describedby', impact.id)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(screen.getByText('Groceries is now £59 ahead of pace')).toBeInTheDocument()
   })
 })

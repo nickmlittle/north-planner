@@ -193,9 +193,10 @@ it('places a transaction with one tap on a suggestion', () => {
   const dialog = screen.getByRole('dialog', { name: 'Sort TRAIN TICKETS ONLINE' })
   const options = within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')
   expect(options.map(option => option.textContent)).toEqual([
-    'Treats · AdaSuggested · Used last time',
-    'Eating out · JointJoint',
-    'Groceries · JointJoint',
+    // No plan this month in this household, so each pot says so (Spending ↔ Month link F5).
+    'Treats · AdaSuggested · Used last timenothing planned',
+    'Eating out · JointJointnothing planned',
+    'Groceries · JointJointnothing planned',
     'JointOne-offs',
   ])
   fireEvent.click(options[1]!)
@@ -730,7 +731,7 @@ describe('on desktop', () => {
     expect(within(table).queryByRole('button', { name: 'Place' })).not.toBeInTheDocument()
     const rows = () => within(table).getAllByRole('row').slice(1)
     expect(rows().map(row => row.getAttribute('aria-label'))).toEqual(['TRAIN TICKETS ONLINE, £9.00, Mon 9 Nov', 'TRAIN TICKETS ONLINE, £112.81, Sun 8 Nov'])
-    expect(within(rows()[0]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveDisplayValue('Treats · Ada')
+    expect(within(rows()[0]!).getByLabelText('Pot for TRAIN TICKETS ONLINE')).toHaveDisplayValue('Treats · Ada · nothing planned')
     expect(within(rows()[0]!).getByText('Suggested')).toHaveClass('status-chip')
     expect(within(rows()[0]!).getByRole('button', { name: 'Place TRAIN TICKETS ONLINE in Treats · Ada' })).toBeInTheDocument()
     rows()[0]!.focus()

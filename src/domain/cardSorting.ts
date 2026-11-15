@@ -107,6 +107,11 @@ export function unsortTransaction<T extends Pick<BudgetDocument, 'card'>>(docume
   return replaceTransaction(document, id, row => { const next = { ...row }; delete next.sort; return next })
 }
 
+/** Undo a placing: put the transaction's sort back as it was, or back in To sort when it had none. */
+export function restoreSort<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, sort: TransactionSort | undefined): T {
+  return sort ? replaceTransaction(document, id, row => ({ ...row, sort })) : unsortTransaction(document, id)
+}
+
 /** "Check" on the rule-sorted ones: they leave the Sorted by rules list. */
 export function checkRuleSorts<T extends Pick<BudgetDocument, 'card'>>(document: T, ids: readonly string[], now: Date): T {
   const tracker = cardTracker(document)

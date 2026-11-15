@@ -3,6 +3,7 @@ import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, month
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
 import { monthBills, potBillTotals } from './recurringBills'
 import { merchantBreakdown } from './merchants'
+import { potBalance } from './potBalances'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -223,6 +224,51 @@ export function needsALook(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
   return figures.rows.filter(row => row.needsCare && row.destination.kind === 'pot')
     .sort((a, b) => Number(b.status === 'over') - Number(a.status === 'over') || gap(b) - gap(a) || a.key.localeCompare(b.key))
     .map(row => { const reason = lookReason(document, figures.month, row); return reason ? { row, reason } : { row } })
+}
+
+/** The document as it would be with this transaction placed whole in `destination`, for "what would this change". */
+export function withPlaced<T extends Pick<BudgetDocument, 'card'>>(document: T, transaction: Pick<CardTransaction, 'id'>, destination: BudgetDestination): T {
+  const tracker = cardTracker(document)
+  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => row.id === transaction.id ? { ...row, sort: { lines: [{ amountPence: row.amountPence, destination }], by: 'person' as const, at: '' } } : row) } }
+}
+
+export type PlacedPace = {
+  destination: BudgetDestination
+  /** The transaction's month, where it counts (D2). */
+  figures: Pick<MonthSpending, 'month' | 'when'>
+  /** The destination's row now and with the transaction in it. `before` is absent for a pot the month doesn't list yet. */
+  before?: DestinationSpending
+  after?: DestinationSpending
+  /** Carry-over pots once their balance is checked: what's free now and after. */
+  freeBefore?: number
+  freeAfter?: number
+  /** Already there: placing it changes nothing. */
+  same: boolean
+  /** Placing it tips the pot into ahead or over (Spending ↔ Month link F5): the toast's cue. */
+  tipped: boolean
+}
+
+/**
+ * What placing a transaction in a destination would do to its pace (Spending ↔ Month link F5): the destination's row
+ * in the transaction's month before and after. A refund lowers Spent, so it never tips a pot.
+ */
+export function paceIfPlaced(document: Pick<BudgetDocument, 'budget' | 'card' | 'household' | 'ticks'>, transaction: CardTransaction, destination: BudgetDestination, today: string): PlacedPace {
+  const key = destinationKey(destination)
+  const month = monthOf(transaction.date)
+  const lines = transaction.sort?.lines ?? []
+  const same = lines.length === 1 && destinationKey(lines[0]!.destination) === key
+  const placed = withPlaced(document, transaction, destination)
+  const now = monthSpending(document, month, today)
+  const before = now.rows.find(row => row.key === key)
+  const after = monthSpending(placed, month, today).rows.find(row => row.key === key)
+  const bad = (row?: DestinationSpending) => row?.status === 'over' || row?.status === 'ahead'
+  const tipped = !same && bad(after) && after!.status !== before?.status
+  const result: PlacedPace = { destination, figures: { month, when: now.when }, ...before ? { before } : {}, ...after ? { after } : {}, same, tipped }
+  if (destination.kind === 'pot' && potSettings(document, destination.potId).carriesOver) {
+    const free = potBalance(document, destination.potId, today).freePence
+    if (free !== undefined) { result.freeBefore = free; result.freeAfter = potBalance(placed, destination.potId, today).freePence }
+  }
+  return result
 }
 
 /** A destination's transactions in a month, newest first. */

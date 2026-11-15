@@ -1,6 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
-import { EmptyState, ListRow, PageHeader, Section, StatusChip, Tabs, useMobilePresentation, useStepCopy } from '../components/ui'
+import { EmptyState, ListRow, PageHeader, Section, StatusChip, Tabs, useMobilePresentation, useStepCopy, useToast } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, localDate, monthOf, type CardTransaction } from '../domain/cardTracker'
 import { monthSpending, needsALook, type LookRow } from '../domain/cardSpending'
@@ -19,6 +19,7 @@ import { SortSheet } from './SortSheet'
 import { SplitEditor } from './SplitEditor'
 import { StatementsPanel } from './StatementsPanel'
 import { SortTable } from './SortTable'
+import type { Tipped } from './sortPace'
 import { TransactionsTable } from './TransactionsTable'
 import { splitLabel } from '../domain/cardSplits'
 import { cardLabel, dayOf, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
@@ -93,6 +94,18 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const [checkingBalances, setCheckingBalances] = useState(false)
   const { copy, status: copiedStatus } = useStepCopy()
   const setMessage = (text: string) => { setMessageText(text); setUndoId(null) }
+  // A placing that tips a pot into ahead or over gets a toast: Open the pot in Month, or Undo (link F5).
+  const { show: showToast, toast } = useToast()
+  // Mounted from the first tip on, so the page keeps one status line until then.
+  const [tipShown, setTipShown] = useState(false)
+  const sorted = (text: string, tipped?: Tipped) => {
+    setMessage(text)
+    if (tipped) setTipShown(true)
+    if (tipped) showToast(tipped.text, [
+      ...onOpenMonth ? [{ label: `Open ${tipped.potName}`, onClick: () => onOpenMonth(tipped.potId, tipped.month) }] : [],
+      { label: 'Undo', onClick: () => { setDocument(tipped.undo); setMessage(tipped.undone) } },
+    ])
+  }
   const hasCard = tracker.cards.length > 0
   useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
   useShortcut(hasCard ? { keys: 'n', description: 'Add a transaction', group: 'This page', run: () => setSheet('manual') } : null)
@@ -187,7 +200,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
           label={[transaction.description, signedPounds(transaction.amountPence), `${dayDate(transaction.date)} · ${cardLabel(document, transaction)}`, hint(transaction)].filter(Boolean).join(', ')}
           meta={[dayDate(transaction.date), document.household.adults.find(person => person.id === transaction.personId)?.name ?? cardLabel(document, transaction), hint(transaction)].filter(Boolean).join(' · ')}
           trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li>)}</ul>
-        : <SortTable document={document} setDocument={setDocument} transactions={toSort} onSorted={setMessage} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
+        : <SortTable document={document} setDocument={setDocument} transactions={toSort} today={today} onSorted={sorted} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
         : tracker.transactions.length ? <EmptyState title="Everything is sorted"/>
         : <EmptyState title="Nothing to sort" action={<button type="button" className="secondary-button" onClick={() => setSheet('bring-in')}>Bring in</button>}>Bring in the Excel export from {card.name} to start.</EmptyState>}
       {(compact || !toSort.length) && ruleToggle && <div className="spending-rule-line">{ruleToggle}</div>}
@@ -196,6 +209,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     {toSort.length > 0 && setAside}
   </div>
   const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>
+
+  const messageLine = <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}</p>
 
   return <div className="page-frame spending-page">
     <PageHeader title={tracker.cards.length > 1 ? 'Spending' : card.name} titleText="Spending" context={context} actions={<>
@@ -206,22 +221,24 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       ]}/>
       <button type="button" className="primary-button spending-bring-in" aria-label={compact ? 'Bring in transactions' : undefined} title="Bring in transactions (I)" onClick={() => setSheet('bring-in')}><FileSpreadsheet aria-hidden="true"/>{!compact && 'Bring in'}</button>
     </>}/>
-    <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}</p>
+    {!compact && messageLine}
     <Tabs label="Spending" current={view} onSelect={id => onSelectView(id as SpendingSection)} tabs={[
       { id: 'sort', label: 'To sort', ...toSort.length ? { count: toSort.length } : {} },
       { id: 'transactions', label: 'Transactions' },
       { id: 'statements', label: 'Statements', ...toSettle ? { badge: <StatusChip tone="warning">{toSettle} to settle</StatusChip> } : {} },
     ]}>
-      {/* Under the tabs, so phones keep the tab bar clear where it tucks under the pine header. */}
+      {/* Under the tabs, so phones keep the tab bar on the pine band under the header. */}
+      {compact && messageLine}
       {soFarRow}
       {view === 'sort' ? sortPanel : view === 'transactions' ? allPanel
         : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>}
     </Tabs>
-    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={text => { setSorting(null); setMessage(text) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
+    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={(text, tipped) => { setSorting(null); sorted(text, tipped) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}
     {checkingBalances && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setCheckingBalances(false)} onSaved={text => { setCheckingBalances(false); setMessage(text) }}/>}
+    {tipShown && toast}
     {sheet === 'manual' && <ManualEntrySheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onAdded={description => { setSheet(null); setMessage(`Added ${description}.`) }}/>}
   </div>
 }

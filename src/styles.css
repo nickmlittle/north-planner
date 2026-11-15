@@ -1060,6 +1060,12 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .sort-refund p{margin:0;color:var(--pine)}
 .sort-option-amount{flex:none;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums}
 .sort-option-left{flex:none;margin-left:auto;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.sort-option-left.is-warning{color:var(--warning)}
+.sort-option-left.is-critical{color:var(--critical)}
+/* The impact line (Spending ↔ Month link F5): what placing it would change, toned once it tips. */
+.sort-impact{margin:0;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);background:var(--surface-band);color:var(--pine);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.sort-impact.is-warning{background:var(--warning-bg);color:var(--warning)}
+.sort-impact.is-critical{background:var(--critical-bg);color:var(--critical)}
 .spending-month-summary{display:grid;gap:var(--space-1);padding:var(--space-4) var(--space-5);border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--card);box-shadow:var(--shadow-card)}
 .spending-eyebrow{margin:0;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-bold)}
 .spending-big{margin:0;color:var(--pine);font-size:var(--text-2xl);font-weight:var(--weight-bold);letter-spacing:-.4px;font-variant-numeric:tabular-nums}

@@ -8,7 +8,8 @@
 .sort-col-date{width:96px}
 .sort-col-card{width:112px}
 .sort-col-amount{width:100px}
-.sort-col-pot{width:36%}
+/* Wide enough for "Spending · Starling Ada · £1,122.92 left" (Left and pace, link F5). */
+.sort-col-pot{width:42%}
 .sort-col-always{width:70px}
 .sort-col-split{width:52px}
 .sort-table th{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium);text-align:left;white-space:nowrap}
@@ -24,6 +25,7 @@
 .sort-table-pot{display:flex;align-items:center;gap:var(--space-2);min-width:0}
 .sort-table-pot select{flex:1 1 auto;width:auto;min-width:0;margin:0}
 .sort-table-pot .status-chip{flex:none}
+.sort-table-impact{margin-top:var(--space-1);padding:var(--space-1) var(--space-2)}
 /* ✓ Place: quiet until the row is hovered or focused. */
 .sort-table-place{flex:none;opacity:0}
 .sort-table-row:hover .sort-table-place,.sort-table-row:focus-within .sort-table-place,.sort-table-place:focus-visible{opacity:1}

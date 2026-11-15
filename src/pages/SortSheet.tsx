@@ -2,9 +2,7 @@ import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, defaultRuleText, destinationKey, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
-import { leftByDestination } from '../domain/cardSpending'
-import { potBalance } from '../domain/potBalances'
+import { cardTracker, defaultRuleText, localDate, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
 import { addRule, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
 import { refundPlan, refundPurchase, sortRefund, type RefundChoice } from '../domain/cardRefunds'
 import { formatMonth } from '../formatting/month'
@@ -12,18 +10,19 @@ import { shortDate } from './cardLabels'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { destinationGroups, destinationNamer } from './cardLabels'
 import { pounds, signedPounds, transactionMeta } from './spendingFormat'
+import { pickerPace, placeImpact, type Tipped } from './sortPace'
 
 type Props = {
   document: BudgetDocument
   setDocument: Dispatch<SetStateAction<BudgetDocument>>
   transaction: CardTransaction
   onClose: () => void
-  /** After placing it: what to announce. */
-  onSorted: (message: string) => void
+  /** After placing it: what to announce, and the toast's content when it tipped a pot into ahead or over. */
+  onSorted: (message: string, tipped?: Tipped) => void
   /** "Split across pots": open the split editor instead. */
   onSplit?: () => void
   now?: () => Date
-  /** For "£X left" against this month's plan. */
+  /** For Left and pace against the transaction's month. */
   today?: string
   /** A placed transaction's pot, on Month, for the transaction's month (Spending ↔ Month link F1). */
   onOpenMonth?: (potId: string, month: string) => void
@@ -33,16 +32,9 @@ type Props = {
 const SHOWN = 6
 
 /** Sort one transaction: one tap on a suggestion places it. "Always" makes a rule in place. */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today, onOpenMonth }: Props) {
-  // What's left in each planned pot in the transaction's month, so the choice shows its consequence.
-  const left = leftByDestination(document, transaction.date.slice(0, 7))
-  // Carry-over pots have no "left": once their balance is checked, show what's free in them instead.
-  const leftText = (destination: BudgetDestination) => {
-    const pence = left.get(destinationKey(destination))
-    if (pence !== undefined) return pence < 0 ? `${pounds(-pence)} over` : `${pounds(pence)} left`
-    const free = destination.kind === 'pot' && document.card?.pots[destination.potId]?.carriesOver ? potBalance(document, destination.potId, today).freePence : undefined
-    return free === undefined ? '' : `${signedPounds(free)} free`
-  }
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today = localDate(), onOpenMonth }: Props) {
+  // Left and pace for each pot in the transaction's month, so the choice shows its consequence (link F5).
+  const pace = pickerPace(document, transaction.date.slice(0, 7), today)
   const id = useId()
   const name = destinationNamer(document)
   const tracker = cardTracker(document)
@@ -69,11 +61,15 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
     onSorted(`Sorted to ${label}.`)
   }
   const options = suggestions(document, transaction).filter(row => !sameDestination(row.destination, refundBack)).slice(0, refundBack ? SHOWN - 1 : SHOWN)
+  // One tap places, so the impact line is for the suggestion: what placing it there would change.
+  const suggestion = refundBack ?? options[0]?.destination
+  const impact = suggestion ? placeImpact(document, transaction, suggestion, today) : undefined
 
   const place = (destination: BudgetDestination) => {
     if (purchase && !always) { placeRefund(plan?.kind === 'single' && plan.lineIndex !== undefined && sameDestination(destination, plan.destination) ? { lineIndex: plan.lineIndex } : { destination }, name(destination)); return }
     const at = now()
     const lines = [{ amountPence: transaction.amountPence, destination }]
+    const { tipped } = placeImpact(document, transaction, destination, today)
     let message = `Sorted to ${name(destination)}.`
     if (always && ruleText.trim()) {
       const draft = { contains: ruleText, destination, ...(onlyThisCard ? { cardSuffix: transaction.cardSuffix } : {}) }
@@ -84,13 +80,13 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
       setDocument(latest => updateRule(sortTransaction(latest, transaction.id, lines, at), rule.id, { contains: rule.contains, ...(rule.cardSuffix ? { cardSuffix: rule.cardSuffix } : {}), destination }))
       message += ` The rule for “${rule.contains}” now sorts to it too.`
     } else setDocument(latest => sortTransaction(latest, transaction.id, lines, at))
-    onSorted(message)
+    onSorted(message, tipped)
   }
   const option = (destination: BudgetDestination, sub?: string) => {
     const selected = sameDestination(destination, current)
     return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected} onClick={() => place(destination)}>
       <span className="sort-option-text"><span className="sort-option-name">{name(destination)}</span>{sub && <span className="sort-option-sub">{sub}</span>}</span>
-      {leftText(destination) && <span className="sort-option-left">{leftText(destination)}</span>}
+      {(() => { const { text, tone } = pace(destination); return text && <span className={`sort-option-left${tone ? ` is-${tone}` : ''}`}>{text}</span> })()}
       {selected && <Check aria-hidden="true"/>}
     </button></li>
   }
@@ -120,6 +116,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
         <li><button type="button" className="sort-option" onClick={() => placeRefund({ spread: true }, 'each part of the split')}><span className="sort-option-text"><span className="sort-option-name">Spread across the split</span><span className="sort-option-sub">In proportion to each line</span></span></button></li>
       </ul>}
     </div>}
+    {impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`}>{impact.text}</p>}
     <ul className="sort-options" aria-label="Suggested pots and accounts">{refundBack && option(refundBack, 'Suggested · Where the purchase went')}{options.map((row, index) => option(row.destination, `${index === 0 && !refundBack ? 'Suggested · ' : ''}${reason(row.reason)}`))}</ul>
     <button type="button" className="text-button sort-all-toggle" aria-expanded={showAll} aria-controls={`${id}-all`} onClick={() => setShowAll(value => !value)}>{showAll ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}All pots and accounts</button>
     {showAll && <div id={`${id}-all`} className="sort-all">

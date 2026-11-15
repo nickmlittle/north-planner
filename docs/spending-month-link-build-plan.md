@@ -1,6 +1,6 @@
 # Spending ↔ Month link: design and PR build plan
 
-Status: planned, 15 November 2026, with Nick. PRs 1–3 (`link/1-links`, `link/2-where-it-went`, `link/3-needs-a-look`) are built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
+Status: planned, 15 November 2026, with Nick. PRs 1–4 (`link/1-links`, `link/2-where-it-went`, `link/3-needs-a-look`, `link/4-sort-pace`) are built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/B98PWR9ZRecPSKRsEk55BF. Boards D1, D2, D4, M1, M2 and M3 are the source for this plan. The canvas was drawn for "lines" on an account; read "line" there as "pot" (decision L1).
 - **Working doc** (private to the owner): https://claude.ai/artifact/QUKqHuCUVd9oaRKWmr33bx. It holds the household setup checklist with real figures.
@@ -86,7 +86,7 @@ The pot page shows spending by merchant, so "it's Tesco" is visible at a glance.
 Sorting shows the consequence before you commit.
 
 - **Options:** each pot shows Left and pace ("£130.00 left · £110 ahead", "£20.00 left · £150 ahead", "£150.00 over"). The phone sort sheet already shows "£X left", so this adds pace. On desktop the native select gets the same text after the pot name (decision L6).
-- **Impact line:** once a pot is chosen and before it's placed: "Groceries: On track → £110 ahead · runs out ~Fri 20 Nov". Phone: above the Place button. Desktop: under the row, while it's focused.
+- **Impact line:** once a pot is chosen and before it's placed: "Groceries: On track → £110 ahead · runs out ~Fri 20 Nov". Phone: the sort sheet places with one tap, so the line is for the suggested pot, above the options (as built in `link/4`; M2's Place button would add a tap to every sort). Desktop: under the row, while it's focused.
 - **Toast after placing:** only when a pot tips into ahead or over: "Groceries is now £110 ahead of pace", with Open Groceries and Undo.
 
 ### F6 · Sorts itself here (D2, M1)

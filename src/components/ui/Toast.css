@@ -6,4 +6,6 @@
 
 @media (max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
   .toast{right:auto;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));white-space:nowrap;transform:translateX(-50%)}
+  /* A longer toast with its actions ("Groceries is now £110 ahead of pace · Open Groceries · Undo") wraps inside the gutters. */
+  .toast.has-action{flex-wrap:wrap;row-gap:var(--space-1);width:max-content;max-width:calc(100vw - var(--space-4) * 2);box-sizing:border-box;white-space:normal}
 }
