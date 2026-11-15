@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { emptyCardTracker, type CardTransaction } from './cardTracker'
-import { addRule, allTransactions, checkRuleSorts, deleteRule, moveRule, ruleUses, sortTransaction, suggestions, transactionsToSort, uncheckedRuleSorts, unsortTransaction, updateRule } from './cardSorting'
+import { addRule, allTransactions, checkRuleSorts, deleteRule, moveRule, ruleSuggestions, rulesFor, ruleUses, sortTransaction, suggestions, transactionsToSort, uncheckedRuleSorts, unsortTransaction, updateRule } from './cardSorting'
 
 const now = new Date('2026-11-10T09:00:00Z')
 const pot = (potId: string) => ({ kind: 'pot' as const, potId })
@@ -122,5 +122,61 @@ describe('rules', () => {
     expect(without.card!.rules.map(rule => rule.id)).toEqual(['a'])
     expect(without.card!.transactions[0]!.sort?.lines[0]?.destination).toEqual(pot('eating'))
     expect(decodeBudgetDocument(JSON.parse(JSON.stringify(without)))).toEqual(without)
+  })
+})
+
+describe('a pot’s rules and suggestions (Spending ↔ Month link F6)', () => {
+  const groceries = { kind: 'pot' as const, potId: 'groceries' }
+  const treats = { kind: 'pot' as const, potId: 'treats' }
+  let n = 0
+  const sorted = (merchant: string, destination: typeof groceries, overrides: Partial<CardTransaction> = {}): CardTransaction => ({
+    id: `s${n++}`, cardId: 'amex', date: '2026-11-06', description: merchant, merchant, amountPence: 1000, kind: 'purchase', cardSuffix: '41001', statementKey: 'amex:2026-11-24', importedAt: 'x',
+    sort: { lines: [{ amountPence: 1000, destination }], by: 'person', at: 'x' }, ...overrides,
+  })
+
+  it('lists the single-pot rules pointing at the pot, A to Z, without split rules', () => {
+    const rules = [
+      { id: 'b', contains: 'TESCO', destination: groceries, createdAt: 'x' },
+      { id: 'a', contains: 'LIDL', destination: groceries, cardSuffix: '41001', createdAt: 'x' },
+      { id: 'c', contains: 'BOOK', destination: treats, createdAt: 'x' },
+      { id: 'd', contains: 'COSTCO', split: [{ destination: groceries, percent: 50 }, { destination: treats, percent: 50 }], createdAt: 'x' },
+    ]
+    expect(rulesFor({ rules }, groceries).map(rule => rule.id)).toEqual(['a', 'b'])
+  })
+
+  it('suggests a rule after 2 hand sorts here, grouping a merchant’s forms under the rule it would make', () => {
+    const transactions = [
+      sorted('TESCO STORES', groceries), sorted('TESCO STORE 3180 SIDCUP', groceries), sorted('TESCO STORES', groceries),
+      sorted('LIDL GB', groceries),
+      sorted('GREEN GROCER', groceries), sorted('GREEN GROCER', groceries),
+    ]
+    expect(ruleSuggestions({ rules: [], transactions }, groceries)).toEqual([
+      { contains: 'TESCO', merchant: 'TESCO STORES', count: 3 },
+      { contains: 'GREEN', merchant: 'GREEN GROCER', count: 2 },
+    ])
+  })
+
+  it('leaves out merchants a rule already matches, rule sorts, splits, refunds, and ones sorted elsewhere as often', () => {
+    const split = sorted('ASDA', groceries, { sort: { lines: [{ amountPence: 500, destination: groceries }, { amountPence: 500, destination: treats }], by: 'person', at: 'x' } })
+    const transactions = [
+      sorted('TESCO STORES', groceries), sorted('TESCO STORES', groceries),
+      sorted('ALDI', groceries, { sort: { lines: [{ amountPence: 1000, destination: groceries }], by: 'rule', ruleId: 'r', at: 'x' } }), sorted('ALDI', groceries),
+      split, { ...split, id: 'split-2' },
+      sorted('MARKET', groceries, { kind: 'refund', amountPence: -1000 }), sorted('MARKET', groceries, { kind: 'refund', amountPence: -1000 }),
+      sorted('AMAZON', groceries), sorted('AMAZON', groceries), sorted('AMAZON', treats), sorted('AMAZON', treats),
+    ]
+    expect(ruleSuggestions({ rules: [{ id: 'r', contains: 'TESCO', destination: groceries, createdAt: 'x' }], transactions }, groceries)).toEqual([])
+    // Two here and one elsewhere is still mostly here.
+    expect(ruleSuggestions({ rules: [], transactions: transactions.slice(0, -1) }, groceries).map(row => row.contains)).toEqual(['AMAZON', 'TESCO'])
+  })
+
+  it('makes the rule with addRule, which says how many waiting transactions it also sorted', () => {
+    const document = newBudgetDocument()
+    document.card = { ...emptyCardTracker(), transactions: [sorted('TESCO STORES', groceries), sorted('TESCO STORES', groceries), sorted('TESCO EXPRESS', groceries, { sort: undefined })] }
+    const [suggestion] = ruleSuggestions(document.card, groceries)
+    const { document: next, alsoSorted } = addRule(document, { contains: suggestion!.contains, destination: groceries }, new Date('2026-11-15T10:00:00Z'))
+    expect(alsoSorted).toBe(1)
+    expect(ruleSuggestions(next.card!, groceries)).toEqual([])
+    expect(rulesFor(next.card!, groceries).map(rule => rule.contains)).toEqual(['TESCO'])
   })
 })

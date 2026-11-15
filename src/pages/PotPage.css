@@ -65,3 +65,7 @@
 .pot-merchant-amount{flex:none;font-variant-numeric:tabular-nums}
 .pot-merchant-bar{display:block;height:6px;border-radius:var(--radius-pill);background:var(--surface-sunken);overflow:hidden}
 .pot-merchant-bar>span{display:block;height:100%;border-radius:var(--radius-pill);background:var(--accent)}
+/* Sorts itself here (Spending ↔ Month link F6): rules and "Make rule". */
+.pot-make-rule{flex:none;min-height:36px;padding:0 var(--space-3);font-size:var(--text-sm)}
+.pot-rules-message{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
+.pot-rules-message:empty{display:none}

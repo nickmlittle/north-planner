@@ -1,6 +1,6 @@
 # Spending ↔ Month link: design and PR build plan
 
-Status: planned, 15 November 2026, with Nick. PRs 1–4 (`link/1-links`, `link/2-where-it-went`, `link/3-needs-a-look`, `link/4-sort-pace`) are built; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
+Status: planned, 15 November 2026, with Nick. All five PRs (`link/1-links` to `link/5-pot-rules`) are built; only the live check after the setup (§7) is left; [card-tracker-rules](card-tracker-rules.md#links-between-spending-and-month) tracks what has shipped. Read this in full before starting any PR in it. Where it disagrees with the design canvas, this document wins.
 
 - **Design canvas** (private to the owner): https://claude.ai/artifact/B98PWR9ZRecPSKRsEk55BF. Boards D1, D2, D4, M1, M2 and M3 are the source for this plan. The canvas was drawn for "lines" on an account; read "line" there as "pot" (decision L1).
 - **Working doc** (private to the owner): https://claude.ai/artifact/QUKqHuCUVd9oaRKWmr33bx. It holds the household setup checklist with real figures.
