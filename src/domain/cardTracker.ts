@@ -20,6 +20,8 @@ export interface CardTracker {
   imports: ImportRecord[]
   /** Money moved into a card's set-aside pot (the Amex pot), oldest first. Absent until the first move. */
   moves?: SetAsideMove[]
+  /** Checking the Amex pot: extra moved out of it, or a top-up into it, oldest first. Absent until the first. */
+  gapMoves?: GapMove[]
 }
 
 export interface Cardholder { suffix: string; personId: string }
@@ -48,6 +50,20 @@ export interface CardAccount {
 export interface SetAside { potId: string; fromCloseDate: string }
 
 export interface MovedLine { destination: BudgetDestination; amountPence: number }
+
+/**
+ * Evening up a card's set-aside pot after checking it against the bank: `pence` > 0 is extra moved out of the pot
+ * to `destination` (the card's buffer when it was recorded); `pence` < 0 is a top-up into the pot from it.
+ */
+export interface GapMove {
+  id: string
+  cardId: string
+  /** ISO. */
+  at: string
+  /** Never 0. */
+  pence: number
+  destination: BudgetDestination
+}
 
 /** One "Move to the Amex pot": what each transaction moved, its lines' change since it was last moved (all of them the first time). */
 export interface SetAsideMove {
@@ -361,6 +377,7 @@ export function saveCard<T extends { card?: CardTracker }>(document: T, card: Ca
 export function cardRemovable(tracker: CardTracker, cardId: string): boolean {
   return !tracker.transactions.some(row => row.cardId === cardId) && !Object.values(tracker.statements).some(row => row.cardId === cardId)
     && !tracker.imports.some(row => row.cardId === cardId) && !(tracker.moves ?? []).some(row => row.cardId === cardId)
+    && !(tracker.gapMoves ?? []).some(row => row.cardId === cardId)
 }
 
 /** Remove a card with no history (cardRemovable); otherwise the document is unchanged. */
@@ -381,8 +398,8 @@ const uniqueIds = (rows: Array<{ id: unknown }>) => rows.every(row => typeof row
 
 export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>, personIds: ReadonlySet<string>): value is CardTracker {
   if (!isRecord(value)) return false
-  const { cards, transactions, rules, statements, months, pots, imports, moves } = value
-  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves)) return false
+  const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves } = value
+  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves) || gapMoves !== undefined && !Array.isArray(gapMoves)) return false
   const destination = (row: unknown) => validDestination(row, budget)
   if (!cards.every(isRecord) || !uniqueIds(cards as Array<{ id: unknown }>)) return false
   for (const card of cards as Array<Record<string, unknown>>) {
@@ -445,6 +462,10 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
       if (!move.transactions.every(row => isRecord(row) && typeof row.transactionId === 'string' && transactionIds.has(row.transactionId) && Array.isArray(row.lines)
         && row.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination)))) return false
     }
+  }
+  if (gapMoves !== undefined) {
+    if (!gapMoves.every(isRecord) || !uniqueIds(gapMoves as Array<{ id: unknown }>)) return false
+    if (!(gapMoves as Array<Record<string, unknown>>).every(row => typeof row.cardId === 'string' && cardIds.has(row.cardId) && typeof row.at === 'string' && isInt(row.pence) && row.pence !== 0 && destination(row.destination))) return false
   }
   return imports.every(row => isRecord(row) && typeof row.at === 'string' && typeof row.cardId === 'string' && typeof row.fileName === 'string' && typeof row.statementKey === 'string'
     && [row.rows, row.added, row.skipped, row.sortedByRules].every(count => isInt(count) && (count as number) >= 0) && typeof row.latestDate === 'string' && typeof row.matchesSummary === 'boolean')
