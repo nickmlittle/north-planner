@@ -85,3 +85,19 @@
 .pot-make-rule{flex:none;min-height:36px;padding:0 var(--space-3);font-size:var(--text-sm)}
 .pot-rules-message{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
 .pot-rules-message:empty{display:none}
+/* Pot pages by kind (month-health 5): weekly line, typical shop, Try an amount, last 3 months. */
+.pot-lead-week{color:var(--text);font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.pot-lead-week small,.pot-lead-shop small{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-regular)}
+.pot-lead-shop{color:var(--text);font-size:var(--text-md);font-variant-numeric:tabular-nums}
+.pot-try{display:grid;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.pot-try-answer{display:grid;gap:var(--space-1);min-height:44px;color:var(--text-muted);font-size:var(--text-md)}
+.pot-try-answer p{margin:0}
+.pot-try-answer.is-yes>p:first-child{color:var(--positive);font-weight:var(--weight-bold)}
+.pot-try-answer.is-over>p:first-child{color:var(--critical);font-weight:var(--weight-bold)}
+.pot-try-answer.is-check>p:first-child{color:var(--text);font-weight:var(--weight-bold)}
+.pot-months>li{display:grid;grid-template-columns:1fr auto;gap:0 var(--space-3);padding:var(--space-3) var(--space-4);font-variant-numeric:tabular-nums}
+.pot-months>li+li{border-top:1px solid var(--border)}
+.pot-month-name{font-weight:var(--weight-medium)}
+.pot-month-meta{grid-column:1;color:var(--text-muted);font-size:var(--text-sm)}
+.pot-month-left{grid-column:2;grid-row:1 / span 2;align-self:center;text-align:right}
+.pot-month-left.is-over{color:var(--critical)}
