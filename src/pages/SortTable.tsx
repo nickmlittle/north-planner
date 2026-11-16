@@ -1,4 +1,4 @@
-import { useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
+import { Fragment, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
 import { Check, Split } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Kbd, StatusChip } from '../components/ui'
@@ -21,6 +21,8 @@ type Props = {
   onOpen: (id: string) => void
   /** The footer's right side: "Sorted by rules · 15 · Check". */
   footerAside?: ReactNode
+  /** A heading before the row that starts a month, when the rows span more than one (`monthHeads`). */
+  heads?: ReadonlyMap<string, { month: string; name: string; earlier: boolean }>
   now?: () => Date
   /** For Left and pace in each option and the impact line (Spending ↔ Month link F5). */
   today?: string
@@ -32,7 +34,7 @@ type Props = {
  * placed. For the mouse, the focused or hovered row shows a ✓ beside its pot. Each pot option carries its Left and pace,
  * and the focused row says what placing it would change ("Groceries: On track → £110 ahead · runs out ~Fri 20 Nov").
  */
-export function SortTable({ document, setDocument, transactions, onSorted, onSplit, onOpen, footerAside, now = () => new Date(), today = localDate() }: Props) {
+export function SortTable({ document, setDocument, transactions, onSorted, onSplit, onOpen, footerAside, heads, now = () => new Date(), today = localDate() }: Props) {
   const name = destinationNamer(document)
   const groups = destinationGroups(document)
   const tracker = cardTracker(document)
@@ -96,7 +98,8 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
         // Only the focused row works out its impact: it's the one about to be placed.
         const impact = focused === transaction.id && chosen ? placeImpact(document, transaction, chosen, today) : undefined
         const impactId = `sort-impact-${transaction.id}`
-        return <tr key={transaction.id} ref={element => { rows.current[transaction.id] = element }} tabIndex={0} className="sort-table-row" data-transaction={transaction.id} aria-keyshortcuts="ArrowUp ArrowDown J K / Enter A S"
+        const head = heads?.get(transaction.id)
+        return <Fragment key={transaction.id}>{head && <tr className="sort-table-month"><th scope="colgroup" colSpan={7}>{head.name}{head.earlier && <span> · earlier month</span>}</th></tr>}<tr ref={element => { rows.current[transaction.id] = element }} tabIndex={0} className="sort-table-row" data-transaction={transaction.id} aria-keyshortcuts="ArrowUp ArrowDown J K / Enter A S"
           aria-label={`${transaction.description}, ${signedPounds(transaction.amountPence)}, ${dayDate(transaction.date)}`} onKeyDown={event => onRowKey(event, transaction, index)}
           onFocus={() => setFocused(transaction.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(current => current === transaction.id ? null : current) }}>
           <td onClick={() => rows.current[transaction.id]?.focus()}>{dayDate(transaction.date)}</td>
@@ -114,7 +117,7 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
           </span>{impact?.text && <p id={impactId} className={`sort-impact sort-table-impact${impact.tone ? ` is-${impact.tone}` : ''}`}>{impact.text}</p>}</td>
           <td>{transaction.kind !== 'refund' && <label className="sort-table-always"><input type="checkbox" checked={!!always[transaction.id]} onChange={event => setAlways({ ...always, [transaction.id]: event.target.checked })}/><span className="visually-hidden">Always put {transaction.merchant} in this pot</span></label>}</td>
           <td><button type="button" className="icon-button" aria-label={`Split ${transaction.description}`} onClick={() => onSplit(transaction.id)}><Split aria-hidden="true"/></button></td>
-        </tr>
+        </tr></Fragment>
       })}</tbody>
     </table>
     <div className="sort-table-foot"><p className="sort-table-keys" id="sort-table-keys"><Kbd>J</Kbd> <Kbd>K</Kbd> move · <Kbd>↵</Kbd> place · <Kbd>/</Kbd> choose a pot · <Kbd>A</Kbd> always · <Kbd>S</Kbd> split</p>{footerAside}</div>

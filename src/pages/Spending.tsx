@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { Fragment, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { EmptyState, ListRow, PageHeader, Section, StatusChip, Tabs, useMobilePresentation, useStepCopy, useToast } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
@@ -22,7 +22,7 @@ import { SortTable } from './SortTable'
 import type { Tipped } from './sortPace'
 import { TransactionsTable } from './TransactionsTable'
 import { splitLabel } from '../domain/cardSplits'
-import { cardLabel, dayOf, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
+import { cardLabel, dayOf, monthHeads, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { closeDateFor } from '../domain/cardTracker'
 import './Spending.css'
 import { movedByTransaction, moveState, potPhrase, potTitle, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
@@ -112,6 +112,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
   useShortcut(hasCard ? { keys: 'n', description: 'Add a transaction', group: 'This page', run: () => setSheet('manual') } : null)
   const toSort = transactionsToSort(tracker)
+  // Rows from an earlier month sit under their own month's heading (PR 7).
+  const heads = monthHeads(toSort, today)
   const byRules = uncheckedRuleSorts(tracker)
   const latest = lastImport(tracker)
   const sortedThrough = tracker.transactions.reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
@@ -198,11 +200,11 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     {!toSort.length && setAside}
     <Section title="To sort" count={toSort.length || undefined} aside={!compact ? `${latest ? `Brought in ${dayOf(latest.at)}` : 'Nothing brought in yet'}${sortedThrough ? ` · sorted to ${shortDate(sortedThrough)}` : ''}` : undefined}>
       {toSort.length ? compact
-        ? <ul className="spending-sort-list" aria-label="To sort">{toSort.map(transaction => <li key={transaction.id}><ListRow title={transaction.description}
+        ? <ul className="spending-sort-list" aria-label="To sort">{toSort.map(transaction => <Fragment key={transaction.id}>{heads.has(transaction.id) && <li className="spending-month-head" aria-hidden="true">{heads.get(transaction.id)!.name}{heads.get(transaction.id)!.earlier && <span> · earlier month</span>}</li>}<li><ListRow title={transaction.description}
           label={[transaction.description, signedPounds(transaction.amountPence), `${dayDate(transaction.date)} · ${cardLabel(document, transaction)}`, hint(transaction)].filter(Boolean).join(', ')}
           meta={[dayDate(transaction.date), document.household.adults.find(person => person.id === transaction.personId)?.name ?? cardLabel(document, transaction), hint(transaction)].filter(Boolean).join(' · ')}
-          trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li>)}</ul>
-        : <SortTable document={document} setDocument={setDocument} transactions={toSort} today={today} onSorted={sorted} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
+          trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li></Fragment>)}</ul>
+        : <SortTable document={document} setDocument={setDocument} transactions={toSort} heads={heads} today={today} onSorted={sorted} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
         : tracker.transactions.length ? <EmptyState title="Everything is sorted"/>
         : <EmptyState title="Nothing to sort" action={<button type="button" className="secondary-button" onClick={() => setSheet('bring-in')}>Bring in</button>}>Bring in the Excel export from {card.name} to start.</EmptyState>}
       {(compact || !toSort.length) && ruleToggle && <div className="spending-rule-line">{ruleToggle}</div>}

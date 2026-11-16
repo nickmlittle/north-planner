@@ -3,9 +3,12 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type Dispatch, ty
 import { Check, FileSpreadsheet, TriangleAlert } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
 import { AmexImportError, importAmexExport, readAmexExport, type ImportResult } from '../domain/amexImport'
+import { importChanges, type BroughtIn } from '../domain/bringIn'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, saveCard, type CardAccount } from '../domain/cardTracker'
-import { ordinal, shortDate } from './cardLabels'
+import { cardTracker, localDate, monthOf, saveCard, type CardAccount } from '../domain/cardTracker'
+import { homeInbox } from '../domain/homeInbox'
+import { BroughtInLines } from './BroughtInLines'
+import { destinationNamer, ordinal, shortDate } from './cardLabels'
 import { plural, pounds } from './spendingFormat'
 
 type Props = {
@@ -34,7 +37,7 @@ export function BringInSheet({ document, setDocument, onClose, onSort, now = () 
   const id = useId()
   const cards = cardTracker(document).cards
   const [cardId, setCardId] = useState(cards[0]?.id ?? '')
-  const [state, setState] = useState<{ kind: 'idle' } | { kind: 'reading'; fileName: string } | { kind: 'error'; message: string } | { kind: 'done'; fileName: string; result: ImportResult }>({ kind: 'idle' })
+  const [state, setState] = useState<{ kind: 'idle' } | { kind: 'reading'; fileName: string } | { kind: 'error'; message: string } | { kind: 'done'; fileName: string; result: ImportResult; changes: BroughtIn | null; verdict?: string }>({ kind: 'idle' })
   const [owners, setOwners] = useState<Record<string, string>>({})
   const card = cards.find(row => row.id === cardId)
   // The file input goes once a result shows, so focus moves to the result to stay in the dialog.
@@ -50,9 +53,12 @@ export function BringInSheet({ document, setDocument, onClose, onSort, now = () 
       const parsed = await readAmexExport(new Uint8Array(await file.arrayBuffer()))
       const at = now()
       // Worked out on the document as it is now, then applied to the latest one (it may have changed while reading).
-      const { result } = importAmexExport(document, card.id, parsed, file.name, at)
+      const { result, document: brought } = importAmexExport(document, card.id, parsed, file.name, at)
       setDocument(current => importAmexExport(current, card.id, parsed, file.name, at).document)
-      setState({ kind: 'done', fileName: file.name, result })
+      // What it did to the month, worked out on the document with the import in it.
+      const today = localDate(at)
+      const verdict = homeInbox(brought, { month: monthOf(today), today, nameDestination: destinationNamer(brought) }).verdict
+      setState({ kind: 'done', fileName: file.name, result, changes: importChanges(brought, at.toISOString(), today), ...verdict ? { verdict } : {} })
     } catch (error) {
       setState({ kind: 'error', message: error instanceof AmexImportError ? error.message : 'North couldn’t read that file. Download the Excel version of your transactions and try again.' })
     }
@@ -88,6 +94,7 @@ export function BringInSheet({ document, setDocument, onClose, onSort, now = () 
         <div><dt>Sorted by your rules</dt><dd>{result.sortedByRules}</dd></div>
         <div><dt>To sort</dt><dd>{result.toSort}</dd></div>
       </dl>
+      {state.kind === 'done' && state.changes && <BroughtInLines document={document} broughtIn={state.changes} verdict={state.verdict} month={monthOf(localDate(now()))}/>}
       <p className={`bring-in-check${result.summary.matches ? ' is-ok' : ' is-warn'}`}>{result.summary.matches ? <Check aria-hidden="true"/> : <TriangleAlert aria-hidden="true"/>}<span>{summaryText(result)}</span></p>
       {result.final && <p className="bring-in-check is-ok"><Check aria-hidden="true"/><span>This is the final export for the {shortDate(result.period.to)} statement.</span></p>}
       {unknown.length > 0 && <fieldset className="bring-in-owners"><legend>Whose {unknown.length === 1 ? 'card is this' : 'cards are these'}?</legend>

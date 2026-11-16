@@ -29,6 +29,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot check 3: Check balances, settle up's cover line, Home | C3 | `src/pages/CheckBalancesSheet.tsx`, `SettleSteps` in `StatementsPanel.tsx`, `gap` in `homeMonths` and `homeInbox` |
 | Month health 4: one sum per bill and per pot (D1, D2, D13) | health/4 | `src/domain/billSum.ts`, `src/domain/potSum.ts`, `SetAsideCheckLead.tsx`, `PotSumSection` in `SpendingMonth.tsx` |
 | Month health 5: pot pages by kind, This week, typical shop, Try an amount (D2, D3) | health/5 | `src/domain/afford.ts`, `src/domain/potSum.ts`, `src/pages/PotLeads.tsx` |
+| Month health 7: what a bring-in did, Just brought in, earlier months in To sort | health/7 | `src/domain/bringIn.ts`, `src/pages/BroughtInLines.tsx`, `BringInSheet.tsx`, `Home.tsx`, `monthHeads` in `spendingFormat.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -91,6 +92,21 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 10. **A final export:** an import taken after the period's close that matches the summary sets the statement's `finalImportAt` (it is then *complete*, §6.7).
 
 `scripts/amex-fixture.mjs` writes `docs/fixtures/amex-export-sample.xlsx` (15 fictitious rows: a payment, a refund, a row dated the day before the period, a newline in Extended Details, two card endings, a matching summary) and `amex-export-mismatch.xlsx` (Charges £12.34 higher). Tests use only these and workbooks built by `xlsx.testing.ts`. Never put a real export, or anything from one, in the repo.
+
+## What a bring-in did (month-health PR 7)
+
+`importChanges(document, at, today)` in `src/domain/bringIn.ts` says what the import made at `at` changed, as the document stands now. Nothing is stored: the import's rows are the ones whose `importedAt` is `at` (manual entries are never counted), and "before" is the document without them (`withoutImport`). It returns:
+
+- **Sorted to:** the destinations of the added purchases and refunds, biggest first. A split row counts once under each pot.
+- **Earlier months:** added purchases and refunds dated before the month of `today`, by month ("3 are October's"). They still count in their own month, as they always did.
+- **Pot changes:** each Tracked pot's pace this month, before and after: "Groceries went from on track to £73 ahead". Only pots whose phrase changed are listed.
+- **Bills gone out:** added purchases sorted to a Carries over pot.
+- **Refunds:** each added refund with the purchase it answers (`refundOf`) and where it went back, or "no purchase found" / "to sort".
+- **The bill:** `billSum` of the statement the file was for, as it is now. Null when that statement isn't paid from the Amex pot.
+
+It is null for an unknown import or one that added nothing. `justBroughtIn(document, today)` is the latest import's changes while it's the day of the import or one of the two after (`JUST_BROUGHT_IN_DAYS`); Home shows it as **Just brought in**. The Bring in sheet shows the same lines straight after the import, plus the month's verdict (`homeInbox().verdict` on the new document).
+
+**To sort by month.** When To sort holds rows from more than one month, each month gets a heading ("November", "October · earlier month"): `monthHeads` in `spendingFormat.ts`, used by the phone list and the desktop table. With one month there are no headings. Close <Month> counts earlier-month rows as before.
 
 ## Adding by hand
 

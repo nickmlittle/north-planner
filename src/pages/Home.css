@@ -82,3 +82,10 @@
 .home-payday .secondary-button{justify-self:start}
 .home-payday .home-progress{gap:var(--space-1) var(--space-4)}.home-payday .home-progress-person{white-space:nowrap}
 .home-payday .home-progress{flex-wrap:wrap}
+/* Just brought in: between the verdict and To do. */
+.home-brought-in{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--card)}
+.home-brought-in header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:var(--space-1) var(--space-3)}
+.home-brought-in h2{margin:0;font-size:var(--text-lg);font-weight:var(--weight-bold)}
+.home-brought-in-date{color:var(--text-muted);font-size:var(--text-sm)}
+.home-brought-in-counts{margin:0;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.home-brought-in .secondary-button{justify-self:start}
