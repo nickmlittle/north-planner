@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { BudgetDocument } from '../../domain/budgetDocument'
 import type { BudgetImpact } from '../../domain/budgetImpact'
-import { personProgress, setStepTick } from '../../domain/transferTicks'
+import { householdProgress, personProgress, setStepTick } from '../../domain/transferTicks'
 import { EmptyState, Section, Segmented, useStepCopy } from '../../components/ui'
 import { formatGBP } from '../../formatting/money'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../../state/transferPerson'
@@ -46,7 +46,9 @@ export function PaydaySection({ document, setDocument, month, budget, mobilePres
   const { copy, hintSeen, status: copied } = useStepCopy()
   const progress = new Map(personPlans.people.map(plan => [plan.personId, personProgress(plan, ticks)]))
   const counted = [...progress.entries()].filter(([personId]) => selection === 'both' || personId === selection).map(([, row]) => row)
-  const done = counted.reduce((sum, row) => sum + row.done, 0), total = counted.reduce((sum, row) => sum + row.total, 0)
+  // The household's joint pot moves (D6) are either person's, so they count whoever is chosen.
+  const together = householdProgress(personPlans, ticks)
+  const done = counted.reduce((sum, row) => sum + row.done, together.done), total = counted.reduce((sum, row) => sum + row.total, together.total)
   const potName = (potId: string) => document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot'
   const ownerLabel = (accountId: string) => {
     const owners = document.budget.accounts.find(account => account.id === accountId)?.ownerPersonIds ?? []

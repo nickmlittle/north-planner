@@ -16,17 +16,26 @@ const fixture = () => decodeBudgetDocument(JSON.parse(readFileSync(resolve(__dir
 const desktop = () => vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 const tickEverything = () => { for (let round = 0; round < 3; round++) for (const tick of screen.queryAllByRole('button', { name: / done$/, pressed: false })) fireEvent.click(tick) }
 
-it('stores November’s payday ticks under the same keys', () => {
+function tickMonth(month: string, start: (document: BudgetDocument) => BudgetDocument = document => document) {
   desktop()
   let saved: BudgetDocument | undefined
   function Harness() {
-    const [document, setDocument] = useState(fixture)
+    const [document, setDocument] = useState(() => start(fixture()))
     saved = document
-    return <MonthlyBudget document={document} setDocument={setDocument} view="month" month="2026-11"/>
+    return <MonthlyBudget document={document} setDocument={setDocument} view="month" month={month}/>
   }
   render(<Harness/>)
   tickEverything()
-  expect(Object.keys(saved!.ticks?.['2026-11'] ?? {}).sort()).toEqual(PAYDAY_KEYS)
+  return Object.keys(saved!.ticks?.[month] ?? {}).sort()
+}
+
+it('stores November’s payday ticks under the same keys', () => {
+  // A month already ticked under the per-person steps keeps them (P5): one of its old joint pot moves is ticked.
+  expect(tickMonth('2026-11', document => ({ ...document, ticks: { '2026-11': { 'ada:move:bills': { amountPence: 51962, at: '2026-11-01T09:00:00.000Z' } } } }))).toEqual(PAYDAY_KEYS)
+})
+
+it('stores a new month’s payday ticks with the joint pot moves once for the household', () => {
+  expect(tickMonth('2026-12')).toEqual(HOUSEHOLD_KEYS)
 })
 
 it('stores the October statement’s settle-up ticks under the same keys', () => {
@@ -46,4 +55,8 @@ it('stores the October statement’s settle-up ticks under the same keys', () =>
 
 const PAYDAY_KEYS = ['ada:fund:ada', 'ada:fund:ben', 'ada:fund:joint', 'ada:fund:saving', 'ada:move:ada-spend', 'ada:move:bills', 'ada:move:emergency', 'ada:move:groceries', 'ada:move:holidays',
   'ben:fund:ada', 'ben:fund:ben', 'ben:fund:joint', 'ben:fund:saving', 'ben:move:ben-spend', 'ben:move:bills', 'ben:move:emergency', 'ben:move:groceries', 'ben:move:holidays']
+// D6: the household layout's joint pot moves end in `:move:<potId>` like a person's, so balances read them unchanged.
+const HOUSEHOLD_KEYS = ['ada:fund:ada', 'ada:fund:ben', 'ada:fund:joint', 'ada:fund:saving', 'ada:move:ada-spend',
+  'ben:fund:ada', 'ben:fund:ben', 'ben:fund:joint', 'ben:fund:saving', 'ben:move:ben-spend',
+  'household:move:bills', 'household:move:emergency', 'household:move:groceries', 'household:move:holidays']
 const SETTLE_KEYS = ['settle:out:ada-spend', 'settle:out:ben-spend', 'settle:out:bills', 'settle:out:groceries', 'settle:out:holidays', 'settle:pay', 'settle:send:ada', 'settle:send:ben']

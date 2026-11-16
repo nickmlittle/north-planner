@@ -35,7 +35,7 @@ Zero allocations create no actionable steps. Existing income-policy fields remai
 ## Routing and responsibility
 
 1. **Fund accounts:** group contributions by person and destination account, including both direct allocations and its pot allocations. The source is where that person's pay lands, when it's set (see *Source account*); otherwise it is unknown (`null`) and nothing is assumed about where salaries arrive.
-2. **Distribute pots:** after funding, derive movements from the parent account to each pot. For a joint account, each contributor handles their own shares, including a contributor who is not one of the joint owners. For a sole-owned account, its owner moves the combined pot allocation, retaining every original contributor in the breakdown. An account without an owner has unresolved pot responsibility.
+2. **Distribute pots:** after funding, derive movements from the parent account to each pot. For a joint account, each contributor handles their own shares, including a contributor who is not one of the joint owners. For a sole-owned account, its owner moves the combined pot allocation, retaining every original contributor in the breakdown. An account without an owner has unresolved pot responsibility. From December 2026, payday shows a joint account's moves once for the household instead (see *Household payday*); the instructions themselves don't change.
 
 ### Source account ("Pay lands in")
 
@@ -50,6 +50,19 @@ Agreed 13 November 2026 (audit 3, decision D9).
 Automation and account operating permissions have not been verified. A complete calculated instruction does not mean a bank payment is required, manual, authorised or completed. The app does not execute payments.
 
 Funding dependencies link each joint pot step to that person's account-funding requirement. A sole-owner pot step depends on all contributions to its account. These links describe planning order, not tracked payment completion. The mobile step list orders each person's steps by account, funding first and then that account's pot moves; where a pot move depends on someone else's funding, it says so in a caption rather than reordering across people.
+
+### Household payday (D6, D7)
+
+Agreed 15–16 November 2026 (audit 4, [build plan](month-health-build-plan.md) §5, decisions D6, D7, P5 and P6). Payday steps are a projection of the instructions above. The household layout changes who makes each move and in what order. It never changes what each account or pot receives, or what each person contributes.
+
+- **Joint pot moves, once (D6).** Both of you fund a joint account (two or more owners). Then *either of you* makes each of its pot moves once, at the household total. These are household steps, keyed `household:move:<potId>`. The key ends in `:move:<potId>` like a person's move, so pot balances read it unchanged. Each move keeps its parts by person ("Ada's £162.74 and Ben's £162.73"). A sole-owned account is unchanged: its owner moves everything.
+- **Paying each other (D7).** Two people may each fund the other's *pay account*: the account their pay lands in, owned by them alone. Those two transfers become one. The person who owes more sends the difference under their usual fund key (`<person>:fund:<account>`), and the other side's transfer is no longer a step. Equal amounts cancel out, and nobody sends anything. Both rows keep their funding, so each person's contribution, and "£X from £Y available", is unchanged. Nothing is netted without both landing accounts, one way only, or into an account that isn't the other person's own.
+- **Waiting (P6).** A step that needs someone else's money waits for their transfer to be ticked. A household move waits for every transfer into its joint account ("Waiting for Ben's £1,796.27"). A person's move waits only when it includes someone else's money, and then only for their transfer into that account. A transfer netted down to nothing is nothing to wait for. Any tick unlocks a step, including a tick at a different amount. Transfers wait for nothing. Waiting describes order only. It never blocks a tick.
+- **Which months (P5).** A month uses the household layout unless it was already ticked under the per-person one. That shows as a tick on a person's own move into a joint pot (`<person>:move:<jointPotId>`), a key the household layout never makes. So November 2026, ticked before the change, keeps its steps and isn't netted, and December, the first month with no ticks, starts the new ones. A tick on a fund step or a personal-account move is the same in both layouts, so it doesn't decide.
+- **One adult:** nothing changes.
+- **Same money.** A test checks every fixture month, with and without landing accounts. The household steps give every account the same net money by transfer and every pot the same moves as the per-person steps.
+
+`paydayPlans(document, month, accounts, instructions)` in `src/domain/personTransfers.ts` is the one entry point for Month, Home and the month's stage. `paydaySteps(plans)` in `transferTicks.ts` lists every step with what it `waitsFor`, and `waitingOn(step, ticks)` gives what is still unticked.
 
 ## Totals, precision and incomplete data
 
@@ -73,11 +86,11 @@ Invalid document references or an invalid calendar-month argument fail explicitl
 
 Agreed with Nick on 10 November 2026 (Immy's feedback). People tick each payday step once they have made it; when everything is ticked the household is up to date for the month.
 
-- **Per month, per step.** A tick belongs to one month and one step: a person funding an account (`person:fund:account`) or a person's pot move (`person:move:pot`). It stores the amount it was ticked at and when. Ticks live in the budget document (`ticks`), so they sync like the rest of the budget.
+- **Per month, per step.** A tick belongs to one month and one step: a person funding an account (`person:fund:account`), a person's pot move (`person:move:pot`) or, on the household layout, a joint pot move either of you makes (`household:move:pot`). It stores the amount it was ticked at and when. Ticks live in the budget document (`ticks`), so they sync like the rest of the budget.
 - **Shared by the household for now.** Any signed-in device can tick any person's step. Once shared login links an account to an adult, ticks become per person.
 - **Done** means ticked at today's amount. **Changed** means ticked at a different amount: the step stays ticked, shows the difference (more to send, or less needed) and is not counted as done until it is ticked again, which records the new amount.
 - **Steps that disappear** (an item removed, an account no longer funded) lose their tick silently. Withheld steps (needs review) can't be ticked.
-- **Up to date** means every step for every person is done.
+- **Up to date** means every step for every person, and every household step, is done.
 - **Ticks never change the plan** or any amount. They are a record of what people did, not a payment ledger; the app doesn't verify them against a bank. Copying an amount never ticks a step.
 - **A new month starts with nothing ticked.** Past months keep their ticks.
 
@@ -103,6 +116,18 @@ After funding, Nick moves £100 and £60 into the pots; Immy moves £50 and £30
 ### Personal pot funded by another member
 
 Immy owns an account. Its pot needs £100.01: Nick contributes £70.01 and Immy £30.00 using fixed funding. Account-funding requirements preserve those two contributions. Immy handles one £100.01 pot movement, whose breakdown still attributes £70.01 to Nick and £30.00 to Immy.
+
+### Household payday: Ada and Ben, December 2026
+
+Ada's pay lands in Starling and Ben's in Nationwide. Both fund Monzo Joint and Monzo Joint Savings. Each also funds part of the other's Spending pot: Ada £810.74 into Ben's, Ben £516.10 into Ada's.
+
+| In | Who | Steps |
+| --- | --- | --- |
+| Starling | Ada | Send to Monzo Joint £2,223.22 · Send to Monzo Joint Savings £518.98 · Send to Ben £294.64 (£810.74 less Ben's £516.10) · Move to her Spending £1,135.42, which needs no wait because Ben's £516.10 was netted, not sent |
+| Nationwide | Ben | Send to Monzo Joint £1,796.27 · Send to Monzo Joint Savings £718.48 · Move to his Spending £1,249.50, which waits for Ada's £294.64 |
+| Monzo | Either of you, once both have funded | Bills £965.58 · Groceries £325.47 · Going out £251.77 · Holidays £1,586.36 (from Monzo Joint) · Emergency £1,237.46 (from Joint Savings) |
+
+That makes 12 steps: Ada 4, Ben 3 and 5 household moves. On the per-person steps it was 18: each of you moved your own share of each of the five joint pots, and both cross transfers were sent in full. Starling's net is the same either way: −£2,223.22 − £518.98 − £810.74 + £516.10 = −£2,223.22 − £518.98 − £294.64.
 
 ### Spare penny and incomplete funding
 

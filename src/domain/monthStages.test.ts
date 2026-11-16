@@ -5,8 +5,8 @@ import { setSettleTick, settleSteps, allSettleSteps, settleWithoutFinal } from '
 import { builtUp, closeMonth, closeMonthPlan, coverStepStatus, keepBuiltUp, markAllIn, monthStage, moveBuiltUp, paydayProgress, setCover, setCoverTick } from './monthStages'
 import { buildTransferInstructions } from './transferInstructions'
 import { budgetTransfers } from './budgetTransfers'
-import { orderTransferAccounts, personTransferPlans } from './personTransfers'
-import { planSteps } from './transferTicks'
+import { orderTransferAccounts, paydayPlans } from './personTransfers'
+import { paydaySteps } from './transferTicks'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 
 const pot = (potId: string): BudgetDestination => ({ kind: 'pot', potId })
@@ -40,17 +40,18 @@ function household(): BudgetDocument {
 function tickPayday(document: BudgetDocument, month: string, count = Infinity): BudgetDocument {
   const ids = document.household.adults.map(person => person.id)
   const instructions = buildTransferInstructions(document, month)
-  const plans = personTransferPlans(orderTransferAccounts(budgetTransfers(document.budget, ids, month, resolveBudget(document.budget, month).items).accounts, instructions, document.budget.accounts, ids, new Map()), instructions, ids)
-  const steps = plans.people.flatMap(planSteps).slice(0, count)
+  const plans = paydayPlans(document, month, orderTransferAccounts(budgetTransfers(document.budget, ids, month, resolveBudget(document.budget, month).items).accounts, instructions, document.budget.accounts, ids, new Map()), instructions)
+  const steps = paydaySteps(plans).slice(0, count)
   return { ...document, ticks: { ...document.ticks, [month]: Object.fromEntries(steps.map(step => [step.key, { amountPence: step.amountPence, at: 'x' }])) } }
 }
 
 describe('month stages', () => {
   it('goes upcoming → funding → funded before the month, then in progress, closing, to settle and settled', () => {
     let document = household()
-    expect(paydayProgress(document, '2026-12')).toMatchObject({ total: 10, done: 0 })
+    // Two fundings, then the four joint pot moves once for the household (D6).
+    expect(paydayProgress(document, '2026-12')).toMatchObject({ total: 6, done: 0 })
     expect(monthStage(document, '2026-12', '2026-11-20').stage).toBe('upcoming')
-    expect(monthStage(tickPayday(document, '2026-12', 2), '2026-12', '2026-11-28')).toMatchObject({ stage: 'funding', funding: { done: 2, total: 10 } })
+    expect(monthStage(tickPayday(document, '2026-12', 2), '2026-12', '2026-11-28')).toMatchObject({ stage: 'funding', funding: { done: 2, total: 6 } })
     expect(monthStage(tickPayday(document, '2026-12'), '2026-12', '2026-11-28').stage).toBe('funded')
     expect(monthStage(document, '2026-11', '2026-11-12').stage).toBe('in-progress')
     expect(monthStage(document, '2026-10', '2026-11-04')).toMatchObject({ stage: 'closing', statements: ['amex:2026-10-24', 'amex:2026-11-24'] })

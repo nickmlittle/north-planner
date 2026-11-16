@@ -6,12 +6,12 @@ import { transactionsToSort } from './cardSorting'
 import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey } from './cardTracker'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { closeMonthPlan, homeMonths, moneyArrivesDates, type HomeMonth, type HomeTask } from './monthStages'
-import { orderTransferAccounts, personTransferPlans } from './personTransfers'
+import { HOUSEHOLD, orderTransferAccounts, paydayPlans } from './personTransfers'
 import { potBalance } from './potBalances'
 import { potPhrase } from './setAside'
 import { gapDestination } from './setAsideCheck'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
-import { personProgress } from './transferTicks'
+import { householdProgress, personProgress } from './transferTicks'
 import { moneyArrives } from './workingDays'
 import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
@@ -95,14 +95,16 @@ function fundingFor(document: BudgetDocument, month: string) {
   const transfers = budgetTransfers(document.budget, ids, month, items)
   let instructions: TransferInstructions | undefined
   try { instructions = buildTransferInstructions(document, month) } catch { /* Month explains it; Home has no steps. */ }
-  const plans = personTransferPlans(orderTransferAccounts(transfers.accounts, instructions, document.budget.accounts, ids, new Map()), instructions, ids)
-  const people = plans.people.map(plan => ({ personId: plan.personId, ...personProgress(plan, document.ticks?.[month]) })).filter(row => row.total > 0)
+  const plans = paydayPlans(document, month, orderTransferAccounts(transfers.accounts, instructions, document.budget.accounts, ids, new Map()), instructions)
+  const ticks = document.ticks?.[month]
+  // The household's joint pot moves (D6) count as one more row: "Either of you 0 of 5".
+  const people = [...plans.people.map(plan => ({ personId: plan.personId, ...personProgress(plan, ticks) })), { personId: HOUSEHOLD, ...householdProgress(plans, ticks) }].filter(row => row.total > 0)
   return { transfers, items, plans, people }
 }
 
 export function homeInbox(document: BudgetDocument, { month, today = localDate(), nameDestination = () => 'Pot', nameAccount = () => 'Account' }: Options): HomeInbox {
   const adults = document.household.adults
-  const name = (personId: string) => adults.find(person => person.id === personId)?.name ?? 'Someone'
+  const name = (personId: string) => personId === HOUSEHOLD ? 'Either of you' : adults.find(person => person.id === personId)?.name ?? 'Someone'
   const tracker = cardTracker(document)
   const card = tracker.cards[0]
   const todo: InboxTask[] = [], headsUp: InboxTask[] = [], done: InboxTask[] = [], comingUp: Upcoming[] = []

@@ -1,9 +1,9 @@
 import { ChevronRight } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import type { NeedsReviewReason, PersonAmount, PersonTransferPlan, PersonTransferPlans, PersonTransferRow } from '../domain/personTransfers'
+import { sendPence, type HouseholdRow, type NeedsReviewReason, type PersonAmount, type PersonTransferPlan, type PersonTransferPlans, type PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 import { stepSummary } from './budgetLabels'
-import { fundStepKey, moveStepKey, personProgress, type StepTick } from '../domain/transferTicks'
+import { fundStepKey, householdMoveKey, householdProgress, moveStepKey, personProgress, type StepTick } from '../domain/transferTicks'
 import { Meter } from '../components/ui'
 import { StepCaption, StepGroup, StepRow } from '../components/ui/StepRow'
 import { useListNavigation } from '../state/useListNavigation'
@@ -66,9 +66,15 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
   const steps = (plan: PersonTransferPlan) => plan.rows.map((row: PersonTransferRow) => {
     const account = label(row.accountId)
     // Pay already lands here: shown (and copyable) but not a step to tick. With a known source, a fund step reads "from → to".
-    const fundName = row.alreadyThere ? `Already in ${account}` : row.fromAccountId ? `${label(row.fromAccountId)} → ${account}` : `Fund ${account}`
-    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundStepKey(plan.personId, row.accountId)} name={fundName} {...row.alreadyThere ? { mode: 'copy' as const, quiet: true } : {}} amountPence={row.fundingPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}>
-      {row.movedOnBy.map(other => <StepCaption key={other.personId}>{name(other.personId)} moves {other.amountPence === row.fundingPence ? 'it' : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</StepCaption>)}
+    const transfer = row.fromAccountId ? `${label(row.fromAccountId)} → ${account}` : `Fund ${account}`
+    // Paying each other (D7): the bigger side sends the difference; the other side's transfer is folded into it.
+    const netted = !row.alreadyThere && row.net && sendPence(row) === 0 ? row.net : null
+    const fundName = row.alreadyThere ? `Already in ${account}` : netted ? `${transfer}: netted with ${name(netted.personId)}’s` : transfer
+    const netCaption = !row.net || row.alreadyThere ? undefined
+      : netted ? (netted.otherPence > row.fundingPence ? `${name(netted.personId)} sends the ${pounds(netted.otherPence - row.fundingPence)} difference instead` : `Cancels out with ${name(netted.personId)}’s ${pounds(netted.otherPence)}: nothing to send`)
+      : `${pounds(row.fundingPence)} less ${name(row.net.personId)}’s ${pounds(row.net.otherPence)}`
+    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundStepKey(plan.personId, row.accountId)} name={fundName} {...row.alreadyThere || netted ? { mode: 'copy' as const, quiet: true } : {}} amountPence={netted ? row.fundingPence : sendPence(row)} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId} caption={netCaption}>
+      {row.movedOnBy.map(other => <StepCaption key={other.personId}>{name(other.personId)} moves {other.amountPence === sendPence(row) ? 'it' : row.net ? pounds(other.amountPence) : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</StepCaption>)}
       {affected(row.accountId)}
     </StepRow> : null
     const moves = row.potMoves.map((move, index) => {
@@ -96,13 +102,31 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     </header>
   }
 
+  /** The household's joint pot moves (D6): made once, by either of you, at the household total. */
+  const household = (rows: HouseholdRow[]) => {
+    const progress = householdProgress(plans, ticks), count = rows.reduce((sum, row) => sum + row.moves.length, 0)
+    const total = rows.reduce((sum, row) => sum + row.moves.reduce((moves, move) => moves + move.amountPence, 0), 0)
+    return <section className="payday-person payday-household" aria-label="Either of you steps">
+      <header className="payday-person-head">
+        <h3><span className="payday-person-name">Either of you</span><span className="payday-person-count">{progress.done} of {progress.total} · {plural(count, 'move')}</span></h3>
+        <Meter label="Either of you: steps ticked" value={progress.done} max={progress.total || 1}/>
+        <p className="payday-person-sub">{pounds(total)} into joint pots, once you’ve both sent your money</p>
+      </header>
+      {rows.map(row => <StepGroup key={row.accountId} title={label(row.accountId)} aside={<>{accountOwnerLabel(row.accountId)}{onSeeItems && <> · {seeItems(row.accountId)}</>}</>}>
+        {row.moves.map(move => <StepRow key={move.potId} stepKey={householdMoveKey(move.potId)} name={`Move to ${potName(move.potId)}`} indent amountPence={move.amountPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}
+          caption={move.byPerson.length > 1 ? list(move.byPerson.map(part => `${name(part.personId)}’s ${pounds(part.amountPence)}`)) : undefined}/>)}
+      </StepGroup>)}
+    </section>
+  }
+
   return <div className="payday" role="region" aria-label="Steps by person">
-    {!shown.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
-    {chosen && !shown.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
-    {shown.length > 0 && <div className="payday-people" {...listKeys.listProps}>{listKeys.hint}{shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
+    {!shown.length && !plans.household.length && !plans.needsReview.length && <p className="budget-destination-empty">{chosen ? `${name(chosen)} has nothing to move this month.` : 'Nothing to move this month.'}</p>}
+    {chosen && !shown.length && !plans.household.length && plans.needsReview.length > 0 && <p className="budget-destination-empty">{name(chosen)} has no steps ready this month.</p>}
+    {(shown.length > 0 || plans.household.length > 0) && <div className="payday-people" {...listKeys.listProps}>{listKeys.hint}{shown.map(plan => <section key={plan.personId} className="payday-person" aria-label={`${name(plan.personId)} steps`}>
       {personHead(plan)}
       {steps(plan)}
-    </section>)}</div>}
+    </section>)}
+    {plans.household.length > 0 && household(plans.household)}</div>}
     {plans.needsReview.length > 0 && <section className="payday-review" aria-label="Needs review">
       <h3 className="payday-person-heading"><span>Needs review</span><span>{plural(plans.needsReview.length, 'account')}</span></h3>
       <ul>{plans.needsReview.map(account => {

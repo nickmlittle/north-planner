@@ -91,7 +91,7 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     expect(result.todo.map(row => [row.kind, row.title, row.meta, row.trailing ?? row.chip, row.trailingMeta])).toEqual([
       ['settle', 'Settle the October statement', 'All 12 sorted · matches Amex’s summary', '£646.88', 'due Wed 18 Nov'],
       ['close', 'Close October', 'Groceries £88.58 over · 3 pots with money left', 'Ended 31 Oct', undefined],
-      ['fund', 'Fund November', 'Ada 0 of 9 · Ben 0 of 9', '18 steps', undefined],
+      ['fund', 'Fund November', 'Ada 0 of 5 · Ben 0 of 5 · Either of you 0 of 4', '14 steps', undefined],
       ['sort', 'Sort 4 Amex transactions', 'Brought in Mon 9 Nov', '£195.79', undefined],
       ['set-aside', 'Set aside in the Amex pot', '3 transactions sorted since the last move', '£140.59', undefined],
       ['renewal', 'Breakdown cover renews 6 Dec', 'In 3 weeks · £1,395.60 a year · Card · Amex', undefined, undefined],
