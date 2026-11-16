@@ -882,7 +882,7 @@ it('keeps an open group heading in view, operable, as boundaries cross and resul
 })
 
 it.each([
-  {income:2000,text:'£10.00 left'},
+  {income:2000,text:'£10.00 unassigned'},
   {income:1000,text:'Balanced'},
   {income:0,text:'£10.00 over'},
 ])('leads the mobile Plan summary with $text',({income,text})=>{
@@ -1093,7 +1093,7 @@ it('shows the balance change of a removal directly above its confirm button', ()
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('Before removing')
   expect(impact).toHaveTextContent('Changes apply: December 2026–February 2027.')
-  expect(impact).toHaveTextContent('£2,000.00 left → £2,100.00 left')
+  expect(impact).toHaveTextContent('£2,000.00 unassigned → £2,100.00 unassigned')
   expect(impact.compareDocumentPosition(within(dialog).getByRole('button', { name: 'Remove item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
@@ -1104,7 +1104,7 @@ it('shows the balance change of clearing a month budget', () => {
   const dialog = screen.getByRole('dialog', { name: 'Clear the November 2026 budget?' })
   const impact = within(dialog).getByRole('region', { name: 'Impact preview' })
   expect(impact).toHaveTextContent('November 2026–February 2027 will use no budget.')
-  expect(impact).toHaveTextContent('£2,000.00 left → £2,100.00 left')
+  expect(impact).toHaveTextContent('£2,000.00 unassigned → £2,100.00 unassigned')
 })
 
 it('puts the full editor’s scope and impact in the footer, directly above Save', () => {
@@ -1118,7 +1118,7 @@ it('puts the full editor’s scope and impact in the footer, directly above Save
   expect(footer).not.toHaveTextContent('1 item')
   fireEvent.change(within(form).getByLabelText('Amount'), { target: { value: '150' } })
   const impact = within(footer).getByRole('region', { name: 'Impact preview' })
-  expect(impact).toHaveTextContent('£2,000.00 left → £1,950.00 left')
+  expect(impact).toHaveTextContent('£2,000.00 unassigned → £1,950.00 unassigned')
   expect(within(body).queryByRole('region', { name: 'Impact preview' })).not.toBeInTheDocument()
   expect(impact.compareDocumentPosition(within(footer).getByRole('button', { name: 'Save item' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })

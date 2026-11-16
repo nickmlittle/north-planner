@@ -107,7 +107,8 @@ export function closeMonthPlan(document: Pick<BudgetDocument, 'budget' | 'card' 
   if (!card) return null
   const record = tracker.months[month]
   const figures = monthSpending(document, month, today)
-  const monthly = figures.rows.filter(row => row.destination.kind === 'pot' && !row.carriesOver && row.plannedPence > 0)
+  // Close covers and leftovers are for Tracked pots only: Funded only and Saving pots have no Left (D3).
+  const monthly = figures.rows.filter(row => row.destination.kind === 'pot' && row.kind === 'tracked' && row.plannedPence > 0)
   const potId = (row: { destination: BudgetDestination }) => (row.destination as { potId: string }).potId
   const lastImportDate = [...tracker.imports].reverse()[0]?.at
   const toSort = monthTransactions(tracker, month).filter(row => !row.sort).length

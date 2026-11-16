@@ -132,11 +132,28 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 - **Taken**: the previous month's next-month covers for the pot (R1). **Left** = Planned − Spent − Taken.
 - **Pace** (steady pots in the current month only): day = today's day of the month; expected = Planned × day ÷ days in month. **Ahead of pace** when (Spent + Taken) − expected ≥ max(£10, 10% of Planned). **Over** when Left < 0 (in any month). **Runs out** when the daily average would reach Planned before the month's last day; the screens show it only when ahead. The thresholds are constants in `cardSpending.ts`.
 - **Needs care** = over or ahead. "Sorted to" is the latest transaction date brought in.
-- **Status**: over, ahead, on track, left (no pace, or a past month), or one-offs (accounts, and pots with no plan). Carry-over pots show what was spent this month (Free comes with PR 8).
-- **Which rows show**: paced pots with a plan (even at £0 spent), and any pot or account with spending or a cover taken. Rows are grouped Joint, each adult (a pot belongs to its account's single owner), then Accounts; carry-over pots last in a group, then A–Z. The month's Planned total is the shown pots' Planned; Spent is every row's.
-- **Pot settings** (`potSettings`, `savePotSettings`): pace defaults to steady, or none for a carry-over pot or a pot in a savings, ISA or pension account; build-up limit defaults to 2× the monthly Planned. Edited in Manage → Pots.
+- **Status**: over, ahead, on track, left (no pace, or a past month), one-offs (accounts, and pots with no plan), funded (a Funded only pot) or saving (a Saving pot). Carry-over pots show what was spent this month (Free comes with PR 8).
+- **Which rows show**: paced pots with a plan (even at £0 spent), Funded only pots with a plan, and any pot or account with spending or a cover taken. Rows are grouped by kind (see Pot kinds), each ordered Joint first, then each adult (a pot belongs to its account's single owner), then A–Z. **Spending this month counts Tracked pots only** (D4): the month's Planned and Spent totals are the Tracked rows'. Bills, Saving, Funded only pots and an account's one-offs are listed in their own groups, not in that total.
+- **Pot settings** (`potSettings`, `savePotSettings`): the pot's kind decides. Pace is steady for a Tracked pot (unless pace was switched off) and none for any other kind; carries-over is true only for Carries over. Build-up limit defaults to 2× the monthly Planned. Edited in Settings › Accounts & pots, where the pot's kind is chosen.
 - **Pot detail**: what's left and for how many days, about £X a day (Left ÷ days left) against the average so far (Spent ÷ day), the cumulative chart (`cumulativeByDay`) against the planned pace, and the pot's transactions in the month (`destinationTransactions`), each split showing only its line for this pot.
-- **Sort sheet**: `leftByDestination` gives "£X left" for every planned pot that doesn't carry over, in the transaction's month.
+- **Sort sheet**: `leftByDestination` gives "£X left" for every planned Tracked pot, in the transaction's month. A Funded only pot's option says "Funded only" and a Saving pot's says "Saving": they have no Left. Placing spend on them shows no impact line.
+
+## Pot kinds (month-health plan D3–D5, P2)
+
+`PotTracking.kind` is `tracked`, `funded-only`, `saving` or `carries-over`, kept in `card.pots[potId]` and validated like its neighbours. Rules and defaults live in `src/domain/potKinds.ts`.
+
+| Kind | What North does | Month › Pots shows |
+| --- | --- | --- |
+| **Tracked** (Groceries, Going out) | Left this month, pace, covers and leftovers at Close, build-up flag | Left, pace, the meter |
+| **Funded only** (Ada's and Ben's Spending) | Moves the money in on payday and stops there. No Left, no pace, no leftovers or build-up, not counted in Spending this month | "£1,135.42 moved in", then "£115.30 on the Amex" |
+| **Saving** (Holidays, Emergency) | No Left or pace, nothing to cover or carry. (Built up is a later PR) | "£1,586.36 put by" and what was spent from it |
+| **Carries over** (Bills) | What's left stays in the pot; Free (below) | Free, and what's due |
+
+- **Default** (`defaultPotKind`, P2), when nobody has chosen: a pot with the older `carriesOver` flag is Carries over; a savings pot or a pot in a savings, ISA or pension account is Saving; a spending pot in one person's account is Funded only; anything else is Tracked. A savings pot kept in a current account (Holidays in Monzo Joint) is set to Saving by hand.
+- **Chosen** (`savePotKind`): stored only when someone picks one in Settings › Accounts & pots; until then a pot follows where it is (move it to a joint account and it becomes Tracked). It sets `pace` and `carriesOver` to match, so older readers agree. `savePotSettings` with `carriesOver` moves a chosen kind with it.
+- **The Amex pot has no kind** (`potKind` returns nothing for a card's set-aside pot); it has its own group in Month › Pots and no choice in settings.
+- **Close** (`closeMonthPlan`) covers overspends, lists leftovers and flags build-ups for Tracked pots only.
+- A Funded only pot's rows are named with their account ("Spending · Ada") since Ada's and Ben's pots sit in one group.
 
 ## Carry-over pots (D9, §6.6)
 
@@ -152,7 +169,7 @@ free = checked balance
 - **Moves** are payday ticks whose key ends `:move:<potId>`, in any month, made after the check.
 - With no checked balance there's no figure: "Check the balance to see what's free". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
 - **Annual costs** (`annualCosts`) are the month's Plan items to the pot entered yearly, shown as "£612.00 a year".
-- Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's free.
+- Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's free. ("Carries over" is one of the four pot kinds, see Pot kinds.)
 
 ## Month stages (§6.9)
 
@@ -173,9 +190,9 @@ Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks 
 ## Closing a month (D7, D8, D11, R1, §6.10)
 
 - **Can close** (`closeMonthPlan`'s readiness) once the month has ended, every purchase and refund dated in it is sorted, and the latest import is at least 3 days after the month's last day (`LATE_POSTING_DAYS`), or "All <Month> transactions are in" was pressed (`markAllIn`).
-- **Overspends**: every monthly pot (not carry-over) with Left below 0. Each is covered by its whole overspend from the buffer by default, or from another monthly pot with money left that month (most left first), or from next month's funding for the pot. A chosen source is stored at once (`setCover`) so its step can be ticked before Close; changing the source drops the step's tick.
+- **Overspends**: every Tracked pot with a plan and Left below 0 (Funded only, Saving and carry-over pots have none). Each is covered by its whole overspend from the buffer by default, or from another monthly pot with money left that month (most left first), or from next month's funding for the pot. A chosen source is stored at once (`setCover`) so its step can be ticked before Close; changing the source drops the step's tick.
 - **Cover steps** (`cover:<potId>`), ticked like any step (`setCoverTick`): from an account, "Move £35.00 from Joint Monzo into Eating out"; from a pot, "Out of Treats £35.00, then move into Eating out". A next-month cover moves no money; next month's pot shows "£35.00 taken by October" and has that much less left.
-- **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each monthly pot with a plan.
+- **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each Tracked pot with a plan.
 - **Built up** (`builtUp`) = Σ leftovers of closed months − Σ moved out. The close screen shows it including this month. A pot is flagged when built up > its limit × this month's Planned, unless "Keep it" recorded at least that much (`keptBuildUpPence`). "Move £X…" suggests keeping one month's worth and records what was moved (`moveBuiltUp`); the money itself moves in the bank.
 - **Close** (`closeMonth`), one button for the household, records `closedAt`, the covers, the leftovers and what each destination had spent (`closedSpent`). A later re-sort or late transaction in the month shows "Changed since closed" with Close again, which records them afresh.
 

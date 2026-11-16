@@ -4,6 +4,7 @@ import { restoreSort } from '../domain/cardSorting'
 import { destinationKey, monthOf, type CardTransaction } from '../domain/cardTracker'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { potBalance } from '../domain/potBalances'
+import { potKind } from '../domain/potKinds'
 import { impactText, impactTone, optionPaceText, tippedText } from '../formatting/paceLabels'
 
 /**
@@ -21,6 +22,9 @@ export function pickerPace(document: BudgetDocument, month: string, today: strin
     if (destination.kind === 'account') return { text: '' }
     const key = destinationKey(destination)
     const row = rows.get(key)
+    const kind = potKind(document, destination.potId)
+    if (kind === 'funded-only') return { text: 'Funded only' }
+    if (kind === 'saving') return { text: 'Saving' }
     if (potSettings(document, destination.potId).carriesOver) return { text: optionPaceText(row, potBalance(document, destination.potId, today).freePence) }
     if (row) return { text: optionPaceText(row), ...row.status === 'over' ? { tone: 'critical' } : row.status === 'ahead' ? { tone: 'warning' } : {} }
     // Not on the month's list: nothing spent yet and no pace, so Left is what's planned.

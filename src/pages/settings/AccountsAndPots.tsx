@@ -6,8 +6,9 @@ import type { BudgetAccount, BudgetPot } from '../../domain/monthlyBudget'
 import { accountTypeLabel, isAccountTypeId } from '../../domain/accountTypes'
 import { createPotsForAccounts, planPotCreation } from '../../domain/bulkPots'
 import { potSettings, savePotSettings } from '../../domain/cardSpending'
+import { POT_KIND_HINTS, POT_KIND_LABELS, POT_KINDS, potKind, savePotKind } from '../../domain/potKinds'
 import { potBalance } from '../../domain/potBalances'
-import { cardTracker } from '../../domain/cardTracker'
+import { cardTracker, type PotKind } from '../../domain/cardTracker'
 import { formatGBP } from '../../formatting/money'
 import { AccountFields, type AccountFieldsValue } from '../AccountFields'
 import { BudgetOptionsMenu } from '../BudgetOptionsMenu'
@@ -36,12 +37,15 @@ function AccountForm({ document, account, formId, onSave }: { document: BudgetDo
 }
 
 /** A pot's name, account and spending settings (carries over, pace, build-up). */
-function PotForm({ document, pot, formId, onSave }: { document: BudgetDocument; pot: BudgetPot; formId: string; onSave: (next: { name: string; accountId: string; carriesOver: boolean; pace: boolean; buildUpLimit: number }) => void }) {
+function PotForm({ document, pot, formId, onSave }: { document: BudgetDocument; pot: BudgetPot; formId: string; onSave: (next: { name: string; accountId: string; kind?: PotKind; buildUpLimit: number }) => void }) {
   const settings = potSettings(document, pot.id)
   const [name, setName] = useState(pot.name)
   const [accountId, setAccountId] = useState(pot.accountId)
-  const [carriesOver, setCarriesOver] = useState(settings.carriesOver)
-  const [pace, setPace] = useState(settings.pace === 'steady')
+  // The Amex pot has no kind: North moves money in and out of it by its own rules.
+  const startKind = potKind(document, pot.id)
+  const [kind, setKind] = useState<PotKind | undefined>(startKind)
+  // Only a kind someone picks is stored; until then it follows where the pot is.
+  const [picked, setPicked] = useState(false)
   const [buildUpLimit, setBuildUpLimit] = useState(String(settings.buildUpLimit))
   const [error, setError] = useState('')
   const { accounts } = document.budget
@@ -51,20 +55,19 @@ function PotForm({ document, pot, formId, onSave }: { document: BudgetDocument; 
     event.preventDefault()
     if (!name.trim()) { setError('Enter a name.'); return }
     if (!accounts.some(account => account.id === accountId)) { setError('Choose an account for this pot.'); return }
-    // Carry-over pots aren't flagged for building up, so their limit isn't asked for.
+    // Only a Tracked pot is flagged for building up, so only it asks for the limit.
     const typed = Number(buildUpLimit)
-    if (!carriesOver && (!buildUpLimit.trim() || !Number.isFinite(typed) || typed <= 0)) { setError('Enter how many months’ worth can build up, like 2.'); return }
-    onSave({ name: name.trim(), accountId, carriesOver, pace, buildUpLimit: carriesOver ? settings.buildUpLimit : typed })
+    if (kind === 'tracked' && (!buildUpLimit.trim() || !Number.isFinite(typed) || typed <= 0)) { setError('Enter how many months’ worth can build up, like 2.'); return }
+    onSave({ name: name.trim(), accountId, ...kind && picked ? { kind } : {}, buildUpLimit: kind === 'tracked' ? typed : settings.buildUpLimit })
   }
   return <form id={formId} className="settings-form" aria-label="Edit pot" onSubmit={save} noValidate>
     <label>Pot name<input data-autofocus value={name} onChange={event => setName(event.target.value)}/></label>
     <label>Parent account<select value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">Choose an account</option>{groups.flatMap(group => group.accounts).map(account => <option key={account.id} value={account.id}>{optionLabels.get(account.id)}</option>)}</select></label>
     {accountId !== pot.accountId && <p className="settings-form-note">Updates funding for this pot’s items in every month.</p>}
-    <fieldset className="settings-form-group"><legend>Spending</legend>
-      <label className="settings-form-check"><input type="checkbox" checked={carriesOver} onChange={event => { setCarriesOver(event.target.checked); if (event.target.checked) setPace(false) }}/>Carries over from month to month</label>
-      <label className="settings-form-check"><input type="checkbox" checked={pace} disabled={carriesOver} onChange={event => setPace(event.target.checked)}/>Show pace (for steady spending like groceries)</label>
-      {!carriesOver && <label>Flag a build-up over (months’ worth)<input inputMode="decimal" value={buildUpLimit} onChange={event => setBuildUpLimit(event.target.value)}/></label>}
-    </fieldset>
+    {kind && <fieldset className="settings-form-group"><legend>Kind</legend>
+      {POT_KINDS.map(option => <div key={option} className="settings-form-kind"><label className="settings-form-check"><input type="radio" name="pot-kind" aria-describedby={`${formId}-${option}`} checked={kind === option} onChange={() => { setKind(option); setPicked(true); setError('') }}/>{POT_KIND_LABELS[option]}</label><small id={`${formId}-${option}`} className="settings-form-note">{POT_KIND_HINTS[option]}</small></div>)}
+      {kind === 'tracked' && <label>Flag a build-up over (months’ worth)<input inputMode="decimal" value={buildUpLimit} onChange={event => setBuildUpLimit(event.target.value)}/></label>}
+    </fieldset>}
     {error && <p className="input-error" role="alert">{error}</p>}
   </form>
 }
@@ -113,8 +116,9 @@ export function AccountsAndPots({ document, setDocument, notify }: Props) {
     const card = tracker.cards.find(row => row.setAside?.potId === pot.id)
     if (card) return `Set-aside pot · pays ${card.name} from the ${statementName(card.setAside!.fromCloseDate)}`
     const settings = potSettings(document, pot.id)
-    if (settings.carriesOver) return 'Carries over'
-    return ['Monthly', settings.pace === 'steady' ? 'shows pace' : '', `flags over ${settings.buildUpLimit} months’ worth`].filter(Boolean).join(' · ')
+    const kind = potKind(document, pot.id)
+    if (kind !== 'tracked') return kind ? POT_KIND_LABELS[kind] : ''
+    return ['Tracked', settings.pace === 'steady' ? 'shows pace' : '', `flags over ${settings.buildUpLimit} months’ worth`].filter(Boolean).join(' · ')
   }
   const potTrailing = (pot: BudgetPot) => {
     const balance = potBalance(document, pot.id).balancePence
@@ -156,7 +160,11 @@ export function AccountsAndPots({ document, setDocument, notify }: Props) {
         close(); notify(editing.account ? 'Account saved.' : 'Account added.')
       }}/>
         : editing.kind === 'pot' ? <PotForm document={document} pot={editing.pot} formId={formId} onSave={next => {
-          setDocument(current => savePotSettings({ ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === editing.pot.id ? { ...row, name: next.name, accountId: next.accountId } : row) } }, editing.pot.id, { carriesOver: next.carriesOver, pace: next.pace ? 'steady' : 'none', buildUpLimit: next.buildUpLimit }))
+          setDocument(current => {
+            const renamed = { ...current, budget: { ...current.budget, pots: current.budget.pots.map(row => row.id === editing.pot.id ? { ...row, name: next.name, accountId: next.accountId } : row) } }
+            const kinded = next.kind ? savePotKind(renamed, editing.pot.id, next.kind) : renamed
+            return savePotSettings(kinded, editing.pot.id, { buildUpLimit: next.buildUpLimit })
+          })
           close(); notify('Pot saved.')
         }}/>
         : <AddPotForm document={document} formId={formId} onPlanChange={setCreates} onSave={(name, accountIds) => {

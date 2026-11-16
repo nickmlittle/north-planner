@@ -115,6 +115,24 @@ describe('closing a month', () => {
     expect(decodeBudgetDocument(JSON.parse(JSON.stringify(document)))).toEqual(document)
   })
 
+  it('leaves Funded only and Saving pots out of Close: no cover for their overspend, no leftover, no build-up (D3)', () => {
+    const document = household()
+    document.budget.accounts.push({ id: 'ada-own', name: 'Ada', provider: 'Starling', ownerPersonIds: ['ada'] })
+    document.budget.pots.push({ id: 'spend', name: 'Spending', accountId: 'ada-own' }, { id: 'holidays', name: 'Holidays', accountId: 'joint' })
+    const items = document.budget.snapshots['2026-10']!.items
+    items.push({ ...items[0]!, id: 's', name: 's', entryAmountPence: 20000, amountPence: 20000, destination: pot('spend') }, { ...items[0]!, id: 'h', name: 'h', entryAmountPence: 30000, amountPence: 30000, destination: pot('holidays') })
+    document.card!.pots.holidays = { kind: 'saving' }
+    document.card!.transactions.push(tx('2026-10-06', pot('spend'), 25000), tx('2026-10-07', pot('holidays'), 5000))
+    const plan = closeMonthPlan(document, '2026-10', '2026-11-04')!
+    // Groceries (£511.80 of £520.00) and Eating out (over) are Tracked; the personal pot is over its £200.00 but not covered.
+    expect(plan.overspends.map(row => row.potId)).toEqual(['eating'])
+    expect(plan.leftovers.map(row => row.potId)).toEqual(expect.not.arrayContaining(['spend', 'holidays']))
+    expect(plan.figures.rows.find(row => row.key === 'pot:spend')).toMatchObject({ kind: 'funded-only', status: 'funded' })
+    // Made Tracked, the same pot is covered like any other.
+    document.card!.pots.spend = { kind: 'tracked' }
+    expect(closeMonthPlan(document, '2026-10', '2026-11-04')!.overspends.map(row => row.potId).sort()).toEqual(['eating', 'spend'])
+  })
+
   it('next month’s cover moves no money and takes from next month’s pot', () => {
     let document = setCover(household(), '2026-10', { potId: 'eating', amountPence: 3500, source: { kind: 'next-month' } })
     document = closeMonth(document, '2026-10', '2026-11-04', now)

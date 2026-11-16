@@ -176,6 +176,8 @@ function sortingHousehold(): BudgetDocument {
   const document = household()
   document.budget.accounts.push({ id: 'ada-own', name: 'Ada', provider: 'Starling', ownerPersonIds: ['ada'] })
   document.budget.pots.push({ id: 'treats', name: 'Treats', accountId: 'ada-own' }, { id: 'eating', name: 'Eating out', accountId: 'joint' })
+  // A pot in one person's account defaults to Funded only; these tests are about pace, so Treats is Tracked.
+  document.card!.pots = { ...document.card!.pots, treats: { kind: 'tracked' } }
   document.card!.transactions = [
     tx('old', '2026-10-02', 'TRAIN TICKETS ONLINE', 2000, { merchant: 'TRAIN TICKETS ONLINE', sort: { lines: [{ amountPence: 2000, destination: { kind: 'pot', potId: 'treats' } }], by: 'person', at: 'x' } }),
     tx('new', '2026-11-08', 'TRAIN TICKETS ONLINE', 11281, { merchant: 'TRAIN TICKETS ONLINE' }),
@@ -320,6 +322,7 @@ function splitHousehold(): BudgetDocument {
   const document = sortingHousehold()
   document.budget.accounts.push({ id: 'ben-own', name: 'Ben', provider: 'Nationwide', ownerPersonIds: ['ben'] })
   document.budget.pots.push({ id: 'ben-treats', name: 'Treats', accountId: 'ben-own' })
+  document.card!.pots = { ...document.card!.pots, 'ben-treats': { kind: 'tracked' } }
   document.budget.incomeSources = [
     { id: 'a', personId: 'ada', name: 'Pay', type: 'employment', baseAmountPence: 300000, changes: {} },
     { id: 'b', personId: 'ben', name: 'Pay', type: 'employment', baseAmountPence: 200000, changes: {} },
@@ -446,6 +449,7 @@ it('lists payments to Amex apart, and never as something to sort', () => {
 
 function monthHousehold(): BudgetDocument {
   const document = splitHousehold()
+  document.card!.pots = { ...document.card!.pots, treats: { kind: 'tracked' } }
   document.budget.categories = [{ id: 'c', name: 'Spending' }]
   const item = (id: string, potId: string, pence: number) => ({ id, name: id, categoryId: 'c', entryAmountPence: pence, amountPence: pence, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId }, funding: 'equal' as const })
   document.budget.snapshots['2026-11'] = { items: [item('g', 'groceries', 52000), item('e', 'eating', 15000), item('t', 'treats', 20000)] }
@@ -464,9 +468,9 @@ function monthHousehold(): BudgetDocument {
   return document
 }
 
-it('shows planned vs spent for each pot this month, grouped like Plan, with pace', () => {
+it('shows planned vs spent for each pot this month, grouped by kind, with pace', () => {
   render(<MonthHarness initial={monthHousehold()}/>)
-  expect(screen.getByRole('heading', { level: 2, name: 'Pots£727.92 spent of £870.00' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 2, name: 'Pots£615.11 spent of £870.00' })).toBeInTheDocument()
   // Phones: pots over or ahead of pace lead in Needs a look, over first, and leave their groups (decision L5).
   const look = within(screen.getByRole('region', { name: 'Needs a look' })).getAllByRole('button')
   expect(look.map(button => button.getAttribute('aria-label'))).toEqual([
@@ -474,7 +478,7 @@ it('shows planned vs spent for each pot this month, grouped like Plan, with pace
     'Groceries · Joint: £131 ahead. Mostly Green Grocer £263.71. Runs out ~Thu 19 Nov',
   ])
   // Then a card per group, three lines a pot. Ada's only pot is in Needs a look, so Ada has no card.
-  expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Joint', 'Accounts'])
+  expect([...window.document.querySelectorAll('.pots-card-title')].map(heading => heading.textContent)).toEqual(['Tracked', 'Accounts'])
   expect(screen.getByRole('button', { name: 'Eating out: £86.00 left. On track' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /^Groceries:/ })).toBeNull()
   expect(within(screen.getByRole('region', { name: 'Accounts' })).getByText(/one-offs/).closest('.pots-card-row')).toHaveTextContent('£112.81 spent')
@@ -489,7 +493,7 @@ it('shows the pots as one aligned table on desktop', () => {
   expect(within(table).getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['Pot', 'Spent', 'Planned', 'Left', 'Pace', 'In Monzo'])
   const row = (name: string) => within(table).getByRole('button', { name: new RegExp(`^${name}:`) }).closest('tr')!
   expect([...row('Groceries').querySelectorAll('td')].map(cell => cell.textContent)).toEqual(['£338.61', '£520.00', '£181.39', '£131 ahead · runs out ~Thu 19 Nov', '—'])
-  expect(within(table).getAllByRole('rowheader').map(cell => cell.textContent)).toEqual(expect.arrayContaining(['Joint', 'Ada', 'Accounts']))
+  expect(within(table).getAllByRole('rowheader').map(cell => cell.textContent)).toEqual(expect.arrayContaining(['Tracked', 'Accounts']))
   fireEvent.click(row('Groceries'))
   expect(onOpenPot).toHaveBeenCalledWith('groceries')
   vi.unstubAllGlobals()
@@ -533,8 +537,8 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   )
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={document} onChange={next => { saved = next }}/>)
-  expect(screen.getByRole('button', { name: 'Bills · carries over: £19.99 spent. Check the balance to see what’s free' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /^Bills · carries over:/ }))
+  expect(screen.getByRole('button', { name: 'Bills: £19.99 spent. Check the balance to see what’s free' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^Bills:/ }))
   expect(screen.getByText('Free in the pot').parentElement).toHaveTextContent('Free in the pot—')
   const sums = () => [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
   expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99'])
@@ -548,7 +552,7 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   expect(sums()[0]).toMatch(/^In Monzo · checked .+£1,240.00$/)
   expect(sums()).toContain('Free£1,134.01')
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' }))
-  expect(screen.getByRole('button', { name: 'Bills · carries over: £1,134.01 free. No pace' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Bills: £1,134.01 free. No pace' })).toBeInTheDocument()
 })
 
 function statementHousehold(): BudgetDocument {

@@ -173,8 +173,14 @@ export interface MonthRecord {
 
 export type PacePolicy = 'steady' | 'none'
 
+/** What a pot is for (month-health plan D3): see `potKinds.ts`. */
+export type PotKind = 'tracked' | 'funded-only' | 'saving' | 'carries-over'
+const POT_KIND_VALUES: readonly unknown[] = ['tracked', 'funded-only', 'saving', 'carries-over']
+
 export interface PotTracking {
-  /** Default: steady for spending pots, none for carry-over or savings pots. */
+  /** Chosen in the pot's settings; absent until then, when the default comes from where the pot is (`defaultPotKind`). */
+  kind?: PotKind
+  /** Default: steady for tracked pots, none for any other kind. */
   pace?: PacePolicy
   carriesOver?: boolean
   /** A multiple of the monthly Planned; default 2. */
@@ -449,6 +455,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
   for (const [potId, tracking] of Object.entries(pots)) {
     if (!potIds.has(potId) || !isRecord(tracking)) return false
     if (tracking.pace !== undefined && tracking.pace !== 'steady' && tracking.pace !== 'none' || tracking.carriesOver !== undefined && typeof tracking.carriesOver !== 'boolean') return false
+    if (tracking.kind !== undefined && !POT_KIND_VALUES.includes(tracking.kind)) return false
     if (tracking.buildUpLimit !== undefined && !(typeof tracking.buildUpLimit === 'number' && Number.isFinite(tracking.buildUpLimit) && tracking.buildUpLimit > 0)) return false
     if (tracking.checkedBalance !== undefined && !(isRecord(tracking.checkedBalance) && isInt(tracking.checkedBalance.pence) && typeof tracking.checkedBalance.at === 'string')) return false
     if (tracking.movedOut !== undefined && !(Array.isArray(tracking.movedOut) && tracking.movedOut.every(row => isRecord(row) && isInt(row.pence) && row.pence > 0 && typeof row.at === 'string'))) return false

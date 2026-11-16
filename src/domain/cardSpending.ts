@@ -1,9 +1,10 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy } from './cardTracker'
+import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy, type PotKind } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
 import { monthBills, potBillTotals } from './recurringBills'
 import { merchantBreakdown } from './merchants'
 import { potBalance } from './potBalances'
+import { potKind } from './potKinds'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -11,24 +12,30 @@ export const PACE_AHEAD_SHARE = 0.1
 
 export type PotSettings = { pace: PacePolicy; carriesOver: boolean; buildUpLimit: number }
 
-/** A pot's tracking settings with their defaults: steady pace for spending pots; none for carry-over or savings pots. */
+/**
+ * A pot's tracking settings with their defaults. Its kind decides: only a Tracked pot has pace (unless pace was switched
+ * off), only a Carries over pot carries over.
+ */
 export function potSettings(document: Pick<BudgetDocument, 'budget' | 'card'>, potId: string): PotSettings {
   const tracking = document.card?.pots[potId]
-  const pot = document.budget.pots.find(row => row.id === potId)
-  const account = pot && document.budget.accounts.find(row => row.id === pot.accountId)
-  const carriesOver = tracking?.carriesOver ?? false
-  const savings = pot?.kind === 'savings' || account?.accountTypeId === 'savings-account' || account?.accountTypeId === 'cash-isa' || account?.accountTypeId === 'stocks-shares-isa' || account?.accountTypeId === 'pension'
-  return { pace: tracking?.pace ?? (carriesOver || savings ? 'none' : 'steady'), carriesOver, buildUpLimit: tracking?.buildUpLimit ?? DEFAULT_BUILD_UP_LIMIT }
+  const kind = potKind(document, potId)
+  return { pace: kind === 'tracked' ? tracking?.pace ?? 'steady' : 'none', carriesOver: kind === 'carries-over', buildUpLimit: tracking?.buildUpLimit ?? DEFAULT_BUILD_UP_LIMIT }
 }
 
 /** Save a pot's settings. Values equal to the defaults are still stored, so a later default change doesn't move them. */
 export function savePotSettings<T extends Pick<BudgetDocument, 'card'>>(document: T, potId: string, settings: Partial<PotSettings>): T {
   const tracker = cardTracker(document)
-  const tracking = { ...tracker.pots[potId], ...settings.pace !== undefined ? { pace: settings.pace } : {}, ...settings.carriesOver !== undefined ? { carriesOver: settings.carriesOver } : {}, ...settings.buildUpLimit !== undefined ? { buildUpLimit: settings.buildUpLimit } : {} }
+  const stored = tracker.pots[potId]
+  // The older settings and the kind must agree: turning carries-over on or off moves a chosen kind with it.
+  const kind = settings.carriesOver === undefined || !stored?.kind ? stored?.kind : settings.carriesOver ? 'carries-over' as const : stored.kind === 'carries-over' ? undefined : stored.kind
+  const rest = { ...stored }
+  delete rest.kind
+  const tracking = { ...rest, ...kind ? { kind } : {}, ...settings.pace !== undefined ? { pace: settings.pace } : {}, ...settings.carriesOver !== undefined ? { carriesOver: settings.carriesOver } : {}, ...settings.buildUpLimit !== undefined ? { buildUpLimit: settings.buildUpLimit } : {} }
   return { ...document, card: { ...tracker, pots: { ...tracker.pots, [potId]: tracking } } }
 }
 
-export type PaceStatus = 'over' | 'ahead' | 'on-track' | 'left' | 'one-offs'
+/** 'funded' (a Funded only pot) and 'saving' have no Left and no pace (D3). */
+export type PaceStatus = 'over' | 'ahead' | 'on-track' | 'left' | 'one-offs' | 'funded' | 'saving'
 
 export type DestinationSpending = {
   destination: BudgetDestination
@@ -48,6 +55,8 @@ export type DestinationSpending = {
   leftPence: number
   pace: PacePolicy
   carriesOver: boolean
+  /** The pot's kind (D3). Absent for an account's one-offs. */
+  kind?: PotKind
   status: PaceStatus
   /** Steady pots in the current month. */
   expectedPence?: number
@@ -142,11 +151,17 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
     const takenPence = taken.get(key) ?? 0
     const settings = destination.kind === 'pot' ? potSettings(document, destination.potId) : { pace: 'none' as const, carriesOver: false }
     // A pot shows when it's paced and planned, has a bill this month, or anything was spent or taken; accounts only with spending.
-    const shown = spentPence !== 0 || takenPence !== 0 || !!potBills?.count || destination.kind === 'pot' && plannedPence > 0 && settings.pace === 'steady'
+    const kind = destination.kind === 'pot' ? potKind(document, destination.potId) : undefined
+    // A Funded only pot shows what was moved in, so it's listed with a plan even before anything is spent on it.
+    const shown = spentPence !== 0 || takenPence !== 0 || !!potBills?.count || destination.kind === 'pot' && plannedPence > 0 && (settings.pace === 'steady' || kind === 'funded-only')
     if (!shown) continue
-    const leftPence = plannedPence - spentPence - takenPence
-    const row: DestinationSpending = { destination, key, group: groupOf(document, destination), plannedPence, spentPence, billsPaidPence, duePence: potBills?.duePence ?? 0, takenPence, leftPence, pace: settings.pace, carriesOver: settings.carriesOver, status: 'left', needsCare: false }
-    if (destination.kind === 'account' || plannedPence === 0 && !settings.carriesOver) row.status = 'one-offs'
+    // Funded only and Saving pots have no Left (D3): nothing is judged against the plan.
+    const noLeft = kind === 'funded-only' || kind === 'saving'
+    const leftPence = noLeft ? 0 : plannedPence - spentPence - takenPence
+    const row: DestinationSpending = { destination, key, group: groupOf(document, destination), plannedPence, spentPence, billsPaidPence, duePence: potBills?.duePence ?? 0, takenPence, leftPence, pace: settings.pace, carriesOver: settings.carriesOver, ...kind ? { kind } : {}, status: 'left', needsCare: false }
+    if (destination.kind === 'account' || plannedPence === 0 && !settings.carriesOver && !noLeft) row.status = 'one-offs'
+    else if (kind === 'funded-only') row.status = 'funded'
+    else if (kind === 'saving') row.status = 'saving'
     else if (settings.carriesOver) row.status = 'left'
     else if (leftPence < 0) row.status = 'over'
     else if (settings.pace === 'steady' && when === 'current') {
@@ -173,7 +188,8 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
   rows.sort((a, b) => groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group) || Number(a.carriesOver) - Number(b.carriesOver) || name(a).localeCompare(name(b), 'en-GB') || a.key.localeCompare(b.key))
   return {
     month, today, when, day, daysInMonth: length, daysLeft: when === 'current' ? length - day : when === 'future' ? length : 0, rows,
-    plannedPence: rows.reduce((sum, row) => sum + row.plannedPence, 0), spentPence: rows.reduce((sum, row) => sum + row.spentPence, 0),
+    // Spending this month counts Tracked pots only (D4): bills, saving and a person's own pot are not part of it.
+    plannedPence: rows.filter(row => row.kind === 'tracked').reduce((sum, row) => sum + row.plannedPence, 0), spentPence: rows.filter(row => row.kind === 'tracked').reduce((sum, row) => sum + row.spentPence, 0),
     needsCare: rows.filter(row => row.needsCare).length, sortedTo: sortedTo(tracker),
   }
 }
@@ -277,7 +293,7 @@ export function destinationTransactions(tracker: Pick<CardTracker, 'transactions
   return monthTransactions(tracker, month).filter(row => row.sort?.lines.some(line => destinationKey(line.destination) === key)).sort((a, b) => b.date.localeCompare(a.date))
 }
 
-/** "£X left" for every pot with a plan, for the sort sheet's options (the transaction's month). Carry-over pots aren't included. */
+/** "£X left" for every Tracked pot with a plan, for the sort sheet's options (the transaction's month). Other kinds have no Left. */
 export function leftByDestination(document: Pick<BudgetDocument, 'budget' | 'card'>, month: string): Map<string, number> {
   const tracker = cardTracker(document)
   const spent = spentByDestination(monthTransactions(tracker, month))
@@ -285,7 +301,7 @@ export function leftByDestination(document: Pick<BudgetDocument, 'budget' | 'car
   for (const cover of tracker.months[shiftMonth(month, -1)]?.covers ?? []) if (cover.source.kind === 'next-month') taken.set(`pot:${cover.potId}`, (taken.get(`pot:${cover.potId}`) ?? 0) + cover.amountPence)
   const left = new Map<string, number>()
   for (const [key, row] of plannedByDestination(document, month)) {
-    if (row.destination.kind !== 'pot' || potSettings(document, row.destination.potId).carriesOver) continue
+    if (row.destination.kind !== 'pot' || potKind(document, row.destination.potId) !== 'tracked') continue
     left.set(key, row.pence - (spent.get(key)?.pence ?? 0) - (taken.get(key) ?? 0))
   }
   return left
