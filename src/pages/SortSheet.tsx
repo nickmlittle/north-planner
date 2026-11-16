@@ -1,3 +1,4 @@
+import { isHeld } from '../domain/expectingBack'
 import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
@@ -124,7 +125,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
         : `Matches ${purchase.description} ${pounds(purchase.amountPence)} on ${shortDate(purchase.date)}${plan?.kind === 'unsorted' ? ', which isn’t sorted yet' : ''}.`} It counts in {formatMonth(transaction.date.slice(0, 7)).split(' ')[0]}, the month it arrived.</p>
       {plan?.kind === 'split' && <ul className="sort-options" aria-label="Parts of the purchase">
         {purchase.sort!.lines.map((line, index) => <li key={index}><button type="button" className="sort-option" onClick={() => placeRefund({ lineIndex: index }, name(line.destination))}>
-          <span className="sort-option-text"><span className="sort-option-name">{line.item ?? line.note ?? name(line.destination)}</span>{(() => { const sub = [line.amountPence === -transaction.amountPence ? 'Exact match' : '', line.item ?? line.note ? name(line.destination) : ''].filter(Boolean).join(' · '); return sub && <span className="sort-option-sub">{sub}</span> })()}</span><span className="sort-option-amount">{pounds(line.amountPence)}</span>
+          <span className="sort-option-text"><span className="sort-option-name">{line.item ?? line.note ?? name(line.destination)}</span>{(() => { const sub = [line.amountPence === -transaction.amountPence ? 'Exact match' : '', line.item ?? line.note ? name(line.destination) : '', isHeld(line) ? 'Expecting back' : ''].filter(Boolean).join(' · '); return sub && <span className="sort-option-sub">{sub}</span> })()}</span><span className="sort-option-amount">{pounds(line.amountPence)}</span>
         </button></li>)}
         <li><button type="button" className="sort-option" onClick={() => placeRefund({ spread: true }, 'each part of the split')}><span className="sort-option-text"><span className="sort-option-name">Spread across the split</span><span className="sort-option-sub">In proportion to each line</span></span></button></li>
       </ul>}

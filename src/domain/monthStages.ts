@@ -3,6 +3,7 @@ import { budgetTransfers } from './budgetTransfers'
 import { monthSpending, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { toMove } from './setAside'
+import { heldOut } from './expectingBack'
 import { setAsideCheck } from './setAsideCheck'
 import { potBalance } from './potBalances'
 import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
@@ -138,7 +139,7 @@ export function closeMonthPlan(document: Pick<BudgetDocument, 'budget' | 'card' 
     return { potId: potId(row), leftPence: left, plannedPence: row.plannedPence, builtUpPence: total, ...flagged ? { flag: { limitPence, movePence: total - row.plannedPence } } : {} }
   }).filter(row => row.leftPence > 0)
   const carryOver = figures.rows.filter(row => row.carriesOver && row.destination.kind === 'pot').map(row => { const free = potBalance(document, potId(row), today); return { potId: potId(row), ...free.freePence !== undefined ? { freePence: free.freePence, checkedAt: free.checked!.at } : {} } })
-  const spentNow = spentByDestination(monthTransactions(tracker, month))
+  const spentNow = spentByDestination(monthTransactions(tracker, month), heldOut(tracker, today))
   const changedSinceClosed = record?.closedSpent ? [...new Set([...Object.keys(record.closedSpent), ...spentNow.keys()])].flatMap(key => {
     const closedPence = record.closedSpent![key] ?? 0, nowPence = spentNow.get(key)?.pence ?? 0
     const destination = spentNow.get(key)?.destination ?? (key.startsWith('pot:') ? { kind: 'pot' as const, potId: key.slice(4) } : { kind: 'account' as const, accountId: key.slice(8) })
@@ -192,7 +193,7 @@ export const markAllIn = <T extends Pick<BudgetDocument, 'card'>>(document: T, m
 export function closeMonth<T extends Pick<BudgetDocument, 'budget' | 'card' | 'household' | 'ticks'>>(document: T, month: string, today: string, now: Date): T {
   const plan = closeMonthPlan(document, month, today)
   if (!plan) return document
-  const spent = spentByDestination(monthTransactions(cardTracker(document), month))
+  const spent = spentByDestination(monthTransactions(cardTracker(document), month), heldOut(cardTracker(document), today))
   return withMonth(document, month, record => ({
     ...record,
     closedAt: now.toISOString(),
@@ -275,7 +276,7 @@ export function homeMonths(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
   if (!lastImportAt || daysBetween(localDate(new Date(lastImportAt)), today) >= BRING_IN_AFTER_DAYS) tasks.push({ key: 'bring-in', kind: 'bring-in', month: current, done: false })
   for (const card of tracker.cards) {
     // Money sorted since the last move, for the set-aside pot (the Amex pot).
-    const rows = toMove(document, card.id)
+    const rows = toMove(document, card.id, undefined, today)
     if (rows.length) tasks.push({ key: `move:${card.id}`, kind: 'move', month: current, done: false, cardId: card.id, count: rows.length, amountPence: rows.reduce((sum, row) => sum + row.pence, 0) })
     // Checking the Amex pot: extra to move out, or short (amountPence is the gap: + extra, − short).
     const gap = setAsideCheck(document, card.id, today)?.gapPence

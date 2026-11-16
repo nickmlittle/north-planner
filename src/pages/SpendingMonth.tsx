@@ -21,9 +21,11 @@ import { FreshnessLine } from './Freshness'
 import { SetAsideCheckLead } from './SetAsideCheckLead'
 import { bankOf } from './affordText'
 import { AffordSheet } from './AffordSheet'
-import { AffordRow, CarriedOverList, FundedLead, LastMonths, SavingLead, WeekLines } from './PotLeads'
+import { AffordRow, CarriedOverList, FundedLead, HeldLine, LastMonths, SavingLead, WeekLines } from './PotLeads'
 import { merchantBreakdown, type MerchantRow } from '../domain/merchants'
 import { addRule, ruleSuggestions, rulesFor, type RuleSuggestion } from '../domain/cardSorting'
+import { ExpectingBackList } from './ExpectingBack'
+import { heldInPot, heldOut, isHeld } from '../domain/expectingBack'
 import './PotPage.css'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -50,7 +52,7 @@ const assumedBills = (document: BudgetDocument, month: string, figures: MonthSpe
 /** Cumulative spend against the planned pace, with today and the run-out date (board 4, screen 2). */
 function PaceChart({ document, month, row, figures, label }: { document: BudgetDocument; month: string; row: DestinationSpending; figures: MonthSpending; label: string }) {
   const through = figures.when === 'current' ? figures.day : figures.daysInMonth
-  const points = cumulativeByDay(cardTracker(document), month, row.destination, through, assumedBills(document, month, figures))
+  const points = cumulativeByDay(cardTracker(document), month, row.destination, through, assumedBills(document, month, figures), heldOut(cardTracker(document), figures.today))
   const top = Math.max(row.plannedPence, ...points.map(([, pence]) => pence), 1) * 1.05
   const x = (day: number) => 10 + 300 * day / figures.daysInMonth
   const y = (pence: number) => 130 - 120 * Math.max(0, pence) / top
@@ -210,6 +212,7 @@ function SetAsidePot({ document, setDocument, potId, onBack, month, today, onOpe
           {...onOpenStatement ? { onOpen: () => onOpenStatement(bill.statementKey), label: `${billName(bill.closeDate, bill.open)}, ${signedPounds(bill.billPence)}, open it in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">Nothing to pay from {potPhrase(pot.name)} yet.</p>}
     </Section>
+    <ExpectingBackList document={document} setDocument={setDocument} today={today}/>
     {checking && <CheckBalance potName={pot.name} bank={bank} onClose={() => setChecking(false)} onSave={pence => { setDocument(current => checkPotBalance(current, potId, pence, new Date())); setChecking(false) }}/>}
   </div>
 }
@@ -278,7 +281,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const destination: BudgetDestination = { kind: 'pot', potId }
   const row = figures.rows.find(item => item.key === `pot:${potId}`)
   const transactions = destinationTransactions(cardTracker(document), month, destination)
-  const breakdown = merchantBreakdown(transactions, destination)
+  const breakdown = merchantBreakdown(transactions, destination, undefined, heldOut(cardTracker(document), today))
   const merchants = [...breakdown.rows, ...breakdown.other ? [breakdown.other] : []]
   const picked = merchants.find(row => row.brand === brand)
   const shownTransactions = picked ? transactions.filter(transaction => picked.transactionIds.includes(transaction.id)) : transactions
@@ -299,6 +302,8 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
   const average = row && figures.day > 0 ? (row.spentPence + row.takenPence) / figures.day : undefined
   const chartLabel = row ? `${pot.name} spending ${figures.when === 'current' ? 'so far' : `in ${monthName(month)}`} against the plan: ${pounds(row.spentPence)} spent${figures.when === 'current' ? ` by day ${figures.day}` : ''}${row.expectedPence !== undefined ? `, against ${pounds(row.expectedPence)} at the planned pace` : ''}, of ${pounds(row.plannedPence)} planned.${row.runsOut && row.status === 'ahead' ? ` Runs out around ${dayDate(row.runsOut)}.` : ''}` : ''
   const lineAmount = (transaction: CardTransaction) => transaction.sort!.lines.filter(line => line.destination.kind === 'pot' && line.destination.potId === potId).reduce((sum, line) => sum + line.amountPence, 0)
+  // Items ticked Back on a purchase here (D11): named in its row, so the row's amount isn't read as all spent.
+  const heldNote = (transaction: CardTransaction) => { const pence = transaction.kind === 'purchase' ? transaction.sort!.lines.filter(line => isHeld(line) && line.destination.kind === 'pot' && line.destination.potId === potId).reduce((sum, line) => sum + line.amountPence, 0) : 0; return pence ? ` · ${pounds(pence)} expecting back` : '' }
   const context = `${ownerLabel} · ${carriesOver ? 'carries over' : kind ? POT_KIND_LABELS[kind] : 'monthly'} · ${formatMonth(month)}${figures.when === 'current' ? ` · day ${figures.day} of ${figures.daysInMonth}` : ''}`
   // Month → Spending (F1): the pot's transactions, filtered; or one of them, in view.
   const seeInSpending = onOpenTransactions && (() => onOpenTransactions({ destinationKey: `pot:${potId}` }))
@@ -319,6 +324,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
         {steady && allowance !== undefined && average !== undefined && <p className="pot-lead-pace">About {whole(allowance)} a day · you’ve averaged {whole(average)}</p>}
         {!(steady && figures.when === 'current' && row.leftPence >= 0) && <p className={`pot-lead-status is-${row.status}`}>{statusText(row, figures)}</p>}
         <WeekLines {...week ? { week } : {}} {...shop ? { shop } : {}} onTry={pence => setAfford({ amount: (pence / 100).toFixed(2) })}/>
+        {figures.when === 'current' && <HeldLine pence={heldInPot(cardTracker(document), potId, today)}/>}
         {bills.length > 0 && <p className="pot-lead-bills">{[row.duePence ? `${pounds(row.duePence)} of it due` : '', spentParts(document, row)].filter(Boolean).join(' · ')}</p>}
         {steady && figures.when !== 'future' && <PaceChart document={document} month={month} row={row} figures={figures} label={chartLabel}/>}
         {row.status === 'ahead' && row.runsOut && <p className="pot-runout">At this rate it runs out around {dayDate(row.runsOut)}, {daysBetween(row.runsOut, `${month}-${String(figures.daysInMonth).padStart(2, '0')}`)} days before the month ends.</p>}
@@ -335,7 +341,7 @@ export function PotDetail({ document, setDocument, potId, month, today = localDa
     {merchants.length > 0 && <WhereItWent rows={merchants} selected={picked ? picked.brand : null} onSelect={setBrand}/>}
     <Section title="Transactions" count={picked ? `${picked.brand} only` : undefined} aside={seeInSpending && transactions.length > 0 && <button type="button" className="text-button" onClick={seeInSpending}>See in Spending</button>}>
       {transactions.length ? <ul className="pot-list" aria-label="Transactions">{shownTransactions.map(transaction => <li key={transaction.id}>
-        <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}
+        <ListRow title={transaction.description} meta={`${transactionMeta(document, transaction)}${statementNote(transaction, month)}${lineAmount(transaction) !== transaction.amountPence ? ` · part of ${signedPounds(transaction.amountPence)}` : ''}${heldNote(transaction)}`} trailing={<span className={lineAmount(transaction) < 0 ? 'pot-credit' : undefined}>{signedPounds(lineAmount(transaction))}</span>}
           {...onOpenTransactions ? { onOpen: () => onOpenTransactions({ transactionId: transaction.id }), label: `${transaction.description}, ${signedPounds(lineAmount(transaction))}, ${transactionMeta(document, transaction)}, open in Spending` } : {}}/>
       </li>)}</ul> : <p className="pot-none">No transactions in {monthName(month)}.</p>}
     </Section>

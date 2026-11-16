@@ -29,6 +29,8 @@ import { movedByTransaction, moveState, potPhrase, potTitle, toMove, undoMove, u
 import { MoveToPotSheet, SetAsideSteps } from './MoveToPotSheet'
 import { markSetAsideMoved } from './setAsideMove'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
+import { ExpectingBackList } from './ExpectingBack'
+import { heldOut, isHeld } from '../domain/expectingBack'
 import { useShortcut } from '../state/shortcuts'
 
 type Props = {
@@ -70,7 +72,7 @@ export function TransactionRow({ document, transaction, where, tag, moved, actio
   const lines = transaction.sort && transaction.sort.lines.length > 1 ? transaction.sort.lines : null
   if (!lines) return row
   const name = destinationNamer(document)
-  return <>{row}<ul className="spending-row-lines" aria-label={`${transaction.description} split`}>{lines.map((line, index) => <li key={index}><span>{name(line.destination)}{line.item ? ` · ${line.item}` : ''}{line.note ? ` · ${line.note}` : ''}</span><span>{signedPounds(line.amountPence)}</span></li>)}</ul></>
+  return <>{row}<ul className="spending-row-lines" aria-label={`${transaction.description} split`}>{lines.map((line, index) => <li key={index}><span>{name(line.destination)}{line.item ? ` · ${line.item}` : ''}{line.note ? ` · ${line.note}` : ''}{transaction.kind === 'purchase' && isHeld(line) && <span className="split-held"> · expecting back</span>}</span><span>{signedPounds(line.amountPence)}</span></li>)}</ul></>
 }
 
 /**
@@ -122,12 +124,13 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   // The set-aside pot (the Amex pot): what's sorted but not moved into it yet, and each row's state.
   const setAsideCard = tracker.cards.find(card => card.setAside)
   const setAsidePot = document.budget.pots.find(pot => pot.id === setAsideCard?.setAside?.potId)
-  const pending = setAsideCard ? toMove(document, setAsideCard.id) : []
+  const pending = setAsideCard ? toMove(document, setAsideCard.id, undefined, today) : []
   const pendingPence = pending.reduce((sum, row) => sum + row.pence, 0)
   const moves = movedByTransaction(tracker)
+  const held = heldOut(tracker, today)
   const movedOf = (transaction: CardTransaction): MoveState | undefined => {
     const card = tracker.cards.find(row => row.id === transaction.cardId)
-    return transaction.kind !== 'payment' && usesSetAside(card, transaction.statementKey) ? moveState(transaction, moves.get(transaction.id)) : undefined
+    return transaction.kind !== 'payment' && usesSetAside(card, transaction.statementKey) ? moveState(transaction, moves.get(transaction.id), held.get(transaction.id)) : undefined
   }
 
   if (!hasCard) return <div className="page-frame spending-page">
@@ -211,6 +214,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       {ruleSorts}
     </Section>
     {toSort.length > 0 && setAside}
+    <ExpectingBackList document={document} setDocument={setDocument} today={today}/>
   </div>
   const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>
 

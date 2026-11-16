@@ -2,6 +2,7 @@ import { addDays, cardTracker, type CardTracker, type CardTransaction, type Spli
 import { byNewest, splitByPercent } from './cardSorting'
 import type { BudgetDocument } from './budgetDocument'
 import type { BudgetDestination } from './monthlyBudget'
+import { heldRefundLines, isHeld } from './expectingBack'
 
 /**
  * Refunds (D5, §6.4): a refund goes back to the pot of the purchase it refunds, in the month it arrives,
@@ -63,7 +64,8 @@ export function sortRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, 
   } else if ('lineIndex' in choice) {
     const line = purchaseLines[choice.lineIndex]
     if (!line) return document
-    lines = [{ amountPence: refund.amountPence, destination: line.destination, ...(line.item ? { item: line.item } : {}) }]
+    // Back to a line that's expected back: the refund cancels it (D11).
+    lines = [{ amountPence: refund.amountPence, destination: line.destination, ...(line.item ? { item: line.item } : {}), ...isHeld(line) ? { expectingBack: true as const } : {} }]
     lineIndex = choice.lineIndex
   } else lines = [{ amountPence: refund.amountPence, destination: choice.destination }]
   const sort: TransactionSort = { lines, by, at: now.toISOString() }
@@ -71,12 +73,15 @@ export function sortRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, 
 }
 
 /**
- * On import (§6.2 step 6): a new refund first tries a refund match. A plain or exactly matching purchase
- * sorts it straight back (shown under Sorted by rules for checking); otherwise it's linked and left to sort.
+ * On import (§6.2 step 6): a new refund first tries a refund match. A purchase with items expected back takes it
+ * against those first (D11). A plain or exactly matching purchase sorts it straight back (shown under Sorted by rules
+ * for checking); otherwise it's linked and left to sort.
  */
 export function matchRefundOnImport(tracker: Pick<CardTracker, 'transactions'>, refund: CardTransaction, at: string): CardTransaction {
   const purchase = findRefundMatch(tracker, refund)
   if (!purchase) return refund
+  const held = heldRefundLines(tracker, purchase, refund)
+  if (held) return { ...refund, refundOf: { transactionId: purchase.id, lineIndex: held.lineIndex }, sort: { lines: held.lines, by: 'rule', at } }
   const plan = refundPlan(purchase, refund)
   const refundOf = { transactionId: purchase.id, ...(plan.kind === 'single' && plan.lineIndex !== undefined ? { lineIndex: plan.lineIndex } : {}) }
   if (plan.kind !== 'single') return { ...refund, refundOf }

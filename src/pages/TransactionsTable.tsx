@@ -1,3 +1,4 @@
+import { isHeld } from '../domain/expectingBack'
 import { useEffect, useState } from 'react'
 import { useListNavigation } from '../state/useListNavigation'
 import { SlidersHorizontal, X } from 'lucide-react'
@@ -75,7 +76,7 @@ export function TransactionsTable({ document, onOpen, onBringIn, movedOf, focusI
   /** Read as one phrase: "TESCO, £62.40, Tue 10 Nov · Ada ··41001, Groceries · Monzo Joint, rule". */
   const label = (transaction: CardTransaction) => [transaction.description, signedPounds(transaction.amountPence), transactionMeta(document, transaction), link(transaction), where(transaction), ...tagsOf(transaction).map(tag => tag.text.toLowerCase())].filter(Boolean).join(', ')
   const splitLines = (transaction: CardTransaction) => transaction.sort && transaction.sort.lines.length > 1 ? transaction.sort.lines : []
-  const lineName = (line: NonNullable<CardTransaction['sort']>['lines'][number]) => `${name(line.destination)}${line.item ? ` · ${line.item}` : ''}${line.note ? ` · ${line.note}` : ''}`
+  const lineName = (line: NonNullable<CardTransaction['sort']>['lines'][number]) => `${name(line.destination)}${line.item ? ` · ${line.item}` : ''}${line.note ? ` · ${line.note}` : ''}${isHeld(line) && line.amountPence > 0 ? ' · expecting back' : ''}`
   /** The Pot or account cell: a pot links to its page on Month (F1); the row's own click still opens the sort sheet. */
   const pot = (transaction: CardTransaction) => {
     if (!transaction.sort) return <StatusChip tone="warning">To sort</StatusChip>

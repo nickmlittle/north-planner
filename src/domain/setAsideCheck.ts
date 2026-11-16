@@ -75,7 +75,7 @@ export function setAsideCheck(document: Pick<BudgetDocument, 'budget' | 'card' |
   const holdsPence = balance.balancePence
   const gapPence = holdsPence === undefined ? undefined : holdsPence - shouldHoldPence
   const state: SetAsideState = gapPence === undefined ? 'unchecked' : gapPence === 0 ? 'matches' : gapPence > 0 ? 'extra' : 'short'
-  const rows = toMove(document, cardId)
+  const rows = toMove(document, cardId, undefined, today)
   const unpaidClosed = unpaidRows.map(([statementKey]) => ({ statementKey, closeDate: parseStatementKey(statementKey)?.closeDate ?? '' }))
     .filter(row => row.closeDate && row.closeDate < today).sort((a, b) => a.closeDate.localeCompare(b.closeDate))
   const recentMoves = (tracker.moves ?? []).filter(move => move.cardId === cardId).slice(-RECENT_MOVES).reverse()

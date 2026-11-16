@@ -1,10 +1,11 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, daysInMonth, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy, type PotKind } from './cardTracker'
+import { cardTracker, daysInMonth, localDate, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy, type PotKind } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
 import { monthBills, potBillTotals } from './recurringBills'
 import { merchantBreakdown } from './merchants'
 import { potBalance } from './potBalances'
 import { potKind } from './potKinds'
+import { countedTotals, heldOut, type Held } from './expectingBack'
 
 /** Pace thresholds (§6.5), in one place: ahead of pace when spent − expected ≥ max(£10, 10% of Planned). */
 export const PACE_AHEAD_MIN_PENCE = 1000
@@ -87,13 +88,12 @@ export type MonthSpending = {
 /** Transactions that count in a month: purchases and refunds dated in it (D2). Payments never count. */
 export const monthTransactions = (tracker: Pick<CardTracker, 'transactions'>, month: string) => tracker.transactions.filter(row => row.kind !== 'payment' && monthOf(row.date) === month)
 
-/** Σ split lines by destination for these transactions. */
-export function spentByDestination(transactions: readonly CardTransaction[]): Map<string, { destination: BudgetDestination; pence: number }> {
+/** Σ split lines by destination for these transactions, less anything held as expecting back (`heldOut`, D11). */
+export function spentByDestination(transactions: readonly CardTransaction[], held?: Held): Map<string, { destination: BudgetDestination; pence: number }> {
   const spent = new Map<string, { destination: BudgetDestination; pence: number }>()
-  for (const transaction of transactions) for (const line of transaction.sort?.lines ?? []) {
-    const key = destinationKey(line.destination)
+  for (const transaction of transactions) for (const [key, line] of countedTotals(transaction, held)) {
     const row = spent.get(key) ?? { destination: line.destination, pence: 0 }
-    row.pence += line.amountPence
+    row.pence += line.pence
     spent.set(key, row)
   }
   return spent
@@ -134,7 +134,7 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
   const when = month < monthOf(today) ? 'past' : month > monthOf(today) ? 'future' : 'current'
   const day = when === 'current' ? Number(today.slice(8)) : when === 'past' ? length : 0
   const planned = plannedByDestination(document, month)
-  const spent = spentByDestination(monthTransactions(tracker, month))
+  const spent = spentByDestination(monthTransactions(tracker, month), heldOut(tracker, today))
   const taken = new Map<string, number>()
   for (const cover of tracker.months[shiftMonth(month, -1)]?.covers ?? []) if (cover.source.kind === 'next-month') taken.set(`pot:${cover.potId}`, (taken.get(`pot:${cover.potId}`) ?? 0) + cover.amountPence)
   const bills = monthBills(document, month, today)
@@ -198,13 +198,15 @@ export function monthSpending(document: Pick<BudgetDocument, 'budget' | 'card' |
  * Cumulative spend by day for a destination, for the pot chart: [day, pence] from day 1 to `throughDay`. `extra` adds
  * other spending on its date, such as the bills North assumes went out.
  */
-export function cumulativeByDay(tracker: Pick<CardTracker, 'transactions'>, month: string, destination: BudgetDestination, throughDay: number, extra: ReadonlyArray<{ date: string; destination: BudgetDestination; pence: number }> = []): Array<[number, number]> {
+export function cumulativeByDay(tracker: Pick<CardTracker, 'transactions'>, month: string, destination: BudgetDestination, throughDay: number, extra: ReadonlyArray<{ date: string; destination: BudgetDestination; pence: number }> = [], held?: Held): Array<[number, number]> {
   const key = destinationKey(destination)
   const byDay = new Map<number, number>()
   for (const row of extra) if (monthOf(row.date) === month && destinationKey(row.destination) === key) byDay.set(Number(row.date.slice(8)), (byDay.get(Number(row.date.slice(8))) ?? 0) + row.pence)
-  for (const transaction of monthTransactions(tracker, month)) for (const line of transaction.sort?.lines ?? []) if (destinationKey(line.destination) === key) {
+  for (const transaction of monthTransactions(tracker, month)) {
+    const pence = countedTotals(transaction, held).get(key)?.pence
+    if (!pence) continue
     const day = Number(transaction.date.slice(8))
-    byDay.set(day, (byDay.get(day) ?? 0) + line.amountPence)
+    byDay.set(day, (byDay.get(day) ?? 0) + pence)
   }
   const points: Array<[number, number]> = []
   let total = 0
@@ -220,13 +222,14 @@ export type LookRow = { row: DestinationSpending; reason?: LookReason }
 export const MOSTLY_SHARE = 0.5
 
 /** The reason line for a pot: from its card spend this month (`merchantBreakdown`). None with no card spend on it. */
-export function lookReason(document: Pick<BudgetDocument, 'card'>, month: string, row: Pick<DestinationSpending, 'destination' | 'spentPence'>): LookReason | undefined {
+export function lookReason(document: Pick<BudgetDocument, 'card'>, month: string, row: Pick<DestinationSpending, 'destination' | 'spentPence'>, today: string = localDate()): LookReason | undefined {
   const transactions = destinationTransactions(cardTracker(document), month, row.destination)
-  const { rows } = merchantBreakdown(transactions, row.destination)
+  const held = heldOut(cardTracker(document), today)
+  const { rows } = merchantBreakdown(transactions, row.destination, undefined, held)
   const top = rows[0]
   if (top && top.pence > 0 && row.spentPence > 0 && top.pence >= row.spentPence * MOSTLY_SHARE) return { kind: 'mostly', name: top.brand, pence: top.pence }
   const key = destinationKey(row.destination)
-  const lineOf = (transaction: CardTransaction) => (transaction.sort?.lines ?? []).filter(line => destinationKey(line.destination) === key).reduce((sum, line) => sum + line.amountPence, 0)
+  const lineOf = (transaction: CardTransaction) => countedTotals(transaction, held).get(key)?.pence ?? 0
   const biggest = [...transactions].sort((a, b) => lineOf(b) - lineOf(a))[0]
   return biggest && lineOf(biggest) > 0 ? { kind: 'biggest', name: biggest.description, pence: lineOf(biggest) } : undefined
 }
@@ -239,7 +242,7 @@ export function needsALook(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
   const gap = (row: DestinationSpending) => row.status === 'over' ? -row.leftPence : row.aheadPence ?? 0
   return figures.rows.filter(row => row.needsCare && row.destination.kind === 'pot')
     .sort((a, b) => Number(b.status === 'over') - Number(a.status === 'over') || gap(b) - gap(a) || a.key.localeCompare(b.key))
-    .map(row => { const reason = lookReason(document, figures.month, row); return reason ? { row, reason } : { row } })
+    .map(row => { const reason = lookReason(document, figures.month, row, figures.today); return reason ? { row, reason } : { row } })
 }
 
 /** The document as it would be with this transaction placed whole in `destination`, for "what would this change". */
@@ -294,9 +297,9 @@ export function destinationTransactions(tracker: Pick<CardTracker, 'transactions
 }
 
 /** "£X left" for every Tracked pot with a plan, for the sort sheet's options (the transaction's month). Other kinds have no Left. */
-export function leftByDestination(document: Pick<BudgetDocument, 'budget' | 'card'>, month: string): Map<string, number> {
+export function leftByDestination(document: Pick<BudgetDocument, 'budget' | 'card'>, month: string, today: string = localDate()): Map<string, number> {
   const tracker = cardTracker(document)
-  const spent = spentByDestination(monthTransactions(tracker, month))
+  const spent = spentByDestination(monthTransactions(tracker, month), heldOut(tracker, today))
   const taken = new Map<string, number>()
   for (const cover of tracker.months[shiftMonth(month, -1)]?.covers ?? []) if (cover.source.kind === 'next-month') taken.set(`pot:${cover.potId}`, (taken.get(`pot:${cover.potId}`) ?? 0) + cover.amountPence)
   const left = new Map<string, number>()

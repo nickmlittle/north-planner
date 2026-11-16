@@ -1,6 +1,8 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { carriedOverByMonth, moneyIn, recentMonths, type WeekFigures } from '../domain/potSum'
 import { potBalance } from '../domain/potBalances'
+import { heldInPot } from '../domain/expectingBack'
+import { cardTracker } from '../domain/cardTracker'
 import { Section } from '../components/ui'
 import { formatMonth } from '../formatting/month'
 import { dayDate } from './cardLabels'
@@ -14,6 +16,11 @@ export function WeekLines({ week, shop, onTry }: { week?: WeekFigures; shop?: { 
     {week && <p className="pot-lead-week"><strong>{week.label}</strong> {pounds(week.pence)}<small> · {week.pence === 0 ? 'nothing to spend' : `to ${dayDate(week.through)}`}</small></p>}
     {shop && <p className="pot-lead-shop">A typical shop is {pounds(shop.pence)}<small> · average of {shop.count} · <button type="button" className="text-button" onClick={() => onTry(shop.pence)}>Try it</button></small></p>}
   </>
+}
+
+/** Held in the pot (D11): items ticked Back, not spent and not moved until the refund or the bill. Nothing when none. */
+export function HeldLine({ pence }: { pence: number }) {
+  return pence > 0 ? <p className="pot-lead-held">{pounds(pence)} expecting back<small> · held here until the refund or the bill, not spent</small></p> : null
 }
 
 /** Can we afford… from a pot page (PR 8): one row that opens the sheet with this pot chosen. */
@@ -30,6 +37,7 @@ export function FundedLead({ document, potId, month, today, bank, onCheck }: { d
     <p className="pot-lead-value">{pounds(money.movedInPence ?? money.plannedPence)}</p>
     <p className="pot-lead-status">{pounds(money.onCardPence)} on the Amex</p>
     {balance.waitingPence !== 0 && <p className="pot-lead-pace">Next move to the Amex pot: {pounds(balance.waitingPence)}</p>}
+    <HeldLine pence={heldInPot(cardTracker(document), potId, today)}/>
     <p className="pot-lead-bills">North only sees the Amex part of what’s spent. What’s in it now? <button type="button" className="text-button" onClick={onCheck}>Check {bank}</button></p>
   </section>
 }

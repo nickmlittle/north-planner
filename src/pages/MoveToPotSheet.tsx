@@ -4,7 +4,8 @@ import { ModalDialog } from '../components/ModalDialog'
 import { StepCopyHint, StepGroup, StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker } from '../domain/cardTracker'
+import { cardTracker, localDate } from '../domain/cardTracker'
+import { heldPurchases } from '../domain/expectingBack'
 import type { SettleStep } from '../domain/cardStatements'
 import { moveSteps, potPhrase, toMove, type ToMoveRow } from '../domain/setAside'
 import { markSetAsideMoved } from './setAsideMove'
@@ -34,7 +35,12 @@ const owners = (document: BudgetDocument, ownerPersonIds: readonly string[]) => 
 export function MoveToPotSheet({ document, setDocument, cardId, statementKey, onClose, onMoved, now = () => new Date() }: Props) {
   const card = cardTracker(document).cards.find(row => row.id === cardId)
   const pot = document.budget.pots.find(row => row.id === card?.setAside?.potId)
-  const rows = toMove(document, cardId, statementKey)
+  const today = localDate(now())
+  const rows = toMove(document, cardId, statementKey, today)
+  // Expecting back (D11): held money stays in its pot while the bill is open; once it has closed, it moves with the rest.
+  const held = heldPurchases(cardTracker(document), today).filter(row => row.purchase.cardId === cardId && (!statementKey || row.purchase.statementKey === statementKey) && row.outPence > 0)
+  const staying = held.filter(row => row.open)
+  const released = new Map(held.filter(row => !row.open).map(row => [row.purchase.id, row.outPence]))
   const [unticked, setUnticked] = useState<ReadonlySet<string>>(new Set())
   const selected = rows.filter(row => !unticked.has(row.transaction.id))
   const plan = moveSteps(document, cardId, selected)
@@ -66,12 +72,14 @@ export function MoveToPotSheet({ document, setDocument, cardId, statementKey, on
       <fieldset className="move-transactions">
         <legend>What it covers</legend>
         <p className="move-hint">Untick anything you haven’t moved yet. It stays here for next time.</p>
+        {staying.map(row => <p key={row.purchase.id} className="move-hint move-held">{row.purchase.description}: {pounds(row.outPence)} expecting back stays in {row.byDestination.filter(part => part.outPence > 0).map(part => name(part.destination)).join(' and ')} until the refund or the bill.</p>)}
         <ul>{rows.map(row => <li key={row.transaction.id}><label className="move-transaction">
           <input type="checkbox" checked={!unticked.has(row.transaction.id)} onChange={() => toggle(row.transaction.id)}/>
           <span className="move-transaction-body">
             <span className="spending-row-main"><span className="spending-row-title">{row.transaction.description}</span><span className="spending-row-amount">{signedPounds(row.pence)}</span></span>
             <span className="spending-row-meta">{transactionMeta(document, row.transaction)}</span>
             <span className="spending-row-meta">{row.changed ? <><span className="spending-tag is-changed">Changed since moved</span> {what(row)}</> : what(row)}</span>
+            {released.has(row.transaction.id) && <span className="spending-row-meta">Includes {pounds(released.get(row.transaction.id)!)} expecting back: not refunded by the bill, so it moves now</span>}
           </span>
         </label></li>)}</ul>
       </fieldset>

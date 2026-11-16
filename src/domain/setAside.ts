@@ -1,7 +1,8 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, destinationKey, parseStatementKey, type CardAccount, type CardTracker, type CardTransaction, type MovedLine, type SetAsideMove } from './cardTracker'
+import { cardTracker, destinationKey, localDate, parseStatementKey, type CardAccount, type CardTracker, type CardTransaction, type MovedLine, type SetAsideMove } from './cardTracker'
 import { shareSteps, type SettleAccount } from './cardStatements'
 import type { BudgetDestination } from './monthlyBudget'
+import { heldOut, type DestinationTotals } from './expectingBack'
 
 /**
  * Setting money aside in the card's pot (the Amex pot in Monzo) as you review, rather than once per statement.
@@ -35,23 +36,25 @@ export function movedByTransaction(tracker: Pick<CardTracker, 'moves'>): Map<str
 }
 
 /**
- * What still has to move for a transaction: its lines now, less what has moved, by destination. An unsorted
- * transaction waits until it's sorted (nothing to move yet), and payments never move.
+ * What still has to move for a transaction: its lines now, less what's held as expecting back (`heldOut`, D11), less
+ * what has moved, by destination. An unsorted transaction waits until it's sorted (nothing to move yet), and payments
+ * never move.
  */
-export function pendingLines(transaction: CardTransaction, moved: Totals | undefined): MovedLine[] {
+export function pendingLines(transaction: CardTransaction, moved: Totals | undefined, held?: DestinationTotals): MovedLine[] {
   if (transaction.kind === 'payment' || !transaction.sort) return []
   const totals: Totals = new Map()
   for (const line of transaction.sort.lines) add(totals, line.destination, line.amountPence)
+  for (const row of held?.values() ?? []) add(totals, row.destination, -row.pence)
   for (const row of moved?.values() ?? []) add(totals, row.destination, -row.pence)
   return [...totals.values()].filter(row => row.pence !== 0).map(row => ({ destination: row.destination, amountPence: row.pence }))
 }
 
 export type MoveState = 'not-moved' | 'moved' | 'changed'
 /** "Moved to the Amex pot", or "Changed since moved" when it was re-sorted or split after moving. */
-export function moveState(transaction: CardTransaction, moved: Totals | undefined): MoveState {
+export function moveState(transaction: CardTransaction, moved: Totals | undefined, held?: DestinationTotals): MoveState {
   if (!moved?.size) return 'not-moved'
   if (!transaction.sort) return [...moved.values()].some(row => row.pence !== 0) ? 'changed' : 'not-moved'
-  return pendingLines(transaction, moved).length ? 'changed' : 'moved'
+  return pendingLines(transaction, moved, held).length ? 'changed' : 'moved'
 }
 
 export type ToMoveRow = {
@@ -64,17 +67,18 @@ export type ToMoveRow = {
 
 /**
  * Transactions with money still to move to the card's set-aside pot, newest first: sorted purchases and refunds
- * on statements paid from the pot, optionally on one statement.
+ * on statements paid from the pot, optionally on one statement. Held money waits for its bill to close (D11).
  */
-export function toMove(document: Pick<BudgetDocument, 'card'>, cardId: string, statementKey?: string): ToMoveRow[] {
+export function toMove(document: Pick<BudgetDocument, 'card'>, cardId: string, statementKey?: string, today: string = localDate()): ToMoveRow[] {
   const tracker = cardTracker(document)
   const card = tracker.cards.find(row => row.id === cardId)
   if (!card?.setAside) return []
   const moved = movedByTransaction(tracker)
+  const held = heldOut(tracker, today)
   const order = new Map(tracker.transactions.map((row, index) => [row.id, index]))
   return tracker.transactions
     .filter(row => row.cardId === cardId && (!statementKey || row.statementKey === statementKey) && usesSetAside(card, row.statementKey))
-    .map(transaction => { const lines = pendingLines(transaction, moved.get(transaction.id)); return { transaction, lines, pence: lines.reduce((sum, line) => sum + line.amountPence, 0), changed: !!moved.get(transaction.id)?.size } })
+    .map(transaction => { const lines = pendingLines(transaction, moved.get(transaction.id), held.get(transaction.id)); return { transaction, lines, pence: lines.reduce((sum, line) => sum + line.amountPence, 0), changed: !!moved.get(transaction.id)?.size } })
     .filter(row => row.lines.length > 0)
     .sort((a, b) => b.transaction.date.localeCompare(a.transaction.date) || order.get(a.transaction.id)! - order.get(b.transaction.id)!)
 }
@@ -104,7 +108,7 @@ export function moveSteps(document: Pick<BudgetDocument, 'budget' | 'card' | 'ho
 export function recordMove<T extends Pick<BudgetDocument, 'card'>>(document: T, cardId: string, transactionIds: readonly string[], now: Date, id: string): T {
   const tracker = cardTracker(document)
   const wanted = new Set(transactionIds)
-  const rows = toMove(document, cardId).filter(row => wanted.has(row.transaction.id))
+  const rows = toMove(document, cardId, undefined, localDate(now)).filter(row => wanted.has(row.transaction.id))
   if (!rows.length) return document
   const move: SetAsideMove = { id, cardId, at: now.toISOString(), transactions: rows.map(row => ({ transactionId: row.transaction.id, lines: row.lines })) }
   return { ...document, card: { ...tracker, moves: [...tracker.moves ?? [], move] } }

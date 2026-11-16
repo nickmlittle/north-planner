@@ -44,14 +44,15 @@ export const byFundingShare = (document: Pick<BudgetDocument, 'budget' | 'househ
 
 /**
  * Receipt items: each typed item is a line, and "Everything else" takes the remainder. Amounts are typed
- * as positive pence and given the transaction's sign. Null when the items come to more than the transaction.
+ * as positive pence and given the transaction's sign. An item ticked Back is expected back (D11). Null when the items
+ * come to more than the transaction.
  */
-export function receiptLines(transaction: Pick<CardTransaction, 'amountPence'>, items: ReadonlyArray<{ item: string; pence: number; destination: BudgetDestination }>, rest: BudgetDestination): SplitLine[] | null {
+export function receiptLines(transaction: Pick<CardTransaction, 'amountPence'>, items: ReadonlyArray<{ item: string; pence: number; destination: BudgetDestination; back?: boolean }>, rest: BudgetDestination): SplitLine[] | null {
   const sign = transaction.amountPence < 0 ? -1 : 1
   const total = Math.abs(transaction.amountPence)
   const placed = items.reduce((sum, row) => sum + row.pence, 0)
   if (placed > total || items.some(row => row.pence <= 0)) return null
-  const lines: SplitLine[] = items.map(row => ({ amountPence: row.pence * sign, destination: row.destination, ...(row.item.trim() ? { item: row.item.trim() } : {}) }))
+  const lines: SplitLine[] = items.map(row => ({ amountPence: row.pence * sign, destination: row.destination, ...(row.item.trim() ? { item: row.item.trim() } : {}), ...row.back && sign > 0 ? { expectingBack: true as const } : {} }))
   return total - placed > 0 ? [...lines, { amountPence: (total - placed) * sign, destination: rest }] : lines
 }
 

@@ -1,4 +1,5 @@
 import { destinationKey, type CardTransaction } from './cardTracker'
+import { countedTotals, type Held } from './expectingBack'
 import type { BudgetDestination } from './monthlyBudget'
 
 /**
@@ -57,14 +58,14 @@ export type MerchantRow = {
 /**
  * Where a pot's card spend went, by brand, biggest first: up to `bars` brands, then everything else as one "Other"
  * row (`other`). Only each transaction's lines on this destination count, so splits and refunds add up to the pot's
- * card spend (`totalPence`).
+ * card spend (`totalPence`). Held money (expecting back, `heldOut`) isn't spend, so it's left out.
  */
-export function merchantBreakdown(transactions: readonly CardTransaction[], destination: BudgetDestination, bars = 5): { rows: MerchantRow[]; other?: MerchantRow; totalPence: number } {
+export function merchantBreakdown(transactions: readonly CardTransaction[], destination: BudgetDestination, bars = 5, held?: Held): { rows: MerchantRow[]; other?: MerchantRow; totalPence: number } {
   const key = destinationKey(destination)
   const byBrand = new Map<string, MerchantRow>()
   let totalPence = 0
   for (const transaction of transactions) {
-    const pence = (transaction.sort?.lines ?? []).filter(line => destinationKey(line.destination) === key).reduce((sum, line) => sum + line.amountPence, 0)
+    const pence = countedTotals(transaction, held).get(key)?.pence ?? 0
     if (!transaction.sort?.lines.some(line => destinationKey(line.destination) === key)) continue
     const brand = brandOf(transaction.merchant || transaction.description)
     const row = byBrand.get(brand) ?? { brand, pence: 0, count: 0, transactionIds: [] }

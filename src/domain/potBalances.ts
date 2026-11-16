@@ -3,6 +3,7 @@ import { cardTracker, localDate, monthOf, parseStatementKey, shiftMonth, type Ca
 import { monthBills, potBillTotals } from './recurringBills'
 import { SETTLE_PAY_KEY, settleIntoKey, settleOutKey, statementShares, statementTransactions } from './cardStatements'
 import { moveTotal, usesSetAside } from './setAside'
+import { heldOut } from './expectingBack'
 
 /**
  * Every pot's balance, worked out (§6.6, extended for the Amex pot): the balance last checked against the bank,
@@ -86,14 +87,18 @@ export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'tic
   return flows
 }
 
-/** Card spend on a pot still to move out of it, per statement: its share, less settle-up ticks and moves to the Amex pot. */
-export function waitingShares(tracker: CardTracker, potId: string): WaitingShare[] {
+/**
+ * Card spend on a pot still to move out of it, per statement: its share, less settle-up ticks and moves to the Amex pot.
+ * Held money (expecting back, D11) isn't waiting: it stays in the pot until its bill closes.
+ */
+export function waitingShares(tracker: CardTracker, potId: string, today: string = localDate()): WaitingShare[] {
+  const held = heldOut(tracker, today)
   const movedByTransaction = new Map<string, number>()
   for (const move of tracker.moves ?? []) for (const row of move.transactions) for (const line of row.lines) if (line.destination.kind === 'pot' && line.destination.potId === potId) movedByTransaction.set(row.transactionId, (movedByTransaction.get(row.transactionId) ?? 0) + line.amountPence)
   const keys = new Set(tracker.transactions.filter(row => row.sort?.lines.some(line => line.destination.kind === 'pot' && line.destination.potId === potId) || movedByTransaction.has(row.id)).map(row => row.statementKey))
   const waiting: WaitingShare[] = []
   for (const statementKey of [...keys].sort()) {
-    const share = statementShares(tracker, statementKey).get(`pot:${potId}`)?.pence ?? 0
+    const share = statementShares(tracker, statementKey, held).get(`pot:${potId}`)?.pence ?? 0
     const ticks = tracker.statements[statementKey]?.ticks
     const settled = (ticks?.[settleOutKey(potId)]?.amountPence ?? 0) - (ticks?.[settleIntoKey(potId)]?.amountPence ?? 0)
     const moved = statementTransactions(tracker, statementKey).reduce((sum, row) => sum + (movedByTransaction.get(row.id) ?? 0), 0)
@@ -115,7 +120,7 @@ export function potBalance(document: Pick<BudgetDocument, 'budget' | 'card' | 't
   // Bills from the month of the check: a bill on the check's own day went out before it (direct debits leave early).
   if (checked) for (const entry of potFlows(document, potId, today, monthOf(localDate(new Date(checked.at))))) if (entry.at > checked.at) totals.set(entry.flow, (totals.get(entry.flow) ?? 0) + entry.pence)
   const since = FLOW_ORDER.filter(flow => totals.get(flow)).map(flow => ({ flow, pence: totals.get(flow)! }))
-  const waiting = setAside ? [] : waitingShares(tracker, potId)
+  const waiting = setAside ? [] : waitingShares(tracker, potId, today)
   const waitingPence = waiting.reduce((sum, row) => sum + row.pence, 0)
   const billsDuePence = potBillTotals(monthBills(document, monthOf(today), today), potId).assumedDuePence
   const balancePence = checked ? checked.pence + since.reduce((sum, row) => sum + row.pence, 0) : undefined

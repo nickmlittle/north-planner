@@ -4,12 +4,14 @@ import { SETTLE_PAY_KEY, statementTransactions } from './cardStatements'
 import { potBalance } from './potBalances'
 import { movedByTransaction, toMove, usesSetAside } from './setAside'
 import { setAsideCheck } from './setAsideCheck'
+import { heldOut, heldPence } from './expectingBack'
 
 /**
- * One sum per bill (month-health plan D1): Bill = In the Amex pot + To move + To sort (+ Expecting back, D11).
+ * One sum per bill (month-health plan D1, D11): Bill = In the Amex pot + To move + To sort + Expecting back.
  * - In the Amex pot: what has moved in for the bill's purchases and refunds (lines sorted to the pot itself count).
  * - To move: sorted, not moved yet (`toMove`).
  * - To sort: purchases and refunds not sorted yet, less anything they had moved before they were unsorted.
+ * - Expecting back: held returns, not refunded yet, while the bill is open (`heldOut`). Closed, they're To move.
  * The parts add up to the bill by construction. Only for statements paid from the card's set-aside pot.
  * Rules: docs/card-tracker-rules.md, "Bill and pot sums".
  */
@@ -34,7 +36,7 @@ export type BillSum = {
   toMove: number
   toSortPence: number
   toSort: number
-  /** Held returns (D11): always 0 until Expecting back is built. */
+  /** Held returns (D11), less refunds on the same bill. Once the bill has closed they're part of To move. */
   expectingBackPence: number
   /** Σ purchases and refunds. */
   billPence: number
@@ -63,14 +65,16 @@ export function billSum(document: Pick<BudgetDocument, 'budget' | 'card' | 'tick
   const rows = statementTransactions(tracker, statementKey).filter(row => row.kind !== 'payment')
   const billPence = rows.reduce((sum, row) => sum + row.amountPence, 0)
   const inPotPence = rows.reduce((sum, row) => sum + movedFor(row.id), 0)
-  const moving = toMove(document, card.id, statementKey)
+  const moving = toMove(document, card.id, statementKey, today)
+  const sorted = rows.filter(row => row.sort)
+  const expectingBackPence = heldPence(heldOut(tracker, today), sorted)
   const toMovePence = moving.reduce((sum, row) => sum + row.pence, 0)
   const unsorted = rows.filter(row => !row.sort)
   const toSortPence = unsorted.reduce((sum, row) => sum + row.amountPence - movedFor(row.id), 0)
   const open = today <= parsed.closeDate
   return {
     statementKey, cardId: card.id, closeDate: parsed.closeDate, open, paid: !unpaid(tracker, statementKey),
-    inPotPence, toMovePence, toMove: moving.length, toSortPence, toSort: unsorted.length, expectingBackPence: 0, billPence,
+    inPotPence, toMovePence, toMove: moving.length, toSortPence, toSort: unsorted.length, expectingBackPence, billPence,
     covered: !open && moving.length === 0 && unsorted.length === 0, known: amexPotKnown(document, card.id, today),
   }
 }
