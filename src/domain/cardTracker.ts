@@ -116,6 +116,8 @@ export interface TransactionSort {
   at: string
   /** ISO: when someone checked a rule's sort ("Sorted by rules · Check"). */
   checkedAt?: string
+  /** The discount code spread over the items that carry `originalPence` (D12). Kept so the sort can be edited. */
+  discount?: { pence: number; percent?: number }
 }
 
 export interface SplitLine {
@@ -132,6 +134,8 @@ export interface SplitLine {
   expectingBack?: true
   /** ISO: "Not coming back" (P7). The held line counts as spending from then on. */
   notComingBackAt?: string
+  /** The item's price before the sort's discount (D12). `amountPence` is the discounted price, which is what every figure reads. */
+  originalPence?: number
 }
 
 export interface SortRule {
@@ -436,7 +440,8 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
       if (row.kind === 'payment' || !isRecord(row.sort)) return false
       const sort = row.sort
       if (!Array.isArray(sort.lines) || !sort.lines.length || !['rule', 'person'].includes(sort.by as string) || !optionalString(sort.ruleId) || typeof sort.at !== 'string' || !optionalString(sort.checkedAt)) return false
-      if (!sort.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination) && optionalString(line.item) && optionalString(line.note) && (line.expectingBack === undefined || line.expectingBack === true) && optionalString(line.notComingBackAt))) return false
+      if (!sort.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination) && optionalString(line.item) && optionalString(line.note) && (line.expectingBack === undefined || line.expectingBack === true) && optionalString(line.notComingBackAt) && (line.originalPence === undefined || isInt(line.originalPence) && line.originalPence > 0))) return false
+      if (sort.discount !== undefined && !(isRecord(sort.discount) && isInt(sort.discount.pence) && sort.discount.pence > 0 && (sort.discount.percent === undefined || typeof sort.discount.percent === 'number' && sort.discount.percent > 0 && sort.discount.percent <= 100))) return false
       if ((sort.lines as SplitLine[]).reduce((sum, line) => sum + line.amountPence, 0) !== row.amountPence) return false
     }
   }
