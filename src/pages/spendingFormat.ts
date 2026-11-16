@@ -29,6 +29,8 @@ export const dayOf = (iso: string) => dayDate(localDate(new Date(iso)))
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 /** Statements are named by the month they close in: the 25 Oct – 24 Nov statement is November's. */
 export const statementName = (closeDate: string) => `${monthName(closeDate.slice(0, 7))} statement`
+/** A bill names its month too (D1): "November bill", or "November bill so far" while it's open. */
+export const billName = (closeDate: string, open = false) => `${monthName(closeDate.slice(0, 7))} bill${open ? ' so far' : ''}`
 
 /** Where a statement is: open, waiting for something, ready, part ticked, or settled. */
 export function statementStatus(summary: StatementSummary): { text: string; tone: 'open' | 'todo' | 'ready' | 'done' } {

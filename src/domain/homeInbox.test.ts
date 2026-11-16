@@ -70,7 +70,7 @@ describe('the Amex pot’s check on Home', () => {
     expect(row(checked(31285 + 580))).toMatchObject({ kind: 'set-aside', tone: 'warning', title: 'Move extra out of the Amex pot', meta: 'To Account · checked Tue 10 Nov', trailing: '£5.80', target: { view: 'month', month: '2026-11', potId: 'amex-pot' } })
   })
   it('says when the pot is short', () => {
-    expect(row(checked(31285 - 920))).toMatchObject({ title: 'The Amex pot is short', meta: 'Less than it should hold · checked Tue 10 Nov', trailing: '£9.20' })
+    expect(row(checked(31285 - 920))).toMatchObject({ title: 'The Amex pot is short', meta: 'Less than its bills need · checked Tue 10 Nov', trailing: '£9.20' })
   })
   it('has nothing to say when it matches', () => {
     expect(row(checked(31285))).toBeUndefined()
@@ -85,8 +85,14 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
     // assumed bills (£234.82) are Carries over, so they're not part of it.
     expect(result.strip.spent).toMatchObject({ value: '£181.90', sub: 'of £1,911.83', detailTone: 'warning' })
     expect(result.strip.spent!.detail).toMatch(/^Groceries .*£63 ahead of pace$/)
-    expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'this statement', detail: '£312.85 set aside · closes Tue 24 Nov' })
+    // The bill (D1), named by its month: the open one, while no older bill is unpaid.
+    expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'November bill so far', detail: '£312.85 in the Amex pot · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')
+  })
+  it('keeps the oldest unpaid bill on Home once it closes, with its due date (D1)', () => {
+    const card = inbox(seed(), '2026-11-26', '2026-11').strip.card!
+    expect(card).toMatchObject({ value: '£649.23', sub: 'November bill' })
+    expect(card.detail).toMatch(/^£312\.85 in the Amex pot · due /)
   })
   it('says unassigned, not left, when the plan is under Available (D5)', () => {
     const document = seed()

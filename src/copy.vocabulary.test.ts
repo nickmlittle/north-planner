@@ -39,6 +39,12 @@ const retired: Array<[RegExp, string]> = [
   [/scheduled payment|standing item|payment method/i, 'Recurring bill / Paid by'],
   [/\boutstanding\b|pending (bill|payment)/i, 'Due: “£172.00 of it due”, “Due 22 Nov”'],
   [/\bexpires\b/i, 'Renews: “Renews 3 Mar”'],
+  // One sum per bill and per pot (month-health plan D1, D2, §2).
+  [/\bfree\b/i, 'the pot sum (“In the pot”), or “Spare” for a carry-over pot'],
+  [/\bthis statement\b/i, '“the November bill”, “November bill so far”'],
+  [/(£[\d,.]+|\}) set aside\b|\bin (monzo|the bank|\$\{\w+\}) now\b/i, '“In the Amex pot” (“Set aside in the Amex pot” is the action)'],
+  [/still to move/i, '“To move”'],
+  [/should hold/i, '“Expected”, inside Check balances only'],
 ]
 
 describe('on-screen vocabulary', () => {

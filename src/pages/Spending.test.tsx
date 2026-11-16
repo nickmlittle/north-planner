@@ -526,7 +526,7 @@ it('shows what’s left in each pot when sorting', () => {
   expect(options.map(option => option.textContent)).toContain('Treats · AdaSuggested · Ada’s card£12.50 over')
 })
 
-it('shows what’s free in a carry-over pot, how it’s worked out, and checks it against the bank', () => {
+it('shows what’s spare in a carry-over pot, how it’s worked out, and checks it against the bank', () => {
   const document = monthHousehold()
   document.budget.pots.push({ id: 'bills', name: 'Bills', accountId: 'joint' })
   document.budget.snapshots['2026-11']!.items.push({ id: 'ins', name: 'Car insurance', categoryId: 'c', entryAmountPence: 61200, amountPence: 5100, frequency: 'annually', destination: { kind: 'pot', potId: 'bills' }, funding: 'equal' })
@@ -537,9 +537,9 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   )
   let saved: BudgetDocument | undefined
   render(<MonthHarness initial={document} onChange={next => { saved = next }}/>)
-  expect(screen.getByRole('button', { name: 'Bills: £19.99 spent. Check the balance to see what’s free' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Bills: £19.99 spent. Check the balance to see what’s spare' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /^Bills:/ }))
-  expect(screen.getByText('Free in the pot').parentElement).toHaveTextContent('Free in the pot—')
+  expect(screen.getByText('Spare').parentElement).toHaveTextContent('Spare—')
   const sums = () => [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
   expect(sums()).toEqual(['Not checked yet—', 'Waiting to settle · October statement−£86.00', 'Waiting to settle · November statement−£19.99'])
   // The yearly item it saves for has no renewal date yet.
@@ -550,9 +550,9 @@ it('shows what’s free in a carry-over pot, how it’s worked out, and checks i
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save balance' }))
   expect(saved!.card!.pots.bills!.checkedBalance).toEqual({ pence: 124000, at: expect.any(String) })
   expect(sums()[0]).toMatch(/^In Monzo · checked .+£1,240.00$/)
-  expect(sums()).toContain('Free£1,134.01')
+  expect(sums()).toContain('Spare£1,134.01')
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' }))
-  expect(screen.getByRole('button', { name: 'Bills: £1,134.01 free. No pace' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Bills: £1,134.01 spare. No pace' })).toBeInTheDocument()
 })
 
 function statementHousehold(): BudgetDocument {
@@ -867,13 +867,13 @@ describe('the Amex pot', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save 1 balance' }))
     expect(saved!.card!.pots.groceries!.checkedBalance!.pence).toBe(45000)
     expect(screen.getByRole('status')).toHaveTextContent('1 balance checked.')
-    // The Amex pot: what each statement it pays costs, and what's still to move.
-    expect(screen.getByRole('button', { name: /^Amex · set aside: .*£76.20 still to move for November$/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Amex · set aside:/ }))
+    // The Amex pot: what's in it, and the November bill's sum (D1).
+    expect(screen.getByRole('button', { name: 'Amex: £44.60 in the pot. November bill so far · £58.20 to move · £18.00 to sort' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Amex:/ }))
     expect(screen.getByRole('heading', { level: 1, name: 'Amex pot' })).toBeInTheDocument()
     expect(screen.getByText(/^Pays the Amex from the \w+ statement$/)).toBeInTheDocument()
-    const statements = within(screen.getByRole('list', { name: 'Statements it pays' })).getAllByRole('listitem')
-    expect(statements[0]).toHaveTextContent('November statement£44.60 moved in · £76.20 still to move£120.80')
+    const bills = within(screen.getByRole('list', { name: 'Bills it pays' })).getAllByRole('listitem')
+    expect(bills[0]).toHaveTextContent('November bill so far£44.60 in the Amex pot · £58.20 to move · £18.00 to sort£120.80')
   })
 
   it('a statement paid from the pot shows what’s in it, moves the rest, then pays from the pot', () => {

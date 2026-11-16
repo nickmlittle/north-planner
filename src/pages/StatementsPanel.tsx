@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetSta
 import { Clock, FileUp, Inbox, PiggyBank } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { allSettleSteps, paymentMatchingPay, setSettleTick, settleStepDone, settleSteps, settleWithoutFinal, shareSteps, statementKeys, statementShares, statementSummary, type SettleAccount, type SettleStep, type StatementSummary } from '../domain/cardStatements'
-import { setAsideStatements } from '../domain/potBalances'
+import { billSum } from '../domain/billSum'
 import { potPhrase } from '../domain/setAside'
 import { billCover } from '../domain/setAsideCheck'
 import { capitalise } from '../formatting/paceLabels'
@@ -78,7 +78,8 @@ function StatementDetail({ document, setDocument, today, statementKey, onBack, o
   // Paid from the Amex pot: shares are still shown by account, gathered where the pot is.
   const shareAccounts = plan?.setAside ? shareSteps(document, shares.values(), plan.payFromAccountId) : plan?.accounts ?? []
   const setAsidePot = plan?.setAside && document.budget.pots.find(pot => pot.id === plan.setAside!.potId)
-  const inPot = plan?.setAside && setAsideStatements(document, card.id).find(row => row.statementKey === statementKey)
+  // Paid from the Amex pot: the bill's sum (D1), In the Amex pot + To move + To sort.
+  const inPot = plan?.setAside ? billSum(document, statementKey, today) : null
   const potShares = (account: SettleAccount) => [...shares.values()].filter(row => row.destination.kind === 'pot' && document.budget.pots.find(pot => pot.id === (row.destination as { potId: string }).potId)?.accountId === account.accountId && row.pence !== 0)
   const check = summary.summaryCheck
   const summaryChip = !check ? <StatusChip>No summary from {card.name} yet</StatusChip> : check.matches ? <StatusChip tone="positive">✓ Matches {card.name}’s summary</StatusChip>
@@ -112,8 +113,8 @@ function StatementDetail({ document, setDocument, today, statementKey, onBack, o
         {summary.open && <li><ListRow icon={<Clock/>} title={`Closes ${dayDate(summary.closeDate)}`} meta="You can settle up once it closes."/></li>}
         {finalExportMissing && <li><ListRow icon={<FileUp/>} tone="warning" title="Bring in the final export" meta={`So North can check it’s all here. ${card.name} can export past periods.`}
           trailing={<span className="statement-actions"><button type="button" className="text-button" onClick={onBringIn}>Bring it in</button><button type="button" className="text-button" onClick={settleWithout}>Settle without it</button></span>}/></li>}
-        {setAsidePot && inPot && <li><ListRow icon={<PiggyBank/>} tone={plan!.setAside!.toMove ? 'warning' : 'done'} title={`${signedPounds(inPot.movedPence)} of ${signedPounds(inPot.totalPence)} is in ${potPhrase(setAsidePot.name)}`}
-          meta={plan!.setAside!.toMove ? `${signedPounds(plan!.setAside!.toMovePence)} sorted and still to move` : 'All moved in'} trailing={plan!.setAside!.toMove > 0 ? <button type="button" className="text-button" onClick={onSort}>Set aside</button> : undefined}/></li>}
+        {setAsidePot && inPot && <li><ListRow icon={<PiggyBank/>} tone={plan!.setAside!.toMove ? 'warning' : 'done'} title={`${signedPounds(inPot.inPotPence)} of ${signedPounds(inPot.billPence)} is in ${potPhrase(setAsidePot.name)}`}
+          meta={inPot.toMove || inPot.toSort ? [inPot.toMove ? `${signedPounds(inPot.toMovePence)} to move` : '', inPot.toSort ? `${signedPounds(inPot.toSortPence)} to sort` : ''].filter(Boolean).join(' · ') : 'All moved in'} trailing={plan!.setAside!.toMove > 0 ? <button type="button" className="text-button" onClick={onSort}>Set aside</button> : undefined}/></li>}
         {payment.map(({ row }) => <li key={row.id}><ListRow title={`${card.name} shows a payment of ${pounds(-row.amountPence)} on ${shortDate(row.date)}`}/></li>)}
       </ul>
     </Section>

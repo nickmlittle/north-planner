@@ -1,5 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
+import { homeBill } from './billSum'
 import { monthSpending, needsALook, type DestinationSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { transactionsToSort } from './cardSorting'
@@ -153,11 +154,14 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   const spent: StripFigure | undefined = figures && { value: pounds(figures.spentPence), sub: `of ${pounds(figures.plannedPence)}`, detail: worst ? careText(worst) : 'On track', ...worst ? { detailTone: 'warning' as const } : {} }
   let cardFigure: HomeInbox['strip']['card']
   if (card) {
-    const close = closeDateFor(today, card.closeDay)
-    const open = statementSummary(document, statementKey(card.id, close), today)
+    // The bill (D1): the oldest unpaid one until its Pay tick, then the open one, named by its month.
+    const bill = card.setAside ? homeBill(document, today) : null
+    const close = bill?.closeDate ?? closeDateFor(today, card.closeDay)
+    const summary = statementSummary(document, bill?.statementKey ?? statementKey(card.id, close), today)
+    const open = bill ? bill.open : true
     const pot = card.setAside && document.budget.pots.find(row => row.id === card.setAside!.potId)
-    const balance = pot ? potBalance(document, pot.id, today).balancePence : undefined
-    cardFigure = { name: card.name, value: pounds(open?.totalPence ?? 0), sub: 'this statement', detail: [balance !== undefined ? `${pounds(balance)} set aside` : '', `closes ${dayDate(close)}`].filter(Boolean).join(' · ') }
+    cardFigure = { name: card.name, value: pounds(bill?.billPence ?? summary?.totalPence ?? 0), sub: `${monthName(close.slice(0, 7))} bill${open ? ' so far' : ''}`,
+      detail: [bill && pot ? bill.covered ? 'covered' : `${pounds(bill.inPotPence)} in ${potPhrase(pot.name)}` : '', open ? `closes ${dayDate(close)}` : summary ? `due ${dayDate(summary.dueDate)}` : ''].filter(Boolean).join(' · ') }
   }
 
   // ——— First run: plan the month first ———
@@ -212,7 +216,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         return
       }
       case 'gap': {
-        // Checking the Amex pot (card-tracker-rules): extra to move to the card's buffer, or short of what it should hold.
+        // Checking the Amex pot (card-tracker-rules): extra to move to the card's buffer, or short of what its bills need.
         const owner = tracker.cards.find(row => row.id === task.cardId)
         const pot = document.budget.pots.find(row => row.id === owner?.setAside?.potId)
         if (!owner || !pot) return
@@ -222,7 +226,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         const buffer = gapDestination(owner)
         // What to do first (phones cut the meta short), then when it was checked.
         todo.push({ key: task.key, kind: 'set-aside', tone: 'warning', title: gap > 0 ? `Move extra out of ${phrase}` : `${capitalise(phrase)} is short`,
-          meta: [gap > 0 ? `To ${buffer.kind === 'account' ? nameAccount(buffer.accountId) : nameDestination(buffer)}` : 'Less than it should hold', checked ? `checked ${dayDate(localDate(new Date(checked.at)))}` : ''].filter(Boolean).join(' · '),
+          meta: [gap > 0 ? `To ${buffer.kind === 'account' ? nameAccount(buffer.accountId) : nameDestination(buffer)}` : 'Less than its bills need', checked ? `checked ${dayDate(localDate(new Date(checked.at)))}` : ''].filter(Boolean).join(' · '),
           trailing: pounds(Math.abs(gap)), target: { view: 'month', month: task.month, potId: pot.id } })
         return
       }

@@ -11,6 +11,9 @@
 .pot-runout{color:var(--warning);font-size:var(--text-md);font-weight:var(--weight-medium)}
 .pot-lead .carry-over-sums{margin-top:var(--space-2)}
 .pot-balance-line{margin:0;font-size:var(--text-md);font-variant-numeric:tabular-nums}
+/* In the pot (D2): the sum comes first, then the line that says if it's checked; Not explained is toned (P1). */
+.pot-sum{margin-bottom:var(--space-2)!important}
+.carry-over-sums>.is-different dt,.carry-over-sums>.is-different dd{color:var(--warning);font-weight:var(--weight-bold)}
 .pot-balance-how{margin-top:var(--space-2);color:var(--text-muted);font-size:var(--text-sm)}
 .pot-balance-how summary{min-height:32px;color:var(--accent);font-weight:var(--weight-medium);cursor:pointer}
 .pot-balance-how .carry-over-sums,.pot-detail .ui-section .carry-over-sums{margin:var(--space-2) 0 0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
@@ -18,10 +21,12 @@
 .pot-list>li+li>.list-row{border-top:1px solid var(--border)}
 .pot-credit{color:var(--positive)}
 .pot-none{margin:0;color:var(--text-muted);font-size:var(--text-md)}
-/* Checking the Amex pot (card-tracker-rules › Checking the Amex pot): should hold against what's in it. */
+/* Checking the Amex pot (card-tracker-rules › Checking the Amex pot): In the Amex pot, worked out or checked. */
 .pot-check.is-extra,.pot-check.is-short{border-color:var(--warning)}
-.pot-check.is-extra .pot-lead-value,.pot-check.is-short .pot-lead-value{color:var(--warning)}
-.pot-check.is-matches .pot-lead-value{color:var(--positive)}
+.pot-check-status{margin:0;color:var(--text-muted);font-size:var(--text-sm)}
+.pot-check-again{margin:var(--space-3) 0 0}
+.pot-check.is-extra .pot-check-status,.pot-check.is-short .pot-check-status{color:var(--warning);font-weight:var(--weight-bold)}
+.pot-check.is-matches .pot-check-status{color:var(--positive)}
 .pot-check:not(.is-extra):not(.is-short) .carry-over-sums>div:last-child{border-bottom:0}
 .pot-check-act{display:grid;gap:var(--space-2);margin-top:var(--space-3)}
 .pot-check-say{color:var(--text);font-size:var(--text-md)}

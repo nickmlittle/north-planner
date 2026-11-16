@@ -25,13 +25,14 @@ function difference(typed: number, worked: number | undefined) {
   return gap === 0 ? 'Matches' : `${pounds(Math.abs(gap))} ${gap > 0 ? 'more' : 'less'} than North worked out`
 }
 
-/** The Amex pot's row compares with what it should hold (card-tracker-rules, "Checking the Amex pot"). */
+/** The Amex pot's row compares with what its bills need, its Expected (card-tracker-rules, "Checking the Amex pot"). */
 const gapText = (gap: number) => gap === 0 ? 'Matches' : `${pounds(Math.abs(gap))} ${gap > 0 ? 'extra' : 'short'}`
 
 /**
  * Check balances: every pot's worked-out balance next to a box for what the bank shows. Saving records each
  * typed balance as the pot's check (`checkPotBalances`); pots left blank keep their last check. A card's set-aside
- * pot (the Amex pot) shows what it should hold instead, warns while anything sorted is still to move, and the saved
+ * pot (the Amex pot) shows what's Expected instead (what has moved in for unpaid bills), warns while anything sorted is
+ * waiting to move, and the saved
  * message says if it has extra or is short.
  */
 export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, now = () => new Date() }: Props) {
@@ -50,7 +51,7 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
     if (invalid.length) { setError('Enter each balance like 1240.00, or leave it blank.'); return }
     if (!parsed.length) { onClose(); return }
     setDocument(current => checkPotBalances(current, new Map(parsed as Array<[string, number]>), now()))
-    // Should hold doesn't depend on a check, so the typed figure gives the Amex pot's new gap.
+    // Expected doesn't depend on a check, so the typed figure gives the Amex pot's new gap.
     const gapped = parsed.flatMap(([potId, pence]) => { const check = checks.get(potId); return check && pence! !== check.shouldHoldPence ? [{ potId, gap: pence! - check.shouldHoldPence }] : [] })[0]
     const phrase = gapped && potPhrase(document.budget.pots.find(pot => pot.id === gapped.potId)?.name ?? 'Amex')
     onSaved(`${plural(parsed.length, 'balance')} checked.${gapped ? ` ${gapped.gap > 0 ? `${capitalise(phrase!)} has ${pounds(gapped.gap)} extra.` : `${capitalise(phrase!)} is ${pounds(-gapped.gap)} short.`}` : ''}`, gapped?.potId)
@@ -68,8 +69,8 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
           const pence = text.trim() ? parsePence(text) : null
           const bad = invalid.includes(pot.id)
           const checkedText = balance.checked ? `checked ${dayOf(balance.checked.at)}` : 'not checked yet'
-          const note = check ? `Should hold ${signedPounds(check.shouldHoldPence)} · ${checkedText}` : balance.balancePence === undefined ? 'Not checked yet' : `North: ${signedPounds(balance.balancePence)} · ${checkedText}`
-          // The figure the typed balance is held against: what the Amex pot should hold, else North's worked-out balance.
+          const note = check ? `Expected ${signedPounds(check.shouldHoldPence)} · ${checkedText}` : balance.balancePence === undefined ? 'Not checked yet' : `North: ${signedPounds(balance.balancePence)} · ${checkedText}`
+          // The figure the typed balance is held against: the Amex pot's Expected, else North's worked-out balance.
           const against = check ? check.shouldHoldPence : balance.balancePence
           const said = pence === null || bad ? '' : check ? gapText(pence - check.shouldHoldPence) : difference(pence, balance.balancePence)
           const same = check ? (balance.balancePence === check.shouldHoldPence ? balance.balancePence : undefined) : balance.balancePence
@@ -78,7 +79,7 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
             <input id={`check-${pot.id}`} inputMode="decimal" value={text} aria-invalid={bad || undefined} aria-describedby={`check-${pot.id}-note${check?.toMove ? ` check-${pot.id}-warn` : ''}`} onChange={event => { setTyped({ ...typed, [pot.id]: event.target.value }); setError('') }}/>
             <span id={`check-${pot.id}-note`} className={`check-balances-note${pence !== null && against !== undefined && pence !== against ? ' is-different' : ''}`} aria-live="polite">{said}</span>
             {same !== undefined && !text && <button type="button" className="text-button check-balances-same" onClick={() => setTyped({ ...typed, [pot.id]: (same / 100).toFixed(2) })}>Same as North</button>}
-            {check && check.toMove > 0 && <span id={`check-${pot.id}-warn`} className="check-balances-warn">{signedPounds(check.toMovePence)} sorted and still to move. Moved it in {document.budget.accounts.find(account => account.id === pot.accountId)?.provider?.trim() || 'the bank'} already? Press Moved first, or it counts twice.</span>}
+            {check && check.toMove > 0 && <span id={`check-${pot.id}-warn`} className="check-balances-warn">{signedPounds(check.toMovePence)} sorted, to move. Moved it in {document.budget.accounts.find(account => account.id === pot.accountId)?.provider?.trim() || 'the bank'} already? Press Moved first, or it counts twice.</span>}
           </li>
         })}</ul>
       </fieldset>)}
