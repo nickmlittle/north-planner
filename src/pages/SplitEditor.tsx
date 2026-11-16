@@ -10,7 +10,7 @@ import { pounds, signedPounds, transactionMeta } from './spendingFormat'
 
 type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; transaction: CardTransaction; onClose: () => void; onSaved: (message: string) => void; now?: () => Date }
 type AmountLine = { key: number; destination: string; amount: string; note: string }
-type ItemLine = { key: number; item: string; amount: string; destination: string }
+type ItemLine = { key: number; item: string; amount: string; destination: string; back: boolean }
 
 const typed = (pence: number) => (Math.abs(pence) / 100).toFixed(2)
 let nextKey = 1
@@ -28,7 +28,7 @@ export function SplitEditor({ document, setDocument, transaction, onClose, onSav
   const [lines, setLines] = useState<AmountLine[]>(() => existing.length
     ? existing.map(line => ({ key: nextKey++, destination: destinationKey(line.destination), amount: typed(line.amountPence), note: line.note ?? line.item ?? '' }))
     : [{ key: nextKey++, destination: first ? destinationKey(first) : '', amount: typed(total), note: '' }])
-  const [items, setItems] = useState<ItemLine[]>(() => existing.filter(line => line.item).map(line => ({ key: nextKey++, item: line.item!, amount: typed(line.amountPence), destination: destinationKey(line.destination) })))
+  const [items, setItems] = useState<ItemLine[]>(() => existing.filter(line => line.item).map(line => ({ key: nextKey++, item: line.item!, amount: typed(line.amountPence), destination: destinationKey(line.destination), back: !!line.expectingBack })))
   const [rest, setRest] = useState(() => destinationKey(existing.find(line => !line.item)?.destination ?? existing[0]?.destination ?? first ?? { kind: 'account', accountId: '' }))
   const shares = document.household.adults.length > 1 ? fundingShares(document, monthOf(transaction.date)) : null
   const groups = destinationGroups(document)
@@ -42,20 +42,26 @@ export function SplitEditor({ document, setDocument, transaction, onClose, onSav
     return { left: total - placed, lines: valid ? parsed.map(line => ({ amountPence: line.pence! * sign, destination: line.destination!, ...(line.note ? { note: line.note } : {}) })) : null }
   })()
   const itemResult = (() => {
-    const parsed = items.map(row => ({ item: row.item, pence: parsePence(row.amount) ?? 0, destination: parseDestinationValue(row.destination) }))
+    const parsed = items.map(row => ({ item: row.item, pence: parsePence(row.amount) ?? 0, destination: parseDestinationValue(row.destination), back: row.back }))
     const restDestination = parseDestinationValue(rest)
     const left = total - parsed.reduce((sum, row) => sum + row.pence, 0)
     const valid = parsed.every(row => row.pence > 0 && row.destination && row.item.trim()) && !!restDestination
-    return { left, lines: valid ? receiptLines(transaction, parsed.map(row => ({ ...row, destination: row.destination! })), restDestination!) : null }
+    const made = valid ? receiptLines(transaction, parsed.map(row => ({ ...row, destination: row.destination! })), restDestination!) : null
+    // A line already marked Not coming back keeps that when the items are saved again.
+    return { left, lines: made && made.map(line => { const before = line.expectingBack && existing.find(old => old.notComingBackAt && old.item === line.item && destinationKey(old.destination) === destinationKey(line.destination)); return before ? { ...line, notComingBackAt: before.notComingBackAt! } : line }) }
   })()
+  // Back ticks are for purchases: a return on its way (D11).
+  const canHold = transaction.kind === 'purchase'
+  const backPence = items.filter(row => row.back).reduce((sum, row) => sum + (parsePence(row.amount) ?? 0), 0)
   const result = mode === 'amount' ? amountResult : itemResult
   const ready = !!result.lines && (mode === 'items' ? result.left >= 0 : result.left === 0)
   const save = () => {
     if (!result.lines) return
     const at = now()
-    const next = result.lines
+    const next: SplitLine[] = result.lines
     setDocument(latest => sortTransaction(latest, transaction.id, next, at))
-    onSaved(next.length > 1 ? `${transaction.description}: ${splitLabel(next).replace('Split · ', 'split across ')}.` : `Sorted to ${name(next[0]!.destination)}.`)
+    const held = mode === 'items' && canHold ? next.filter(line => line.expectingBack && !line.notComingBackAt).reduce((sum, line) => sum + line.amountPence, 0) : 0
+    onSaved(held ? `${transaction.description}: ${pounds(held)} expecting back, held in its pot until the bill.` : next.length > 1 ? `${transaction.description}: ${splitLabel(next).replace('Split · ', 'split across ')}.` : `Sorted to ${name(next[0]!.destination)}.`)
   }
 
   const select = (value: string, onChange: (value: string) => void, label: string) => <label className="spending-field split-destination">{label}<select value={value} onChange={event => onChange(event.target.value)}>
@@ -83,13 +89,14 @@ export function SplitEditor({ document, setDocument, transaction, onClose, onSav
       </li>)}</ol>
       <button type="button" className="text-button split-add" onClick={() => setLines([...lines, { key: nextKey++, destination: '', amount: amountResult.left > 0 ? typed(amountResult.left) : '', note: '' }])}><Plus aria-hidden="true"/>Add a line</button>
     </> : <>
-      <ol className="split-lines">{items.map((row, index) => <li key={row.key} className="split-line is-item" aria-label={`Item ${index + 1}`}>
+      <ol className="split-lines">{items.map((row, index) => <li key={row.key} className={`split-line is-item${canHold ? ' can-hold' : ''}`} aria-label={`Item ${index + 1}`}>
         <label className="spending-field split-note">Item<input value={row.item} onChange={event => setItems(items.map(other => other.key === row.key ? { ...other, item: event.target.value } : other))}/></label>
         <label className="spending-field split-amount">Amount<input inputMode="decimal" value={row.amount} onChange={event => setItems(items.map(other => other.key === row.key ? { ...other, amount: event.target.value } : other))}/></label>
         {select(row.destination, value => setItems(items.map(other => other.key === row.key ? { ...other, destination: value } : other)), 'Pot or account')}
+        {canHold && <label className="split-back"><input type="checkbox" checked={row.back} onChange={event => setItems(items.map(other => other.key === row.key ? { ...other, back: event.target.checked } : other))}/>Back</label>}
         <button type="button" className="icon-button split-remove" aria-label={`Remove item ${index + 1}`} onClick={() => setItems(items.filter(other => other.key !== row.key))}><X aria-hidden="true"/></button>
       </li>)}</ol>
-      <button type="button" className="text-button split-add" onClick={() => setItems([...items, { key: nextKey++, item: '', amount: '', destination: rest }])}><Plus aria-hidden="true"/>Add an item</button>
+      <button type="button" className="text-button split-add" onClick={() => setItems([...items, { key: nextKey++, item: '', amount: '', destination: rest, back: false }])}><Plus aria-hidden="true"/>Add an item</button>
       <div className="split-rest">
         <p><strong>Everything else</strong><span>{itemResult.left >= 0 ? pounds(itemResult.left) : '—'}</span></p>
         {select(rest, setRest, 'Everything else goes to')}
@@ -97,7 +104,8 @@ export function SplitEditor({ document, setDocument, transaction, onClose, onSav
     </>}
     <p className={`split-left${ready ? ' is-ok' : ''}`} aria-live="polite" id={`${id}-left`}>{mode === 'amount'
       ? `Left to place ${result.left < 0 ? `−${pounds(-result.left)}` : pounds(result.left)}`
-      : result.left < 0 ? `The items come to ${pounds(-result.left)} more than ${pounds(total)}` : `${pounds(total - result.left)} in items`}</p>
+      : result.left < 0 ? `The items come to ${pounds(-result.left)} more than ${pounds(total)}` : `${pounds(total - result.left)} in items${backPence > 0 ? ` · ${pounds(backPence)} expecting back` : ''}`}</p>
+    {mode === 'items' && canHold && <p className="split-back-hint">Tick <strong>Back</strong> for anything you’re sending back. It stays in its pot, not spent, until the refund or the bill.</p>}
     {totals.length > 1 && <section className="split-totals" aria-labelledby={`${id}-totals`}>
       <h3 id={`${id}-totals`}>By pot</h3>
       <ul>{totals.map(row => <li key={destinationKey(row.destination)}><span>{name(row.destination)}</span><span>{signedPounds(row.amountPence)}</span></li>)}</ul>

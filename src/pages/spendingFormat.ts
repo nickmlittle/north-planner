@@ -82,10 +82,10 @@ export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: strin
   return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, broughtIn: true }
 }
 
-/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort", or "Covered" once it's all in. */
+/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort · £79.00 expecting back", or "Covered" once it's all in. */
 export function billParts(bill: BillSum, phrase: string): string {
   if (bill.covered) return `Covered · all in ${phrase}`
-  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '']
+  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '', bill.expectingBackPence ? `${signedPounds(bill.expectingBackPence)} expecting back` : '']
   return parts.filter(Boolean).join(' · ')
 }
 

@@ -192,7 +192,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     const open = bill ? bill.open : true
     const pot = card.setAside && document.budget.pots.find(row => row.id === card.setAside!.potId)
     cardFigure = { name: card.name, value: pounds(bill?.billPence ?? summary?.totalPence ?? 0), sub: `${monthName(close.slice(0, 7))} bill${open ? ' so far' : ''}`,
-      detail: [bill && pot ? bill.covered ? 'covered' : `${pounds(bill.inPotPence)} in ${potPhrase(pot.name)}` : '', open ? `closes ${dayDate(close)}` : summary ? `due ${dayDate(summary.dueDate)}` : ''].filter(Boolean).join(' · ') }
+      detail: [bill && pot ? bill.covered ? 'covered' : `${pounds(bill.inPotPence)} in ${potPhrase(pot.name)}` : '', bill?.expectingBackPence ? `${pounds(bill.expectingBackPence)} expecting back` : '', open ? `closes ${dayDate(close)}` : summary ? `due ${dayDate(summary.dueDate)}` : ''].filter(Boolean).join(' · ') }
   }
 
   // ——— First run: plan the month first ———

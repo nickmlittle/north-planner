@@ -125,6 +125,13 @@ export interface SplitLine {
   /** A receipt item's name. */
   item?: string
   note?: string
+  /**
+   * Expecting back (D11). On a purchase: a return on its way, held in its pot until the bill (not spent, not moved).
+   * On a refund: the part that refunds held lines of its purchase.
+   */
+  expectingBack?: true
+  /** ISO: "Not coming back" (P7). The held line counts as spending from then on. */
+  notComingBackAt?: string
 }
 
 export interface SortRule {
@@ -429,7 +436,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
       if (row.kind === 'payment' || !isRecord(row.sort)) return false
       const sort = row.sort
       if (!Array.isArray(sort.lines) || !sort.lines.length || !['rule', 'person'].includes(sort.by as string) || !optionalString(sort.ruleId) || typeof sort.at !== 'string' || !optionalString(sort.checkedAt)) return false
-      if (!sort.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination) && optionalString(line.item) && optionalString(line.note))) return false
+      if (!sort.lines.every(line => isRecord(line) && isInt(line.amountPence) && destination(line.destination) && optionalString(line.item) && optionalString(line.note) && (line.expectingBack === undefined || line.expectingBack === true) && optionalString(line.notComingBackAt))) return false
       if ((sort.lines as SplitLine[]).reduce((sum, line) => sum + line.amountPence, 0) !== row.amountPence) return false
     }
   }

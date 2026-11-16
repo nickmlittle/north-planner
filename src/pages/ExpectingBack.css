@@ -1,0 +1,11 @@
+/* Expecting back (month-health PR 9): held returns on Spending and the Amex pot page. Tokens only (styles.tokens.test.ts). */
+.expecting-list{display:grid;gap:var(--space-2);margin:0;padding:0;list-style:none}
+.expecting-row{display:grid;gap:var(--space-1);padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card)}
+.expecting-row p{margin:0}
+.expecting-main{display:flex;justify-content:space-between;gap:var(--space-3);font-weight:var(--weight-bold);color:var(--text)}
+.expecting-title{min-width:0;overflow-wrap:anywhere}
+.expecting-amount{font-variant-numeric:tabular-nums;white-space:nowrap}
+.expecting-items{color:var(--text);font-size:var(--text-sm)}
+.expecting-meta{color:var(--text-muted);font-size:var(--text-sm)}
+.expecting-action{justify-self:start;min-height:44px}
+.split-held{color:var(--text-muted)}

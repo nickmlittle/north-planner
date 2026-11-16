@@ -1,8 +1,9 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, destinationKey, dueDate, monthOf, parseStatementKey, statementWindow, type CardTracker, type CardTransaction, type StatementRecord } from './cardTracker'
+import { cardTracker, dueDate, monthOf, parseStatementKey, statementWindow, type CardTracker, type CardTransaction, type StatementRecord } from './cardTracker'
 import { stepStatus, type StepTick } from './transferTicks'
 import { toMove, usesSetAside } from './setAside'
 import type { BudgetDestination } from './monthlyBudget'
+import { countedTotals, type Held } from './expectingBack'
 
 /** Settle-up step keys (§6.8), shared by settling up and a carry-over pot's Free (§6.6). */
 export const settleOutKey = (potId: string) => `settle:out:${potId}`
@@ -71,13 +72,12 @@ export type SettlePlan = {
 
 export const SETTLE_MOVE_KEY = 'settle:move'
 
-/** Σ split lines of a statement's transactions, by destination. */
-export function statementShares(tracker: Pick<CardTracker, 'transactions'>, key: string): Map<string, { destination: BudgetDestination; pence: number }> {
+/** Σ split lines of a statement's transactions, by destination, less anything held as expecting back (D11). */
+export function statementShares(tracker: Pick<CardTracker, 'transactions'>, key: string, held?: Held): Map<string, { destination: BudgetDestination; pence: number }> {
   const shares = new Map<string, { destination: BudgetDestination; pence: number }>()
-  for (const transaction of statementTransactions(tracker, key)) for (const line of transaction.sort?.lines ?? []) {
-    const id = destinationKey(line.destination)
+  for (const transaction of statementTransactions(tracker, key)) for (const [id, line] of countedTotals(transaction, held)) {
     const row = shares.get(id) ?? { destination: line.destination, pence: 0 }
-    row.pence += line.amountPence
+    row.pence += line.pence
     shares.set(id, row)
   }
   return shares

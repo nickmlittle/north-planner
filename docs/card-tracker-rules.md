@@ -31,6 +31,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Month health 5: pot pages by kind, This week, typical shop, Try an amount (D2, D3) | health/5 | `src/domain/afford.ts`, `src/domain/potSum.ts`, `src/pages/PotLeads.tsx` |
 | Month health 8: Can we afford… sheet, the buffer check and the overlap-day month line (P9) | health/8 | `src/domain/afford.ts`, `src/domain/buffer.ts`, `src/pages/AffordSheet.tsx`, `affordText.ts`, `CheckBalancesSheet.tsx` |
 | Month health 7: what a bring-in did, Just brought in, earlier months in To sort | health/7 | `src/domain/bringIn.ts`, `src/pages/BroughtInLines.tsx`, `BringInSheet.tsx`, `Home.tsx`, `monthHeads` in `spendingFormat.ts` |
+| Month health 9: Expecting back: the Back tick, held lines, the bill's fifth part, refunds, settle up, Not coming back (D11, P7) | health/9 | `src/domain/expectingBack.ts`, `src/pages/ExpectingBack.tsx`, `SplitEditor.tsx`, `MoveToPotSheet.tsx`, `PotLeads.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -133,6 +134,22 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 - **Receipt items** (`receiptLines`): each typed item is a line with its `item` name; "Everything else" takes what's left as one more line (left out when nothing's left). Items worth more than the transaction can't be saved.
 - `totalsByDestination` adds the lines up per pot or account ("By pot"); `splitLabel` gives "Split · 4 pots", or "Split · 3 ways" when an account is one of them.
 - **Split rules** (D13): `SortRule.split` holds percentages that add up to 100, and `ruleLines` turns them into lines with `splitByPercent`. There's no UI to make one yet.
+
+## Expecting back (month-health plan D11, P7)
+
+**Status:** month-health PR 9 (`health/9-expecting-back`), built 16 November 2026. `src/domain/expectingBack.ts`.
+
+- **Marking:** Receipt items has a **Back** tick per item, on purchases only (not refunds, not By amount, not Everything else). A ticked item's line stores `expectingBack: true`. Saving says "ASOS: £79.00 expecting back, held in its pot until the bill."
+- **Held** (`heldOut(tracker, today)`, per transaction and destination): while the purchase's bill is open (today ≤ its close date) all its held lines are left out of spending (`spentByDestination`, so Left, pace, the verdict, the chart and Close) and out of moves (`pendingLines`, so `toMove`, the Set aside block, the Move sheet, `waitingShares`). The money stays in its pot, so a Tracked pot's sum still adds up: held money is part of Left, not Waiting.
+- **Refunds:** a refund linked to the purchase (`refundOf`) whose lines carry `expectingBack` refunds held money. **On the same bill** it cancels it: the cancelled part of the purchase and the refund are left out of spending and moves for good, so nothing moves even after the bill closes. A partial refund leaves the rest held (£79.00 held, £47.00 refunded: £32.00 still expecting back).
+- **Matching** (`heldRefundLines`, called first by `matchRefundOnImport`): a refund for a purchase with money still expected back goes to its held lines in line order, each up to what's still out at that destination, marked `expectingBack` with the item's name; `refundOf.lineIndex` is the first held line used. Anything over goes to the purchase's biggest kept line as an ordinary refund line. With nothing expected back it's today's flow. Sorting a refund by hand to a held line (`sortRefund`, a line choice) marks it too; the sort sheet labels such a line "Expecting back".
+- **Settle up:** once the purchase's bill has closed, whatever is still held has to be paid with it, so it counts as spending in the purchase's month and is To move ("Move the rest to the Amex pot" includes it). The Move sheet labels the row "Includes £32.00 expecting back: not refunded by the bill, so it moves now". If that month was already closed, Month shows "Changed since closed".
+- **A refund after settle up** (on a later bill) is an ordinary refund: it counts in its own month, moves back out of the Amex pot, and, being marked, clears the purchase from the list.
+- **Not coming back** (`notComingBack`, P7): stamps `notComingBackAt` on the purchase's held lines, which then count as spending in the purchase's month and move like any line (a same-bill refund then counts as an ordinary refund). Undo (`comingBackAgain`) removes the stamp.
+- **Spending › Expecting back** (`expectingBack`): a section under To sort and Set aside, and on the Amex pot page under Bills it pays: each purchase with something still out, newest first: its name and what's out, the held items ("Coat £45.00 · Boots £34.00 · £47.00 refunded"), "Bought Thu 26 Nov · marked Back 4 days ago" (from the sort's time), where it is ("Held in Spending · Ada until the refund or the bill", or "Paid with the December bill: a refund moves it back") and **Not coming back** with an Undo toast.
+- **Elsewhere:** the bill's fifth part in every bill line ("£79.00 expecting back": Bills it pays, Month's Amex row, the statement page, Bring in's bill sum, Home's bill card); a pot page's lead says "£79.00 expecting back · held here until the refund or the bill, not spent" (`heldInPot`; Tracked pots this month, Funded only pots beside Next move); a pot's transaction rows add "£79.00 expecting back"; split lines on Spending add "· expecting back"; the Move sheet says "ASOS: £79.00 expecting back stays in Spending · Ada until the refund or the bill."
+- "Where it went" and Needs a look's reason (`merchantBreakdown`, `lookReason`) leave held money out too, so a pot's brands add up to its card spend.
+- **Not built:** the Move sheet naming each pot's parts ("Netflix £9.99 + ASOS kept £69.00 − ASOS refund £42.00"); the typical shop still reads the full lines.
 
 ## Refunds (D5, §6.4)
 
@@ -313,12 +330,13 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 **The bill** (`billSum(document, statementKey, today)`, `src/domain/billSum.ts`), for a statement paid from the Amex pot (null otherwise):
 
 ```
-Bill = In the Amex pot + To move + To sort (+ Expecting back, D11: 0 until PR 9)
+Bill = In the Amex pot + To move + To sort + Expecting back
 ```
 
 - **In the Amex pot:** Σ what has moved in for the bill's purchases and refunds, lines sorted to the pot itself included.
 - **To move:** sorted and not moved yet (`toMove` for the statement), with how many transactions.
 - **To sort:** purchases and refunds not sorted yet, less anything they moved before they were unsorted, so the parts always add up to the bill (Σ purchases and refunds, payments left out).
+- **Expecting back** (month-health PR 9): what `heldOut` leaves out of the bill's sorted rows: held returns less refunds on the same bill, while the bill is open. Once it has closed, anything still held is part of To move (see "Expecting back" below).
 - **Open** while today ≤ the close date: "November bill so far". **Covered** once it has closed and nothing is left to move or sort, until the Pay tick. **Paid** once Pay is ticked.
 - **Known** (`amexPotKnown`): **checked** only when the Amex pot was checked after its last move (no flow since the check) and matched; otherwise **worked out**. "Matches Monzo" appears only when checked.
 - **Which bills** (`potBills`): every unpaid statement paid from the pot with something on it or in the pot, oldest first, then the open one even when empty. **Home's bill** (`homeBill`) is the first of them: the oldest unpaid bill until its Pay tick, then the open one.
