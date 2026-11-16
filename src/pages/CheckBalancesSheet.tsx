@@ -1,6 +1,7 @@
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
+import { bufferBalance, checkBuffer } from '../domain/buffer'
 import { cardTracker, parsePence } from '../domain/cardTracker'
 import { checkPotBalances, potBalance } from '../domain/potBalances'
 import { potPhrase } from '../domain/setAside'
@@ -43,6 +44,10 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
     .flatMap(group => group.accounts)
     .map(account => ({ account, pots: document.budget.pots.filter(pot => pot.accountId === account.id).sort((a, b) => a.name.localeCompare(b.name, 'en-GB')) }))
     .filter(row => row.pots.length)
+  // The card's buffer, when it's an account's main balance rather than a pot (a buffer pot is already in its account's list).
+  const buffer = bufferBalance(document)
+  const bufferAccount = buffer?.destination.kind === 'account' ? buffer.destination : undefined
+  const bufferAccountKey = bufferAccount ? `account:${bufferAccount.accountId}` : ''
   const parsed = Object.entries(typed).filter(([, text]) => text.trim()).map(([potId, text]) => [potId, parsePence(text)] as const)
   const invalid = parsed.filter(([, pence]) => pence === null || pence < 0).map(([potId]) => potId)
   const checks = new Map(cardTracker(document).cards.filter(card => card.setAside).flatMap(card => { const check = setAsideCheck(document, card.id); return check ? [[check.potId, check] as const] : [] }))
@@ -50,7 +55,11 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
     event.preventDefault()
     if (invalid.length) { setError('Enter each balance like 1240.00, or leave it blank.'); return }
     if (!parsed.length) { onClose(); return }
-    setDocument(current => checkPotBalances(current, new Map(parsed as Array<[string, number]>), now()))
+    const bufferTyped = parsed.find(([key]) => key === bufferAccountKey)
+    setDocument(current => {
+      const checked = checkPotBalances(current, new Map((parsed as Array<[string, number]>).filter(([key]) => key !== bufferAccountKey)), now())
+      return bufferTyped && bufferAccount ? checkBuffer(checked, bufferAccount, bufferTyped[1]!, now()) : checked
+    })
     // Expected doesn't depend on a check, so the typed figure gives the Amex pot's new gap.
     const gapped = parsed.flatMap(([potId, pence]) => { const check = checks.get(potId); return check && pence! !== check.shouldHoldPence ? [{ potId, gap: pence! - check.shouldHoldPence }] : [] })[0]
     const phrase = gapped && potPhrase(document.budget.pots.find(pot => pot.id === gapped.potId)?.name ?? 'Amex')
@@ -83,6 +92,15 @@ export function CheckBalancesSheet({ document, setDocument, onClose, onSaved, no
           </li>
         })}</ul>
       </fieldset>)}
+      {bufferAccount && <fieldset className="check-balances-account">
+        <legend>Buffer for overspends</legend>
+        <ul><li className="check-balances-row">
+          <label className="check-balances-label" htmlFor={`check-${bufferAccountKey}`}><strong>{labels.get(bufferAccount.accountId) ?? 'Account'} main balance</strong><span>{buffer?.balancePence === undefined ? 'Not checked yet' : `North: ${signedPounds(buffer.balancePence)} · checked ${dayOf(buffer.checked!.at)}`}</span></label>
+          <input id={`check-${bufferAccountKey}`} inputMode="decimal" value={typed[bufferAccountKey] ?? ''} aria-invalid={invalid.includes(bufferAccountKey) || undefined} aria-describedby={`check-${bufferAccountKey}-note`} onChange={event => { setTyped({ ...typed, [bufferAccountKey]: event.target.value }); setError('') }}/>
+          <span id={`check-${bufferAccountKey}-note`} className="check-balances-note" aria-live="polite">{typed[bufferAccountKey]?.trim() && !invalid.includes(bufferAccountKey) ? difference(parsePence(typed[bufferAccountKey]!)!, buffer?.balancePence) : ''}</span>
+          {buffer?.balancePence !== undefined && !typed[bufferAccountKey] && <button type="button" className="text-button check-balances-same" onClick={() => setTyped({ ...typed, [bufferAccountKey]: (buffer.balancePence! / 100).toFixed(2) })}>Same as North</button>}
+        </li></ul>
+      </fieldset>}
       {error && <p className="input-error" role="alert">{error}</p>}
       <div className="bring-in-actions">
         <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>

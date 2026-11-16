@@ -5,7 +5,7 @@ import { Sheet } from '../components/ui/Sheet'
 import { useToast } from '../components/ui/useToast'
 import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { localDate } from '../domain/cardTracker'
+import { localDate, monthOf } from '../domain/cardTracker'
 import { homeCount, homeInbox, type AppHomeTarget, type HomeInbox, type HomeTarget, type InboxKind, type InboxTask, type PaydayCard } from '../domain/homeInbox'
 import { resolveBudget } from '../domain/monthlyBudget'
 import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
@@ -13,6 +13,8 @@ import { dayDate, weekday } from '../formatting/date'
 import type { BroughtIn } from '../domain/bringIn'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
+import { canAskAfford } from './affordText'
+import { AffordSheet } from './AffordSheet'
 import { BroughtInLines } from './BroughtInLines'
 import { destinationNamer } from './cardLabels'
 import { FreshnessLine } from './Freshness'
@@ -123,6 +125,7 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
     return () => { setDocument(current => answerRenewal(current, itemId, date)); answered(`${resolveBudget(document.budget, date.slice(0, 7)).items.find(item => item.id === itemId)?.name ?? 'Renewal'}: same price`, undoRenewalAnswer(document, itemId, date)) }
   }
   const [sheet, setSheet] = useState(false)
+  const [afford, setAfford] = useState(false)
   const todoKeys = useListNavigation({ label: 'To do', keys: { enter: 'Open the task' } })
   const names = shortAccountLabels(document.budget.accounts, document.household.adults)
   const inbox = homeInbox(document, { month, today, nameDestination: destinationNamer(document), nameAccount: id => names.get(id) ?? 'Account' })
@@ -151,12 +154,14 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
       {pots.map(pot => <HomeCard key={pot.key} name={pot.name} value={pot.value} status={pot.status} week={pot.week} tone={pot.tone} label={`Open ${pot.name}`} onOpen={() => onOpen(pot.target)}/>)}
       {strip.card && <HomeCard name={strip.card.name} value={strip.card.value} status={[strip.card.sub, strip.card.detail].filter(Boolean).join(' · ')} label={`Open ${strip.card.name}`} onOpen={() => onOpen({ view: 'spending', section: 'sort' })}/>}
     </ul>}
+    {month === monthOf(today) && canAskAfford(document, today) && <p className="home-afford"><button type="button" className="secondary-button" onClick={() => setAfford(true)}>Can we afford…</button></p>}
     <StatStrip label={`${name} at a glance`}>
       {bills && <StatTile label={bills.label} value={<>{bills.value} <small className="home-tile-sub">{bills.sub}</small></>} detail={bills.detail} onOpen={() => onOpen(bills.target)} openLabel="Open Bills"/>}
       {saving && <StatTile label={saving.label} value={<>{saving.value} <small className="home-tile-sub">{saving.sub}</small></>} detail={saving.detail} onOpen={() => onOpen(saving.target)} openLabel="Open Saving"/>}
       <StatTile label="Plan" value={strip.plan.value} detail={strip.plan.detail} tone={strip.plan.tone ?? 'neutral'} onOpen={() => onOpen({ view: 'plan' })} openLabel="Open Plan"/>
     </StatStrip>
     {toast}
+    {afford && <AffordSheet document={document} today={today} onClose={() => setAfford(false)}/>}
     {sheet && <TodoSheet inbox={inbox} samePrice={samePrice} onClose={() => setSheet(false)} onOpen={target => { setSheet(false); onOpen(target) }}/>}
     {renewal && <RenewalSheet document={document} setDocument={setDocument} itemId={renewal.itemId} date={renewal.date} today={today} onClose={() => setRenewal(undefined)}
       onAnswered={(text, undo) => { setRenewal(undefined); answered(text, undo) }}

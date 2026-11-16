@@ -22,6 +22,8 @@ export interface CardTracker {
   moves?: SetAsideMove[]
   /** Checking the Amex pot: extra moved out of it, or a top-up into it, oldest first. Absent until the first. */
   gapMoves?: GapMove[]
+  /** Account id → what its main balance showed when last checked. Only the card's buffer account uses it (month-health P9). */
+  accounts?: Record<string, { checkedBalance?: { pence: number; at: string } }>
 }
 
 export interface Cardholder { suffix: string; personId: string }
@@ -404,8 +406,8 @@ const uniqueIds = (rows: Array<{ id: unknown }>) => rows.every(row => typeof row
 
 export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>, personIds: ReadonlySet<string>): value is CardTracker {
   if (!isRecord(value)) return false
-  const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves } = value
-  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves) || gapMoves !== undefined && !Array.isArray(gapMoves)) return false
+  const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves, accounts } = value
+  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves) || gapMoves !== undefined && !Array.isArray(gapMoves) || accounts !== undefined && !isRecord(accounts)) return false
   const destination = (row: unknown) => validDestination(row, budget)
   if (!cards.every(isRecord) || !uniqueIds(cards as Array<{ id: unknown }>)) return false
   for (const card of cards as Array<Record<string, unknown>>) {
@@ -473,6 +475,13 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
   if (gapMoves !== undefined) {
     if (!gapMoves.every(isRecord) || !uniqueIds(gapMoves as Array<{ id: unknown }>)) return false
     if (!(gapMoves as Array<Record<string, unknown>>).every(row => typeof row.cardId === 'string' && cardIds.has(row.cardId) && typeof row.at === 'string' && isInt(row.pence) && row.pence !== 0 && destination(row.destination))) return false
+  }
+  if (accounts !== undefined) {
+    const accountIds = new Set(budget.accounts.map(account => account.id))
+    for (const [accountId, row] of Object.entries(accounts)) {
+      if (!accountIds.has(accountId) || !isRecord(row)) return false
+      if (row.checkedBalance !== undefined && !(isRecord(row.checkedBalance) && isInt(row.checkedBalance.pence) && typeof row.checkedBalance.at === 'string')) return false
+    }
   }
   return imports.every(row => isRecord(row) && typeof row.at === 'string' && typeof row.cardId === 'string' && typeof row.fileName === 'string' && typeof row.statementKey === 'string'
     && [row.rows, row.added, row.skipped, row.sortedByRules].every(count => isInt(count) && (count as number) >= 0) && typeof row.latestDate === 'string' && typeof row.matchesSummary === 'boolean')

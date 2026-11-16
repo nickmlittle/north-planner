@@ -4,6 +4,8 @@ import { emptyCardTracker, type CardTransaction } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 import { savePotKind } from './potKinds'
 import { affordCheck } from './afford'
+import { checkBuffer } from './buffer'
+import { checkPotBalance } from './potBalances'
 
 const pot = (potId: string): BudgetDestination => ({ kind: 'pot', potId })
 let next = 0
@@ -46,11 +48,11 @@ describe('affordCheck', () => {
 
   it('says over by how much when it goes past Left, and exactly Left is still yes', () => {
     expect(affordCheck(household(), 'groceries', 20000, TODAY)).toMatchObject({ kind: 'within', leftAfterPence: 0 })
-    expect(affordCheck(household(), 'groceries', 21234, TODAY)).toEqual({ kind: 'over', overPence: 1234 })
+    expect(affordCheck(household(), 'groceries', 21234, TODAY)).toMatchObject({ kind: 'over', overPence: 1234 })
   })
 
   it('answers for a pot that is already over', () => {
-    expect(affordCheck(household(32000), 'groceries', 1000, TODAY)).toEqual({ kind: 'over', overPence: 3000 })
+    expect(affordCheck(household(32000), 'groceries', 1000, TODAY)).toEqual({ kind: 'over', overPence: 3000, buffer: { destination: { kind: 'account', accountId: 'joint' }, otherOverPence: 0 } })
   })
 
   it('names the rows to sort and what sorting them here would do', () => {
@@ -68,5 +70,71 @@ describe('affordCheck', () => {
     expect(affordCheck(document, 'holidays', 5000, TODAY).kind).toBe('not-offered')
     expect(affordCheck(document, 'amex-pot', 5000, TODAY).kind).toBe('not-offered')
     expect(affordCheck(document, 'groceries', 0, TODAY).kind).toBe('not-offered')
+  })
+
+  describe('the buffer (P9)', () => {
+    const joint: BudgetDestination = { kind: 'account', accountId: 'joint' }
+
+    it('says it is not checked until it has been, without a balance', () => {
+      expect(affordCheck(household(), 'groceries', 25000, TODAY)).toMatchObject({ kind: 'over', overPence: 5000, buffer: { destination: joint, otherOverPence: 0 } })
+      expect(affordCheck(household(), 'groceries', 25000, TODAY)).not.toHaveProperty('buffer.balancePence')
+    })
+
+    it('covers the overspend from the checked balance and names when it was checked', () => {
+      const document = checkBuffer(household(), joint, 50000, new Date('2026-11-19T10:00:00Z'))
+      expect(affordCheck(document, 'groceries', 25000, TODAY)).toMatchObject({ kind: 'over', buffer: { balancePence: 50000, checkedAt: '2026-11-19T10:00:00.000Z', availablePence: 50000, covers: true } })
+    })
+
+    it('says how short it is when the buffer cannot cover it', () => {
+      const document = checkBuffer(household(), joint, 3000, new Date('2026-11-19T10:00:00Z'))
+      expect(affordCheck(document, 'groceries', 25000, TODAY)).toMatchObject({ kind: 'over', overPence: 5000, buffer: { covers: false, shortPence: 2000 } })
+    })
+
+    it('keeps what other pots that are over will take out of the buffer', () => {
+      const document = checkBuffer(household(), joint, 10000, new Date('2026-11-19T10:00:00Z'))
+      document.budget.pots.push({ id: 'out', name: 'Going out', accountId: 'joint' })
+      document.budget.snapshots['2026-11']!.items.push({ id: 'o', name: 'o', categoryId: 'c', entryAmountPence: 10000, amountPence: 10000, frequency: 'monthly', destination: pot('out'), funding: 'proportional' })
+      document.card!.transactions.push(tx('2026-11-10', pot('out'), 14000))
+      savePotKind(document, 'out', 'tracked')
+      const answer = affordCheck(savePotKind(document, 'out', 'tracked'), 'groceries', 25000, TODAY)
+      expect(answer).toMatchObject({ kind: 'over', buffer: { balancePence: 10000, otherOverPence: 4000, availablePence: 6000, covers: true } })
+    })
+
+    it('works the balance out from the check: covers ticked out of it and extra moved into it since', () => {
+      const document = checkBuffer(household(), joint, 50000, new Date('2026-11-19T10:00:00Z'))
+      document.card!.months['2026-10'] = { covers: [{ potId: 'groceries', amountPence: 8000, source: joint }], coverTicks: { 'cover:groceries': { at: '2026-11-20T09:00:00.000Z', amountPence: 8000 } } }
+      document.card!.gapMoves = [{ id: 'g1', cardId: 'amex', at: '2026-11-21T09:00:00.000Z', pence: 2000, destination: joint }, { id: 'g0', cardId: 'amex', at: '2026-11-18T09:00:00.000Z', pence: 9999, destination: joint }]
+      expect(affordCheck(document, 'groceries', 25000, TODAY)).toMatchObject({ buffer: { balancePence: 50000 - 8000 + 2000 } })
+    })
+
+    it('uses the buffer pot’s own check when the buffer is a pot', () => {
+      const document = household()
+      document.card!.cards[0]!.bufferDestination = pot('holidays')
+      const checked = checkPotBalance(document, 'holidays', 7000, new Date('2026-11-19T10:00:00Z'))
+      expect(affordCheck(checked, 'groceries', 25000, TODAY)).toMatchObject({ buffer: { destination: pot('holidays'), balancePence: 7000, covers: true } })
+    })
+  })
+
+  describe('overlap days', () => {
+    const withPay = (): BudgetDocument => {
+      const document = household()
+      document.budget.incomeSources = [{ id: 'a', personId: 'ada', name: 'Job', type: 'employment', baseAmountPence: 400000, changes: {}, payday: { day: 27, ifNotWorkingDay: 'previous' } }]
+      document.budget.snapshots['2026-12'] = { items: [{ id: 'g', name: 'g', categoryId: 'c', entryAmountPence: 25177, amountPence: 25177, frequency: 'monthly', destination: pot('groceries'), funding: 'proportional' }] }
+      return document
+    }
+
+    it('says which month it counts in and when the next month’s pot starts, from the first payday to the 1st', () => {
+      expect(affordCheck(withPay(), 'groceries', 5000, '2026-11-28')).toMatchObject({ kind: 'within', overlap: { potName: 'Groceries', month: '2026-11', nextMonth: '2026-12', nextPlannedPence: 25177, startsOn: '2026-12-01' } })
+    })
+
+    it('says nothing before the first payday', () => {
+      expect(affordCheck(withPay(), 'groceries', 5000, '2026-11-26')).not.toHaveProperty('overlap')
+    })
+
+    it('says nothing for a pot the next month does not plan', () => {
+      const none = withPay()
+      none.budget.snapshots['2026-12'] = { items: [] }
+      expect(affordCheck(none, 'groceries', 5000, '2026-11-28')).not.toHaveProperty('overlap')
+    })
   })
 })

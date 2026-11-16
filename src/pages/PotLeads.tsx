@@ -1,15 +1,11 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { affordCheck, type AffordAnswer } from '../domain/afford'
-import { parsePence } from '../domain/cardTracker'
 import { carriedOverByMonth, moneyIn, recentMonths, type WeekFigures } from '../domain/potSum'
 import { potBalance } from '../domain/potBalances'
 import { Section } from '../components/ui'
-import { formatGBPWhole } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { dayDate } from './cardLabels'
-import { dayOf, plural, pounds, signedPounds } from './spendingFormat'
+import { dayOf, pounds, signedPounds } from './spendingFormat'
 
-const whole = (pence: number) => formatGBPWhole(Math.round(pence / 100))
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 
 /** A Tracked pot's weekly line and typical shop, under its Left (P3, P4): "This week £140.00 · to Sun 22 Nov". */
@@ -20,34 +16,9 @@ export function WeekLines({ week, shop, onTry }: { week?: WeekFigures; shop?: { 
   </>
 }
 
-/** What the answer says, as sentences: nothing is recorded. */
-function answerLines(answer: AffordAnswer, bank: string, month: string): { tone: 'yes' | 'over' | 'check'; lines: string[] } | null {
-  if (answer.kind === 'not-offered') return null
-  if (answer.kind === 'funded-only') return { tone: 'check', lines: [`Check ${bank}: North only sees what goes on the Amex.`, ...answer.goesOnAmex ? ['If it goes on the Amex, it moves to the Amex pot at your next move.'] : []] }
-  const sorted = answer.toSort && `${answer.toSort.leftIfSortedPence < 0 ? `${pounds(-answer.toSort.leftIfSortedPence)} over` : `${pounds(answer.toSort.leftIfSortedPence)} left`} if the ${plural(answer.toSort.count, 'row')} to sort (${pounds(answer.toSort.pence)}) went here too.`
-  if (answer.kind === 'over') return { tone: 'over', lines: [`${pounds(answer.overPence)} over.`, `Covered when ${monthName(month)} closes.`, ...sorted ? [sorted] : []] }
-  return { tone: 'yes', lines: [
-    `Yes. ${pounds(answer.leftAfterPence)} left${answer.daysLeft > 0 ? ` for the last ${plural(answer.daysLeft, 'day')}` : ''}.`,
-    ...answer.pace === 'ahead' ? [`About ${whole(answer.aheadPence!)} ahead of pace.`] : answer.pace === 'on-pace' ? ['Still on pace.'] : [],
-    ...sorted ? [sorted] : [],
-  ] }
-}
-
-/** Try an amount (`affordCheck`): type what you're about to spend, see the answer. Nothing is saved. */
-export function TryAnAmount({ document, potId, today, bank, month, value, onChange }: { document: BudgetDocument; potId: string; today: string; bank: string; month: string; value: string; onChange: (value: string) => void }) {
-  const pence = parsePence(value)
-  const answer = pence && pence > 0 ? affordCheck(document, potId, pence, today) : undefined
-  const shown = answer && answerLines(answer, bank, month)
-  return <Section title="Try an amount">
-    <div className="pot-try">
-      <label className="spending-field">Before you spend it
-        <input inputMode="decimal" value={value} placeholder="£0.00" onChange={event => onChange(event.target.value)} aria-describedby="pot-try-answer"/>
-      </label>
-      <div id="pot-try-answer" role="status" className={`pot-try-answer${shown ? ` is-${shown.tone}` : ''}`}>
-        {shown ? shown.lines.map(line => <p key={line}>{line}</p>) : <p>{value.trim() && pence === null ? 'Enter an amount, like 42.50.' : 'Nothing is saved.'}</p>}
-      </div>
-    </div>
-  </Section>
+/** Can we afford… from a pot page (PR 8): one row that opens the sheet with this pot chosen. */
+export function AffordRow({ onOpen }: { onOpen: () => void }) {
+  return <p className="pot-afford"><button type="button" className="text-button" onClick={onOpen}>Can we afford…</button><small> an amount before you spend it</small></p>
 }
 
 /** A Funded only pot's lead (D3): what payday moved in and what went on the Amex, with the next move. No Left, no pace. */
