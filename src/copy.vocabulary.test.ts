@@ -21,12 +21,12 @@ function prose(source: string): string[] {
 
 const retired: Array<[RegExp, string]> = [
   [/funding total/i, 'Funding (or Total in a table footer)'],
-  [/budget balance/i, '"£X over" / "£X left" / "Balanced"'],
+  [/budget balance/i, '"£X over" / "£X unassigned" / "Balanced"'],
   [/planned budget/i, 'Planned'],
   [/available (this month|income)/i, 'Available'],
   [/\bcontribut/i, 'Funding, or Fixed amounts for the fixed rule'],
   [/\ballocat/i, 'Funding / funded / unassigned'],
-  [/left to allocate|\bremaining\b|shortfall/i, '"£X left" / "£X over"'],
+  [/left to allocate|\bremaining\b|shortfall/i, '"£X unassigned" / "£X over"'],
   [/transfers by (destination|person)|monthly plan by person|people (&|&amp;|and) transfers/i, 'Funding by account / Funding'],
   [/later saved budgets/i, 'nothing: the scope line already says which months change'],
   [/edit budget item/i, 'Edit item'],

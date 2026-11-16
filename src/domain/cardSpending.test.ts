@@ -35,7 +35,8 @@ function household(): BudgetDocument {
   document.card = {
     ...emptyCardTracker(),
     cards: [{ id: 'amex', name: 'Amex', closeDay: 24, dueDaysAfterClose: 25, payFromAccountId: 'joint', cardholders: [] }],
-    pots: { bills: { carriesOver: true }, fuel: { pace: 'none' } },
+    // Treats and Fuel sit in one person's account, so they'd default to Funded only; here they're chosen as Tracked.
+    pots: { bills: { carriesOver: true }, treats: { kind: 'tracked' }, fuel: { kind: 'tracked', pace: 'none' } },
     transactions: [
       tx('2026-11-01', [[pot('groceries'), 7490]]), tx('2026-11-03', [[pot('groceries'), 8835]]), tx('2026-11-05', [[pot('groceries'), 4460]]), tx('2026-11-07', [[pot('groceries'), 4120]]),
       tx('2026-11-08', [[pot('groceries'), 2715]]), tx('2026-11-10', [[pot('groceries'), 6240]]),
@@ -77,9 +78,30 @@ describe('monthSpending', () => {
     // A savings pot with a plan but no card spending stays off the list.
     expect(month.rows.some(item => item.key === 'pot:rainy')).toBe(false)
     expect(month.rows.map(item => item.key)).toEqual(['pot:eating', 'pot:groceries', 'pot:bills', 'pot:treats', 'pot:fuel', 'account:joint'])
-    // Unsorted spending and payments don't count; October's and December's rows stay in their months.
-    expect(month.spentPence).toBe(33860 + 6400 + 21250 + 5820 + 4197 + 11281)
-    expect(month.plannedPence).toBe(52000 + 15000 + 15000 + 20000 + 12000)
+    // Spending this month is the Tracked pots (D4): not Bills (carries over) or an account's one-offs. Unsorted
+    // spending and payments don't count; October's and December's rows stay in their months.
+    expect(month.spentPence).toBe(33860 + 6400 + 21250 + 5820)
+    expect(month.plannedPence).toBe(52000 + 15000 + 20000 + 12000)
+  })
+
+  it('gives a Funded only pot no Left, no pace and no share of Spent, and lists it with its plan (D3, D4)', () => {
+    const document = household()
+    document.card!.pots.treats = {}
+    const month = monthSpending(document, '2026-11', '2026-11-12')
+    expect(month.rows.find(item => item.key === 'pot:treats')).toMatchObject({ kind: 'funded-only', pace: 'none', plannedPence: 20000, spentPence: 21250, leftPence: 0, status: 'funded', needsCare: false })
+    expect(month.needsCare).toBe(1)
+    expect(month.spentPence).toBe(33860 + 6400 + 5820)
+    expect(month.plannedPence).toBe(52000 + 15000 + 12000)
+    // Moved in but nothing on the Amex yet: still listed, with what was moved in.
+    const quiet = monthSpending({ ...document, card: { ...document.card!, transactions: document.card!.transactions.filter(row => !row.sort?.lines.some(line => line.destination.kind === 'pot' && line.destination.potId === 'treats')) } }, '2026-11', '2026-11-12')
+    expect(quiet.rows.find(item => item.key === 'pot:treats')).toMatchObject({ kind: 'funded-only', plannedPence: 20000, spentPence: 0, status: 'funded' })
+  })
+
+  it('treats a Saving pot as having no Left either, listed once something comes out of it', () => {
+    const document = household()
+    document.card!.transactions.push(tx('2026-11-09', [[pot('rainy'), 4000]]))
+    const rainy = monthSpending(document, '2026-11', '2026-11-12').rows.find(item => item.key === 'pot:rainy')
+    expect(rainy).toMatchObject({ kind: 'saving', pace: 'none', plannedPence: 50000, spentPence: 4000, leftPence: 0, status: 'saving' })
   })
 
   it('lowers spent with a refund in the month it arrives', () => {
@@ -137,7 +159,8 @@ describe('pot detail', () => {
   it('gives the sort sheet what’s left for each planned pot', () => {
     const left = leftByDestination(household(), '2026-11')
     expect(left.get('pot:groceries')).toBe(18140)
-    expect(left.get('pot:rainy')).toBe(50000)
+    // Rainy day is in a savings account, so it's Saving and has no Left.
+    expect(left.has('pot:rainy')).toBe(false)
     expect(left.has('pot:bills')).toBe(false)
   })
 })

@@ -20,8 +20,8 @@ export function formatGBPAxis(value: number): string {
   return formatGBPWhole(value)
 }
 
-/** Available minus planned, in the app's one wording: "£X over", "£X left" or "Balanced". */
+/** Available minus planned, in the app's one wording: "£X over", "£X unassigned" or "Balanced". "Left" is only ever a pot's Left (D5). */
 export function balanceLabel(balancePence: number): string {
   if (balancePence === 0) return 'Balanced'
-  return `${formatGBP(Math.abs(balancePence) / 100)} ${balancePence < 0 ? 'over' : 'left'}`
+  return `${formatGBP(Math.abs(balancePence) / 100)} ${balancePence < 0 ? 'over' : 'unassigned'}`
 }

@@ -5,8 +5,8 @@ const pounds = (pence: number) => formatGBP(pence / 100)
 /** One adult's side of the plan: what they have available and what the plan asks of them. */
 export type MeterPerson = { personId: string; name: string; availablePence: number; plannedPence: number }
 
-/** "£X left", "£X over" or "Balanced" (the glossary's balance wording). */
-export const balanceText = (balancePence: number) => balancePence === 0 ? 'Balanced' : `${pounds(Math.abs(balancePence))} ${balancePence < 0 ? 'over' : 'left'}`
+/** "£X unassigned", "£X over" or "Balanced" (the glossary's balance wording). */
+export const balanceText = (balancePence: number) => balancePence === 0 ? 'Balanced' : `${pounds(Math.abs(balancePence))} ${balancePence < 0 ? 'over' : 'unassigned'}`
 
 /** The household balance, who is over (worst first), and the docked mini meter's line: whoever is over, else the balance. */
 export function meterSummary(people: readonly MeterPerson[], availablePence: number, plannedPence: number) {

@@ -52,12 +52,15 @@ const freeText = (pence: number) => `${pence < 0 ? '−' : ''}${pounds(Math.abs(
 
 /**
  * A pot option's suffix in the picker: "£130.00 left · £110 ahead", "£150.00 over", "£130.00 left", "nothing planned".
- * Carry-over pots show what's free once their balance is checked ("£80.00 free"), else nothing.
+ * Carry-over pots show what's free once their balance is checked ("£80.00 free"), else nothing. Funded only and Saving
+ * pots have no Left, so they say what they are.
  */
 export function optionPaceText(row: Pick<DestinationSpending, 'destination' | 'status' | 'leftPence' | 'aheadPence' | 'carriesOver'> | undefined, freePence?: number): string {
   if (!row) return freePence === undefined ? '' : freeText(freePence)
   if (row.carriesOver) return freePence === undefined ? '' : freeText(freePence)
   if (row.destination.kind === 'account') return ''
+  if (row.status === 'funded') return 'Funded only'
+  if (row.status === 'saving') return 'Saving'
   if (row.status === 'one-offs') return 'nothing planned'
   if (row.status === 'over') return overText(-row.leftPence)
   return row.status === 'ahead' ? `${leftText(row.leftPence)} · ${aheadText(row.aheadPence ?? 0)}` : leftText(row.leftPence)
@@ -75,7 +78,7 @@ export function impactText(name: string, impact: PlacedPace): string {
   const { before, after, figures } = impact
   if (impact.same || impact.destination.kind === 'account') return ''
   if (impact.freeBefore !== undefined && impact.freeAfter !== undefined) return `${name}: ${freeText(impact.freeBefore)} → ${freeText(impact.freeAfter)}`
-  if (!after || after.carriesOver) return ''
+  if (!after || after.carriesOver || after.status === 'funded' || after.status === 'saving') return ''
   if (after.status === 'one-offs') return `${name} has nothing planned in ${monthName(figures.month)}`
   const leftBefore = before ? before.leftPence : after.plannedPence - after.takenPence
   let from = before && before.status !== 'one-offs' ? stateText(before) : leftText(leftBefore)

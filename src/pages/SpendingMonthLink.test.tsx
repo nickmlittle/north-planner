@@ -250,6 +250,8 @@ describe('Needs a look (F3)', () => {
     document.budget.pots.push({ id: 'holidays', name: 'Holidays', accountId: 'joint' }, { id: 'treats-ada', name: 'Treats', accountId: 'ada-own' }, { id: 'treats-ben', name: 'Treats', accountId: 'ben-own' })
     const item = (id: string, potId: string, pence: number) => ({ id, name: id, categoryId: 'c', entryAmountPence: pence, amountPence: pence, frequency: 'monthly' as const, destination: { kind: 'pot' as const, potId }, funding: 'equal' as const })
     document.budget.snapshots['2026-11']!.items.push(item('h', 'holidays', 60000), item('ta', 'treats-ada', 10000), item('tb', 'treats-ben', 10000))
+    // A pot in one person's account would default to Funded only; these two are Tracked.
+    document.card!.pots = { ...document.card!.pots, 'treats-ada': { kind: 'tracked' }, 'treats-ben': { kind: 'tracked' } }
     const pot = (potId: string, pence: number) => to({ kind: 'pot', potId }, pence)
     document.card!.transactions.push(
       tx('tesco-3', '2026-11-10', 'TESCO STORE 3180 SIDCUP', 9481, { merchant: 'TESCO STORE SIDCUP', sort: pot('groceries', 9481) }),
@@ -299,7 +301,7 @@ describe('Needs a look (F3)', () => {
     expect(within(strip).getByRole('button', { name: /^Groceries · Joint/ })).toHaveTextContent('Groceries · Joint£102 aheadMostly Tesco £303.38Runs out ~Sat 21 Nov')
     const table = screen.getByRole('table')
     expect(within(table).getByRole('button', { name: /^Groceries:/ }).closest('tr')).toHaveTextContent('£102 ahead · runs out ~Sat 21 Nov')
-    expect(within(table).getAllByRole('button', { name: /^Treats:/ })).toHaveLength(2)
+    expect(within(table).getAllByRole('button', { name: /^Treats · (Ada|Ben):/ })).toHaveLength(2)
   })
 
   it('has no Needs a look when every pot is on track', () => {

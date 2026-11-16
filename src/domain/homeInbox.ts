@@ -137,9 +137,9 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   // ——— Strip: Plan ———
   const people = current.transfers.people.map(row => ({ ...row, gap: row.availablePence - row.plannedPence }))
   const overPence = planned - current.transfers.availablePence
-  const personText = (row: typeof people[number]) => `${name(row.personId)} ${row.gap < 0 ? `${pounds(-row.gap)} over` : row.gap > 0 ? `${pounds(row.gap)} left` : 'balanced'}`
+  const personText = (row: typeof people[number]) => `${name(row.personId)} ${row.gap < 0 ? `${pounds(-row.gap)} over` : row.gap > 0 ? `${pounds(row.gap)} unassigned` : 'balanced'}`
   const plan: StripFigure = firstRun ? { value: `Nothing planned for ${monthName(month)} yet` }
-    : { value: overPence > 0 ? `${pounds(overPence)} over` : overPence < 0 ? `${pounds(-overPence)} left` : 'Balanced', ...overPence > 0 ? { tone: 'critical' as const } : {},
+    : { value: overPence > 0 ? `${pounds(overPence)} over` : overPence < 0 ? `${pounds(-overPence)} unassigned` : 'Balanced', ...overPence > 0 ? { tone: 'critical' as const } : {},
       detail: adults.length > 1 ? people.map(personText).join(' · ') : `${pounds(planned)} of ${pounds(current.transfers.availablePence)}` }
 
   // ——— Strip: Spent and the card ———

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { useState } from 'react'
 import { decodeBudgetDocument, newBudgetDocument } from '../../domain/budgetDocument'
 import { budgetTransfers } from '../../domain/budgetTransfers'
+import { potKind } from '../../domain/potKinds'
 import { potSettings } from '../../domain/cardSpending'
 import { accountOptionLabels, accountOwnerGroups } from '../budgetLabels'
 import { useBudgetDocument, budgetStorageKey } from '../../state/useBudgetDocument'
@@ -46,7 +47,7 @@ it('lists accounts by owner (Joint, then each adult), with their pots under them
   setup()
   expect(screen.getByText('Shared by every month.')).toBeInTheDocument()
   expect(rows()).toEqual([
-    'Nationwide JointNationwide · Mortgage · Joint', 'Monzo NickMonzo · Current account · Nick', 'BillsMonthly · shows pace · flags over 2 months’ worth', 'HL ImmyHL · S&S ISA · Immy',
+    'Nationwide JointNationwide · Mortgage · Joint', 'Monzo NickMonzo · Current account · Nick', 'BillsFunded only', 'HL ImmyHL · S&S ISA · Immy',
   ])
   expect(within(screen.getByRole('list')).getAllByText(/^\d+ pots?$/).map(node => node.textContent)).toEqual(['0 pots', '1 pot', '0 pots'])
 })
@@ -79,7 +80,7 @@ it('edits an account in a sheet, and the list follows the new owner', () => {
   submit('Save account')
   expect(result.current().budget.accounts[0]).toMatchObject({ name: 'Home loan', ownerPersonIds: ['nick'] })
   // Nick's accounts sort by provider: Monzo, then Nationwide.
-  expect(rows().slice(0, 3)).toEqual(['Monzo NickMonzo · Current account · Nick', 'BillsMonthly · shows pace · flags over 2 months’ worth', 'Home loanNationwide · Mortgage · Nick'])
+  expect(rows().slice(0, 3)).toEqual(['Monzo NickMonzo · Current account · Nick', 'BillsFunded only', 'Home loanNationwide · Mortgage · Nick'])
 })
 
 it('closes the editor with Escape without saving', () => {
@@ -143,7 +144,7 @@ it('reassigns a pot without changing its ID or budget-item destinations across m
   change(form, 'Parent account', 'mortgage')
   expect(within(form).getByText(/every month/)).toBeVisible()
   submit('Save pot')
-  expect(rows().slice(0, 2)).toEqual(['Nationwide JointNationwide · Mortgage · Joint', 'BillsMonthly · shows pace · flags over 2 months’ worth'])
+  expect(rows().slice(0, 2)).toEqual(['Nationwide JointNationwide · Mortgage · Joint', 'BillsTracked · shows pace · flags over 2 months’ worth'])
   for (const month of ['2026-11', '2026-12']) {
     const budget = result.current().budget
     expect(budget.snapshots[month]?.items[0]?.destination).toEqual({ kind: 'pot', potId: 'bills' })
@@ -151,20 +152,35 @@ it('reassigns a pot without changing its ID or budget-item destinations across m
   }
 })
 
-it('edits a pot’s spending settings: carries over, pace and the build-up limit', () => {
+it('chooses a pot’s kind (Tracked, Funded only, Saving, Carries over) and its build-up limit', () => {
   const result = setup()
+  // Bills is in Nick's own account, so it starts as Funded only (P2).
+  expect(potKind(result.current(), 'bills')).toBe('funded-only')
   menu('Bills · Monzo Nick')
   const form = screen.getByRole('form', { name: 'Edit pot' })
-  expect(within(form).getByLabelText('Show pace (for steady spending like groceries)')).toBeChecked()
+  expect(within(form).getByRole('radio', { name: 'Funded only' })).toBeChecked()
+  expect(within(form).getByRole('radio', { name: 'Funded only' })).toHaveAccessibleDescription(/moves the money in on payday/)
+  expect(within(form).queryByLabelText('Flag a build-up over (months’ worth)')).toBeNull()
+  fireEvent.click(within(form).getByRole('radio', { name: 'Tracked' }))
   change(form, 'Flag a build-up over (months’ worth)', '0')
   submit('Save pot')
   expect(within(form).getByRole('alert')).toHaveTextContent('Enter how many months’ worth can build up, like 2.')
-  fireEvent.click(within(form).getByLabelText('Carries over from month to month'))
-  expect(within(form).getByLabelText('Show pace (for steady spending like groceries)')).toBeDisabled()
+  fireEvent.click(within(form).getByRole('radio', { name: 'Carries over' }))
+  expect(within(form).queryByLabelText('Flag a build-up over (months’ worth)')).toBeNull()
   submit('Save pot')
+  expect(potKind(result.current(), 'bills')).toBe('carries-over')
   expect(potSettings(result.current(), 'bills')).toEqual({ carriesOver: true, pace: 'none', buildUpLimit: 2 })
   expect(decodeBudgetDocument(JSON.parse(JSON.stringify(result.current())))).toEqual(result.current())
   expect(rows()).toContain('BillsCarries over')
+})
+
+it('stores a kind only when one is picked, so a pot follows its account until then', () => {
+  const result = setup()
+  menu('Bills · Monzo Nick')
+  change(screen.getByRole('form', { name: 'Edit pot' }), 'Pot name', 'Bills 2')
+  submit('Save pot')
+  expect(result.current().card?.pots.bills?.kind).toBeUndefined()
+  expect(potKind(result.current(), 'bills')).toBe('funded-only')
 })
 
 it('persists typed accounts and nicknames after reopening', () => {

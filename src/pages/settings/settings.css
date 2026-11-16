@@ -18,6 +18,10 @@
 .settings-form .settings-form-check{display:flex;align-items:center;gap:var(--space-2);min-height:44px;color:var(--text);font-weight:var(--weight-regular)}
 .settings-form .settings-form-check input{width:20px;height:20px;margin:0;flex:none}
 .settings-form .settings-form-check small{color:var(--text-muted);font-size:var(--text-sm)}
+/* A kind's radio with its one-line hint tucked under it, in line with the label. */
+.settings-form .settings-form-kind{display:grid}
+.settings-form .settings-form-kind .settings-form-check{min-height:32px}
+.settings-form .settings-form-kind .settings-form-note{margin:0 0 var(--space-2) calc(var(--space-4) + var(--space-3));color:var(--text-muted);font-size:var(--text-sm)}
 .settings-form-pair{grid-template-columns:minmax(0,120px) minmax(0,1fr)}
 .settings-form-pair legend{grid-column:1/-1}
 .sheet-body .settings-form-note{margin:0;color:var(--text-muted);font-size:var(--text-sm);line-height:1.5}

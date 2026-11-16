@@ -81,16 +81,25 @@ describe('homeInbox on the seed (Wed 11 Nov)', () => {
   const result = inbox(seed())
   it('builds the strip: Plan over in red, Spent with the worst pot, and the open Amex statement', () => {
     expect(result.strip.plan).toEqual({ value: '£1,141.87 over', tone: 'critical', detail: 'Ada £429.66 over · Ben £712.21 over' })
-    // Card spend £272.59, plus the Bills pot's assumed bills by the 11th: council tax, water and the phone (£234.82).
-    expect(result.strip.spent).toMatchObject({ value: '£507.41', sub: 'of £5,262.33', detailTone: 'warning' })
+    // Tracked pots only (D4): the card spend of £272.59 less £90.69 on Funded only and Saving pots. The Bills pot's
+    // assumed bills (£234.82) are Carries over, so they're not part of it.
+    expect(result.strip.spent).toMatchObject({ value: '£181.90', sub: 'of £1,911.83', detailTone: 'warning' })
     expect(result.strip.spent!.detail).toMatch(/^Groceries .*£63 ahead of pace$/)
     expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'this statement', detail: '£312.85 set aside · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')
   })
+  it('says unassigned, not left, when the plan is under Available (D5)', () => {
+    const document = seed()
+    document.household.adults.forEach(person => { const source = document.budget.incomeSources.find(row => row.personId === person.id)!; source.baseAmountPence += 200000; source.changes = {} })
+    const plan = inbox(document).strip.plan
+    expect(plan.value).toMatch(/^£[\d,.]+ unassigned$/)
+    expect(plan.detail).toMatch(/unassigned/)
+    expect(`${plan.value} ${plan.detail}`).not.toMatch(/\bleft\b/)
+  })
   it('lists eight rows in order: settle, close, fund, sort, set aside, a renewal, over plan, then the pace heads-up', () => {
     expect(result.todo.map(row => [row.kind, row.title, row.meta, row.trailing ?? row.chip, row.trailingMeta])).toEqual([
       ['settle', 'Settle the October statement', 'All 12 sorted · matches Amex’s summary', '£646.88', 'due Wed 18 Nov'],
-      ['close', 'Close October', 'Groceries £88.58 over · 3 pots with money left', 'Ended 31 Oct', undefined],
+      ['close', 'Close October', 'Groceries £88.58 over · 1 pot with money left', 'Ended 31 Oct', undefined],
       ['fund', 'Fund November', 'Ada 0 of 5 · Ben 0 of 5 · Either of you 0 of 4', '14 steps', undefined],
       ['sort', 'Sort 4 Amex transactions', 'Brought in Mon 9 Nov', '£195.79', undefined],
       ['set-aside', 'Set aside in the Amex pot', '3 transactions sorted since the last move', '£140.59', undefined],

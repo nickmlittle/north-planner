@@ -3,9 +3,10 @@ import { ChevronRight } from 'lucide-react'
 import { EmptyState, Meter, Section, useMobilePresentation } from '../../components/ui'
 import type { BudgetDocument } from '../../domain/budgetDocument'
 import { monthSpending, needsALook, type DestinationSpending, type MonthSpending } from '../../domain/cardSpending'
-import { cardTracker, destinationKey, shiftMonth } from '../../domain/cardTracker'
+import { cardTracker, destinationKey, shiftMonth, type PotKind } from '../../domain/cardTracker'
 import { resolveBudget, type BudgetDestination } from '../../domain/monthlyBudget'
 import { potBalance, setAsideStatements } from '../../domain/potBalances'
+import { POT_KIND_LABELS, potKind } from '../../domain/potKinds'
 import { setAsideCheck } from '../../domain/setAsideCheck'
 import { formatMonth } from '../../formatting/month'
 import { destinationNamer } from '../cardLabels'
@@ -26,8 +27,10 @@ type PotRow = {
   /** An account's one-offs: opens Spending › Transactions filtered to it (F1). */
   accountKey?: string
   name: string
-  /** "carries over", "set aside", "one-offs". */
+  /** "set aside" or "one-offs": a pot's kind is its group's heading. */
   kind?: string
+  /** The phone row's figure when it isn't Left: "£1,135.42 moved in". */
+  figure?: string
   spent?: string
   planned?: string
   left?: string
@@ -47,7 +50,8 @@ function bankOf(document: BudgetDocument, potId: string) {
 /** A spending row in words and figures. */
 function spendingRow(document: BudgetDocument, row: DestinationSpending, figures: MonthSpending, name: (destination: BudgetDestination) => string): PotRow {
   const potId = row.destination.kind === 'pot' ? row.destination.potId : undefined
-  const potName = potId ? document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot' : `${name(row.destination)}`
+  // A person's own pots are named with their account, since Ada's and Ben's Spending sit in one group.
+  const potName = potId ? row.group === 'joint' ? document.budget.pots.find(pot => pot.id === potId)?.name ?? 'Pot' : name(row.destination) : `${name(row.destination)}`
   const balance = potId ? potBalance(document, potId, figures.today) : undefined
   const inBank = balance?.balancePence !== undefined ? signedPounds(balance.balancePence) : '—'
   const taken = row.takenPence ? ` · ${pounds(row.takenPence)} taken by ${monthName(shiftMonth(figures.month, -1))}` : ''
@@ -55,10 +59,13 @@ function spendingRow(document: BudgetDocument, row: DestinationSpending, figures
   const due = row.duePence > 0 ? ` · ${pounds(row.duePence)} of it due` : ''
   const base = { key: row.key, potId, name: potName, spent: signedPounds(row.spentPence), inBank }
   if (row.status === 'one-offs') return { ...base, ...row.destination.kind === 'account' ? { accountKey: destinationKey(row.destination) } : {}, kind: row.destination.kind === 'account' ? 'one-offs' : undefined, planned: '—', left: '—', status: row.destination.kind === 'account' ? 'Spent straight from the account' : 'Nothing planned', inBank: row.destination.kind === 'account' ? '' : inBank }
+  // Funded only (D3): what was moved in, then what went on the Amex. No Left, no pace.
+  if (row.kind === 'funded-only') return { ...base, planned: pounds(row.plannedPence), left: '—', figure: `${pounds(row.plannedPence)} moved in`, status: row.spentPence ? `${pounds(row.spentPence)} on the Amex` : 'Nothing on the Amex' }
+  if (row.kind === 'saving') return { ...base, planned: row.plannedPence ? pounds(row.plannedPence) : '—', left: '—', ...row.plannedPence ? { figure: `${pounds(row.plannedPence)} put by` } : {}, status: row.spentPence ? `${pounds(row.spentPence)} spent from it` : 'Nothing spent' }
   if (row.carriesOver) {
     const free = balance?.freePence
     const dueText = row.duePence > 0 ? `${pounds(row.duePence)} due this month` : ''
-    return { ...base, kind: 'carries over', planned: '—', left: free === undefined ? '—' : `${signedPounds(free)} free`, status: free === undefined ? ['Check the balance to see what’s free', dueText].filter(Boolean).join(' · ') : dueText || 'No pace' }
+    return { ...base, planned: '—', left: free === undefined ? '—' : `${signedPounds(free)} free`, status: free === undefined ? ['Check the balance to see what’s free', dueText].filter(Boolean).join(' · ') : dueText || 'No pace' }
   }
   const paced = row.pace === 'steady' && row.plannedPence > 0
   const meter = paced ? { value: row.spentPence + row.takenPence, max: row.plannedPence, ...figures.when === 'current' && row.expectedPence !== undefined ? { pace: row.expectedPence / row.plannedPence } : {}, tone: row.status === 'over' ? 'critical' as const : row.status === 'ahead' ? 'warning' as const : 'neutral' as const } : undefined
@@ -67,7 +74,7 @@ function spendingRow(document: BudgetDocument, row: DestinationSpending, figures
 }
 
 /**
- * Month › Pots: planned against spent for each pot, grouped like Plan (Joint, each adult, then accounts' one-offs).
+ * Month › Pots: planned against spent for each pot, grouped by kind (Tracked, Funded only, Saving, Carries over), then the Amex pot and accounts' one-offs.
  * Desktop: one table with aligned figures and a pace column. Phones: a card per group, three lines a pot.
  */
 export function PotsSection({ document, month, today, onOpenPot, onOpenSpending, onOpenTransactions, title = 'Pots' }: { document: BudgetDocument; month: string; today: string; onOpenPot: (potId: string) => void; onOpenSpending?: () => void; onOpenTransactions?: OpenTransactions; title?: string }) {
@@ -88,7 +95,11 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   const items = resolveBudget(document.budget, month).items
   const plannedFor = (potId: string) => items.filter(item => item.destination.kind === 'pot' && item.destination.potId === potId).reduce((sum, item) => sum + item.amountPence, 0)
   const quiet = document.budget.pots.filter(pot => !shownPots.has(pot.id) && pot.id !== setAsidePot?.id)
-  const quietRow = (potId: string): PotRow => { const planned = plannedFor(potId), balance = potBalance(document, potId, today).balancePence; return { key: `quiet:${potId}`, potId, name: document.budget.pots.find(pot => pot.id === potId)!.name, spent: pounds(0), planned: planned ? pounds(planned) : '—', left: planned ? pounds(planned) : '—', status: 'Nothing spent', inBank: balance === undefined ? '—' : signedPounds(balance) } }
+  const quietRow = (potId: string): PotRow => {
+    const planned = plannedFor(potId), balance = potBalance(document, potId, today).balancePence, kind = potKind(document, potId) ?? 'tracked'
+    const noLeft = kind === 'funded-only' || kind === 'saving'
+    return { key: `quiet:${potId}`, potId, name: ownerGroup(potId) === 'joint' ? document.budget.pots.find(pot => pot.id === potId)!.name : name({ kind: 'pot', potId }), spent: pounds(0), planned: planned ? pounds(planned) : '—', left: planned && !noLeft ? pounds(planned) : '—', status: 'Nothing spent', inBank: balance === undefined ? '—' : signedPounds(balance) }
+  }
   const setAsideRow = (): PotRow | null => {
     if (!setAsideCard || !setAsidePot) return null
     const statement = setAsideStatements(document, setAsideCard.id).find(row => row.closeDate.slice(0, 7) === month)
@@ -98,14 +109,17 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
     const gap = check?.state === 'extra' ? `${pounds(check.gapPence!)} extra` : check?.state === 'short' ? `${pounds(-check.gapPence!)} short` : ''
     return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, kind: 'set aside', spent: '—', planned: '—', left: '—', status: gap || (statement?.toMovePence ? `${pounds(statement.toMovePence)} still to move for ${monthName(month)}` : statement ? 'All moved in' : 'Nothing to move'), inBank: balance === undefined ? '—' : signedPounds(balance), ...gap ? { tone: 'warning' as const } : {} }
   }
+  // One group per kind (D3), each ordered Joint first, then each person's pots. The Amex pot and an account's one-offs sit apart.
+  const kindOf = (potId: string): PotKind => potKind(document, potId) ?? 'tracked'
+  const groupKeyOf = (row: DestinationSpending) => row.destination.kind === 'account' ? 'accounts' : row.kind ?? 'tracked'
   const groups = [
-    { key: 'joint', label: 'Joint' },
-    ...document.household.adults.map(person => ({ key: person.id, label: person.name })),
+    ...(['tracked', 'funded-only', 'saving', 'carries-over'] as const).map(kind => ({ key: kind as string, label: POT_KIND_LABELS[kind] })),
+    { key: 'set-aside', label: 'Amex pot' },
     { key: 'accounts', label: 'Accounts' },
   ].map(group => {
-    const rows = figures.rows.filter(row => row.group === group.key && !(row.destination.kind === 'pot' && lookPots.has(row.destination.potId))).map(row => spendingRow(document, row, figures, name))
-    const extra = setAsidePot && ownerGroup(setAsidePot.id) === group.key ? setAsideRow() : null
-    const hidden = showAll ? quiet.filter(pot => ownerGroup(pot.id) === group.key).map(pot => quietRow(pot.id)) : []
+    const rows = figures.rows.filter(row => groupKeyOf(row) === group.key && !(row.destination.kind === 'pot' && lookPots.has(row.destination.potId))).map(row => spendingRow(document, row, figures, name))
+    const extra = setAsidePot && group.key === 'set-aside' ? setAsideRow() : null
+    const hidden = showAll ? quiet.filter(pot => kindOf(pot.id) === group.key).map(pot => quietRow(pot.id)) : []
     return { ...group, rows: [...rows, ...extra ? [extra] : [], ...hidden] }
   }).filter(group => group.rows.length)
   const checks = document.budget.pots.map(pot => tracker.pots[pot.id]?.checkedBalance?.at).filter((at): at is string => !!at).sort()
@@ -151,7 +165,7 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
 }
 
 /** A phone row's figure: "£143.57 left", "£1,134.01 free", "£112.81 spent" or the balance. */
-const cardFigure = (row: PotRow) => row.left?.startsWith('−') ? `${row.left.slice(1)} over` : row.left && row.left !== '—' ? `${row.left}${row.left.endsWith('free') ? '' : ' left'}` : row.spent && row.spent !== '—' ? `${row.spent} spent` : row.inBank && row.inBank !== '—' ? `${row.inBank} in the pot` : ''
+const cardFigure = (row: PotRow) => row.figure ?? (row.left?.startsWith('−') ? `${row.left.slice(1)} over` : row.left && row.left !== '—' ? `${row.left}${row.left.endsWith('free') ? '' : ' left'}` : row.spent && row.spent !== '—' ? `${row.spent} spent` : row.inBank && row.inBank !== '—' ? `${row.inBank} in the pot` : '')
 
 /** A phone row: name and what's left, the meter, then the status in words. */
 function cardBody(row: PotRow, pace: (row: PotRow) => ReactNode) {
