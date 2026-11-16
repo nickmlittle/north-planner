@@ -152,6 +152,26 @@ function netTransfers(people: { personId: string; rows: PersonTransferRow[] }[],
   }
 }
 
+/** One account the money leaves, and the steps made from it. */
+export type SourceGroup = { accountId: string; funds: PersonTransferRow[]; moves: { row: PersonTransferRow; move: PersonPotMove }[] }
+
+/**
+ * D8: a person's steps grouped by the account the money leaves, so you stay in one banking app for each run of steps:
+ * the transfers they send first, then the pot moves they make in it. Pay that already lands in an account leaves from
+ * that account. Groups come in the order they first appear.
+ */
+export function stepSources(plan: PersonTransferPlan): SourceGroup[] {
+  const groups = new Map<string, SourceGroup>()
+  const group = (accountId: string) => groups.get(accountId) ?? groups.set(accountId, { accountId, funds: [], moves: [] }).get(accountId)!
+  for (const row of plan.rows) {
+    if (row.fundingPence > 0) group(row.alreadyThere ? row.accountId : row.fromAccountId ?? row.accountId).funds.push(row)
+    for (const move of row.potMoves) group(row.accountId).moves.push({ row, move })
+  }
+  // Pay already in the account isn't something to send: it follows the transfers, before the moves.
+  for (const each of groups.values()) each.funds.sort((a, b) => Number(a.alreadyThere) - Number(b.alreadyThere))
+  return [...groups.values()]
+}
+
 /** The tick-key actor for a household move: either of you makes it. */
 export const HOUSEHOLD = 'household'
 

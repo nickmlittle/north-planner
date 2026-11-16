@@ -1,9 +1,9 @@
 import { ChevronRight } from 'lucide-react'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { sendPence, type HouseholdRow, type NeedsReviewReason, type PersonAmount, type PersonTransferPlan, type PersonTransferPlans, type PersonTransferRow } from '../domain/personTransfers'
+import { HOUSEHOLD, sendPence, stepSources, type HouseholdRow, type NeedsReviewReason, type PersonAmount, type PersonPotMove, type PersonTransferPlan, type PersonTransferPlans, type PersonTransferRow } from '../domain/personTransfers'
 import { formatGBP } from '../formatting/money'
 import { stepSummary } from './budgetLabels'
-import { fundStepKey, householdMoveKey, householdProgress, moveStepKey, personProgress, type StepTick } from '../domain/transferTicks'
+import { fundStepKey, householdMoveKey, householdProgress, moveStepKey, paydaySteps, personProgress, stepStatus, waitingSteps, type StepTick } from '../domain/transferTicks'
 import { Meter } from '../components/ui'
 import { StepCaption, StepGroup, StepRow } from '../components/ui/StepRow'
 import { useListNavigation } from '../state/useListNavigation'
@@ -60,33 +60,54 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
     const count = itemCounts.get(accountId) ?? 0
     return <button type="button" className="text-button payday-see-items" data-see-items={accountId} aria-label={`See ${plural(count, 'item')} for ${label(accountId)}`} onClick={() => onSeeItems(accountId)}>{plural(count, 'item')}<ChevronRight aria-hidden="true"/></button>
   }
+  // P6: a step that needs someone else's money says what it's waiting for ("Waiting for Ada’s £294.64").
+  const all = paydaySteps(plans)
+  const waiting = (key: string) => {
+    const step = all.find(row => row.key === key)
+    const waits = step ? waitingSteps(all, step, ticks) : []
+    return waits.length ? `Waiting for ${list(waits.map(row => `${row.personId === HOUSEHOLD ? 'Either of you' : name(row.personId)}’s ${pounds(row.amountPence)}`))}` : undefined
+  }
+  const byApp = plans.layout === 'household'
+  const stepStatusOf = (key: string, amountPence: number) => stepStatus(ticks, key, amountPence).state
   const affected = (accountId: string) => affectedAccounts?.includes(accountId) ? <span className="budget-affected-label">Changed by recent edit</span> : null
 
-  /** One band per account: fund it, then its pot moves indented beneath. */
-  const steps = (plan: PersonTransferPlan) => plan.rows.map((row: PersonTransferRow) => {
+  /** A transfer: "Starling Ada → Monzo Joint" on the per-person steps, "Send to Monzo Joint" on the household's (D8). */
+  const fundRow = (plan: PersonTransferPlan, row: PersonTransferRow) => {
+    if (row.fundingPence <= 0) return null
     const account = label(row.accountId)
-    // Pay already lands here: shown (and copyable) but not a step to tick. With a known source, a fund step reads "from → to".
-    const transfer = row.fromAccountId ? `${label(row.fromAccountId)} → ${account}` : `Fund ${account}`
+    const transfer = byApp ? `Send to ${row.net ? name(row.net.personId) : account}` : row.fromAccountId ? `${label(row.fromAccountId)} → ${account}` : `Fund ${account}`
     // Paying each other (D7): the bigger side sends the difference; the other side's transfer is folded into it.
     const netted = !row.alreadyThere && row.net && sendPence(row) === 0 ? row.net : null
     const fundName = row.alreadyThere ? `Already in ${account}` : netted ? `${transfer}: netted with ${name(netted.personId)}’s` : transfer
     const netCaption = !row.net || row.alreadyThere ? undefined
       : netted ? (netted.otherPence > row.fundingPence ? `${name(netted.personId)} sends the ${pounds(netted.otherPence - row.fundingPence)} difference instead` : `Cancels out with ${name(netted.personId)}’s ${pounds(netted.otherPence)}: nothing to send`)
       : `${pounds(row.fundingPence)} less ${name(row.net.personId)}’s ${pounds(row.net.otherPence)}`
-    const fund = row.fundingPence > 0 ? <StepRow key="fund" stepKey={fundStepKey(plan.personId, row.accountId)} name={fundName} {...row.alreadyThere || netted ? { mode: 'copy' as const, quiet: true } : {}} amountPence={netted ? row.fundingPence : sendPence(row)} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId} caption={netCaption}>
+    return <StepRow key={`fund:${row.accountId}`} stepKey={fundStepKey(plan.personId, row.accountId)} name={fundName} {...row.alreadyThere || netted ? { mode: 'copy' as const, quiet: true } : {}} amountPence={netted ? row.fundingPence : sendPence(row)} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId} caption={netCaption}>
       {row.movedOnBy.map(other => <StepCaption key={other.personId}>{name(other.personId)} moves {other.amountPence === sendPence(row) ? 'it' : row.net ? pounds(other.amountPence) : `${pounds(other.amountPence)} of it`} into {list(other.potIds.map(potName))}</StepCaption>)}
       {affected(row.accountId)}
-    </StepRow> : null
-    const moves = row.potMoves.map((move, index) => {
-      const first = !fund && index === 0
-      return <StepRow key={move.potId} stepKey={moveStepKey(plan.personId, move.potId)} name={`Move to ${potName(move.potId)}`} indent amountPence={move.amountPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}
-        label={<>Move to {potName(move.potId)}{first ? <span className="step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</>}
-        caption={move.fromOthers.length > 0 ? `Includes ${others(move.fromOthers)}` : undefined}>
-        {first && affected(row.accountId)}
-      </StepRow>
-    })
-    return <StepGroup key={row.accountId} title={account} aside={<>{accountOwnerLabel(row.accountId)}{onSeeItems && <> · {seeItems(row.accountId)}</>}</>}>{fund}{moves}</StepGroup>
+    </StepRow>
+  }
+  /** A pot move. `from` says which account it leaves, once, when the band is the destination's. */
+  const moveRow = (plan: PersonTransferPlan, row: PersonTransferRow, move: PersonPotMove, from: boolean, changed: boolean) => {
+    const account = label(row.accountId)
+    return <StepRow key={`move:${move.potId}`} stepKey={moveStepKey(plan.personId, move.potId)} name={`Move to ${potName(move.potId)}`} indent={!byApp} amountPence={move.amountPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}
+      label={<>Move to {potName(move.potId)}{from ? <span className="step-from"> from {account}</span> : <span className="visually-hidden"> from {account}</span>}</>}
+      caption={move.fromOthers.length > 0 ? `Includes ${others(move.fromOthers)}` : undefined} waiting={waiting(moveStepKey(plan.personId, move.potId))}>
+      {changed && affected(row.accountId)}
+    </StepRow>
+  }
+  /** One band per account the money goes to: fund it, then its pot moves indented beneath (the steps before December 2026). */
+  const stepsByDestination = (plan: PersonTransferPlan) => plan.rows.map((row: PersonTransferRow) => {
+    const fund = fundRow(plan, row)
+    return <StepGroup key={row.accountId} title={label(row.accountId)} aside={<>{accountOwnerLabel(row.accountId)}{onSeeItems && <> · {seeItems(row.accountId)}</>}</>}>{fund}
+      {row.potMoves.map((move, index) => moveRow(plan, row, move, !fund && index === 0, !fund && index === 0))}</StepGroup>
   })
+  /** D8: one band per account the money leaves: the transfers you send from it, then the moves you make in it. */
+  const stepsByApp = (plan: PersonTransferPlan) => stepSources(plan).map(group => <StepGroup key={group.accountId} title={label(group.accountId)} aside={<>{accountOwnerLabel(group.accountId)}{onSeeItems && <> · {seeItems(group.accountId)}</>}</>}>
+    {group.funds.map(row => fundRow(plan, row))}
+    {group.moves.map(({ row, move }, index) => moveRow(plan, row, move, false, index === 0 && !group.funds.length))}
+  </StepGroup>)
+  const steps = byApp ? stepsByApp : stepsByDestination
 
   /** A person's card head: name and progress, a meter, what it adds up to, and anything to act on, in one line each. */
   const personHead = (plan: PersonTransferPlan) => {
@@ -112,10 +133,13 @@ export function PaydaySteps({ plans, selection, labels, itemCounts, adults, potN
         <Meter label="Either of you: steps ticked" value={progress.done} max={progress.total || 1}/>
         <p className="payday-person-sub">{pounds(total)} into joint pots, once you’ve both sent your money</p>
       </header>
-      {rows.map(row => <StepGroup key={row.accountId} title={label(row.accountId)} aside={<>{accountOwnerLabel(row.accountId)}{onSeeItems && <> · {seeItems(row.accountId)}</>}</>}>
+      {rows.map(row => {
+        // Every move out of one joint account waits for the same transfers, so the band says so once.
+        const wait = row.moves.some(move => stepStatusOf(householdMoveKey(move.potId), move.amountPence) !== 'done') ? waiting(householdMoveKey(row.moves[0]!.potId)) : undefined
+        return <StepGroup key={row.accountId} title={label(row.accountId)} aside={<>{accountOwnerLabel(row.accountId)}{onSeeItems && <> · {seeItems(row.accountId)}</>}</>} footer={wait ? <span className="step-waiting">{wait}</span> : undefined}>
         {row.moves.map(move => <StepRow key={move.potId} stepKey={householdMoveKey(move.potId)} name={`Move to ${potName(move.potId)}`} indent amountPence={move.amountPence} ticks={ticks} onTick={onTick} onCopy={onCopy} account={row.accountId}
-          caption={move.byPerson.length > 1 ? list(move.byPerson.map(part => `${name(part.personId)}’s ${pounds(part.amountPence)}`)) : undefined}/>)}
-      </StepGroup>)}
+          caption={move.byPerson.length > 1 ? list(move.byPerson.map(part => `${name(part.personId)}’s ${pounds(part.amountPence)}`)) : undefined} waiting={wait ? true : undefined}/>)}
+      </StepGroup>})}
     </section>
   }
 

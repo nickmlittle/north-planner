@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/useToast'
 import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate } from '../domain/cardTracker'
-import { homeCount, homeInbox, type AppHomeTarget, type HomeTarget, type InboxKind, type InboxTask } from '../domain/homeInbox'
+import { homeCount, homeInbox, type AppHomeTarget, type HomeTarget, type InboxKind, type InboxTask, type PaydayCard } from '../domain/homeInbox'
 import { resolveBudget } from '../domain/monthlyBudget'
 import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
 import { dayDate, weekday } from '../formatting/date'
@@ -40,11 +40,24 @@ const longDate = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleDateStr
 function TaskRow({ task, onOpen, onSamePrice }: { task: InboxTask; onOpen: (target: HomeTarget) => void; onSamePrice?: () => void }) {
   const meta = task.progress ? <span className="home-progress">{task.progress.map(row => <span key={row.personId} className="home-progress-person">
     {row.name} {row.done} of {row.total}<span className="home-progress-bar" aria-hidden="true"><span style={{ width: `${row.total ? row.done / row.total * 100 : 0}%` }}/></span>
-  </span>)}{task.note && <span>{task.note}</span>}</span> : task.meta
+  </span>)}{task.note && <span>{task.note}</span>}{task.landed && <span className="home-landed">{task.landed}</span>}</span> : task.meta
   return <li><ListRow icon={icons[task.kind]} tone={task.tone ?? 'neutral'} title={task.title} meta={meta}
     trailing={task.chip ? <StatusChip>{task.chip}</StatusChip> : task.trailing && <span className={task.tone === 'critical' ? 'home-figure is-critical' : 'home-figure'}>{task.trailing}</span>}
     trailingMeta={task.trailingMeta} onOpen={() => onOpen(task.target)} listRow/>
     {onSamePrice && <div className="home-task-actions"><button type="button" className="secondary-button" onClick={onSamePrice}>Same price</button></div>}</li>
+}
+
+/** D10: from next month's first payday to the 1st, its payday leads: what has landed, the household total and each person's steps. */
+function PaydayCardView({ card, onOpen }: { card: PaydayCard; onOpen: (target: HomeTarget) => void }) {
+  const month = monthName(card.month)
+  return <section className="home-payday" aria-label={`${month}’s payday`}>
+    <header><h2>{month}’s payday</h2><span className="home-payday-count">{card.done} of {card.total} steps</span></header>
+    {card.landed && <p className="home-payday-landed">{card.landed}</p>}
+    <span className="home-progress">{card.progress.map(row => <span key={row.personId} className="home-progress-person">
+      {row.name} {row.done} of {row.total}<span className="home-progress-bar" aria-hidden="true"><span style={{ width: `${row.total ? row.done / row.total * 100 : 0}%` }}/></span>
+    </span>)}{card.changed > 0 && <span>{card.changed} changed since ticked</span>}</span>
+    <button type="button" className="secondary-button" onClick={() => onOpen(card.target)}>{card.done ? `Carry on with ${month}’s steps` : `Open ${month}’s steps`}</button>
+  </section>
 }
 
 /**
@@ -73,6 +86,7 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
     <PageHeader titleText="Home" titlePrefix="Home, " title={name}
       chip={<StatusChip tone="positive" dot>{inbox.stage}</StatusChip>} context={longDate(today)}/>
     <WhatMoved/>
+    {inbox.payday && <PaydayCardView card={inbox.payday} onOpen={onOpen}/>}
     <StatStrip label={`${name} at a glance`}>
       <StatTile label="Plan" value={strip.plan.value} detail={strip.plan.detail} tone={strip.plan.tone ?? 'neutral'} onOpen={() => onOpen({ view: 'plan' })} openLabel="Open Plan"/>
       {strip.spent && <StatTile label="Spent this month" value={<>{strip.spent.value} <small className="home-tile-sub">{strip.spent.sub}</small></>}

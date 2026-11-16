@@ -351,7 +351,7 @@ it('opens an account’s items in Plan from its step and comes back to that step
   window.history.replaceState(null, '', '/?view=budget&budgetView=transfers&month=2026-02')
   render(<App />)
   const alex = await screen.findByRole('region', { name: 'Alex steps' })
-  expect(within(alex).getAllByRole('listitem').map(step => step.textContent)).toEqual(['Fund Monzo Alex£50.00'])
+  expect(within(alex).getAllByRole('listitem').map(step => step.textContent)).toEqual(['Send to Monzo Alex£50.00'])
   const seeItems = within(alex).getByRole('button', { name: 'See 1 item for Monzo Alex' })
   const originalLength = window.history.length
   fireEvent.click(seeItems)
@@ -479,7 +479,7 @@ it('shows the step list for an old destination detail link', async () => {
   render(<App />)
   expect(await screen.findByRole('region', { name: 'Steps by person' })).toBeInTheDocument()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Sam steps' })).toHaveTextContent('Fund Monzo Alex£50.00')
+  expect(screen.getByRole('region', { name: 'Sam steps' })).toHaveTextContent('Send to Monzo Alex£50.00')
   // The retired parameter goes on the next navigation.
   fireEvent.click(within(screen.getByRole('navigation', { name: 'Mobile navigation' })).getByRole('button', { name: 'Plan' }))
   expect(window.location.search).not.toContain('transferAccount')
