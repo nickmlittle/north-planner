@@ -3,9 +3,9 @@ import { expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { resolveBudget } from './monthlyBudget'
-import { orderTransferAccounts, paydayLayout, paydayPlans, personTransferPlans, sendPence, type PersonTransferPlans, type TransferAccount } from './personTransfers'
+import { orderTransferAccounts, paydayLayout, paydayPlans, personTransferPlans, sendPence, stepSources, type PersonTransferPlans, type TransferAccount } from './personTransfers'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
-import { paydaySteps, planSteps, waitingOn } from './transferTicks'
+import { nextStep, paydaySteps, planSteps, restoreStepTick, setStepTick, waitingOn, waitingSteps } from './transferTicks'
 
 function baseline() {
   const document = decodeBudgetDocument(JSON.parse(readFileSync(new URL('../../docs/fixtures/plan-transfers-baseline.json', import.meta.url), 'utf8')))
@@ -251,4 +251,66 @@ it('withholds a joint account’s household moves while it needs review', () => 
   const plans = payday(document)
   expect(plans.needsReview.map(row => row.accountId)).toEqual(['joint'])
   expect(plans.household.map(row => row.accountId)).toEqual(['saving'])
+})
+
+// ——— Steps by the account the money leaves, the next step, and undo (month-health PR 2: D8, D9) ———
+
+it('groups each person’s steps by the account the money leaves: transfers first, pay already there after them, then the moves', () => {
+  const plans = payday(audit4())
+  const [ada, ben] = plans.people.map(stepSources)
+  // Ada's pay lands in Starling, so all of her steps leave it.
+  expect(ada!.map(group => group.accountId)).toEqual(['ada'])
+  expect(ada![0]!.funds.map(row => [row.accountId, row.alreadyThere])).toEqual([['joint', false], ['saving', false], ['ben', false], ['ada', true]])
+  expect(ada![0]!.moves.map(({ move }) => move.potId)).toEqual(['ada-spend'])
+  expect(ben!.map(group => group.accountId)).toEqual(['ben'])
+  expect(ben![0]!.moves.map(({ move }) => move.potId)).toEqual(['ben-spend'])
+})
+
+it('groups by the destination when the pay lands nowhere in particular', () => {
+  const document = audit4()
+  for (const source of document.budget.incomeSources) delete source.landsInAccountId
+  for (const plan of payday(document).people) {
+    const groups = stepSources(plan)
+    // With no source known, a transfer is grouped under the account it funds, as before; every step is in one group.
+    expect(new Set(groups.map(group => group.accountId)).size).toBe(groups.length)
+    expect(groups.reduce((sum, group) => sum + group.funds.length + group.moves.length, 0)).toBe(plan.rows.filter(row => row.fundingPence > 0).length + plan.moveCount)
+  }
+})
+
+it('copies the first step that still needs doing, skipping ticked and waiting steps and the one just ticked', () => {
+  const all = paydaySteps(payday(audit4()))
+  /** Ticks at each step's current amount. */
+  const done = (...keys: string[]) => Object.fromEntries(keys.map(key => [key, { amountPence: all.find(step => step.key === key)!.amountPence, at: '2026-11-27T09:00:00.000Z' }]))
+  expect(nextStep(all, undefined)?.key).toBe('ada:fund:joint')
+  expect(nextStep(all, done('ada:fund:joint'))?.key).toBe('ada:fund:saving')
+  // The one just ticked may not have landed yet.
+  expect(nextStep(all, undefined, { after: 'ada:fund:joint' })?.key).toBe('ada:fund:saving')
+  // Ben's move into Spending waits for Ada's net transfer, so his run ends after his two transfers.
+  expect(nextStep(all, done('ben:fund:joint', 'ben:fund:saving'), { personId: 'ben' })).toBeUndefined()
+  expect(nextStep(all, done('ben:fund:joint', 'ben:fund:saving', 'ada:fund:ben'), { personId: 'ben' })?.key).toBe('ben:move:ben-spend')
+  // The household's moves wait for both fundings of their account.
+  expect(nextStep(all, done('ada:fund:joint'), { personId: 'household' })).toBeUndefined()
+  expect(nextStep(all, done('ada:fund:joint', 'ben:fund:joint'), { personId: 'household' })?.key).toBe('household:move:bills')
+  // A step ticked at another amount still needs doing (the difference).
+  expect(nextStep(all, ticked('ada:fund:joint'))?.key).toBe('ada:fund:joint')
+})
+
+it('says what a step is waiting for until each is ticked, so one person’s late pay holds up the household moves', () => {
+  const all = paydaySteps(payday(audit4()))
+  const bills = all.find(step => step.key === 'household:move:bills')!
+  expect(waitingSteps(all, bills, undefined).map(step => [step.personId, step.amountPence])).toEqual([['ada', 222322], ['ben', 179627]])
+  expect(waitingSteps(all, bills, ticked('ada:fund:joint')).map(step => [step.personId, step.amountPence])).toEqual([['ben', 179627]])
+  expect(waitingSteps(all, bills, ticked('ada:fund:joint', 'ben:fund:joint'))).toEqual([])
+  const emergency = all.find(step => step.key === 'household:move:emergency')!
+  expect(waitingSteps(all, emergency, ticked('ada:fund:joint', 'ben:fund:joint')).map(step => step.key)).toEqual(['ada:fund:saving', 'ben:fund:saving'])
+})
+
+it('undoes a tick or an untick by putting the tick back as it was', () => {
+  const document = audit4(), month = '2026-12'
+  const ticked1 = setStepTick(document, month, 'ada:fund:joint', 222322, new Date('2026-11-27T09:00:00.000Z'))
+  // Undo a first tick: no ticks at all again.
+  expect(restoreStepTick(ticked1, month, 'ada:fund:joint', undefined).ticks).toBeUndefined()
+  // Undo an untick: the same tick, at the same time.
+  const unticked = setStepTick(ticked1, month, 'ada:fund:joint', null)
+  expect(restoreStepTick(unticked, month, 'ada:fund:joint', ticked1.ticks![month]!['ada:fund:joint']).ticks).toEqual(ticked1.ticks)
 })

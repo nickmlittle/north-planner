@@ -7,9 +7,9 @@ import { homeCount, homeInbox } from './homeInbox'
 import { monthSpending } from './cardSpending'
 import { paceHeadline } from '../formatting/paceLabels'
 import { resolveBudget } from './monthlyBudget'
-import { orderTransferAccounts, personTransferPlans } from './personTransfers'
+import { orderTransferAccounts, paydayPlans, personTransferPlans } from './personTransfers'
 import { buildTransferInstructions } from './transferInstructions'
-import { planSteps } from './transferTicks'
+import { paydaySteps, planSteps } from './transferTicks'
 
 const month = '2026-11'
 const seed = () => decodeBudgetDocument(JSON.parse(readFileSync(resolve(process.cwd(), 'docs/fixtures/plan-transfers-baseline.json'), 'utf8')))!
@@ -253,5 +253,52 @@ describe('homeInbox defects from audit 4', () => {
     const result = inbox(document)
     expect(result.strip.spent!.detail).toBe(`Groceries ${headline} of pace`)
     expect(titles(result.headsUp)).toEqual([`Groceries ${headline} of pace`])
+  })
+})
+
+describe('the payday card (month-health PR 2, D10)', () => {
+  /** Audit 4's household: Ada £4,200 (pay on Fri 27 Nov) and Ben £3,500 (Mon 30 Nov). */
+  function audit4() {
+    const document = seed()
+    for (const source of document.budget.incomeSources) { source.baseAmountPence = source.personId === 'ada' ? 420000 : 350000; source.landsInAccountId = source.personId }
+    return document
+  }
+  const decemberTicks = (document: BudgetDocument, keep?: (key: string) => boolean) => {
+    const ids = document.household.adults.map(person => person.id), instructions = buildTransferInstructions(document, '2026-12')
+    const plans = paydayPlans(document, '2026-12', orderTransferAccounts(budgetTransfers(document.budget, ids, '2026-12', resolveBudget(document.budget, '2026-12').items).accounts, instructions, document.budget.accounts, ids, new Map()), instructions)
+    return Object.fromEntries(paydaySteps(plans).filter(step => !keep || keep(step.key)).map(step => [step.key, { amountPence: step.amountPence, at: '2026-11-28T09:00:00Z' }]))
+  }
+
+  it('leads Home from the first payday to the 1st, standing in for December’s Fund row', () => {
+    const document = audit4()
+    const result = inbox(document, '2026-11-27')
+    expect(result.payday).toMatchObject({ month: '2026-12', totalPence: 770000, done: 0, total: 11, changed: 0, target: { view: 'month', month: '2026-12' } })
+    expect(result.payday!.progress.map(row => `${row.name} ${row.done} of ${row.total}`)).toEqual(['Ada 0 of 4', 'Ben 0 of 3', 'Either of you 0 of 4'])
+    expect(result.payday!.landed).toMatch(/^£7,700\.00 in all · Ada’s £4,200\.00 landed Fri 27 Nov · Ben’s £3,500\.00 lands /)
+    expect(titles(result.todo)).not.toContain('Fund December')
+    // The card counts as one thing to do.
+    expect(homeCount(result)).toBe(result.todo.length + result.headsUp.length + 1)
+  })
+
+  it('shows what has landed on the Fund row before the first payday', () => {
+    const result = inbox(audit4(), '2026-11-20')
+    expect(result.payday).toBeUndefined()
+    const fund = result.todo.find(task => task.key === 'fund:2026-12')!
+    expect(fund.landed).toMatch(/^£7,700\.00 in all · Ada’s £4,200\.00 lands Fri 27 Nov · Ben’s £3,500\.00 lands /)
+    expect(fund.progress!.map(row => row.name)).toEqual(['Ada', 'Ben', 'Either of you'])
+  })
+
+  it('counts every tick, including the household’s, and keeps leading until the last one', () => {
+    const document = audit4()
+    document.ticks = { '2026-12': decemberTicks(document, key => key !== 'household:move:bills') }
+    expect(inbox(document, '2026-11-29').payday).toMatchObject({ done: 10, total: 11 })
+    document.ticks = { '2026-12': decemberTicks(document) }
+    expect(inbox(document, '2026-11-29').payday).toBeUndefined()
+  })
+
+  it('stops leading on the 1st, when December is the month Home is on, and for any other month', () => {
+    const document = audit4()
+    expect(inbox(document, '2026-12-01', '2026-12').payday).toBeUndefined()
+    expect(inbox(document, '2026-11-27', '2026-10').payday).toBeUndefined()
   })
 })

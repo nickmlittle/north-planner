@@ -43,6 +43,11 @@ export function setStepTick(document: BudgetDocument, month: string, key: string
   return next
 }
 
+/** Put a step's tick back as it was (undo): the saved tick, or none. */
+export function restoreStepTick(document: BudgetDocument, month: string, key: string, tick: StepTick | undefined): BudgetDocument {
+  return setStepTick(document, month, key, tick ? tick.amountPence : null, tick ? new Date(tick.at) : undefined)
+}
+
 export type PaydayStep = { key: string; kind: 'fund' | 'move'; accountId: string; potId?: string; amountPence: number }
 
 /** Every step in a person's payday plan, in order, with its key and amount. A netted transfer is its net amount (D7). */
@@ -86,6 +91,22 @@ export function paydaySteps(plans: PersonTransferPlans) {
 
 /** The keys a step is still waiting on: any it waits for that nobody has ticked yet (a tick at another amount counts). */
 export const waitingOn = (step: { waitsFor: readonly string[] }, ticks: Readonly<Record<string, StepTick>> | undefined) => step.waitsFor.filter(key => !ticks?.[key])
+
+type OrderedStep = PaydayStep & { personId: string; waitsFor: readonly string[] }
+
+/**
+ * D9: the step to copy next: the first of `steps`, in order, that still needs doing and isn't waiting for anyone's
+ * money. `after` leaves out the step just ticked (its tick may not have landed yet); `personId` keeps to one person's
+ * run, because you tick in one banking app at a time.
+ */
+export function nextStep<Step extends OrderedStep>(steps: readonly Step[], ticks: Readonly<Record<string, StepTick>> | undefined, { after, personId }: { after?: string; personId?: string } = {}): Step | undefined {
+  return steps.find(step => step.key !== after && (!personId || step.personId === personId) && stepStatus(ticks, step.key, step.amountPence).state !== 'done' && !waitingOn(step, ticks).length)
+}
+
+/** What a step is still waiting for: the unticked steps it waits on, with whose they are and their amounts (P6). */
+export function waitingSteps<Step extends OrderedStep>(steps: readonly Step[], step: Pick<Step, 'waitsFor'>, ticks: Readonly<Record<string, StepTick>> | undefined): Step[] {
+  return waitingOn(step, ticks).flatMap(key => steps.find(row => row.key === key) ?? [])
+}
 
 export type PersonProgress = { total: number; done: number; changed: number; differencePence: number; complete: boolean }
 

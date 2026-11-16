@@ -62,6 +62,17 @@ Agreed 15–16 November 2026 (audit 4, [build plan](month-health-build-plan.md) 
 - **One adult:** nothing changes.
 - **Same money.** A test checks every fixture month, with and without landing accounts. The household steps give every account the same net money by transfer and every pot the same moves as the per-person steps.
 
+### Reading the steps (month-health PR 2: D8, D9, D10)
+
+These change how steps are grouped, copied and shown, never what they move.
+
+- **By the account the money leaves (D8).** A person's steps sit under one band per account they send from: their transfers, then pay already there (a quiet row), then the pot moves they make. `stepSources(plan)` does the grouping. Pay that lands in an account leaves from it, and a transfer with no known source is grouped under the account it funds. Joint moves are already grouped by the joint account. This applies to the household layout; a month ticked under the per-person steps keeps its bands by destination.
+- **One pass (D9).** `nextStep(steps, ticks, { after, personId })` is the first step that still needs doing, in order, that isn't done and isn't waiting. A tick at another amount still needs doing (the difference). **Start** copies the first one; each tick copies the next in the same person's run (`personId`), so you stay in one app. The one just ticked is left out with `after`. A waiting step is skipped, so a run can end early. Copying an amount still never ticks a step.
+- **Undo.** Every tick and untick toasts with Undo, which puts the tick back exactly as it was (`restoreStepTick`: the saved tick, or none).
+- **Waiting is said, not enforced.** `waitingSteps(steps, step, ticks)` gives the unticked steps a step waits on, with whose they are and their amounts. The step says "Waiting for Ada’s £294.64" until they are ticked. It never blocks the tick: someone may have moved the money before ticking.
+- **What has landed (D10).** `paydayArrivals` gives each person's pay for a month and the day it arrives (the working day before their payday in the month before, the latest if they have several), and whether it has landed by today. Home's Fund row and payday card show it with the household total.
+- **Where it went.** `paydayWent` adds up the Done view: the household total (Available), each account that gets money with its pots, and what is unassigned.
+
 `paydayPlans(document, month, accounts, instructions)` in `src/domain/personTransfers.ts` is the one entry point for Month, Home and the month's stage. `paydaySteps(plans)` in `transferTicks.ts` lists every step with what it `waitsFor`, and `waitingOn(step, ticks)` gives what is still unticked.
 
 ## Totals, precision and incomplete data

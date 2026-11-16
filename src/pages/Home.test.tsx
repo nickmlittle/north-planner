@@ -180,3 +180,28 @@ it('only offers Same price for an item split by fixed amounts', () => {
   expect(within(sheet).queryByRole('button', { name: 'Save new price' })).not.toBeInTheDocument()
   expect(within(sheet).getByRole('button', { name: 'Same price' })).toBeInTheDocument()
 })
+
+it('leads with December’s payday from the first payday: what landed, the total, each person’s steps, and opens Month', () => {
+  const document = seed()
+  for (const source of document.budget.incomeSources) { source.baseAmountPence = source.personId === 'ada' ? 420000 : 350000; source.landsInAccountId = source.personId }
+  const onOpen = renderHome(document, '2026-11-27')
+  const card = screen.getByRole('region', { name: 'December’s payday' })
+  expect(within(card).getByRole('heading', { name: 'December’s payday' })).toBeInTheDocument()
+  expect(card).toHaveTextContent('0 of 11 steps')
+  expect(card).toHaveTextContent('£7,700.00 in all · Ada’s £4,200.00 landed Fri 27 Nov · Ben’s £3,500.00 lands')
+  expect(card).toHaveTextContent('Ada 0 of 4')
+  expect(card).toHaveTextContent('Ben 0 of 3')
+  expect(card).toHaveTextContent('Either of you 0 of 4')
+  // It stands in for December's Fund row.
+  expect(within(screen.getByRole('list', { name: 'To do' })).queryByRole('button', { name: /Fund December/ })).not.toBeInTheDocument()
+  fireEvent.click(within(card).getByRole('button', { name: 'Open December’s steps' }))
+  expect(onOpen).toHaveBeenCalledWith({ view: 'month', month: '2026-12' })
+})
+
+it('shows what has landed on the Fund row before the first payday', () => {
+  const document = seed()
+  for (const source of document.budget.incomeSources) { source.baseAmountPence = source.personId === 'ada' ? 420000 : 350000 }
+  renderHome(document, '2026-11-20')
+  expect(screen.queryByRole('region', { name: 'December’s payday' })).not.toBeInTheDocument()
+  expect(within(screen.getByRole('list', { name: 'To do' })).getByRole('button', { name: /Fund December/ })).toHaveTextContent('£7,700.00 in all · Ada’s £4,200.00 lands Fri 27 Nov')
+})

@@ -63,6 +63,8 @@ type StepRowProps = {
   /** What to say when the amount changed after the tick. Defaults to Payday's "you sent … Send £X more." */
   changedNote?: (tickedPence: number, differencePence: number) => ReactNode
   caption?: ReactNode
+  /** Payday (P6): who this step is waiting on ("Waiting for Ada’s £294.64"), shown until it's done. `true`: it waits, and the band says for what. */
+  waiting?: ReactNode | true
   /** The account it belongs to, for scrolling to an edited account's steps. */
   account?: string
   children?: ReactNode
@@ -74,7 +76,7 @@ const sendNote = (amountPence: number) => (tickedPence: number, differencePence:
  * One money move: tick it once it's done, tap the amount to copy it. Changed since ticked, the amount shows and copies
  * only the difference ("+£50.00"), and ticking accepts the new amount. The tick and the amount are separate targets.
  */
-export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick', ticks, onTick, onCopy, done, amountText, indent, emphasis, quiet, showTickedDay, changedNote, caption, account, children }: StepRowProps) {
+export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick', ticks, onTick, onCopy, done, amountText, indent, emphasis, quiet, showTickedDay, changedNote, caption, waiting, account, children }: StepRowProps) {
   const status = mode === 'status' ? { state: done ? 'done' as const : 'todo' as const } : stepStatus(ticks, stepKey, amountPence ?? 0)
   const changed = status.state === 'changed' && 'differencePence' in status ? status : null
   const shown = changed ? Math.abs(changed.differencePence) : amountPence ?? 0
@@ -82,7 +84,7 @@ export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick
     ? amountText !== undefined && amountText !== null && amountText !== false && <span className="step-amount">{amountText}</span>
     : amountPence !== undefined && <button type="button" className="step-amount" data-list-copy aria-label={`Copy ${pounds(shown)}`} onClick={() => onCopy?.(shown)}>{changed ? `${changed.differencePence > 0 ? '+' : '−'}${pounds(shown)}` : pounds(shown)}</button>
   const tickedAt = showTickedDay && status.state === 'done' ? ticks?.[stepKey]?.at : undefined
-  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}${quiet ? ' is-quiet' : ''}`} data-payday-account={account} data-list-row>
+  return <li className={`step-row is-${status.state}${mode === 'copy' ? ' is-copy' : ''}${indent ? ' is-indent' : ''}${emphasis === 'pay' ? ' is-pay' : ''}${quiet ? ' is-quiet' : ''}${waiting && status.state !== 'done' ? ' is-waiting' : ''}`} data-payday-account={account} data-list-row>
     {mode === 'tick' && <button type="button" data-list-tick className={`step-tick is-${status.state}`} aria-pressed={status.state === 'done'} aria-label={changed ? `${name}: mark the change done` : `${name} done`} disabled={!onTick} onClick={() => onTick?.(stepKey, status.state === 'done' ? null : amountPence ?? 0)}>
       <span className="step-tick-dot" aria-hidden="true">{status.state === 'done' && <Check/>}{changed && <RefreshCw/>}</span>
     </button>}
@@ -92,6 +94,7 @@ export function StepRow({ stepKey, name, label = name, amountPence, mode = 'tick
       {changed && <p className="step-changed">{(changedNote ?? sendNote(amountPence ?? 0))(changed.tickedPence!, changed.differencePence)}</p>}
       {tickedAt && <p className="step-caption">Ticked {dayOf(tickedAt)}</p>}
       {caption && <p className="step-caption">{caption}</p>}
+      {waiting && waiting !== true && status.state !== 'done' && <p className="step-waiting">{waiting}</p>}
       {children}
     </div>
   </li>

@@ -48,3 +48,5 @@ button.step-amount:active{background:var(--share-track)}
 .step-copy-hint{margin:0;padding:var(--space-3) var(--space-4) 0;color:var(--text-muted);font-size:var(--text-sm)}
 /* Not a step (Pay lands in): money already there. Muted, no tick; the amount still copies. */
 .step-row.is-quiet .step-label,.step-row.is-quiet .step-amount{color:var(--text-muted);font-weight:var(--weight-regular)}
+.step-waiting{margin:0;color:var(--warning);font-size:var(--text-sm);line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.step-row.is-waiting .step-label{color:var(--text-muted)}

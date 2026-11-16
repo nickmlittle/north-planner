@@ -1,8 +1,12 @@
 import { useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import type { BudgetDocument } from '../../domain/budgetDocument'
 import type { BudgetImpact } from '../../domain/budgetImpact'
-import { householdProgress, personProgress, setStepTick } from '../../domain/transferTicks'
+import { paydayWent } from '../../domain/paydayCard'
+import { HOUSEHOLD } from '../../domain/personTransfers'
+import { householdProgress, nextStep, paydaySteps, personProgress, restoreStepTick, setStepTick, stepStatus, type PaydayStep } from '../../domain/transferTicks'
 import { EmptyState, Section, Segmented, useStepCopy } from '../../components/ui'
+import { useToast } from '../../components/ui/useToast'
+import { formatMonth } from '../../formatting/month'
 import { formatGBP } from '../../formatting/money'
 import { readTransferPerson, rememberTransferPerson, resolveTransferPerson } from '../../state/transferPerson'
 import type { StepsReturn } from '../../state/navigation'
@@ -10,6 +14,7 @@ import type { MonthBudget } from '../budget/useMonthBudget'
 import { AccountFundingNote } from '../TransferCalculationNotes'
 import { PaydaySteps } from '../PaydaySteps'
 import { TransferTable } from '../TransferTable'
+import { PaydayDone } from './PaydayDone'
 import './PaydaySection.css'
 
 const pounds = (pence: number) => formatGBP(pence / 100)
@@ -42,8 +47,8 @@ export function PaydaySection({ document, setDocument, month, budget, mobilePres
   // Phones default to Both until someone picks; desktop always shows everyone.
   const selection = mobilePresentation ? resolveTransferPerson(stored, adults.map(person => person.id)) ?? 'both' : 'both'
   const choose = (value: string) => { rememberTransferPerson(value); setStored(value) }
-  const tick = (key: string, amountPence: number | null) => setDocument(current => setStepTick(current, month, key, amountPence))
   const { copy, hintSeen, status: copied } = useStepCopy()
+  const { show: showToast, toast } = useToast()
   const progress = new Map(personPlans.people.map(plan => [plan.personId, personProgress(plan, ticks)]))
   const counted = [...progress.entries()].filter(([personId]) => selection === 'both' || personId === selection).map(([, row]) => row)
   // The household's joint pot moves (D6) are either person's, so they count whoever is chosen.
@@ -55,6 +60,41 @@ export function PaydaySection({ document, setDocument, month, budget, mobilePres
     return owners.length > 1 ? 'Joint' : owners.length ? `${adults.find(adult => adult.id === owners[0])?.name ?? 'Person'}’s` : 'Needs an owner'
   }
   const affectedAccounts = affectedTransfers?.accounts.map(row => row.accountId)
+  const personName = (personId: string) => adults.find(person => person.id === personId)?.name ?? 'Person'
+
+  // D9: one pass. Start copies the first amount; each tick copies the next, and every tick can be undone.
+  const allSteps = paydaySteps(personPlans)
+  const visibleSteps = allSteps.filter(step => selection === 'both' || step.personId === selection || step.personId === HOUSEHOLD)
+  const stepName = (step: PaydayStep & { personId: string }) => {
+    if (step.kind === 'move') return `Move to ${potName(step.potId ?? '')}`
+    const net = personPlans.people.find(plan => plan.personId === step.personId)?.rows.find(row => row.accountId === step.accountId)?.net
+    return `Send to ${net ? personName(net.personId) : shortLabels.get(step.accountId) ?? 'account'}`
+  }
+  /** What to copy for a step: its amount, or only the difference when it changed since it was ticked. */
+  const copyPence = (step: PaydayStep, stepTicks: typeof ticks) => {
+    const status = stepStatus(stepTicks, step.key, step.amountPence)
+    return status.state === 'changed' ? status.differencePence : step.amountPence
+  }
+  const tick = (key: string, amountPence: number | null) => {
+    const before = ticks?.[key], step = allSteps.find(row => row.key === key)
+    setDocument(current => setStepTick(current, month, key, amountPence))
+    const undo = { label: 'Undo', onClick: () => setDocument(current => restoreStepTick(current, month, key, before)) }
+    const named = step ? stepName(step) : 'Step'
+    if (amountPence === null) { showToast(`${named} unticked`, undo); return }
+    const after = { ...ticks, [key]: { amountPence, at: '' } }
+    const next = step && nextStep(allSteps, after, { after: key, personId: step.personId })
+    if (!next) { showToast(`${named} ticked`, undo); return }
+    void copy(copyPence(next, after), false)
+    showToast(`${named} ticked. ${pounds(copyPence(next, after))} copied for ${stepName(next)}`, undo)
+  }
+  const start = nextStep(visibleSteps, ticks)
+  const started = visibleSteps.some(step => ticks?.[step.key])
+  const begin = () => {
+    if (!start) return
+    void copy(copyPence(start, ticks), false)
+    showToast(`${pounds(copyPence(start, ticks))} copied for ${stepName(start)}`)
+  }
+  const complete = allSteps.length > 0 && allSteps.every(step => stepStatus(ticks, step.key, step.amountPence).state === 'done')
 
   // Back from "26 items": land on the same account's link, once per visit.
   const restored = useRef<string | null>(null)
@@ -87,6 +127,8 @@ export function PaydaySection({ document, setDocument, month, budget, mobilePres
   return <Section title="Payday" id="month-payday" count={hasSteps && total ? `${done} of ${total}${mobilePresentation ? '' : ' done'}` : undefined} aside={aside}>
     <div className="payday-section" id="budget-transfers-panel">
       {copied}
+      {hasSteps && !byAccount && complete && <PaydayDone monthName={formatMonth(month).split(' ')[0]!} went={paydayWent(transferAccounts, transfers)} label={id => shortLabels.get(id) ?? 'Account'} potName={potName}/>}
+      {hasSteps && !byAccount && start && !started && <div className="payday-start"><button type="button" className="secondary-button" onClick={begin}>Start</button><span className="payday-start-hint">Copies {pounds(copyPence(start, ticks))} for {stepName(start)}. Tick it once it’s sent and the next amount copies.</span></div>}
       {affectedTransfers && <div className="budget-affected-banner" role="status"><strong>Changed by recent edit</strong>{affectedTransfers.accounts.map(account => <p key={account.accountId}>{shortLabels.get(account.accountId) ?? 'Account'}: {pounds(account.beforePence)} → {pounds(account.afterPence)}</p>)}</div>}
       {unfundedItems.length > 0 && <div className="budget-v3-transfer-warning" role="status"><p><strong>{unfundedItems.length} {unfundedItems.length === 1 ? 'item' : 'items'} can’t be funded yet.</strong> <button type="button" onClick={onEditIncome}>Edit income</button></p><details><summary>Show items</summary><ul>{unfundedItems.map(item => <li key={item.id}>{item.name}</li>)}</ul></details></div>}
       {!instructions && <p className="budget-v3-transfer-warning" role="alert">Can’t work out funding. Check the plan before moving money.</p>}
@@ -101,5 +143,6 @@ export function PaydaySection({ document, setDocument, month, budget, mobilePres
           availableByPerson={new Map(transfers.people.map(person => [person.personId, person.availablePence]))} accountOwnerLabel={ownerLabel} onReview={onReviewPerson}/>}
       {hasSteps && unfundedItems.length === 0 && instructions && <AccountFundingNote/>}
     </div>
+    {toast}
   </Section>
 }

@@ -7,6 +7,7 @@ import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf,
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { closeMonthPlan, homeMonths, moneyArrivesDates, type HomeMonth, type HomeTask } from './monthStages'
 import { HOUSEHOLD, orderTransferAccounts, paydayPlans } from './personTransfers'
+import { landedText, paydayArrivals, type Arrival } from './paydayCard'
 import { potBalance } from './potBalances'
 import { potPhrase } from './setAside'
 import { gapDestination } from './setAsideCheck'
@@ -54,6 +55,24 @@ export type InboxTask = {
   progress?: Array<{ personId: string; name: string; done: number; total: number }>
   /** Beside the progress: "1 changed since ticked". */
   note?: string
+  /** Under the progress: "£7,700.00 in all · Ada’s £4,200.00 landed Fri 27 Nov · Ben’s £3,500.00 lands Mon 30 Nov". */
+  landed?: string
+}
+/**
+ * The payday card (D10): from the day next month's first pay lands until the 1st, while its steps aren't all ticked.
+ * It stands in for that month's Fund row.
+ */
+export type PaydayCard = {
+  month: string
+  /** The household's pay for the month, each person's arrival, and the text that says what has landed. */
+  totalPence: number
+  arrivals: Arrival[]
+  landed: string
+  progress: NonNullable<InboxTask['progress']>
+  done: number
+  total: number
+  changed: number
+  target: HomeTarget
 }
 export type Upcoming = { key: string; date: string; title: string; meta?: string; target?: HomeTarget }
 export type StripFigure = { value: string; sub?: string; detail?: string; detailTone?: 'warning' | 'critical'; tone?: 'critical' }
@@ -66,6 +85,8 @@ export type HomeInbox = {
   /** "In progress · 19 days left". */
   stage: string
   firstRun: boolean
+  /** Next month's payday card, from its first payday to the 1st. */
+  payday?: PaydayCard
 }
 type Options = {
   month: string
@@ -89,7 +110,7 @@ const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1,
 const order = (a: InboxTask, b: InboxTask) => RANK[a.kind] - RANK[b.kind] || (a.due ?? '').localeCompare(b.due ?? '') || a.key.localeCompare(b.key)
 
 /** The payday steps for a month, per person: the same plans and ticks as Month. */
-function fundingFor(document: BudgetDocument, month: string) {
+function fundingFor(document: BudgetDocument, month: string, today: string) {
   const ids = document.household.adults.map(person => person.id)
   const items = resolveBudget(document.budget, month).items
   const transfers = budgetTransfers(document.budget, ids, month, items)
@@ -99,7 +120,8 @@ function fundingFor(document: BudgetDocument, month: string) {
   const ticks = document.ticks?.[month]
   // The household's joint pot moves (D6) count as one more row: "Either of you 0 of 5".
   const people = [...plans.people.map(plan => ({ personId: plan.personId, ...personProgress(plan, ticks) })), { personId: HOUSEHOLD, ...householdProgress(plans, ticks) }].filter(row => row.total > 0)
-  return { transfers, items, plans, people }
+  const arrivals = paydayArrivals(document, transfers, month, today)
+  return { transfers, items, plans, people, arrivals }
 }
 
 export function homeInbox(document: BudgetDocument, { month, today = localDate(), nameDestination = () => 'Pot', nameAccount = () => 'Account' }: Options): HomeInbox {
@@ -108,7 +130,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   const tracker = cardTracker(document)
   const card = tracker.cards[0]
   const todo: InboxTask[] = [], headsUp: InboxTask[] = [], done: InboxTask[] = [], comingUp: Upcoming[] = []
-  const current = fundingFor(document, month)
+  const current = fundingFor(document, month, today)
   const planned = current.items.reduce((sum, item) => sum + item.amountPence, 0)
   const firstRun = planned === 0
 
@@ -237,11 +259,23 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
       meta: [data.people.map(row => `${name(row.personId)} ${row.done} of ${row.total}`).join(' · '), changed ? `${changed} changed since ticked` : ''].filter(Boolean).join(' · '),
       trailing: plural(total, 'step'), due: arrives ?? firstDayOf(target), target: { view: 'month', month: target }, ...changed ? { note: `${changed} changed since ticked` } : {},
       progress: data.people.map(row => ({ personId: row.personId, name: name(row.personId), done: row.done, total: row.total })),
+      ...data.arrivals.length ? { landed: landedText(data.arrivals, data.transfers.availablePence, name) } : {},
     })
   }
   if (!firstRun) fund(month, current)
   const next = shiftMonth(month, 1)
-  fund(next, fundingFor(document, next))
+  const nextFunding = fundingFor(document, next, today)
+  // From next month's first payday to the 1st its steps lead as a card instead of a Fund row (D10).
+  let payday: PaydayCard | undefined
+  const nextTotal = nextFunding.people.reduce((sum, row) => sum + row.total, 0), nextDone = nextFunding.people.reduce((sum, row) => sum + row.done, 0)
+  const firstArrival = moneyArrivesDates(document, next)[0]
+  if (month === monthOf(today) && nextTotal && nextDone < nextTotal && firstArrival && firstArrival <= today) {
+    payday = {
+      month: next, totalPence: nextFunding.transfers.availablePence, arrivals: nextFunding.arrivals, landed: landedText(nextFunding.arrivals, nextFunding.transfers.availablePence, name),
+      progress: nextFunding.people.map(row => ({ personId: row.personId, name: name(row.personId), done: row.done, total: row.total })), done: nextDone, total: nextTotal,
+      changed: nextFunding.people.reduce((sum, row) => sum + row.changed, 0), target: { view: 'month', month: next },
+    }
+  } else fund(next, nextFunding)
 
   // ——— Plan fixes ———
   const overPeople = people.filter(row => row.gap < 0)
@@ -314,7 +348,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
 
   const daysLeft = daysBetween(today, lastDayOf(monthOf(today)))
   const stage = month === monthOf(today) ? `In progress · ${plural(daysLeft, 'day')} left` : month < monthOf(today) ? 'Ended' : 'Upcoming'
-  return { strip: { plan, ...spent ? { spent } : {}, ...cardFigure ? { card: cardFigure } : {} }, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun }
+  return { strip: { plan, ...spent ? { spent } : {}, ...cardFigure ? { card: cardFigure } : {} }, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
 }
 
 /** "In 3 weeks", "In 5 days", "Tomorrow", "Today", "6 days ago". */
@@ -339,4 +373,4 @@ function closeMeta(document: BudgetDocument, month: string, today: string, nameD
 }
 
 /** The sidebar's Home count: every To do row, heads-ups included. */
-export const homeCount = (inbox: Pick<HomeInbox, 'todo' | 'headsUp'>) => inbox.todo.length + inbox.headsUp.length
+export const homeCount = (inbox: Pick<HomeInbox, 'todo' | 'headsUp' | 'payday'>) => inbox.todo.length + inbox.headsUp.length + (inbox.payday ? 1 : 0)

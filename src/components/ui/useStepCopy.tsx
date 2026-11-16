@@ -13,10 +13,11 @@ export function useStepCopy() {
   const [hintSeen, setHintSeen] = useState(copyHintSeen)
   const clear = useRef<ReturnType<typeof setTimeout>>(undefined)
   useEffect(() => () => clearTimeout(clear.current), [])
-  const copy = async (pence: number) => {
+  /** `announce: false` when the caller says so itself (a toast), so the status line stays quiet. */
+  const copy = async (pence: number, announce = true) => {
     let message = `Copied ${pounds(pence)}`
     try { await navigator.clipboard.writeText(copyText(pence)) } catch { message = 'Couldn’t copy' }
-    setCopied(message)
+    setCopied(announce || message === 'Couldn’t copy' ? message : '')
     if (!hintSeen) { rememberCopyHint(); setHintSeen(true) }
     clearTimeout(clear.current)
     clear.current = setTimeout(() => setCopied(''), 2500)

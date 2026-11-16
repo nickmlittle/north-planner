@@ -288,14 +288,15 @@ it('lists each person’s payday steps in order, with pot moves under their acco
   expect(transfers.querySelector('.payday-person-sub')).toHaveTextContent('£25.00 from £4,000.00 available')
   const nick=screen.getByRole('region',{name:'Nick steps'})
   expect(stepTexts(nick)).toEqual([
-    'Fund Monzo Nick£20.00',
-    'Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy',
-    'Fund Nationwide Immy£5.00',
+    'Send to Monzo Nick£20.00',
+    'Move to Spending from Monzo Nick£30.00Includes £15.00 from ImmyWaiting for Immy’s £20.00',
+    'Send to Nationwide Immy£5.00',
   ])
-  expect(within(nick).getAllByRole('listitem')[1]).toHaveClass('is-indent')
+  // D8: the band is the account the money leaves, so a move isn't indented under a transfer.
+  expect(within(nick).getAllByRole('listitem')[1]).not.toHaveClass('is-indent')
   // The band carries the owner and the item count; Immy pays into Nick's account and Nick moves her share on.
   expect([...nick.querySelectorAll('.step-group-band')].map(band=>band.textContent)).toEqual(['Monzo NickNick’s · 3 items','Nationwide ImmyImmy’s · 1 item'])
-  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending'])
+  expect(stepTexts(screen.getByRole('region',{name:'Immy steps'}))).toEqual(['Send to Monzo Nick£20.00Nick moves £15.00 of it into Spending'])
   expect(transfers).not.toHaveTextContent('Direct item')
   expect(screen.getByRole('heading',{name:'Payday0 of 4'})).toBeInTheDocument()
   // Items live in Plan now; there is no detail screen to open.
@@ -330,15 +331,15 @@ it('switches whose steps show on this phone, with each person’s progress, and 
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Immy0 of 2 · 2 to fund'])
   expect(stepTexts(overview)).toEqual([
-    'Fund Monzo Nick£20.00Nick moves £15.00 of it into Spending',
-    'Fund Nationwide Immy£5.00',
+    'Send to Monzo Nick£20.00Nick moves £15.00 of it into Spending',
+    'Send to Nationwide Immy£5.00',
   ])
   unmount()
   render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const again=screen.getByRole('group',{name:'Whose steps'})
   expect(within(again).getByRole('button',{name:/^Immy/})).toHaveAttribute('aria-pressed','true')
   fireEvent.click(within(again).getByRole('button',{name:/^Nick/}))
-  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('Move to Spending from Monzo Nick£30.00Includes £15.00 from Immy')
+  expect(stepTexts(screen.getByRole('region',{name:'Steps by person'}))[1]).toBe('Move to Spending from Monzo Nick£30.00Includes £15.00 from ImmyWaiting for Immy’s £20.00')
   fireEvent.click(within(again).getByRole('button',{name:'Both'}))
   expect(window.localStorage.getItem('north.transferPerson')).toBe('both')
   expect(within(screen.getByRole('region',{name:'Steps by person'})).getAllByRole('heading',{level:3})).toHaveLength(2)
@@ -399,7 +400,7 @@ it('leaves people with nothing to move out of the steps',()=>{
   render(<SeededHarness initial={initial} view="month"/>)
   const overview=screen.getByRole('region',{name:'Steps by person'})
   expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 1 · 1 to fund'])
-  expect(stepTexts(overview)).toEqual(['Fund Monzo Nick£5.00'])
+  expect(stepTexts(overview)).toEqual(['Send to Monzo Nick£5.00'])
   expect(overview).not.toHaveTextContent('Immy')
   expect(overview).not.toHaveTextContent('Sam')
   // Without a Plan route there is nowhere for the item count to go.
@@ -425,7 +426,7 @@ it('lists steps by who pays, with short account names, duplicate suffixes and no
   const overview=screen.getByRole('region',{name:'Steps by person'})
 expect(within(overview).getAllByRole('heading',{level:3}).map(element=>element.textContent)).toEqual(['Nick0 of 6 · 6 to fund'])
   const labels=within(overview).getAllByRole('listitem').map(step=>step.querySelector('.step-label')!.textContent)
-  expect(labels).toEqual(['Fund Home','Fund Everyday (Account 1)','Fund Everyday (Account 2)','Fund ISA','Fund Cash','Fund Old account'])
+  expect(labels).toEqual(['Send to Home','Send to Everyday (Account 1)','Send to Everyday (Account 2)','Send to ISA','Send to Cash','Send to Old account'])
   expect(within(overview).getAllByRole('listitem')[1]).toHaveTextContent('£0.01')
 })
 
@@ -482,7 +483,7 @@ it('keeps a large destination to one funding step and one pot step',()=>{
   initial.budget.snapshots[month]={items:Array.from({length:23},(_,index)=>({id:`item-${index}`,name:`Budget item ${index+1}`,categoryId:'bills',destination:{kind:'pot' as const,potId:'p1'},entryAmountPence:1000,amountPence:1000,frequency:'monthly' as const,funding:'equal' as const}))}
   render(<SeededHarness initial={initial} view="month" onSeeTransferItems={vi.fn()}/>)
   const nick=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nick)).toEqual(['Fund Monzo Nick£115.00','Move to Spending from Monzo Nick£230.00Includes £115.00 from Immy'])
+  expect(stepTexts(nick)).toEqual(['Send to Monzo Nick£115.00','Move to Spending from Monzo Nick£230.00Includes £115.00 from ImmyWaiting for Immy’s £115.00'])
   expect(nick.querySelector('.step-group-band')).toHaveTextContent('Nick’s · 23 items')
   expect(nick).not.toHaveTextContent('Budget item 1')
 })
@@ -970,7 +971,7 @@ it('preserves month, search and owner when switching views',()=>{
   filterBy('Owner','Nick')
   rerender(<SeededHarness initial={initial} view="month"/>)
   const nickSteps=screen.getByRole('region',{name:'Nick steps'})
-  expect(stepTexts(nickSteps)).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
+  expect(stepTexts(nickSteps)).toEqual(['Send to Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from ImmyWaiting for Immy’s £5.00'])
   const trigger=screen.getByRole('button',{name:'More Month options'})
   fireEvent.click(trigger)
   fireEvent.click(screen.getByRole('menuitem',{name:'How funding is worked out'}))
@@ -983,7 +984,7 @@ it('preserves month, search and owner when switching views',()=>{
   expect(filterValue('Owner')).toBe('Nick')
   expect(document.querySelector('.budget-v3-month>button:nth-child(2)')).toHaveTextContent(selectedMonth!)
   rerender(<SeededHarness initial={initial} view="month"/>)
-  expect(stepTexts(screen.getByRole('region',{name:'Nick steps'}))).toEqual(['Fund Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from Immy'])
+  expect(stepTexts(screen.getByRole('region',{name:'Nick steps'}))).toEqual(['Send to Monzo Nick£5.00','Move to Spending from Monzo Nick£10.00Includes £5.00 from ImmyWaiting for Immy’s £5.00'])
 })
 
 it('renders only the screen being shown: Plan or Transfers, never both',()=>{
@@ -1143,10 +1144,10 @@ it('explains the owner-handled pot movement without changing contribution attrib
   initial.budget.snapshots['2026-12'] = { items: [{ id: 'personal-pot', name: 'Personal pot funding', categoryId: 'bills', destination: { kind: 'pot', potId: 'p1' }, entryAmountPence: 10001, amountPence: 10001, frequency: 'monthly', funding: 'fixed', contributions: [{ personId: 'nick', amountPence: 3000 }, { personId: 'immy', amountPence: 7001 }] }] }
   render(<MonthRulesHarness initial={initial} view="month"/>)
   // Immy funds £70.01 of Nick's account, but Nick (the owner) makes the whole pot move.
-  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['Fund Monzo Nick£70.01Nick moves it into Spending'])
+  expect(stepTexts(screen.getByRole('region', { name: 'Immy steps' }))).toEqual(['Send to Monzo Nick£70.01Nick moves it into Spending'])
   expect(stepTexts(screen.getByRole('region', { name: 'Nick steps' }))).toEqual([
-    'Fund Monzo Nick£30.00',
-    'Move to Spending from Monzo Nick£100.01Includes £70.01 from Immy',
+    'Send to Monzo Nick£30.00',
+    'Move to Spending from Monzo Nick£100.01Includes £70.01 from ImmyWaiting for Immy’s £70.01',
   ])
   // Funding still reconciles to the account total; the pot move is not added on top.
   fireEvent.click(screen.getByRole('button', { name: 'More Month options' }))
@@ -1377,7 +1378,7 @@ describe('keyboard lists', () => {
   })
 })
 
-it('reads payday steps from where each salary lands: "already in" isn’t a step, others go from → to', () => {
+it('reads payday steps from where each salary lands: "already in" isn’t a step, others are sent from it', () => {
   const plain = render(<SeededHarness initial={personSwitchDocument()} view="month"/>)
   const before = within(screen.getByRole('region', { name: 'Steps by person' })).getAllByRole('heading', { level: 3 }).map(element => element.textContent)
   plain.unmount()
@@ -1393,7 +1394,7 @@ it('reads payday steps from where each salary lands: "already in" isn’t a step
   expect(within(already).queryByRole('button', { name: / done$/ })).not.toBeInTheDocument()
   expect(within(already).getByRole('button', { name: /^Copy / })).toBeInTheDocument()
   // Immy's pay lands in a2: funding a1 reads from a2.
-  expect(within(immy).getAllByRole('listitem').map(step => step.textContent).join(' | ')).toMatch(/ → /)
+  expect(within(immy).getAllByRole('listitem').map(step => step.textContent).join(' | ')).toMatch(/Send to /)
   const after = within(screen.getByRole('region', { name: 'Steps by person' })).getAllByRole('heading', { level: 3 }).map(element => element.textContent)
   expect(before[0]).toMatch(/to fund/)
   expect(after[0]).not.toMatch(/to fund/)
