@@ -1,4 +1,5 @@
-import { isHeld } from '../domain/expectingBack'
+import { isHeld, linkedOrder, ordersWithReturns } from '../domain/expectingBack'
+import { ReturnLink } from './ReturnLink'
 import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
@@ -59,6 +60,8 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
   const plan = purchase ? refundPlan(purchase, transaction) : undefined
   const refundBack = plan?.kind === 'single' ? plan.destination : undefined
+  // A return for an order with items ticked Back is linked to it instead (health 9b); the plain refund match steps aside.
+  const isReturn = transaction.kind === 'refund' && (ordersWithReturns(tracker, transaction, today).length > 0 || !!linkedOrder(tracker, transaction))
   const placeRefund = (choice: RefundChoice, label: string) => {
     if (!purchase) return
     const at = now()
@@ -120,7 +123,8 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
         {person && <label className="spending-check"><input type="checkbox" checked={onlyThisCard} onChange={event => setOnlyThisCard(event.target.checked)}/>Only on {person}’s card</label>}
       </div>}
     </div>}
-    {purchase && <div className="sort-refund">
+    <ReturnLink document={document} setDocument={setDocument} refund={transaction} today={today} now={now} onLinked={message => onSorted(message)}/>
+    {purchase && !isReturn && <div className="sort-refund">
       <p>{plan?.kind === 'split' ? `Matches the ${purchase.description} purchase on ${shortDate(purchase.date)}, which was split. Which part came back?`
         : `Matches ${purchase.description} ${pounds(purchase.amountPence)} on ${shortDate(purchase.date)}${plan?.kind === 'unsorted' ? ', which isn’t sorted yet' : ''}.`} It counts in {formatMonth(transaction.date.slice(0, 7)).split(' ')[0]}, the month it arrived.</p>
       {plan?.kind === 'split' && <ul className="sort-options" aria-label="Parts of the purchase">

@@ -4,7 +4,7 @@ import { emptyCardTracker, validCardTracker, type CardTransaction, type SplitLin
 import { billSum } from './billSum'
 import { monthSpending } from './cardSpending'
 import { matchRefundOnImport, sortRefund } from './cardRefunds'
-import { comingBackAgain, expectingBack, heldInPot, heldOut, heldPurchases, notComingBack } from './expectingBack'
+import { comingBackAgain, expectingBack, heldInPot, heldOut, heldPurchases, linkedOrder, linkRefund, notComingBack, ordersWithReturns, restoreTransactions } from './expectingBack'
 import type { BudgetDestination } from './monthlyBudget'
 import { potBalance } from './potBalances'
 import { recordMove, toMove } from './setAside'
@@ -90,23 +90,11 @@ describe('refunds for held lines', () => {
     expect(spent(document, '2026-12', OPEN)).toBe(0)
   })
 
-  it('are matched on import: to the held lines first, whole or in part', () => {
+  it('are left to sort on import while the shop has returns out: North never guesses the order', () => {
     const document = household()
-    const full = matchRefundOnImport(document.card!, tx('r1', '2026-12-05', -7900), 'now')
-    expect(full).toMatchObject({ refundOf: { transactionId: 'asos', lineIndex: 1 }, sort: { by: 'rule', lines: [
-      { amountPence: -4500, destination: pot('going-out'), item: 'Coat', expectingBack: true },
-      { amountPence: -3400, destination: pot('going-out'), item: 'Boots', expectingBack: true },
-    ] } })
-    const part = matchRefundOnImport(document.card!, tx('r2', '2026-12-05', -4000), 'now')
-    expect(part.sort!.lines).toEqual([{ amountPence: -4000, destination: pot('going-out'), item: 'Coat', expectingBack: true }])
-  })
-
-  it('send anything over the held amount to the kept items', () => {
-    const document = household()
-    document.budget.pots.push({ id: 'clothes', name: 'Clothes', accountId: 'joint' })
-    document.card!.transactions = [{ ...asos(), sort: { lines: [{ ...asosLines[0]!, destination: pot('clothes') }, asosLines[1]!, asosLines[2]!], by: 'person', at: 'x' } }]
-    const matched = matchRefundOnImport(document.card!, tx('r', '2026-12-05', -9000), 'now')
-    expect(matched.sort!.lines.map(line => [line.amountPence, line.destination, !!line.expectingBack])).toEqual([[-4500, pot('going-out'), true], [-3400, pot('going-out'), true], [-1100, pot('clothes'), false]])
+    const imported = matchRefundOnImport(document.card!, tx('r1', '2026-12-05', -7900), 'now')
+    expect(imported.refundOf).toBeUndefined()
+    expect(imported.sort).toBeUndefined()
   })
 
   it('go to the kept items as today once nothing is expected back', () => {
@@ -155,10 +143,11 @@ describe('not coming back (P7)', () => {
     expect(spent(undone, '2026-11', OPEN)).toBe(6900)
   })
 
-  it('lets a same-bill refund count as an ordinary refund again', () => {
+  it('keeps what a same-bill refund cancelled cancelled: only the rest counts as spending', () => {
     const marked = notComingBack(household(heldRefund('back', '2026-12-05', 4700)), 'asos', now)
-    expect(spent(marked, '2026-11', OPEN)).toBe(14800)
-    expect(spent(marked, '2026-12', OPEN)).toBe(-4700)
+    expect(spent(marked, '2026-11', OPEN)).toBe(10100)
+    expect(spent(marked, '2026-12', OPEN)).toBe(0)
+    expect(moving(marked, OPEN)).toEqual([['asos', 10100]])
   })
 })
 
@@ -171,5 +160,71 @@ describe('the stored lines', () => {
     const bad = household()
     bad.card!.transactions[0]!.sort!.lines[1] = { ...asosLines[1]!, expectingBack: false as unknown as true }
     expect(validCardTracker(bad.card, budget, people)).toBe(false)
+  })
+})
+
+describe('linking a return to its order (health 9b)', () => {
+  // A second order with a return out, so the refund has a choice.
+  const boots = () => tx('boots', '2026-11-20', 5000, { description: 'BOOTS SHOP', merchant: 'BOOTS SHOP', sort: { lines: [{ amountPence: 5000, destination: pot('going-out'), item: 'Wellies', expectingBack: true }], by: 'person', at: 'x' } })
+
+  it('offers orders with returns out: the same shop first, never ones dated after the refund', () => {
+    const document = household(boots(), tx('later', '2026-12-10', 3000, { sort: { lines: [{ amountPence: 3000, destination: pot('going-out'), item: 'Hat', expectingBack: true }], by: 'person', at: 'x' } }))
+    expect(ordersWithReturns(document.card!, tx('r', '2026-12-05', -5128), OPEN).map(row => row.purchase.id)).toEqual(['asos', 'boots'])
+  })
+
+  it('That’s everything back settles the order: the refund cancels what it covers, and the difference is spending', () => {
+    // £79.00 ticked Back, £75.05 refunded (a 5% code): £3.95 counts as spending, nothing is left out.
+    const document = linkRefund(household(tx('r', '2026-12-05', -7505)), 'r', 'asos', true, now)
+    const refund = document.card!.transactions.find(row => row.id === 'r')!
+    expect(refund.refundOf).toEqual({ transactionId: 'asos', lineIndex: 1 })
+    expect(refund.sort!.lines).toEqual([
+      { amountPence: -4500, destination: pot('going-out'), item: 'Coat', expectingBack: true },
+      { amountPence: -3005, destination: pot('going-out'), item: 'Boots', expectingBack: true },
+    ])
+    expect(expectingBack(document.card!, OPEN)).toEqual([])
+    expect(spent(document, '2026-11', OPEN)).toBe(6900 + 395)
+    expect(spent(document, '2026-12', OPEN)).toBe(0)
+    expect(moving(document, OPEN)).toEqual([['asos', 7295]])
+    expect(moving(document, CLOSED)).toEqual([['asos', 7295]])
+    expect(linkedOrder(document.card!, refund)?.id).toBe('asos')
+    const sum = billSum(document, DEC, OPEN)!
+    expect(sum.expectingBackPence).toBe(0)
+    expect(parts(sum)).toBe(sum.billPence)
+  })
+
+  it('More to come leaves the rest expecting back, for the next refund', () => {
+    const first = linkRefund(household(tx('r1', '2026-12-05', -4500), tx('r2', '2026-12-09', -3400)), 'r1', 'asos', false, now)
+    expect(expectingBack(first.card!, OPEN)[0]!.outPence).toBe(3400)
+    expect(ordersWithReturns(first.card!, first.card!.transactions.find(row => row.id === 'r2')!, OPEN).map(row => row.purchase.id)).toEqual(['asos'])
+    const second = linkRefund(first, 'r2', 'asos', true, now)
+    expect(second.card!.transactions.find(row => row.id === 'r2')!.sort!.lines).toEqual([{ amountPence: -3400, destination: pot('going-out'), item: 'Boots', expectingBack: true }])
+    expect(expectingBack(second.card!, OPEN)).toEqual([])
+    expect(spent(second, '2026-12', OPEN)).toBe(0)
+  })
+
+  it('sends a refund bigger than what was out back to the kept items as an ordinary refund', () => {
+    const document = linkRefund(household(tx('r', '2026-12-05', -9000)), 'r', 'asos', true, now)
+    expect(document.card!.transactions.find(row => row.id === 'r')!.sort!.lines.map(line => [line.amountPence, !!line.expectingBack])).toEqual([[-4500, true], [-3400, true], [-1100, false]])
+    expect(spent(document, '2026-12', OPEN)).toBe(-1100)
+  })
+
+  it('relinks a refund already sorted the old way, whenever the Back ticks came', () => {
+    // The live case: refunds sorted whole to the pot, then the items ticked Back afterwards.
+    const refund = tx('r', '2026-12-05', -7900, { refundOf: { transactionId: 'boots' }, sort: { lines: [{ amountPence: -7900, destination: pot('going-out') }], by: 'person', at: 'x' } })
+    const before = household(boots(), refund)
+    expect(spent(before, '2026-12', OPEN)).toBe(-7900)
+    const linked = linkRefund(before, 'r', 'asos', true, now)
+    expect(spent(linked, '2026-12', OPEN)).toBe(0)
+    expect(expectingBack(linked.card!, OPEN).map(row => row.purchase.id)).toEqual(['boots'])
+    const undone = restoreTransactions(linked, before.card!.transactions)
+    expect(undone.card!.transactions).toEqual(before.card!.transactions)
+  })
+
+  it('a refund on a later bill is linked like any other, but counts and moves as an ordinary refund', () => {
+    const document = linkRefund(household(tx('r', '2027-01-03', -7900, { statementKey: JAN })), 'r', 'asos', true, now)
+    const today = '2027-01-05'
+    expect(expectingBack(document.card!, today)).toEqual([])
+    expect(spent(document, '2026-11', today)).toBe(14800)
+    expect(spent(document, '2027-01', today)).toBe(-7900)
   })
 })

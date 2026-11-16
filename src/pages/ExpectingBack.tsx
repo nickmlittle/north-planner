@@ -35,6 +35,7 @@ export function ExpectingBackList({ document, setDocument, today = localDate(), 
   }
   return <>
     {rows.length > 0 && <Section title="Expecting back" count={pounds(total)}>
+      <p className="expecting-hint">When the refund comes in, open it and link it to its order.</p>
       <ul className="expecting-list" aria-label="Expecting back">{rows.map(row => <li key={row.purchase.id} className="expecting-row">
         <p className="expecting-main"><span className="expecting-title">{row.purchase.description}</span><span className="expecting-amount">{pounds(row.outPence)}</span></p>
         <p className="expecting-items">{row.lines.map(({ line }) => `${line.item ?? 'Item'} ${pounds(line.amountPence)}`).join(' · ')}{row.backPence > 0 && ` · ${pounds(row.backPence)} refunded`}</p>

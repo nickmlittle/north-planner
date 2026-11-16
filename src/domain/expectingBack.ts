@@ -5,12 +5,14 @@ import type { BudgetDestination } from './monthlyBudget'
 /**
  * Expecting back (month-health plan D11, P7). A receipt item ticked **Back** is a return on its way:
  * - **Held** while its bill is open: not spent, not moved to the Amex pot. It's the bill's fifth part.
- * - A refund for the purchase is matched to its held lines first. On the same bill the two cancel out: neither is spent
- *   nor moved, ever. A partial refund leaves the rest held.
+ * - **Linking** (`linkRefund`, health 9b): when the refund lands, you link it to the order. On the same bill the refund
+ *   cancels what it covers: neither is spent nor moved, ever. **That's everything back** closes the order, so any
+ *   difference (a discount code, postage) counts as spending; **More to come** leaves the rest expecting back.
  * - **Settle up:** once the bill has closed, whatever is still held has to be paid, so it counts as spending (in the
  *   purchase's month) and moves with the rest. A refund that lands later is an ordinary refund: it moves back out of
  *   the Amex pot, and it clears the purchase from the Expecting back list.
- * - **Not coming back:** the held lines count as spending from then on.
+ * - **Not coming back** / **That's everything back:** one stored mark, `notComingBackAt`: nothing more is coming back.
+ *   What linked refunds cancelled stays cancelled; the rest counts as spending from then on.
  * Rules: docs/card-tracker-rules.md, "Expecting back".
  */
 
@@ -20,6 +22,8 @@ export type Held = Map<string, DestinationTotals>
 
 /** A purchase line that's still expected back (ticked Back, not marked Not coming back). */
 export const isHeld = (line: SplitLine) => !!line.expectingBack && !line.notComingBackAt
+/** A purchase line ticked Back, still out or not: linked refunds cancel against it. */
+const isReturn = (line: SplitLine) => !!line.expectingBack
 
 const add = (totals: DestinationTotals, destination: BudgetDestination, pence: number) => {
   if (!pence) return
@@ -43,6 +47,8 @@ export type HeldPurchase = {
   outPence: number
   /** The purchase's bill is still open: the money is held in its pot. Closed: it moved at settle up. */
   open: boolean
+  /** Nothing more is coming back (That's everything back, or Not coming back). */
+  closed: boolean
   /** When the items were ticked Back (the sort's time). */
   markedAt: string
   byDestination: Array<{ destination: BudgetDestination; heldPence: number; backPence: number; outPence: number; cancelledPence: number }>
@@ -53,8 +59,9 @@ const refundHeldLines = (refund: CardTransaction) => (refund.sort?.lines ?? []).
 
 function heldPurchase(tracker: Pick<CardTracker, 'transactions'>, purchase: CardTransaction, today: string): HeldPurchase | null {
   if (purchase.kind !== 'purchase' || !purchase.sort) return null
-  const lines = purchase.sort.lines.flatMap((line, index) => isHeld(line) ? [{ index, line }] : [])
+  const lines = purchase.sort.lines.flatMap((line, index) => isReturn(line) ? [{ index, line }] : [])
   if (!lines.length) return null
+  const closed = lines.every(({ line }) => !!line.notComingBackAt)
   const held: DestinationTotals = new Map(), back: DestinationTotals = new Map(), cancelled: DestinationTotals = new Map()
   for (const { line } of lines) add(held, line.destination, line.amountPence)
   for (const refund of tracker.transactions) if (refund.kind === 'refund' && refund.refundOf?.transactionId === purchase.id) for (const line of refundHeldLines(refund)) {
@@ -64,10 +71,11 @@ function heldPurchase(tracker: Pick<CardTracker, 'transactions'>, purchase: Card
   }
   const byDestination = [...held.entries()].map(([key, row]) => {
     const backPence = Math.min(row.pence, back.get(key)?.pence ?? 0)
-    return { destination: row.destination, heldPence: row.pence, backPence, outPence: row.pence - backPence, cancelledPence: Math.min(row.pence, cancelled.get(key)?.pence ?? 0) }
+    return { destination: row.destination, heldPence: row.pence, backPence, outPence: closed ? 0 : row.pence - backPence, cancelledPence: Math.min(row.pence, cancelled.get(key)?.pence ?? 0) }
   })
   const heldPence = byDestination.reduce((sum, row) => sum + row.heldPence, 0), backPence = byDestination.reduce((sum, row) => sum + row.backPence, 0)
-  return { purchase, lines, heldPence, backPence, outPence: heldPence - backPence, open: billOpen(purchase, today), markedAt: purchase.sort.at, byDestination }
+  const outPence = byDestination.reduce((sum, row) => sum + row.outPence, 0)
+  return { purchase, lines, heldPence, backPence, outPence, open: billOpen(purchase, today), closed, markedAt: purchase.sort.at, byDestination }
 }
 
 /** Every purchase with lines ticked Back, newest first. */
@@ -87,7 +95,8 @@ export function heldOut(tracker: Pick<CardTracker, 'transactions'>, today: strin
   const out: Held = new Map()
   const totals = (id: string) => { const row = out.get(id) ?? new Map(); out.set(id, row); return row }
   for (const held of heldPurchases(tracker, today)) {
-    for (const row of held.byDestination) add(totals(held.purchase.id), row.destination, held.open ? row.heldPence : row.cancelledPence)
+    // What a same-bill refund cancelled never counts; what's still out is held while the bill is open.
+    for (const row of held.byDestination) add(totals(held.purchase.id), row.destination, row.cancelledPence + (held.open ? row.outPence : 0))
     // Share each destination's cancelled amount over the same-bill refunds, oldest first.
     const left = new Map(held.byDestination.map(row => [destinationKey(row.destination), row.cancelledPence]))
     const refunds = tracker.transactions.filter(row => row.kind === 'refund' && row.refundOf?.transactionId === held.purchase.id && row.statementKey === held.purchase.statementKey)
@@ -120,36 +129,81 @@ export const heldPence = (held: Held, transactions: readonly Pick<CardTransactio
 /** What's held in a pot today (purchases only): "Held £79.00 · expecting back". */
 export function heldInPot(tracker: Pick<CardTracker, 'transactions'>, potId: string, today: string = localDate()): number {
   const key = `pot:${potId}`
-  return heldPurchases(tracker, today).filter(row => row.open).reduce((sum, row) => sum + (row.byDestination.find(part => destinationKey(part.destination) === key)?.outPence ?? 0), 0)
+  return heldPurchases(tracker, today).filter(row => row.open && row.outPence > 0).reduce((sum, row) => sum + (row.byDestination.find(part => destinationKey(part.destination) === key)?.outPence ?? 0), 0)
+}
+
+/** The tracker without one refund: what a purchase had out before that refund was linked (for relinking it). */
+const without = (tracker: Pick<CardTracker, 'transactions'>, refundId: string) => ({ transactions: tracker.transactions.filter(row => row.id !== refundId) })
+
+/**
+ * Orders a refund could be the return for (health 9b): purchases with something still expected back, dated on or before
+ * it. The same shop first, then the rest, newest first within each. The refund itself never counts against them.
+ */
+export function ordersWithReturns(tracker: Pick<CardTracker, 'transactions'>, refund: Pick<CardTransaction, 'id' | 'date' | 'merchant'>, today: string = localDate()): HeldPurchase[] {
+  return expectingBack(without(tracker, refund.id), today).filter(row => row.purchase.date <= refund.date)
+    .sort((a, b) => Number(b.purchase.merchant === refund.merchant) - Number(a.purchase.merchant === refund.merchant) || b.purchase.date.localeCompare(a.purchase.date))
 }
 
 /**
- * A refund for a purchase with money still expected back: its lines go to the held lines first (marked
- * `expectingBack`), in the purchase's line order; anything over goes to the purchase's biggest kept line. Null when
- * nothing is expected back.
+ * A linked refund's lines: against the order's items still out, in line order (marked `expectingBack`, with the item's
+ * name), and anything over what's out goes back to the order's biggest kept line as an ordinary refund.
  */
-export function heldRefundLines(tracker: Pick<CardTracker, 'transactions'>, purchase: CardTransaction, refund: Pick<CardTransaction, 'amountPence'>): { lines: SplitLine[]; lineIndex: number } | null {
-  const held = heldPurchase(tracker, purchase, '')
-  if (!held || held.outPence <= 0) return null
+export function linkLines(tracker: Pick<CardTracker, 'transactions'>, purchase: CardTransaction, refund: Pick<CardTransaction, 'id' | 'amountPence'>): SplitLine[] {
+  const held = heldPurchase(without(tracker, refund.id), purchase, '')
+  if (!held) return [{ amountPence: refund.amountPence, destination: purchase.sort?.lines[0]?.destination ?? { kind: 'account', accountId: '' } }]
   let left = -refund.amountPence
   const out = new Map(held.byDestination.map(row => [destinationKey(row.destination), row.outPence]))
+  // Items earlier refunds already covered, by name and pot, so the next refund names the item still out.
+  const itemKey = (line: SplitLine) => `${destinationKey(line.destination)}|${line.item ?? ''}`
+  const covered = new Map<string, number>()
+  for (const row of tracker.transactions) if (row.id !== refund.id && row.kind === 'refund' && row.refundOf?.transactionId === purchase.id) for (const line of refundHeldLines(row)) covered.set(itemKey(line), (covered.get(itemKey(line)) ?? 0) - line.amountPence)
   const lines: SplitLine[] = []
-  let lineIndex = -1
-  for (const { index, line } of held.lines) {
+  for (const { line } of held.lines) {
     const key = destinationKey(line.destination)
-    const take = Math.min(left, out.get(key) ?? 0, line.amountPence)
+    const already = Math.min(line.amountPence, covered.get(itemKey(line)) ?? 0)
+    covered.set(itemKey(line), (covered.get(itemKey(line)) ?? 0) - already)
+    const take = Math.min(left, out.get(key) ?? 0, line.amountPence - already)
     if (take <= 0) continue
     out.set(key, out.get(key)! - take)
     left -= take
-    if (lineIndex < 0) lineIndex = index
     lines.push({ amountPence: -take, destination: line.destination, expectingBack: true, ...line.item ? { item: line.item } : {} })
   }
-  if (!lines.length) return null
   if (left > 0) {
     const kept = (purchase.sort?.lines ?? []).filter(line => !line.expectingBack).sort((a, b) => b.amountPence - a.amountPence)[0] ?? held.lines[0]!.line
     lines.push({ amountPence: -left, destination: kept.destination })
   }
-  return { lines, lineIndex }
+  return lines
+}
+
+/**
+ * Link a refund to the order it's the return for (health 9b). `everything`: That's everything back, so the order is
+ * settled and any difference counts as spending. Otherwise what's still out stays expecting back (More to come).
+ */
+export function linkRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, refundId: string, purchaseId: string, everything: boolean, now: Date): T {
+  const tracker = cardTracker(document)
+  const refund = tracker.transactions.find(row => row.id === refundId), purchase = tracker.transactions.find(row => row.id === purchaseId)
+  if (!refund || refund.kind !== 'refund' || !purchase || purchase.kind !== 'purchase' || !purchase.sort) return document
+  const at = now.toISOString()
+  const lines = linkLines(tracker, purchase, refund)
+  const firstReturn = purchase.sort.lines.findIndex(isReturn)
+  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => {
+    if (row.id === refundId) return { ...row, refundOf: { transactionId: purchaseId, ...firstReturn >= 0 ? { lineIndex: firstReturn } : {} }, sort: { lines, by: 'person' as const, at } }
+    if (row.id === purchaseId && everything && row.sort) return { ...row, sort: { ...row.sort, lines: row.sort.lines.map(line => isHeld(line) ? { ...line, notComingBackAt: at } : line) } }
+    return row
+  }) } }
+}
+
+/** The order a refund is linked to as its return: a purchase with items ticked Back, and the refund marked against them. */
+export function linkedOrder(tracker: Pick<CardTracker, 'transactions'>, refund: CardTransaction): CardTransaction | undefined {
+  if (refund.kind !== 'refund' || !refund.refundOf || !refund.sort?.lines.some(line => line.expectingBack)) return undefined
+  return tracker.transactions.find(row => row.id === refund.refundOf!.transactionId)
+}
+
+/** Put transactions back as they were (Undo for a link). */
+export function restoreTransactions<T extends Pick<BudgetDocument, 'card'>>(document: T, rows: readonly CardTransaction[]): T {
+  const tracker = cardTracker(document)
+  const byId = new Map(rows.map(row => [row.id, row]))
+  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => byId.get(row.id) ?? row) } }
 }
 
 /** "Not coming back" (P7): the purchase's held lines count as spending from now. */

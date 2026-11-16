@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Kbd, StatusChip } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { refundPlan, refundPurchase, sortRefund } from '../domain/cardRefunds'
+import { ordersWithReturns } from '../domain/expectingBack'
 import { addRule, suggestions, sortTransaction } from '../domain/cardSorting'
 import { cardTracker, defaultRuleText, destinationKey, localDate, monthOf, parseDestinationValue, type CardTransaction } from '../domain/cardTracker'
 import { dayDate, destinationGroups, destinationNamer, shortDate } from './cardLabels'
@@ -55,12 +56,15 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
   const choice = (transaction: CardTransaction) => choices[transaction.id] ?? (suggested(transaction) ? destinationKey(suggested(transaction)!) : '')
   const focusRow = (index: number) => { const target = transactions[Math.max(0, Math.min(index, transactions.length - 1))]; if (target) rows.current[target.id]?.focus() }
 
+  /** The order a refund is most likely the return for: the first with returns out (same shop first). */
+  const returnOrder = (transaction: CardTransaction) => transaction.kind === 'refund' ? ordersWithReturns(tracker, transaction, today)[0] : undefined
   const place = (transaction: CardTransaction, index: number) => {
     const destination = parseDestinationValue(choice(transaction))
     if (!destination) { selects.current[transaction.id]?.focus(); return }
     const at = now()
     const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
-    if (purchase && refundPlan(purchase, transaction).kind === 'split') { onOpen(transaction.id); return }
+    // A split purchase asks which part came back, and a return is linked to its order (health 9b): both in the sheet.
+    if (purchase && refundPlan(purchase, transaction).kind === 'split' || returnOrder(transaction)) { onOpen(transaction.id); return }
     const { tipped } = purchase ? {} : placeImpact(document, transaction, destination, today)
     let message = `Sorted ${transaction.description} to ${name(destination)}.`
     if (purchase) setDocument(current => sortRefund(current, transaction.id, purchase.id, { destination }, at))
@@ -92,6 +96,7 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
       <thead><tr><th scope="col">Date</th><th scope="col">Merchant</th><th scope="col">Card</th><th scope="col" className="is-amount">Amount</th><th scope="col">Pot or account</th><th scope="col">Always</th><th scope="col"><span className="visually-hidden">Split</span></th></tr></thead>
       <tbody>{transactions.map((transaction, index) => {
         const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
+        const order = returnOrder(transaction)
         const top = suggested(transaction)
         const chosen = parseDestinationValue(choice(transaction))
         const pace = paceFor(monthOf(transaction.date))
@@ -103,7 +108,8 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
           aria-label={`${transaction.description}, ${signedPounds(transaction.amountPence)}, ${dayDate(transaction.date)}`} onKeyDown={event => onRowKey(event, transaction, index)}
           onFocus={() => setFocused(transaction.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(current => current === transaction.id ? null : current) }}>
           <td onClick={() => rows.current[transaction.id]?.focus()}>{dayDate(transaction.date)}</td>
-          <td onClick={() => rows.current[transaction.id]?.focus()}><span className="sort-table-merchant">{transaction.description}</span>{purchase && <span className="sort-table-note">Matches {purchase.description} {signedPounds(purchase.amountPence)}, {shortDate(purchase.date)}</span>}</td>
+          <td onClick={() => rows.current[transaction.id]?.focus()}><span className="sort-table-merchant">{transaction.description}</span>{order ? <span className="sort-table-note">Link to an order? {order.purchase.description} {signedPounds(order.purchase.amountPence)}, {shortDate(order.purchase.date)} · <button type="button" className="text-button" onClick={() => onOpen(transaction.id)}>Link it</button></span>
+            : purchase && <span className="sort-table-note">Matches {purchase.description} {signedPounds(purchase.amountPence)}, {shortDate(purchase.date)}</span>}</td>
           <td>{cardLabel(document, transaction)}</td>
           <td className={`is-amount${transaction.amountPence < 0 ? ' is-credit' : ''}`}>{signedPounds(transaction.amountPence)}</td>
           <td><span className="sort-table-pot"><label className="visually-hidden" htmlFor={`sort-${transaction.id}`}>Pot for {transaction.description}</label>
@@ -112,7 +118,7 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
               <option value="">Choose…</option>
               {groups.map(group => <optgroup key={group.key} label={group.label}>{group.options.map(option => { const suffix = pace(option.destination).text; return <option key={option.value} value={option.value}>{suffix ? `${option.label} · ${suffix}` : option.label}</option> })}</optgroup>)}
             </select>
-            {top && choice(transaction) === destinationKey(top) && <StatusChip>{purchase ? 'Same as purchase' : 'Suggested'}</StatusChip>}
+            {top && !order && choice(transaction) === destinationKey(top) && <StatusChip>{purchase ? 'Same as purchase' : 'Suggested'}</StatusChip>}
             <button type="button" className="icon-button sort-table-place" aria-label={chosen ? `Place ${transaction.description} in ${name(chosen)}` : `Place ${transaction.description}`} title="Place (Enter)" onClick={() => place(transaction, index)}><Check aria-hidden="true"/></button>
           </span>{impact?.text && <p id={impactId} className={`sort-impact sort-table-impact${impact.tone ? ` is-${impact.tone}` : ''}`}>{impact.text}</p>}</td>
           <td>{transaction.kind !== 'refund' && <label className="sort-table-always"><input type="checkbox" checked={!!always[transaction.id]} onChange={event => setAlways({ ...always, [transaction.id]: event.target.checked })}/><span className="visually-hidden">Always put {transaction.merchant} in this pot</span></label>}</td>

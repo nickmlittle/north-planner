@@ -43,9 +43,9 @@ function household(held = true): BudgetDocument {
   return document
 }
 
-function SpendingHarness({ initial, onChange = () => {} }: { initial: BudgetDocument; onChange?: (document: BudgetDocument) => void }) {
+function SpendingHarness({ initial, onChange = () => {}, view = 'sort' }: { initial: BudgetDocument; onChange?: (document: BudgetDocument) => void; view?: 'sort' | 'transactions' }) {
   const [document, setDocument] = useState(initial)
-  return <Spending document={document} view="sort" onSelectView={() => {}} onOpenCardSettings={() => {}} onOpenMonth={() => {}} today={TODAY} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
+  return <Spending document={document} view={view} onSelectView={() => {}} onOpenCardSettings={() => {}} onOpenMonth={() => {}} today={TODAY} setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
 }
 
 function MonthHarness({ initial, potId }: { initial: BudgetDocument; potId: string }) {
@@ -132,4 +132,44 @@ it('shows what is held on a Funded only pot, beside its next move', () => {
   render(<MonthHarness initial={household()} potId="ada-spending"/>)
   expect(screen.getByText('Next move to the Amex pot: £69.00')).toBeInTheDocument()
   expect(screen.getByText(/^£79.00 expecting back/)).toHaveTextContent('£79.00 expecting back · held here until the refund or the bill, not spent')
+})
+
+it('links a refund to its order from To sort: That’s everything back settles it, whatever came back', () => {
+  let saved: BudgetDocument | undefined
+  const document = household()
+  document.card!.transactions.push(tx('refund', '2026-11-30', 'ASOS', -7505))
+  render(<SpendingHarness initial={document} onChange={next => { saved = next }}/>)
+  const row = within(screen.getByRole('list', { name: 'To sort' })).getByRole('button', { name: /^ASOS, −£75.05/ })
+  expect(row).toHaveAccessibleName(/Link to an order\? ASOS £148.00 · Thu 26 Nov/)
+  fireEvent.click(row)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('heading', { name: 'Is this a return?' })).toBeInTheDocument()
+  expect(within(dialog).queryByText(/^Matches/)).not.toBeInTheDocument()
+  fireEvent.click(within(within(dialog).getByRole('list', { name: 'Orders with returns out' })).getByRole('button', { name: /^ASOS£79.00 expected back · bought Thu 26 Nov/ }))
+  expect(within(dialog).getByText('£79.00 expected · £75.05 came back')).toBeInTheDocument()
+  expect(within(dialog).getByText('£3.95 counts as spending in Spending · Ada, and the order is done.')).toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'That’s everything back' }))
+  const refund = saved!.card!.transactions.find(row => row.id === 'refund')!
+  expect(refund.refundOf?.transactionId).toBe('asos')
+  expect(refund.sort!.lines.every(line => line.expectingBack)).toBe(true)
+  expect(screen.getByText('Linked to ASOS · 26 Nov. That’s everything back: £3.95 counts as spending.')).toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'Expecting back' })).not.toBeInTheDocument()
+})
+
+it('relinks a refund sorted before the Back ticks, from Transactions, and More to come keeps the rest out', () => {
+  let saved: BudgetDocument | undefined
+  const document = household()
+  document.card!.transactions.push(tx('refund', '2026-11-30', 'ASOS', -4500, { refundOf: { transactionId: 'asos' }, sort: { lines: [{ amountPence: -4500, destination: pot('ada-spending') }], by: 'person', at: 'x' } }))
+  render(<SpendingHarness initial={document} view="transactions" onChange={next => { saved = next }}/>)
+  fireEvent.click(screen.getByRole('button', { name: /^ASOS, −£45.00/ }))
+  const dialog = screen.getByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('button', { name: /^ASOS£79.00 expected back/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'More to come' }))
+  expect(saved!.card!.transactions.find(row => row.id === 'refund')!.sort!.lines).toEqual([{ amountPence: -4500, destination: pot('ada-spending'), item: 'Coat', expectingBack: true }])
+  expect(screen.getByText('Linked to ASOS · 26 Nov. £34.00 still expecting back.')).toBeInTheDocument()
+  // Opened again, it says which order it's the return for, with Change.
+  fireEvent.click(screen.getByRole('button', { name: /^ASOS, −£45.00/ }))
+  const again = screen.getByRole('dialog')
+  expect(within(again).getByRole('region', { name: 'Return for an order' })).toHaveTextContent('The return for ASOS · 26 Nov: Coat.')
+  expect(within(again).getByRole('button', { name: 'Change' })).toBeInTheDocument()
 })

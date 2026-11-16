@@ -2,7 +2,7 @@ import { addDays, cardTracker, type CardTracker, type CardTransaction, type Spli
 import { byNewest, splitByPercent } from './cardSorting'
 import type { BudgetDocument } from './budgetDocument'
 import type { BudgetDestination } from './monthlyBudget'
-import { heldRefundLines, isHeld } from './expectingBack'
+import { isHeld, ordersWithReturns } from './expectingBack'
 
 /**
  * Refunds (D5, §6.4): a refund goes back to the pot of the purchase it refunds, in the month it arrives,
@@ -73,15 +73,15 @@ export function sortRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, 
 }
 
 /**
- * On import (§6.2 step 6): a new refund first tries a refund match. A purchase with items expected back takes it
- * against those first (D11). A plain or exactly matching purchase sorts it straight back (shown under Sorted by rules
- * for checking); otherwise it's linked and left to sort.
+ * On import (§6.2 step 6): a new refund first tries a refund match. While the same shop has an order with returns still
+ * out, it's left to sort, unlinked, for someone to link to its order (health 9b): North never guesses which. Otherwise a
+ * plain or exactly matching purchase sorts it straight back (shown under Sorted by rules for checking), or it's linked
+ * and left to sort.
  */
 export function matchRefundOnImport(tracker: Pick<CardTracker, 'transactions'>, refund: CardTransaction, at: string): CardTransaction {
+  if (refund.kind === 'refund' && ordersWithReturns(tracker, refund, '').some(row => row.purchase.merchant === refund.merchant)) return refund
   const purchase = findRefundMatch(tracker, refund)
   if (!purchase) return refund
-  const held = heldRefundLines(tracker, purchase, refund)
-  if (held) return { ...refund, refundOf: { transactionId: purchase.id, lineIndex: held.lineIndex }, sort: { lines: held.lines, by: 'rule', at } }
   const plan = refundPlan(purchase, refund)
   const refundOf = { transactionId: purchase.id, ...(plan.kind === 'single' && plan.lineIndex !== undefined ? { lineIndex: plan.lineIndex } : {}) }
   if (plan.kind !== 'single') return { ...refund, refundOf }
