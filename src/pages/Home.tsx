@@ -6,6 +6,7 @@ import { useToast } from '../components/ui/useToast'
 import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate, monthOf } from '../domain/cardTracker'
+import { markSummarySeen } from '../domain/monthSummary'
 import { homeCount, homeInbox, type AppHomeTarget, type HomeInbox, type HomeTarget, type InboxKind, type InboxTask, type PaydayCard } from '../domain/homeInbox'
 import { resolveBudget } from '../domain/monthlyBudget'
 import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
@@ -18,6 +19,7 @@ import { AffordSheet } from './AffordSheet'
 import { BroughtInLines } from './BroughtInLines'
 import { destinationNamer } from './cardLabels'
 import { FreshnessLine } from './Freshness'
+import { MonthSummaryCard } from './MonthSummaryCard'
 import { RenewalSheet } from './RenewalSheet'
 import { WhatMoved } from './WhatMoved'
 import './Home.css'
@@ -110,7 +112,7 @@ function TodoSheet({ inbox, onOpen, samePrice, onClose }: { inbox: HomeInbox; on
 
 /**
  * Home (D14): how the month is going, then what to do. The payday card (D10) leads from the first payday to the 1st,
- * then the dated verdict, the top 3 jobs (Open shows them all), a card per Tracked pot and the Amex bill, and a strip
+ * then the month summary after a close (P8, until Seen it or the 7th), the dated verdict, the top 3 jobs (Open shows them all), a card per Tracked pot and the Amex bill, and a strip
  * for Bills, Saving and Plan. Built by `homeInbox`.
  */
 export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, today = localDate() }: Props) {
@@ -139,6 +141,7 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
       chip={<StatusChip tone="positive" dot>{inbox.stage}</StatusChip>} context={longDate(today)}/>
     <WhatMoved/>
     {inbox.payday && <PaydayCardView card={inbox.payday} onOpen={onOpen}/>}
+    {inbox.summary && <MonthSummaryCard document={document} summary={inbox.summary} onSeen={() => setDocument(current => markSummarySeen(current, inbox.summary!.month, new Date()))} onOpenMonth={() => onOpen({ view: 'month', month: inbox.summary!.month })} onOpenPot={potId => onOpen({ view: 'month', month: inbox.summary!.month, potId })}/>}
     {inbox.verdict && <section className="home-verdict" aria-label={`How ${name} is going`}>
       <p className="home-verdict-text">{inbox.verdict}</p>
       <FreshnessLine document={document} onSort={() => onOpen({ view: 'spending', section: 'sort' })}/>

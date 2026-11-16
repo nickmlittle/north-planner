@@ -32,6 +32,8 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Month health 8: Can we afford… sheet, the buffer check and the overlap-day month line (P9) | health/8 | `src/domain/afford.ts`, `src/domain/buffer.ts`, `src/pages/AffordSheet.tsx`, `affordText.ts`, `CheckBalancesSheet.tsx` |
 | Month health 7: what a bring-in did, Just brought in, earlier months in To sort | health/7 | `src/domain/bringIn.ts`, `src/pages/BroughtInLines.tsx`, `BringInSheet.tsx`, `Home.tsx`, `monthHeads` in `spendingFormat.ts` |
 | Month health 9: Expecting back: the Back tick, held lines, the bill's fifth part, refunds, settle up, Not coming back (D11, P7) | health/9 | `src/domain/expectingBack.ts`, `src/pages/ExpectingBack.tsx`, `SplitEditor.tsx`, `MoveToPotSheet.tsx`, `PotLeads.tsx` |
+| Month health 10: discounts, original prices and Add discount (D12) | health/10 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
+| Month health 11: How did <Month> go?, leading Home (P8); Needs a look drops a covered overspend | health/11 | `src/domain/monthSummary.ts`, `src/pages/MonthSummaryCard.tsx`, `Home.tsx`, `MonthPage.tsx`, `coveredAtClose` in `cardSpending.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -60,6 +62,7 @@ Types (`src/domain/cardTracker.ts`) follow plan §5.1, with these refinements:
 - `CardTransaction.merchant` stores `merchantKey` of the raw description at import. The stored description is whitespace-collapsed, so the padding between merchant and town is gone by then, and suggestions and refund matching need the merchant.
 - `TransactionSort.checkedAt` records "Check" on a rule's sort.
 - `StatementRecord.finalImportAt` records the final export (an import of the period, taken after its close, that matched Amex's summary), and `settleWithoutFinalAt` the override.
+- `MonthRecord.summarySeenAt` records "Seen it" on the month's summary (month-health P8).
 - `MonthRecord.allInAt` records "All <Month> transactions are in", and `closedSpent` what each destination had spent at close, for "Changed since closed".
 - `PotTracking.keptBuildUpPence` records "Keep it" on a build-up flag.
 
@@ -243,6 +246,18 @@ Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks 
 - **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each Tracked pot with a plan.
 - **Built up** (`builtUp`) = Σ leftovers of closed months − Σ moved out. The close screen shows it including this month. A pot is flagged when built up > its limit × this month's Planned, unless "Keep it" recorded at least that much (`keptBuildUpPence`). "Move £X…" suggests keeping one month's worth and records what was moved (`moveBuiltUp`); the money itself moves in the bank.
 - **Close** (`closeMonth`), one button for the household, records `closedAt`, the covers, the leftovers and what each destination had spent (`closedSpent`). A later re-sort or late transaction in the month shows "Changed since closed" with Close again, which records them afresh.
+
+### How did <Month> go? (month-health PR 11, P8)
+
+`monthSummary(document, month, today)` is null until the month is closed, and is worked out from the record, `monthSpending`, `closeMonthPlan` and `homeBill`; only `summarySeenAt` is stored.
+- **Verdict**: Tracked pots only, over first (worst first), then what's left, the tightest first: "Eating out £35.00 over. Groceries £8.20 left. Car £45.00 left."
+- **Tracked pots**: spent of planned for the month, with each pot's difference from the month before ("£41.80 more than September"). The comparison shows once the month before had Tracked spending.
+- **Bills** (Carries over): "£40.00 of £150.00 went out". **Saving**: put by, and what was spent from those pots. Neither is judged.
+- **Covers**: each overspend with its source and whether its step is ticked ("moved" or "not moved yet"); a next-month cover "moves no money". "From the buffer" totals the covers taken from the card's buffer (`bufferOf`).
+- **Into <Next month>**: each pot's leftover and its built-up total, and any next-month cover ("December starts £35.00 short"). Then the bill Home shows now (`homeBill`), as parts.
+- **Leads Home** (`summaryMonth`): the latest closed month with no `summarySeenAt`, until the 7th of the month after it (`SUMMARY_UNTIL_DAY`). **Seen it** (`markSummarySeen`) ends it earlier. It sits above the verdict, shows on the current month's Home only, and isn't counted in Home's nav count.
+- **On Month**, a closed month keeps the summary as one collapsed line that opens in place (no Seen it).
+- **Needs a look after close**: `needsALook` drops an over pot of a closed month once its cover step is ticked at the overspend's amount, or the cover is taken from next month. A tick for another amount, or none, keeps it.
 
 ## Home month cards (§7.1)
 

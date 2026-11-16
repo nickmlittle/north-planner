@@ -4,12 +4,14 @@ import { lastDayOf, localDate, monthOf } from '../domain/cardTracker'
 import { monthSpending } from '../domain/cardSpending'
 import { potTitle } from '../domain/setAside'
 import { closeMonth, closeMonthPlan, moneyArrivesDates, monthStage, type MonthStage } from '../domain/monthStages'
+import { monthSummary } from '../domain/monthSummary'
 import { budgetDateMarkers, incomeDateMarkers } from '../domain/monthlyBudget'
 import { formatMonth } from '../formatting/month'
 import { MonthTitle, PageHeader, Section, Sheet, StatusChip, useMobilePresentation } from '../components/ui'
 import { BringInSheet } from './BringInSheet'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
 import { CloseSections } from './CloseMonth'
+import { MonthSummaryCard } from './MonthSummaryCard'
 import { PotDetail, type OpenTransactions } from './SpendingMonth'
 import { FreshnessLine } from './Freshness'
 import { PotsSection } from './month/PotsSection'
@@ -69,6 +71,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   const [notesOpen, setNotesOpen] = useState(false)
   // A finished payday folds after Pots; opening it keeps it open for this month.
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
+  const [summaryFor, setSummaryFor] = useState<string | null>(null)
   const mobile = useMobilePresentation()
   // Opening a pot or Close <Month> starts at the top; coming back lands on the pots. The page scrolls the window on
   // phones and its own frame on desktop.
@@ -122,6 +125,11 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   const paydaySection = payday?.({ byAccount, onByAccount: setByAccount })
   const pots = <PotsSection document={document} month={month} today={today} onOpenPot={onOpenPot} onOpenSpending={onSort} onOpenTransactions={onOpenTransactions}/>
   const paydayFolded = <Section title="Payday" id="month-payday" collapsed={{ summary: `${funding.done} of ${funding.total} done${ticked ? ` · last ticked ${dayOf(ticked)}` : ''}`, onExpand: () => setExpandedMonth(month) }}/>
+  // A closed month's summary (PR 11): one line until opened, then the same card Home leads with.
+  const summary = closePlan?.closedAt ? monthSummary(document, month, today) : null
+  const summarySection = summary && (summaryFor === month
+    ? <MonthSummaryCard document={document} summary={summary} onOpenPot={onOpenPot}/>
+    : <Section title={`How did ${name} go?`} id="month-summary" collapsed={{ summary: summary.verdict ?? `Closed ${dayOf(summary.closedAt)}`, onExpand: () => setSummaryFor(month) }}/>)
   const closeSections = closePlan && <CloseSections document={document} setDocument={setDocument} month={month} today={today} onSort={onSort} onBringIn={() => setBringingIn(true)}/>
   if (potId) return <div ref={frame} className="page-frame monthly-budget-page month-page is-pot">
     <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)} onOpenSettings={onOpenPotSettings} onOpenTransactions={onOpenTransactions} onSort={onSort} onOpenRules={onOpenRules} onOpenStatement={onOpenStatement}/>
@@ -132,6 +140,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
     {blocker && <p className="month-close-blocker">{blocker}</p>}
     {changed.length > 0 && <p className="month-changed">Changed since closed: {changed.map(row => `${destination(row.destination)} ${pounds(row.closedPence)} → ${pounds(row.nowPence)}`).join(', ')}.</p>}
     {closeSections ? <>
+        {summarySection}
         {closeSections}
         {pots}
         {payday && (folded ? paydayFolded : paydaySection)}
