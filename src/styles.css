@@ -1062,6 +1062,13 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .spending-row-link{flex-basis:100%;color:var(--link);font-weight:var(--weight-medium)}
 .sort-refund{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
 .sort-refund p{margin:0;color:var(--pine)}
+.sort-return{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
+.sort-return h3{margin:0;color:var(--pine);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.sort-return p{margin:0;color:var(--pine)}
+.sort-return .text-button{justify-self:start;min-height:44px}
+.sort-return-link{display:grid;gap:var(--space-2);padding-top:var(--space-2)}
+.sort-return-link .primary-button,.sort-return-link .secondary-button{margin:0}
+.sort-return p.sort-return-hint{color:var(--text-muted);font-size:var(--text-sm)}
 .sort-option-amount{flex:none;font-weight:var(--weight-bold);font-variant-numeric:tabular-nums}
 .sort-option-left{flex:none;margin-left:auto;color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
 .sort-option-left.is-warning{color:var(--warning)}

@@ -30,7 +30,7 @@ import { MoveToPotSheet, SetAsideSteps } from './MoveToPotSheet'
 import { markSetAsideMoved } from './setAsideMove'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
 import { ExpectingBackList } from './ExpectingBack'
-import { heldOut, isHeld } from '../domain/expectingBack'
+import { heldOut, isHeld, ordersWithReturns } from '../domain/expectingBack'
 import { useShortcut } from '../state/shortcuts'
 
 type Props = {
@@ -169,6 +169,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   }
   /** "Suggested: Spending · Starling Ada", or what a refund matches. */
   const hint = (transaction: CardTransaction) => {
+    const order = transaction.kind === 'refund' ? ordersWithReturns(tracker, transaction, today)[0] : undefined
+    if (order) return `Link to an order? ${order.purchase.description} ${pounds(order.purchase.amountPence)} · ${dayDate(order.purchase.date)}`
     const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
     if (purchase) { const plan = refundPlan(purchase, transaction); return `refund of ${signedPounds(purchase.amountPence)}${plan.kind === 'single' ? ` · back to ${name(plan.destination)}` : ''}` }
     const top = suggestions(document, transaction)[0]?.destination

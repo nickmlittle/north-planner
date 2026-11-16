@@ -9,3 +9,4 @@
 .expecting-meta{color:var(--text-muted);font-size:var(--text-sm)}
 .expecting-action{justify-self:start;min-height:44px}
 .split-held{color:var(--text-muted)}
+.expecting-hint{margin:0 0 var(--space-2);color:var(--text-muted);font-size:var(--text-sm)}
