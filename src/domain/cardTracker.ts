@@ -182,6 +182,8 @@ export interface MonthRecord {
   leftovers?: Record<string, number>
   /** Destination key → spent at close, so a later re-sort shows "Changed since closed". */
   closedSpent?: Record<string, number>
+  /** ISO: "Seen it" on the month's summary (month-health P8); it stops leading Home. */
+  summarySeenAt?: string
 }
 
 export type PacePolicy = 'steady' | 'none'
@@ -461,7 +463,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
   }
   const potIds = new Set(budget.pots.map(pot => pot.id))
   for (const [key, month] of Object.entries(months)) {
-    if (!validMonthKey(key) || !isRecord(month) || !optionalString(month.closedAt) || !optionalString(month.allInAt) || !validTicks(month.coverTicks)) return false
+    if (!validMonthKey(key) || !isRecord(month) || !optionalString(month.closedAt) || !optionalString(month.allInAt) || !optionalString(month.summarySeenAt) || !validTicks(month.coverTicks)) return false
     if (month.covers !== undefined && !(Array.isArray(month.covers) && month.covers.every(cover => isRecord(cover) && typeof cover.potId === 'string' && potIds.has(cover.potId) && isInt(cover.amountPence) && cover.amountPence > 0 && (isRecord(cover.source) && cover.source.kind === 'next-month' || destination(cover.source))))) return false
     if (month.leftovers !== undefined && !(isRecord(month.leftovers) && Object.entries(month.leftovers).every(([potId, pence]) => potIds.has(potId) && isInt(pence)))) return false
     if (month.closedSpent !== undefined && !(isRecord(month.closedSpent) && Object.values(month.closedSpent).every(isInt))) return false

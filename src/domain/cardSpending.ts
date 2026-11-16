@@ -235,12 +235,24 @@ export function lookReason(document: Pick<BudgetDocument, 'card'>, month: string
 }
 
 /**
+ * Once a month is closed, an overspend whose cover is ticked (or taken from next month, which moves no money) is dealt
+ * with: it leaves Needs a look (month-health PR 11). A tick for a different amount, or none, keeps it there.
+ */
+function coveredAtClose(document: Pick<BudgetDocument, 'card'>, month: string, row: DestinationSpending): boolean {
+  const record = cardTracker(document).months[month]
+  if (!record?.closedAt || row.status !== 'over' || row.destination.kind !== 'pot') return false
+  const potId = row.destination.potId
+  if (record.covers?.some(cover => cover.potId === potId && cover.source.kind === 'next-month')) return true
+  return record.coverTicks?.[`cover:${potId}`]?.amountPence === -row.leftPence
+}
+
+/**
  * Needs a look (Spending ↔ Month link F3): the month's pots that are over or ahead of pace, each with its reason.
  * Over first, then ahead; the bigger gap first within each.
  */
 export function needsALook(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, figures: MonthSpending): LookRow[] {
   const gap = (row: DestinationSpending) => row.status === 'over' ? -row.leftPence : row.aheadPence ?? 0
-  return figures.rows.filter(row => row.needsCare && row.destination.kind === 'pot')
+  return figures.rows.filter(row => row.needsCare && row.destination.kind === 'pot' && !coveredAtClose(document, figures.month, row))
     .sort((a, b) => Number(b.status === 'over') - Number(a.status === 'over') || gap(b) - gap(a) || a.key.localeCompare(b.key))
     .map(row => { const reason = lookReason(document, figures.month, row, figures.today); return reason ? { row, reason } : { row } })
 }

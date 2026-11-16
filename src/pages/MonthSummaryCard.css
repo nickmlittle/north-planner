@@ -1,0 +1,17 @@
+/* "How did <Month> go?" (month-health PR 11): a card on Home, a section on Month. Same shape as the Just brought in card. Tokens only. */
+.month-summary{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--card)}
+.month-summary header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:var(--space-1) var(--space-3)}
+.month-summary h2{margin:0;font-size:var(--text-lg);font-weight:var(--weight-bold)}
+.month-summary-date{color:var(--text-muted);font-size:var(--text-sm)}
+.month-summary-verdict{margin:0;font-size:var(--text-lg);font-weight:var(--weight-bold);line-height:1.35}
+.month-summary-lines{display:grid;gap:var(--space-2);margin:0;font-size:var(--text-md)}
+.month-summary-lines>div{display:grid;gap:var(--space-1);padding-bottom:var(--space-2);border-bottom:1px solid var(--border)}
+.month-summary-lines>div:last-child{padding-bottom:0;border-bottom:0}
+.month-summary-lines dt{color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+.month-summary-lines dd{margin:0;display:grid;gap:var(--space-1);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.month-summary-lines ul{margin:0;padding:0;list-style:none;display:grid;gap:var(--space-1)}
+.month-summary-total{font-weight:var(--weight-medium)}
+.month-summary-lines .text-button{padding:0;min-height:0;font:inherit;font-weight:var(--weight-medium)}
+.month-summary-actions{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+@media (min-width:641px){.month-summary-lines>div{grid-template-columns:150px minmax(0,1fr);gap:var(--space-3)}}
+.month-page>.month-summary{margin-bottom:var(--space-4)}

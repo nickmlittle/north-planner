@@ -23,6 +23,7 @@ import { billsAhead, renewalsInView } from './recurringBills'
 import { aheadText, capitalise, overText, paceDetail, paceStatus, reasonText } from '../formatting/paceLabels'
 import { potSum, weekFigures } from './potSum'
 import { justBroughtIn, type BroughtIn } from './bringIn'
+import { monthSummary, summaryMonth, type MonthSummary } from './monthSummary'
 
 /**
  * Home (audit 3 PR 10, month-health PR 6, D14): a dated verdict, one card per Tracked pot, the Amex bill, Bills, Saving
@@ -100,6 +101,8 @@ export type HomeInbox = {
   strip: { plan: StripFigure; card?: StripFigure & { name: string } }
   /** The month's one line, from the Tracked pots (§3): "Groceries £12.83 over. Going out on track." */
   verdict?: string
+  /** "How did October go?" (PR 11, P8): leads from close until Seen it, or the 7th. This month's view only. */
+  summary?: MonthSummary
   /** "Just brought in" (PR 7): what the latest bring-in did, for the day it was done and the two after. This month only. */
   broughtIn?: BroughtIn
   pots: PotCard[]
@@ -411,7 +414,9 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   const daysLeft = daysBetween(today, lastDayOf(monthOf(today)))
   const stage = month === monthOf(today) ? `In progress · ${plural(daysLeft, 'day')} left` : month < monthOf(today) ? 'Ended' : 'Upcoming'
   const broughtIn = card && month === monthOf(today) ? justBroughtIn(document, today) : null
-  return { strip: { plan, ...cardFigure ? { card: cardFigure } : {} }, ...verdict ? { verdict } : {}, ...broughtIn ? { broughtIn } : {}, pots, ...bills ? { bills } : {}, ...saving ? { saving } : {}, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
+  const lead = card && month === monthOf(today) ? summaryMonth(document, today) : null
+  const summary = lead ? monthSummary(document, lead, today) : null
+  return { strip: { plan, ...cardFigure ? { card: cardFigure } : {} }, ...summary ? { summary } : {}, ...verdict ? { verdict } : {}, ...broughtIn ? { broughtIn } : {}, pots, ...bills ? { bills } : {}, ...saving ? { saving } : {}, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
 }
 
 /** "In 3 weeks", "In 5 days", "Tomorrow", "Today", "6 days ago". */
