@@ -10,8 +10,10 @@ import { homeCount, homeInbox, type AppHomeTarget, type HomeInbox, type HomeTarg
 import { resolveBudget } from '../domain/monthlyBudget'
 import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
 import { dayDate, weekday } from '../formatting/date'
+import type { BroughtIn } from '../domain/bringIn'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
+import { BroughtInLines } from './BroughtInLines'
 import { destinationNamer } from './cardLabels'
 import { FreshnessLine } from './Freshness'
 import { RenewalSheet } from './RenewalSheet'
@@ -71,6 +73,17 @@ function HomeCard({ name, value, status, week, tone, label, onOpen }: { name: st
   </button></li>
 }
 
+/** "Just brought in": what the latest bring-in did, with a way into the rows it left to sort. */
+function JustBroughtIn({ document, broughtIn, month, onSort }: { document: BudgetDocument; broughtIn: BroughtIn; month: string; onSort: () => void }) {
+  const day = dayDate(localDate(new Date(broughtIn.at)))
+  return <section className="home-brought-in" aria-label="Just brought in">
+    <header><h2>Just brought in</h2><span className="home-brought-in-date">{day}</span></header>
+    <p className="home-brought-in-counts">{broughtIn.added} new · {broughtIn.sorted} sorted · {broughtIn.toSort} to sort</p>
+    <BroughtInLines document={document} broughtIn={broughtIn} month={month} compact/>
+    {broughtIn.toSort > 0 && <button type="button" className="secondary-button" onClick={onSort}>Sort {broughtIn.toSort} {broughtIn.toSort === 1 ? 'transaction' : 'transactions'}</button>}
+  </section>
+}
+
 /** The To do sheet (P10): every task, the heads-ups, Coming up and Done. */
 function TodoSheet({ inbox, onOpen, samePrice, onClose }: { inbox: HomeInbox; onOpen: (target: HomeTarget) => void; samePrice: (task: InboxTask) => (() => void) | undefined; onClose: () => void }) {
   const { todo, headsUp, comingUp, done } = inbox
@@ -127,6 +140,7 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
       <p className="home-verdict-text">{inbox.verdict}</p>
       <FreshnessLine document={document} onSort={() => onOpen({ view: 'spending', section: 'sort' })}/>
     </section>}
+    {inbox.broughtIn && <JustBroughtIn document={document} broughtIn={inbox.broughtIn} month={month} onSort={() => onOpen({ view: 'spending', section: 'sort' })}/>}
     <Section title="To do" count={count} aside={<>{count > 0 && <ListKeysHint keys={[['J K', 'move'], ['↵', 'open']]}/>}<button type="button" className="text-button home-open-todo" onClick={() => setSheet(true)}>Open<ChevronRight aria-hidden="true"/></button></>}>
       {todoKeys.hint}
       {top.length ? <ul className="home-list" aria-label="To do" {...todoKeys.listProps}>

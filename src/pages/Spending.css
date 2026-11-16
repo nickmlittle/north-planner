@@ -40,6 +40,12 @@
 .spending-sort-list{margin:0;padding:0;list-style:none;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
 .spending-sort-list>li+li>.list-row{border-top:1px solid var(--border)}
 .spending-sort-list .list-row{min-height:64px}
+/* A month's heading in To sort, when rows span more than one. */
+.spending-month-head,.sort-table .sort-table-month th{padding:var(--space-2) var(--space-4);background:var(--surface-sunken);color:var(--text);font-size:var(--text-sm);font-weight:var(--weight-bold)}
+.spending-month-head{border-top:1px solid var(--border)}
+.spending-month-head:first-child{border-top:0}
+.spending-month-head>span,.sort-table-month span{color:var(--text-muted);font-weight:var(--weight-regular)}
+.spending-month-head+li>.list-row{border-top:0}
 /* Set aside after To sort. */
 .set-aside-steps{display:grid;gap:var(--space-3);align-items:start}
 .set-aside-steps>.step-group{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}

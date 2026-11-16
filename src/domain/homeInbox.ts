@@ -22,6 +22,7 @@ import { dayDate, shortDate } from '../formatting/date'
 import { billsAhead, renewalsInView } from './recurringBills'
 import { aheadText, capitalise, overText, paceDetail, paceStatus, reasonText } from '../formatting/paceLabels'
 import { potSum, weekFigures } from './potSum'
+import { justBroughtIn, type BroughtIn } from './bringIn'
 
 /**
  * Home (audit 3 PR 10, month-health PR 6, D14): a dated verdict, one card per Tracked pot, the Amex bill, Bills, Saving
@@ -99,6 +100,8 @@ export type HomeInbox = {
   strip: { plan: StripFigure; card?: StripFigure & { name: string } }
   /** The month's one line, from the Tracked pots (§3): "Groceries £12.83 over. Going out on track." */
   verdict?: string
+  /** "Just brought in" (PR 7): what the latest bring-in did, for the day it was done and the two after. This month only. */
+  broughtIn?: BroughtIn
   pots: PotCard[]
   bills?: GroupTile
   saving?: GroupTile
@@ -407,7 +410,8 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
 
   const daysLeft = daysBetween(today, lastDayOf(monthOf(today)))
   const stage = month === monthOf(today) ? `In progress · ${plural(daysLeft, 'day')} left` : month < monthOf(today) ? 'Ended' : 'Upcoming'
-  return { strip: { plan, ...cardFigure ? { card: cardFigure } : {} }, ...verdict ? { verdict } : {}, pots, ...bills ? { bills } : {}, ...saving ? { saving } : {}, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
+  const broughtIn = card && month === monthOf(today) ? justBroughtIn(document, today) : null
+  return { strip: { plan, ...cardFigure ? { card: cardFigure } : {} }, ...verdict ? { verdict } : {}, ...broughtIn ? { broughtIn } : {}, pots, ...bills ? { bills } : {}, ...saving ? { saving } : {}, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
 }
 
 /** "In 3 weeks", "In 5 days", "Tomorrow", "Today", "6 days ago". */

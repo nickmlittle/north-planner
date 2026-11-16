@@ -8,6 +8,7 @@ import type { StatementSummary } from '../domain/cardStatements'
 import { formatMonth } from '../formatting/month'
 import type { MonthSpending } from '../domain/cardSpending'
 import type { ClosePlan, MonthStatus } from '../domain/monthStages'
+import type { BillSum } from '../domain/billSum'
 
 export const pounds = (pence: number) => formatGBP(pence / 100)
 /** "£62.40", or "−£24.99" for a refund. */
@@ -79,4 +80,27 @@ export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: strin
   const newest = tracker.transactions.filter(row => row.kind !== 'payment').reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
   if (!newest) return { lead: `${card} not brought in yet`, toSort: 0, broughtIn: false }
   return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, broughtIn: true }
+}
+
+/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort", or "Covered" once it's all in. */
+export function billParts(bill: BillSum, phrase: string): string {
+  if (bill.covered) return `Covered · all in ${phrase}`
+  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '']
+  return parts.filter(Boolean).join(' · ')
+}
+
+/**
+ * To sort lists rows under their own month once they span more than one (a bring-in can carry last month's late rows):
+ * the heading each row starts under, or none for a row that continues its month. Rows come newest first.
+ */
+export function monthHeads(rows: ReadonlyArray<Pick<CardTransaction, 'id' | 'date'>>, today: string): Map<string, { month: string; name: string; earlier: boolean }> {
+  const heads = new Map<string, { month: string; name: string; earlier: boolean }>()
+  if (new Set(rows.map(row => row.date.slice(0, 7))).size < 2) return heads
+  let last = ''
+  for (const row of rows) {
+    const month = row.date.slice(0, 7)
+    if (month !== last) heads.set(row.id, { month, name: monthName(month), earlier: month < today.slice(0, 7) })
+    last = month
+  }
+  return heads
 }

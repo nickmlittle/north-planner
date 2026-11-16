@@ -11,8 +11,8 @@ import { formatGBPWhole } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { dayDate, shortDate } from './cardLabels'
-import { billName, dayOf, plural, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
-import { potBills, type BillSum } from '../domain/billSum'
+import { billName, billParts, dayOf, plural, pounds, signedPounds, statementName, transactionMeta } from './spendingFormat'
+import { potBills } from '../domain/billSum'
 import { potSum, typicalShop, weekFigures } from '../domain/potSum'
 import { potKind, POT_KIND_LABELS } from '../domain/potKinds'
 import { BillsThisMonth, PotMonthFigures, YearlyBillsSetAside } from './PotBills'
@@ -190,13 +190,6 @@ function PotHeader({ title, context, bank, onBack, month, onCheck, onOpenSetting
         ...onOpenSettings ? [{ label: 'Pot settings', onSelect: onOpenSettings }] : [],
       ]}/>}
     </>}/></>
-}
-
-/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort", or "Covered" once it's all in. */
-function billParts(bill: BillSum, phrase: string): string {
-  if (bill.covered) return `Covered · all in ${phrase}`
-  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '']
-  return parts.filter(Boolean).join(' · ')
 }
 
 /**
