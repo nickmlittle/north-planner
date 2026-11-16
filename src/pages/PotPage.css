@@ -95,6 +95,8 @@
 .pot-try-answer.is-yes>p:first-child{color:var(--positive);font-weight:var(--weight-bold)}
 .pot-try-answer.is-over>p:first-child{color:var(--critical);font-weight:var(--weight-bold)}
 .pot-try-answer.is-check>p:first-child{color:var(--text);font-weight:var(--weight-bold)}
+.pot-afford{margin:0;color:var(--text-muted);font-size:var(--text-sm)}
+.pot-afford .text-button{font-size:var(--text-md);font-weight:var(--weight-medium)}
 .pot-months>li{display:grid;grid-template-columns:1fr auto;gap:0 var(--space-3);padding:var(--space-3) var(--space-4);font-variant-numeric:tabular-nums}
 .pot-months>li+li{border-top:1px solid var(--border)}
 .pot-month-name{font-weight:var(--weight-medium)}

@@ -121,6 +121,7 @@ describe('validation', () => {
       months: { '2026-10': { closedAt: '2026-11-04T00:00:00Z', covers: [{ potId: 'groceries', amountPence: 3500, source: { kind: 'next-month' } }], leftovers: { bills: 1200 } } },
       pots: { bills: { carriesOver: true, pace: 'none', checkedBalance: { pence: 124000, at: '2026-11-09T00:00:00Z' } }, groceries: { pace: 'steady', buildUpLimit: 3 } },
       imports: [{ at: '2026-11-05T09:00:00Z', cardId: 'amex', fileName: 'activity.xlsx', statementKey: 'amex:2026-11-24', rows: 1, added: 1, skipped: 0, sortedByRules: 1, latestDate: '2026-11-03', matchesSummary: true }],
+      accounts: { joint: { checkedBalance: { pence: 50000, at: '2026-11-19T10:00:00Z' } } },
     }), budget, people)).toBe(true)
   })
 
@@ -142,6 +143,8 @@ describe('validation', () => {
     ['a bad month key', tracker({ months: { '2026-13': {} } })],
     ['settings for a missing pot', tracker({ pots: { gone: { pace: 'steady' } } })],
     ['a zero build-up limit', tracker({ pots: { bills: { buildUpLimit: 0 } } })],
+    ['a buffer check on a missing account', tracker({ accounts: { gone: { checkedBalance: { pence: 1, at: 'x' } } } })],
+    ['a fractional buffer check', tracker({ accounts: { joint: { checkedBalance: { pence: 1.5, at: 'x' } } } })],
     ['a negative import count', tracker({ imports: [{ at: 'x', cardId: 'amex', fileName: 'f', statementKey: 'amex:2026-11-24', rows: -1, added: 0, skipped: 0, sortedByRules: 0, latestDate: '', matchesSummary: true }] })],
   ])('rejects %s', (_, value) => expect(validCardTracker(value, budget, people)).toBe(false))
 })

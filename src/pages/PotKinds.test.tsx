@@ -13,6 +13,7 @@ afterEach(cleanup)
 const seed = () => decodeBudgetDocument(JSON.parse(readFileSync(resolve(process.cwd(), 'docs/fixtures/plan-transfers-baseline.json'), 'utf8')))!
 const TODAY = '2026-11-11'
 const page = (document: ReturnType<typeof seed>, potId: string, today = TODAY) => render(<PotDetail document={document} setDocument={() => {}} potId={potId} month="2026-11" today={today} onBack={() => {}}/>)
+const openAfford = () => fireEvent.click(screen.getByRole('button', { name: 'Can we afford…' }))
 const tryAmount = (value: string) => fireEvent.change(screen.getByLabelText('Before you spend it'), { target: { value } })
 const answer = () => window.document.getElementById('pot-try-answer')!.textContent
 
@@ -32,21 +33,24 @@ it('switches to This weekend from Friday, and shows £0.00 for a pot that is ove
   expect(screen.getByText('This week').parentElement).toHaveTextContent(/^This week £0\.00 · nothing to spend$/)
 })
 
-it('Try an amount answers yes or over and saves nothing (affordCheck)', () => {
+it('Can we afford… answers yes or over from a pot page and saves nothing (affordCheck)', () => {
   const document = seed()
   const before = JSON.stringify(document)
   page(document, 'groceries')
-  expect(answer()).toBe('Nothing is saved.')
+  openAfford()
+  expect(screen.getByRole('dialog', { name: 'Can we afford…' })).toHaveAccessibleDescription('An amount and a pot. Nothing is saved.')
+  expect(screen.getByLabelText('Which pot')).toHaveValue('groceries')
+  expect(answer()).toBe('Type an amount to see.')
   tryAmount('10')
   expect(answer()).toMatch(/^Yes\. £[\d,.]+ left for the last 19 days\./)
   tryAmount('5000')
-  expect(answer()).toMatch(/^£[\d,.]+ over\.Covered when November closes\./)
+  expect(answer()).toMatch(/^£[\d,.]+ over\..+, the buffer, isn’t checked yet, so North can’t say if it covers this\. Check balances adds it\./)
   tryAmount('abc')
   expect(answer()).toBe('Enter an amount, like 42.50.')
   expect(JSON.stringify(document)).toBe(before)
 })
 
-it('Try it fills the amount with a typical shop', () => {
+it('Try it opens Can we afford… with a typical shop in the amount', () => {
   page(seed(), 'groceries')
   fireEvent.click(screen.getByRole('button', { name: 'Try it' }))
   expect((screen.getByLabelText('Before you spend it') as HTMLInputElement).value).toMatch(/^\d+\.\d{2}$/)
@@ -60,6 +64,7 @@ it('a Funded only pot leads with what payday moved in and its Amex spend, with n
   expect(screen.queryByText(/Left this month|Over this month|a day/)).not.toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'In the pot' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Check Starling' })).toBeInTheDocument()
+  openAfford()
   tryAmount('20')
   expect(answer()).toBe('Check Starling: North only sees what goes on the Amex.If it goes on the Amex, it moves to the Amex pot at your next move.')
 })
@@ -71,13 +76,13 @@ it('a Funded only pot says moved in once payday’s Move is ticked', () => {
   expect(screen.getByText('Moved in on payday').nextElementSibling).toHaveTextContent('£1,135.42')
 })
 
-it('a Saving pot leads with Built up, with no pace and no Try an amount (D2)', () => {
+it('a Saving pot leads with Built up, with no pace and no Can we afford… (D2)', () => {
   const document = savePotKind(seed(), 'holidays', 'saving')
   document.ticks = { '2026-11': { 'household:move:holidays': { amountPence: 158636, at: '2026-11-01T09:00:00.000Z' } } }
   page(document, 'holidays')
   expect(screen.getByText('Built up')).toBeInTheDocument()
   expect(screen.getByText('Put by November').nextElementSibling).toHaveTextContent('£1,586.36')
-  expect(screen.queryByRole('heading', { name: 'Try an amount' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Can we afford…' })).not.toBeInTheDocument()
   expect(screen.queryByText(/Left this month|Over this month/)).not.toBeInTheDocument()
 })
 
