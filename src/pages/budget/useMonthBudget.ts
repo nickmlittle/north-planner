@@ -3,7 +3,7 @@ import type { BudgetDocument } from '../../domain/budgetDocument'
 import { budgetTransfers } from '../../domain/budgetTransfers'
 import { buildTransferInstructions, type TransferInstructions } from '../../domain/transferInstructions'
 import { budgetEditScope, resolveBudget, resolveIncomeSources } from '../../domain/monthlyBudget'
-import { orderTransferAccounts, personTransferPlans } from '../../domain/personTransfers'
+import { orderTransferAccounts, paydayPlans } from '../../domain/personTransfers'
 import { accountOptionLabels, shortAccountLabels } from '../budgetLabels'
 import { planItemLabels, planOwnerOrder } from '../planRows'
 import { formatEditScope, formatMonth as monthLabel } from '../../formatting/month'
@@ -25,7 +25,7 @@ export function monthBudget(document: BudgetDocument, month: string) {
  const labels=planItemLabels(document,shortLabels)
  const total=items.reduce((sum,item)=>sum+item.amountPence,0)
  const transferAccounts=orderTransferAccounts(transfers.accounts,instructions,document.budget.accounts,adults.map(person=>person.id),accountLabels)
- const personPlans=personTransferPlans(transferAccounts,instructions,adults.map(person=>person.id))
+ const personPlans=paydayPlans(document,month,transferAccounts,instructions)
  const snapshotsWithoutMonth=()=>{const snapshots={...document.budget.snapshots};delete snapshots[month];return snapshots}
  const previousBudget=resolved.hasExplicitBudget?resolveBudget({...document.budget,snapshots:snapshotsWithoutMonth()},month):null
  const revertLabel=!previousBudget?undefined:previousBudget.sourceMonth?`Go back to the ${monthLabel(previousBudget.sourceMonth)} budget`:previousBudget.importedBaseline?'Go back to the imported budget':`Clear the ${monthLabel(month)} budget`

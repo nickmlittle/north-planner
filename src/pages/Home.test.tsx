@@ -54,7 +54,7 @@ it('lists every task in one To do, by when it matters, with heads-ups last, and 
     'Settle the October statement', 'Close October', 'Fund November', 'Sort 4 Amex transactions', 'Set aside in the Amex pot', 'Breakdown cover renews 6 Dec', 'Bring the plan back to Available', expect.stringMatching(/ahead of pace$/),
   ])
   expect(within(todo).getByText('Heads-up')).toBeInTheDocument()
-  expect(within(todo).getByRole('button', { name: /Fund November/ })).toHaveTextContent('Ada 0 of 9Ben 0 of 9')
+  expect(within(todo).getByRole('button', { name: /Fund November/ })).toHaveTextContent('Ada 0 of 5Ben 0 of 5Either of you 0 of 4')
   fireEvent.click(within(todo).getByRole('button', { name: /Settle the October statement/ }))
   expect(onOpen).toHaveBeenLastCalledWith({ view: 'spending', section: 'statements', statementKey: 'amex:2026-10-24' })
   fireEvent.click(within(todo).getByRole('button', { name: /Close October/ }))

@@ -8,9 +8,9 @@ import { potBalance } from './potBalances'
 import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
 import { moneyArrives } from './workingDays'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
-import { orderTransferAccounts, personTransferPlans } from './personTransfers'
+import { orderTransferAccounts, paydayPlans } from './personTransfers'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
-import { personProgress, stepStatus, type StepTick } from './transferTicks'
+import { householdProgress, personProgress, stepStatus, type StepTick } from './transferTicks'
 
 /** Days after a month ends before its last postings are trusted to be in (§6.10). */
 export const LATE_POSTING_DAYS = 3
@@ -26,8 +26,9 @@ export function paydayProgress(document: Pick<BudgetDocument, 'budget' | 'househ
   const transfers = budgetTransfers(document.budget, ids, month, items)
   let instructions: TransferInstructions | undefined
   try { instructions = buildTransferInstructions(document as BudgetDocument, month) } catch { /* No steps when they can't be worked out. */ }
-  const plans = personTransferPlans(orderTransferAccounts(transfers.accounts, instructions, document.budget.accounts, ids, new Map()), instructions, ids)
-  return plans.people.map(plan => personProgress(plan, document.ticks?.[month])).reduce((sum, row) => ({ total: sum.total + row.total, done: sum.done + row.done, changed: sum.changed + row.changed }), { total: 0, done: 0, changed: 0 })
+  const plans = paydayPlans(document, month, orderTransferAccounts(transfers.accounts, instructions, document.budget.accounts, ids, new Map()), instructions)
+  const ticks = document.ticks?.[month]
+  return [...plans.people.map(plan => personProgress(plan, ticks)), householdProgress(plans, ticks)].reduce((sum, row) => ({ total: sum.total + row.total, done: sum.done + row.done, changed: sum.changed + row.changed }), { total: 0, done: 0, changed: 0 })
 }
 
 // ——— Stages (§6.9) ———
