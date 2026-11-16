@@ -4,7 +4,7 @@ import { emptyCardTracker, type CardTransaction } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 import { checkPotBalance } from './potBalances'
 import { savePotKind } from './potKinds'
-import { potSum } from './potSum'
+import { carriedOverByMonth, moneyIn, potSum, recentMonths, typicalShop, weekFigures } from './potSum'
 import { recordMove } from './setAside'
 
 const pot = (potId: string): BudgetDestination => ({ kind: 'pot', potId })
@@ -83,5 +83,67 @@ describe('the pot sum (D2)', () => {
     expect(sum).toMatchObject({ kind: 'saving', inPotPence: 49000, waitingPence: 3000 })
     expect(sum.leftPence).toBeUndefined()
     expect(sum.carriedOverPence).toBeUndefined()
+  })
+})
+
+describe('the pot page figures (health/5)', () => {
+  const monday = '2026-11-16'
+  it('spreads Left over the days left to Sunday: This week to Thursday, This weekend from Friday (P3)', () => {
+    // Nov 16 is a Monday: 15 days left including today, 7 of them to Sunday.
+    expect(weekFigures(30000, '2026-11', '2026-11-16')).toEqual({ label: 'This week', pence: 14000, through: '2026-11-22', days: 7 })
+    expect(weekFigures(30000, '2026-11', '2026-11-19')).toMatchObject({ label: 'This week', days: 4, pence: Math.round(30000 * 4 / 12) })
+    expect(weekFigures(30000, '2026-11', '2026-11-20')).toMatchObject({ label: 'This weekend', days: 3, pence: Math.round(30000 * 3 / 11) })
+    expect(weekFigures(30000, '2026-11', '2026-11-22')).toMatchObject({ label: 'This weekend', days: 1 })
+  })
+
+  it('makes it all of Left when the month ends first, and £0.00 over a pot (P3)', () => {
+    // 30 Nov is a Monday and the last day; 31 Oct 2026 is a Saturday and the last day.
+    expect(weekFigures(9000, '2026-11', '2026-11-30')).toMatchObject({ label: 'This week', pence: 9000, days: 1 })
+    expect(weekFigures(9000, '2026-10', '2026-10-31')).toMatchObject({ label: 'This weekend', pence: 9000, through: '2026-10-31', days: 1 })
+    expect(weekFigures(-1200, '2026-11', monday)!.pence).toBe(0)
+    expect(weekFigures(0, '2026-11', monday)!.pence).toBe(0)
+  })
+
+  it('has no weekly figure for a month that is not the current one', () => {
+    expect(weekFigures(30000, '2026-10', monday)).toBeUndefined()
+    expect(weekFigures(30000, '2026-12', monday)).toBeUndefined()
+  })
+
+  it('works out a typical shop from £30+ purchases in the last 3 months, once there are 3 (P4)', () => {
+    const document = household()
+    document.card!.transactions = [tx('2026-11-03', pot('groceries'), 8000), tx('2026-10-12', pot('groceries'), 4000)]
+    expect(typicalShop(document, 'groceries', '2026-11-11')).toBeUndefined()
+    document.card!.transactions.push(tx('2026-09-20', pot('groceries'), 6000), tx('2026-11-04', pot('groceries'), 2999), tx('2026-11-05', pot('groceries'), -5000), tx('2026-08-10', pot('groceries'), 90000))
+    // £29.99 is under £30, the refund isn't a purchase and 10 Aug is older than 3 months.
+    expect(typicalShop(document, 'groceries', '2026-11-11')).toEqual({ pence: 6000, count: 3 })
+    document.card!.transactions.push(tx('2026-11-06', pot('bills'), 70000))
+    expect(typicalShop(document, 'groceries', '2026-11-11')!.count).toBe(3)
+  })
+
+  it('lists Carried over by month and what moved out, adding to builtUp (D13)', () => {
+    const document = household()
+    document.card!.months['2026-09'] = { closedAt: 'x', leftovers: { groceries: 2500 } }
+    document.card!.pots.groceries = { ...document.card!.pots.groceries, movedOut: [{ pence: 1000, at: at('2026-10-20').toISOString() }] }
+    const carried = carriedOverByMonth(document, 'groceries', '2026-11')
+    expect(carried.months).toEqual([{ month: '2026-10', pence: 5000 }, { month: '2026-09', pence: 2500 }])
+    expect(carried.movedOut).toEqual([{ at: at('2026-10-20').toISOString(), pence: 1000 }])
+    expect(carried.totalPence).toBe(6500)
+    expect(carried.totalPence).toBe(potSum(document, 'groceries', '2026-11', '2026-11-11').carriedOverPence)
+    // Asking about October leaves October out, like potSum.
+    expect(carriedOverByMonth(document, 'groceries', '2026-10').months).toEqual([{ month: '2026-09', pence: 2500 }])
+  })
+
+  it('shows the last 3 months of a pot, leaving out empty ones', () => {
+    const document = household()
+    document.card!.transactions.push(tx('2026-10-05', pot('groceries'), 30000))
+    document.budget.snapshots['2026-10'] = document.budget.snapshots['2026-11']!
+    expect(recentMonths(document, 'groceries', '2026-11', '2026-11-11')).toEqual([{ month: '2026-10', plannedPence: 52000, spentPence: 30000, leftPence: 22000 }])
+  })
+
+  it('reports what payday moved into a pot and its card spend', () => {
+    const document = household()
+    expect(moneyIn(document, 'groceries', '2026-11', '2026-11-11')).toEqual({ plannedPence: 52000, movedInPence: 52000, onCardPence: 11000 })
+    delete document.ticks
+    expect(moneyIn(document, 'groceries', '2026-11', '2026-11-11')).toEqual({ plannedPence: 52000, onCardPence: 11000 })
   })
 })

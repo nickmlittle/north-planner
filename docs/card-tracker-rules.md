@@ -28,6 +28,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot check 2: the check on the Amex pot's page, Month's Amex row | C2 | `src/pages/SetAsideCheckLead.tsx`, `SetAsidePot` in `SpendingMonth.tsx`, `src/pages/month/PotsSection.tsx` |
 | Amex pot check 3: Check balances, settle up's cover line, Home | C3 | `src/pages/CheckBalancesSheet.tsx`, `SettleSteps` in `StatementsPanel.tsx`, `gap` in `homeMonths` and `homeInbox` |
 | Month health 4: one sum per bill and per pot (D1, D2, D13) | health/4 | `src/domain/billSum.ts`, `src/domain/potSum.ts`, `SetAsideCheckLead.tsx`, `PotSumSection` in `SpendingMonth.tsx` |
+| Month health 5: pot pages by kind, This week, typical shop, Try an amount (D2, D3) | health/5 | `src/domain/afford.ts`, `src/domain/potSum.ts`, `src/pages/PotLeads.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -316,7 +317,7 @@ Spare = In the pot − waiting to move − bills still due          (Carries ove
 - **Left this month** is Month's Left. **Waiting to move** is `waitingShares`: card spend on the pot not yet moved out (per bill: "Waiting to move · November bill"; "Waiting to settle · October statement" for a statement that settles once). **Carried over** is `builtUp` without this month (P1). It's shown, never part of Left (D13).
 - **In the pot** is `potBalance`: the last check plus every flow since. Before the first check there's none: the pot shows Left and Waiting, "Not checked against Monzo yet" and **Check against Monzo** (§7).
 - **Not explained** is its own line whenever it isn't £0 (a missed transfer, interest, an unticked payday move), toned, with Check against Monzo, until a check makes it add up. It's only worked out for the current month, since the balance is today's.
-- Funded only and Saving pots show In the pot and what's waiting; their own leads come in PR 5. The month's to-sort total (`toSortPence`) rides along for PR 5's "To sort beside Left".
+- Funded only and Saving pots show In the pot and what's waiting, under their own leads (below). The month's to-sort total (`toSortPence`) rides along; the lead's freshness line already says "N to sort".
 - A pot that changes kind recomputes (it's read from `potKind` each time); closed months keep their records.
 
 **On screen:**
@@ -327,6 +328,15 @@ Spare = In the pot − waiting to move − bills still due          (Carries ove
 - **Check balances:** the Amex pot's row reads "Expected £109.20 · checked …" (the only place "Expected" is used), and warns "£60.00 sorted, to move. Moved it in Monzo already? Press Moved first, or it counts twice."
 - **Home's card figure:** "Amex · £649.23 November bill so far", "£312.85 in the Amex pot · closes Tue 24 Nov"; once it closes, "November bill" with "due Fri 18 Dec", and "covered" once it's all in. The gap task says "Less than its bills need".
 - **Retired** (copy guard, `src/copy.vocabulary.test.ts`): "free", "this statement", "£X set aside" and "In Monzo now", "still to move", "should hold".
+
+**Pot pages by kind** (month-health plan PR 5, `health/5-pot-pages`, D2, D3, D13, P3, P4; 16 November 2026), `src/domain/potSum.ts`, `src/domain/afford.ts`, `src/pages/PotLeads.tsx`:
+- **This week / This weekend** (`weekFigures(leftPence, month, today)`): Left × days to Sunday ÷ days left in the month, both counting today. Monday to Thursday it's labelled "This week", Friday to Sunday "This weekend". The month ending before Sunday makes the days equal, so it's all of Left. Left ≤ 0 gives £0.00. Only the current month has one, and only Tracked pots show it.
+- **A typical shop** (`typicalShop`): the average of the pot's split lines of £30 or more (`SHOP_MIN_PENCE`) on purchases dated after today's date 3 months ago; absent until there are 3 (`SHOPS_NEEDED`). Refunds and smaller lines don't count.
+- **Try an amount** (`affordCheck(document, potId, pence, today)`) records nothing. A Tracked pot answers `within` (Left after, days left, `pace`: on pace or `ahead` by `aheadPence` to the pound, only for steady pots) or `over` (by how much), each with `toSort` (the month's unsorted rows card-wide, and Left if they all went there). A Funded only pot answers `funded-only` with whether an Amex pot is set. Saving, carry-over, the Amex pot, no amount, or a pot with no plan this month: `not-offered`. The buffer answer for an over pot (P9) and the overlap-day month line come with health/8; for now "Covered when November closes".
+- **Carried over by month** (`carriedOverByMonth`): each closed month's leftover for the pot (not `month` itself) and the moved-out rows; `totalPence` is `builtUp`, so the list adds up to the sum's Carried over line.
+- **Last 3 months** (`recentMonths`): the 3 months before, each as planned, spent and left (`monthSpending`). A month shows only with something spent or a close record, since its plan alone says nothing.
+- **Money in** (`moneyIn`): a Funded only or Saving pot's planned amount, what its Move ticks say went in this month (`:move:<potId>` keys, household or per person), and its card spend (`spentPence − billsPaidPence`: "£115.30 on the Amex").
+- **Leads:** a Funded only pot leads with Moved in on payday (or To move in on payday), its Amex spend, Next move to the Amex pot (its waiting spend) and "Check <bank>". A Saving pot leads with Built up (`potBalance.balancePence`, "—" before a check), Put by this month and Spent from it. Both show whether or not a row exists, because a pot with a plan and nothing spent still has money moving in. **Not built:** a Saving pot's "before this month + put by − spent" sum, since North has no history of a saving pot's balance before its first check; Built up is the checked balance and what has moved since.
 
 ## Links between Spending and Month
 

@@ -504,7 +504,7 @@ it('opens a steady pot: what’s left a day, the pace chart, when it runs out, a
   fireEvent.click(screen.getByRole('button', { name: /^Groceries · Joint:/ }))
   expect(screen.getByRole('heading', { level: 1, name: 'Groceries' })).toBeInTheDocument()
   expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: 'Month' })).toBeInTheDocument()
-  expect(screen.getByText('Joint · monthly · November 2026 · day 12 of 30')).toBeInTheDocument()
+  expect(screen.getByText('Joint · Tracked · November 2026 · day 12 of 30')).toBeInTheDocument()
   expect(screen.getByText('for 18 days').parentElement).toHaveTextContent('£181.39 for 18 days')
   expect(screen.getByText('About £10 a day · you’ve averaged £28')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'Groceries spending so far against the plan: £338.61 spent by day 12, against £208.00 at the planned pace, of £520.00 planned. Runs out around Thu 19 Nov.' })).toBeInTheDocument()
