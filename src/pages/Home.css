@@ -1,4 +1,4 @@
-/* Home (audit 3 PR 10): the strip, To do, Coming up and Done. Tokens only (styles.tokens.test.ts). */
+/* Home (audit 3 PR 10, month-health PR 6): the verdict, To do (top 3), pot cards and the Bills, Saving and Plan strip; the To do sheet. Tokens only (styles.tokens.test.ts). */
 .home-page{display:grid;align-content:start;gap:var(--space-5)}
 /* Rows take their content's height. In the fixed-height desktop frame a taller page scrolls; without this the strip
    (overflow hidden, so no minimum height) was squeezed and its tiles clipped. */
@@ -31,6 +31,27 @@
 /* A renewal's Same price, under its row, in line with the text. */
 .home-task-actions{display:flex;gap:var(--space-2);padding:0 var(--space-4) var(--space-3) calc(var(--space-7) + var(--space-2))}
 .home-task-actions .secondary-button{min-height:32px;font-size:var(--text-sm)}
+/* The verdict (§3): one dated line. */
+.home-verdict{display:grid;gap:var(--space-1);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--card)}
+.home-verdict-text{margin:0;font-size:var(--text-lg);font-weight:var(--weight-bold);line-height:1.35}
+.home-verdict .freshness{font-size:var(--text-sm)}
+/* To do's Open link, beside the key hints. */
+.home-page .ui-section-aside{display:flex;align-items:center;gap:var(--space-3)}
+.home-open-todo{display:inline-flex;align-items:center;gap:var(--space-1);min-height:32px;font-weight:var(--weight-medium)}
+.home-open-todo svg{width:16px;height:16px}
+/* A card per Tracked pot, then the Amex bill. */
+.home-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--space-3);margin:0;padding:0;list-style:none}
+.home-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-1) var(--space-3);align-items:baseline;width:100%;height:100%;padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:var(--radius-lg);background:var(--card);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.home-card:hover{background:var(--surface-sunken)}
+.home-card.is-warning{border-left-color:var(--warning)}
+.home-card.is-critical{border-left-color:var(--critical)}
+.home-card-name{font-weight:var(--weight-bold)}
+.home-card-value{font-size:var(--text-lg);font-weight:var(--weight-bold);font-variant-numeric:tabular-nums;text-align:right}
+.home-card.is-critical .home-card-value{color:var(--critical)}
+.home-card-status,.home-card-week{grid-column:1/-1;color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.home-card.is-warning .home-card-status{color:var(--warning);font-weight:var(--weight-medium)}
+.home-card.is-critical .home-card-status{color:var(--critical);font-weight:var(--weight-medium)}
+.home-sheet{display:grid;gap:var(--space-5)}
 @media(min-width:768px){
   .planner-app-content .home-page.page-frame{overflow-y:auto}
 }

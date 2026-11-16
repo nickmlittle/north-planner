@@ -306,6 +306,8 @@ Bill = In the Amex pot + To move + To sort (+ Expecting back, D11: 0 until PR 9)
 - **Known** (`amexPotKnown`): **checked** only when the Amex pot was checked after its last move (no flow since the check) and matched; otherwise **worked out**. "Matches Monzo" appears only when checked.
 - **Which bills** (`potBills`): every unpaid statement paid from the pot with something on it or in the pot, oldest first, then the open one even when empty. **Home's bill** (`homeBill`) is the first of them: the oldest unpaid bill until its Pay tick, then the open one.
 
+**Home's verdict and pot cards** (`homeInbox`, month-health PR 6). Both read the Tracked pots' rows from `monthSpending` (`kind === 'tracked'`, a pot, a status of over, ahead, on track or left; Funded only, Saving and Carries over never count, and neither does a pot with nothing planned or spent). The verdict names the pots over (worst first), then those ahead of pace, then the rest together as "on track"; on an overlap day (the payday card is showing) it opens with the month ("November:") and gives each remaining pot's Left instead. A future month, a first run or no Tracked pot has none. A pot card's week line is `weekFigures` (this month only). Bills and Saving tiles come from the plan: Carries over pots' planned total, what's due (`duePence`) and, once every one is checked, their `potSum` Spare; Saving pots' planned total. They don't need a spending row.
+
 **The pot** (`potSum(document, potId, month, today)`, `src/domain/potSum.ts`):
 
 ```
