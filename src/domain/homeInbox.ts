@@ -1,7 +1,8 @@
 import type { BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { homeBill } from './billSum'
-import { monthSpending, needsALook, type DestinationSpending } from './cardSpending'
+import { monthSpending, needsALook, plannedByDestination } from './cardSpending'
+import { potKind } from './potKinds'
 import { statementSummary } from './cardStatements'
 import { transactionsToSort } from './cardSorting'
 import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey } from './cardTracker'
@@ -19,11 +20,13 @@ import { formatGBP } from '../formatting/money'
 import { formatMonth } from '../formatting/month'
 import { dayDate, shortDate } from '../formatting/date'
 import { billsAhead, renewalsInView } from './recurringBills'
-import { aheadText, capitalise, overText, paceDetail, reasonText } from '../formatting/paceLabels'
+import { aheadText, capitalise, overText, paceDetail, paceStatus, reasonText } from '../formatting/paceLabels'
+import { potSum, weekFigures } from './potSum'
 
 /**
- * Home as an inbox (audit 3 PR 10): a three-figure strip, one To do list ordered by when it matters, heads-ups,
- * Coming up and Done. Pure: it maps `homeMonths()` and the payday plans into rows and never recomputes the
+ * Home (audit 3 PR 10, month-health PR 6, D14): a dated verdict, one card per Tracked pot, the Amex bill, Bills, Saving
+ * and Plan, and one To do list ordered by when it matters (its top 3 on Home, all of it, with heads-ups, Coming up and
+ * Done, in the To do sheet). Pure: it maps `homeMonths()` and the payday plans into rows and never recomputes the
  * stage, settle or pace rules.
  */
 
@@ -77,8 +80,28 @@ export type PaydayCard = {
 }
 export type Upcoming = { key: string; date: string; title: string; meta?: string; target?: HomeTarget }
 export type StripFigure = { value: string; sub?: string; detail?: string; detailTone?: 'warning' | 'critical'; tone?: 'critical' }
+/** A Tracked pot's card (D14): what's left, where it stands against pace, and the week's allowance. */
+export type PotCard = {
+  key: string
+  name: string
+  /** "£23.87 left", "£12.83 over". */
+  value: string
+  /** "On track", "£102 ahead · runs out ~Sat 21 Nov", "£12.83 over · covered when November closes". */
+  status: string
+  tone?: 'warning' | 'critical'
+  /** "This week £140.00 · to Sun 22 Nov". Current month only. */
+  week?: string
+  target: HomeTarget
+}
+/** The Bills and Saving tiles: one figure, one line under it. */
+export type GroupTile = { label: string; value: string; sub: string; detail: string; target: HomeTarget }
 export type HomeInbox = {
-  strip: { plan: StripFigure; spent?: StripFigure; card?: StripFigure & { name: string } }
+  strip: { plan: StripFigure; card?: StripFigure & { name: string } }
+  /** The month's one line, from the Tracked pots (§3): "Groceries £12.83 over. Going out on track." */
+  verdict?: string
+  pots: PotCard[]
+  bills?: GroupTile
+  saving?: GroupTile
   todo: InboxTask[]
   headsUp: InboxTask[]
   comingUp: Upcoming[]
@@ -143,15 +166,20 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     : { value: overPence > 0 ? `${pounds(overPence)} over` : overPence < 0 ? `${pounds(-overPence)} unassigned` : 'Balanced', ...overPence > 0 ? { tone: 'critical' as const } : {},
       detail: adults.length > 1 ? people.map(personText).join(' · ') : `${pounds(planned)} of ${pounds(current.transfers.availablePence)}` }
 
-  // ——— Strip: Spent and the card ———
+  // ——— Pot cards and the verdict: Tracked pots only (D3, D4) ———
   const figures = card && !firstRun ? monthSpending(document, month, today) : undefined
-  const care = figures?.rows.filter(row => row.needsCare) ?? []
-  const worst = [...care].sort((a, b) => (a.leftPence < 0 ? a.leftPence : -(a.aheadPence ?? 0)) - (b.leftPence < 0 ? b.leftPence : -(b.aheadPence ?? 0)))[0]
-  // The strip is short: the pot's own name ("Groceries"), without its account.
+  // The pot's own name ("Groceries"), without its account.
   const shortName = (destination: BudgetDestination) => nameDestination(destination).split(' · ')[0]!
-  // Pace in Month's words (paceLabels): "£85 ahead" rounds to the pound, "£52.93 over" is to the penny.
-  const careText = (row: DestinationSpending) => `${shortName(row.destination)} ${row.leftPence < 0 ? overText(-row.leftPence) : `${aheadText(row.aheadPence ?? 0)} of pace`}`
-  const spent: StripFigure | undefined = figures && { value: pounds(figures.spentPence), sub: `of ${pounds(figures.plannedPence)}`, detail: worst ? careText(worst) : 'On track', ...worst ? { detailTone: 'warning' as const } : {} }
+  const tracked = figures?.rows.filter(row => row.kind === 'tracked' && row.destination.kind === 'pot' && ['over', 'ahead', 'on-track', 'left'].includes(row.status)) ?? []
+  const pots: PotCard[] = !figures ? [] : tracked.map(row => {
+    const week = row.status !== 'left' && figures.when === 'current' ? weekFigures(row.leftPence, month, today) : undefined
+    return {
+      key: row.key, name: shortName(row.destination), value: row.leftPence < 0 ? overText(-row.leftPence) : `${pounds(row.leftPence)} left`,
+      status: row.status === 'left' ? '' : paceStatus(row, figures), ...row.needsCare ? { tone: row.status === 'over' ? 'critical' as const : 'warning' as const } : {},
+      ...week ? { week: `${week.label} ${pounds(week.pence)}${week.pence ? ` · to ${dayDate(week.through)}` : ' · nothing to spend'}` } : {},
+      target: { view: 'month', month, ...row.destination.kind === 'pot' ? { potId: row.destination.potId } : {} },
+    }
+  })
   let cardFigure: HomeInbox['strip']['card']
   if (card) {
     // The bill (D1): the oldest unpaid one until its Pay tick, then the open one, named by its month.
@@ -281,6 +309,33 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     }
   } else fund(next, nextFunding)
 
+  // ——— The verdict (§3): over first, worst first, then ahead, then the rest. On an overlap day it names its month (D10). ———
+  const verdictRows = tracked.filter(row => row.needsCare).sort((a, b) => a.status === b.status ? (a.status === 'over' ? a.leftPence - b.leftPence : (b.aheadPence ?? 0) - (a.aheadPence ?? 0)) : a.status === 'over' ? -1 : 1)
+  const fine = tracked.filter(row => !row.needsCare)
+  const joinNames = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]!
+  const sentences = [
+    ...verdictRows.map(row => `${shortName(row.destination)} ${row.status === 'over' ? overText(-row.leftPence) : `${aheadText(row.aheadPence ?? 0)} of pace`}`),
+    ...!fine.length ? [] : payday ? fine.map(row => `${shortName(row.destination)} ${pounds(row.leftPence)} left`) : [`${joinNames(fine.map(row => shortName(row.destination)))} on track`],
+  ]
+  const verdict = sentences.length && figures?.when !== 'future' ? `${payday ? `${monthName(month)}: ` : ''}${sentences.join('. ')}.` : undefined
+
+  // ——— Bills and Saving: a tile each, from the pots of those kinds (D14) ———
+  // From the plan, not the spending rows: a Saving pot with nothing spent from it has no row.
+  const plannedPots = plannedByDestination(document, month)
+  const ofKind = (kind: 'carries-over' | 'saving') => card && !firstRun ? [...plannedPots.values()].flatMap(({ destination, pence }) => destination.kind === 'pot' && pence > 0 && potKind(document, destination.potId) === kind ? [{ destination, potId: destination.potId, pence, due: figures?.rows.find(row => row.key === `pot:${destination.potId}`)?.duePence ?? 0 }] : []) : []
+  const groupTarget = (rows: Array<{ potId: string }>): HomeTarget => ({ view: 'month', month, ...rows.length === 1 ? { potId: rows[0]!.potId } : {} })
+  const billRows = ofKind('carries-over'), savingRows = ofKind('saving')
+  const sumPence = (rows: Array<{ pence: number; due: number }>, pick: 'pence' | 'due') => rows.reduce((sum, row) => sum + row[pick], 0)
+  const spares = billRows.map(row => potSum(document, row.potId, month, today).sparePence)
+  const bills: GroupTile | undefined = billRows.length ? {
+    label: 'Bills', value: pounds(sumPence(billRows, 'pence')), sub: `planned for ${monthName(month)}`, target: groupTarget(billRows),
+    detail: [sumPence(billRows, 'due') > 0 ? `${pounds(sumPence(billRows, 'due'))} still to go out` : 'All gone out', spares.every(spare => spare !== undefined) ? `${pounds(spares.reduce<number>((sum, spare) => sum + spare!, 0))} spare` : ''].filter(Boolean).join(' · '),
+  } : undefined
+  const saving: GroupTile | undefined = savingRows.length ? {
+    label: 'Saving', value: pounds(sumPence(savingRows, 'pence')), sub: `put by in ${monthName(month)}`, target: groupTarget(savingRows),
+    detail: savingRows.map(row => shortName(row.destination)).join(' · '),
+  } : undefined
+
   // ——— Plan fixes ———
   const overPeople = people.filter(row => row.gap < 0)
   if (!firstRun && (overPence > 0 || adults.length > 1 && overPeople.length)) {
@@ -352,7 +407,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
 
   const daysLeft = daysBetween(today, lastDayOf(monthOf(today)))
   const stage = month === monthOf(today) ? `In progress · ${plural(daysLeft, 'day')} left` : month < monthOf(today) ? 'Ended' : 'Upcoming'
-  return { strip: { plan, ...spent ? { spent } : {}, ...cardFigure ? { card: cardFigure } : {} }, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
+  return { strip: { plan, ...cardFigure ? { card: cardFigure } : {} }, ...verdict ? { verdict } : {}, pots, ...bills ? { bills } : {}, ...saving ? { saving } : {}, todo: todo.sort(order), headsUp, comingUp, done, stage, firstRun, ...payday ? { payday } : {} }
 }
 
 /** "In 3 weeks", "In 5 days", "Tomorrow", "Today", "6 days ago". */

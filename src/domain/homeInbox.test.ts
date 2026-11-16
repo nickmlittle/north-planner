@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { homeCount, homeInbox } from './homeInbox'
+import { savePotKind } from './potKinds'
 import { monthSpending } from './cardSpending'
 import { paceHeadline } from '../formatting/paceLabels'
 import { resolveBudget } from './monthlyBudget'
@@ -79,12 +80,8 @@ describe('the Amex pot’s check on Home', () => {
 
 describe('homeInbox on the seed (Wed 11 Nov)', () => {
   const result = inbox(seed())
-  it('builds the strip: Plan over in red, Spent with the worst pot, and the open Amex statement', () => {
+  it('builds the strip: Plan over in red, and the open Amex statement', () => {
     expect(result.strip.plan).toEqual({ value: '£1,141.87 over', tone: 'critical', detail: 'Ada £429.66 over · Ben £712.21 over' })
-    // Tracked pots only (D4): the card spend of £272.59 less £90.69 on Funded only and Saving pots. The Bills pot's
-    // assumed bills (£234.82) are Carries over, so they're not part of it.
-    expect(result.strip.spent).toMatchObject({ value: '£181.90', sub: 'of £1,911.83', detailTone: 'warning' })
-    expect(result.strip.spent!.detail).toMatch(/^Groceries .*£63 ahead of pace$/)
     // The bill (D1), named by its month: the open one, while no older bill is unpaid.
     expect(result.strip.card).toEqual({ name: 'Amex', value: '£649.23', sub: 'November bill so far', detail: '£312.85 in the Amex pot · closes Tue 24 Nov' })
     expect(result.stage).toBe('In progress · 19 days left')
@@ -266,8 +263,49 @@ describe('homeInbox defects from audit 4', () => {
     const row = monthSpending(document, month, '2026-11-11').rows.find(each => each.status === 'ahead')!
     const headline = paceHeadline(row)
     const result = inbox(document)
-    expect(result.strip.spent!.detail).toBe(`Groceries ${headline} of pace`)
+    expect(result.verdict).toMatch(new RegExp(`^Groceries ${headline} of pace\\.`))
     expect(titles(result.headsUp)).toEqual([`Groceries ${headline} of pace`])
+  })
+})
+
+describe('Home B (month-health PR 6, D14)', () => {
+  it('says the month in one line, from the Tracked pots: the pot ahead of pace, then the pots on track', () => {
+    expect(inbox(seed()).verdict).toBe('Groceries £63 ahead of pace. Holidays on track.')
+  })
+  it('puts the pot over first, to the penny, and names the pots that are fine', () => {
+    const document = seed()
+    const source = document.card!.transactions.find(row => row.kind === 'purchase' && row.sort?.lines.some(line => line.destination.kind === 'pot' && line.destination.potId === 'groceries'))!
+    document.card!.transactions.push({ ...source, id: 'big', date: '2026-11-10', amountPence: 20000, sort: { ...source.sort!, lines: [{ amountPence: 20000, destination: { kind: 'pot', potId: 'groceries' } }] } })
+    const result = inbox(document)
+    expect(result.verdict).toMatch(/^Groceries £[\d.,]+ over\. Holidays on track\.$/)
+    expect(result.pots[0]).toMatchObject({ name: 'Groceries', tone: 'critical', week: 'This week £0.00 · nothing to spend' })
+    expect(result.pots[0]!.value).toMatch(/over$/)
+    expect(result.pots[0]!.status).toMatch(/covered when November closes$/)
+  })
+  it('has one card per Tracked pot, with its week and where it opens', () => {
+    const { pots } = inbox(seed())
+    expect(pots.map(pot => pot.name)).toEqual(['Groceries', 'Holidays'])
+    expect(pots[0]).toEqual({ key: 'pot:groceries', name: 'Groceries', value: '£143.57 left', status: '£63 ahead · runs out ~Fri 20 Nov', tone: 'warning', week: 'This week £35.89 · to Sun 15 Nov', target: { view: 'month', month, potId: 'groceries' } })
+    expect(pots[1]).not.toHaveProperty('tone')
+  })
+  it('leaves Funded only, Saving and Carries over pots off the cards and the verdict', () => {
+    const result = inbox(savePotKind(seed(), 'holidays', 'saving'))
+    expect(result.pots.map(pot => pot.name)).toEqual(['Groceries'])
+    expect(result.verdict).toBe('Groceries £63 ahead of pace.')
+    // Saving gets a tile of its own, Bills too.
+    expect(result.saving).toEqual({ label: 'Saving', value: '£1,586.36', sub: 'put by in November', detail: 'Holidays', target: { view: 'month', month, potId: 'holidays' } })
+    expect(result.bills).toEqual({ label: 'Bills', value: '£965.58', sub: 'planned for November', detail: '£154.17 still to go out · £796.03 spare', target: { view: 'month', month, potId: 'bills' } })
+  })
+  it('has no verdict or cards for a future month, or before the first plan', () => {
+    expect(inbox(seed(), '2026-11-11', '2026-12').verdict).toBeUndefined()
+    const first = inbox(household())
+    expect(first.verdict).toBeUndefined()
+    expect(first.pots).toEqual([])
+    expect(first.bills).toBeUndefined()
+  })
+  it('names the month in the verdict on an overlap day, and says what is left rather than "on track"', () => {
+    const result = inbox(seed(), '2026-11-27')
+    expect(result.verdict).toBe('November: Groceries £143.57 left. Holidays £1,586.36 left.')
   })
 })
 
