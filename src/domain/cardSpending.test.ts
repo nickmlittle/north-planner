@@ -272,13 +272,13 @@ describe('pace if placed (Spending ↔ Month link F5)', () => {
     expect(impactText('Eating out', same)).toBe('')
   })
 
-  it('shows what’s free in a carry-over pot once its balance is checked', () => {
+  it('shows what’s spare in a carry-over pot once its balance is checked', () => {
     const document = household()
     expect(impactText('Bills', paceIfPlaced(document, unsorted(document), pot('bills'), today))).toBe('')
     document.card!.pots.bills = { carriesOver: true, checkedBalance: { pence: 30000, at: '2026-11-01T09:00:00.000Z' } }
     const impact = paceIfPlaced(document, unsorted(document), pot('bills'), today)
     expect(impact.freeAfter).toBe(impact.freeBefore! - 5000)
-    expect(impactText('Bills', impact)).toMatch(/^Bills: £[\d,.]+ free → £[\d,.]+ free$/)
+    expect(impactText('Bills', impact)).toMatch(/^Bills: £[\d,.]+ spare → £[\d,.]+ spare$/)
     expect(impact.tipped).toBe(false)
   })
 
@@ -290,7 +290,7 @@ describe('pace if placed (Spending ↔ Month link F5)', () => {
     expect(optionPaceText(row('pot:treats'))).toBe('£12.50 over')
     expect(optionPaceText(row('pot:fuel'))).toBe('£61.80 left')
     expect(optionPaceText(row('pot:bills'))).toBe('')
-    expect(optionPaceText(row('pot:bills'), 8000)).toBe('£80.00 free')
+    expect(optionPaceText(row('pot:bills'), 8000)).toBe('£80.00 spare')
     expect(optionPaceText(row('account:joint'))).toBe('')
     expect(optionPaceText({ destination: pot('gifts'), status: 'one-offs', leftPence: 0, carriesOver: false })).toBe('nothing planned')
     expect(optionPaceText(undefined)).toBe('')

@@ -48,16 +48,16 @@ export const capitalise = (text: string) => text ? `${text[0]!.toUpperCase()}${t
 // ——— Sorting (Spending ↔ Month link F5): the picker, the impact line and the toast ———
 
 const leftText = (pence: number) => pence < 0 ? overText(-pence) : `${pounds(pence)} left`
-const freeText = (pence: number) => `${pence < 0 ? '−' : ''}${pounds(Math.abs(pence))} free`
+const spareText = (pence: number) => `${pence < 0 ? '−' : ''}${pounds(Math.abs(pence))} spare`
 
 /**
  * A pot option's suffix in the picker: "£130.00 left · £110 ahead", "£150.00 over", "£130.00 left", "nothing planned".
- * Carry-over pots show what's free once their balance is checked ("£80.00 free"), else nothing. Funded only and Saving
+ * Carry-over pots show what's spare once their balance is checked ("£80.00 spare"), else nothing. Funded only and Saving
  * pots have no Left, so they say what they are.
  */
 export function optionPaceText(row: Pick<DestinationSpending, 'destination' | 'status' | 'leftPence' | 'aheadPence' | 'carriesOver'> | undefined, freePence?: number): string {
-  if (!row) return freePence === undefined ? '' : freeText(freePence)
-  if (row.carriesOver) return freePence === undefined ? '' : freeText(freePence)
+  if (!row) return freePence === undefined ? '' : spareText(freePence)
+  if (row.carriesOver) return freePence === undefined ? '' : spareText(freePence)
   if (row.destination.kind === 'account') return ''
   if (row.status === 'funded') return 'Funded only'
   if (row.status === 'saving') return 'Saving'
@@ -77,7 +77,7 @@ const stateText = (row: Pick<DestinationSpending, 'status' | 'leftPence' | 'ahea
 export function impactText(name: string, impact: PlacedPace): string {
   const { before, after, figures } = impact
   if (impact.same || impact.destination.kind === 'account') return ''
-  if (impact.freeBefore !== undefined && impact.freeAfter !== undefined) return `${name}: ${freeText(impact.freeBefore)} → ${freeText(impact.freeAfter)}`
+  if (impact.freeBefore !== undefined && impact.freeAfter !== undefined) return `${name}: ${spareText(impact.freeBefore)} → ${spareText(impact.freeAfter)}`
   if (!after || after.carriesOver || after.status === 'funded' || after.status === 'saving') return ''
   if (after.status === 'one-offs') return `${name} has nothing planned in ${monthName(figures.month)}`
   const leftBefore = before ? before.leftPence : after.plannedPence - after.takenPence

@@ -18,7 +18,7 @@ it('shows what’s due on a pot with bills, and on a monthly pot as part of Left
   for (const snapshot of Object.values(document.budget.snapshots)) snapshot.items = [...snapshot.items, { ...snapshot.items[0]!, id: 'veg', name: 'Veg box', entryAmountPence: 3000, amountPence: 3000, funding: 'equal', bill: { paidBy: 'direct-debit', day: 20 } }]
   render(<PotsSection document={document} month="2026-11" today={TODAY} onOpenPot={() => {}}/>)
   // Bills: electricity and broadband are still to come.
-  expect(screen.getByRole('button', { name: /^Bills: .+ free\. £154\.17 due this month$/ })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /^Bills: .+ spare\. £154\.17 due this month$/ })).toBeInTheDocument()
   // Groceries is ahead of pace, so on phones it sits in Needs a look, which keeps its Due.
   expect(screen.getByRole('button', { name: /^Groceries · Joint: .+ ahead\..* · £30\.00 of it due$/ })).toBeInTheDocument()
 })
@@ -28,5 +28,5 @@ it('shows the bills paid and still due in how a pot’s balance is worked out', 
   const sums = [...window.document.body.querySelectorAll('.carry-over-sums > div')].map(row => row.textContent)
   expect(sums).toContain('Bills paid since−£234.82')
   expect(sums).toContain('Bills still due this month−£154.17')
-  expect(sums.some(row => row?.startsWith('Free'))).toBe(true)
+  expect(sums.some(row => row?.startsWith('Spare'))).toBe(true)
 })

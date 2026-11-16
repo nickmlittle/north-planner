@@ -86,7 +86,7 @@ export function CloseSections({ document, setDocument, month, today, onSort, onB
     </Section>}
 
     {plan.carryOver.length > 0 && <Section title="Carry-over pots">
-      <ul className="close-list" aria-label="Carry-over pots">{plan.carryOver.map(row => <li key={row.potId}><ListRow title={destination({ kind: 'pot', potId: row.potId })} meta={row.checkedAt ? `Checked ${dayOf(row.checkedAt)}` : 'Not checked yet'} trailing={row.freePence === undefined ? 'Not checked' : `${signedPounds(row.freePence)} free`}/></li>)}</ul>
+      <ul className="close-list" aria-label="Carry-over pots">{plan.carryOver.map(row => <li key={row.potId}><ListRow title={destination({ kind: 'pot', potId: row.potId })} meta={row.checkedAt ? `Checked ${dayOf(row.checkedAt)}` : 'Not checked yet'} trailing={row.freePence === undefined ? 'Not checked' : `${signedPounds(row.freePence)} spare`}/></li>)}</ul>
     </Section>}
     {moving && <MoveBuiltUp potName={potName(moving.potId)} suggested={moving.flag?.movePence ?? 0} onClose={() => setMoving(null)} onSave={pence => { setDocument(current => moveBuiltUp(current, moving.potId, pence, now())); setMoving(null) }}/>}
   </div>

@@ -27,6 +27,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Amex pot check 1: should hold, the check, extra and top-ups, covering a bill | C1 | `src/domain/setAsideCheck.ts`, the `gap` flow in `potBalances.ts`, `GapMove` in `cardTracker.ts` |
 | Amex pot check 2: the check on the Amex pot's page, Month's Amex row | C2 | `src/pages/SetAsideCheckLead.tsx`, `SetAsidePot` in `SpendingMonth.tsx`, `src/pages/month/PotsSection.tsx` |
 | Amex pot check 3: Check balances, settle up's cover line, Home | C3 | `src/pages/CheckBalancesSheet.tsx`, `SettleSteps` in `StatementsPanel.tsx`, `gap` in `homeMonths` and `homeInbox` |
+| Month health 4: one sum per bill and per pot (D1, D2, D13) | health/4 | `src/domain/billSum.ts`, `src/domain/potSum.ts`, `SetAsideCheckLead.tsx`, `PotSumSection` in `SpendingMonth.tsx` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -147,7 +148,7 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 | **Tracked** (Groceries, Going out) | Left this month, pace, covers and leftovers at Close, build-up flag | Left, pace, the meter |
 | **Funded only** (Ada's and Ben's Spending) | Moves the money in on payday and stops there. No Left, no pace, no leftovers or build-up, not counted in Spending this month | "£1,135.42 moved in", then "£115.30 on the Amex" |
 | **Saving** (Holidays, Emergency) | No Left or pace, nothing to cover or carry. (Built up is a later PR) | "£1,586.36 put by" and what was spent from it |
-| **Carries over** (Bills) | What's left stays in the pot; Free (below) | Free, and what's due |
+| **Carries over** (Bills) | What's left stays in the pot; Spare (below) | Spare, and what's due |
 
 - **Default** (`defaultPotKind`, P2), when nobody has chosen: a pot with the older `carriesOver` flag is Carries over; a savings pot or a pot in a savings, ISA or pension account is Saving; a spending pot in one person's account is Funded only; anything else is Tracked. A savings pot kept in a current account (Holidays in Monzo Joint) is set to Saving by hand.
 - **Chosen** (`savePotKind`): stored only when someone picks one in Settings › Accounts & pots; until then a pot follows where it is (move it to a joint account and it becomes Tracked). It sets `pace` and `carriesOver` to match, so older readers agree. `savePotSettings` with `carriesOver` moves a chosen kind with it.
@@ -157,8 +158,10 @@ Only the reference, date, collapsed description, merchant, pence, card suffix, A
 
 ## Carry-over pots (D9, §6.6)
 
+Since month health 4 this figure is called **Spare** on screen ("Free" is retired, plan §2). The code still calls it `freePence`.
+
 ```
-free = checked balance
+spare = checked balance
      + payday Move ticks into the pot made after the check
      − settle-up "Out of <pot>" ticks made after the check (net of "Into <pot>")
      − card spend on the pot not yet settled
@@ -167,9 +170,9 @@ free = checked balance
 - (Since A3 this is `potBalance` in `potBalances.ts`, which also counts covers, built-up moves and moves to the Amex pot; see "The Amex pot".)
 - **Not yet settled**, per statement: the pot's share of that statement (its split lines, by `statementKey`) minus what its settle-up tick moved (`settle:out:<potId>`, less `settle:into:<potId>`). A late refund after settling leaves a negative amount waiting (money to come back). Each statement with something waiting is listed by name ("Waiting to settle · October statement").
 - **Moves** are payday ticks whose key ends `:move:<potId>`, in any month, made after the check.
-- With no checked balance there's no figure: "Check the balance to see what's free". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
+- With no checked balance there's no figure: "Check the balance to see what's spare". **Check against Monzo** (`checkPotBalance`) records the balance and the time; the bank's name is the pot's account provider.
 - **Annual costs** (`annualCosts`) are the month's Plan items to the pot entered yearly, shown as "£612.00 a year".
-- Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's free. ("Carries over" is one of the four pot kinds, see Pot kinds.)
+- Carry-over pots never show pace or "£X left"; This month shows what they spent this month and what's spare. ("Carries over" is one of the four pot kinds, see Pot kinds.)
 
 ## Month stages (§6.9)
 
@@ -247,7 +250,7 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 
 ## The Amex pot (set aside as you go)
 
-**Status:** agreed with Nick on 11 November 2026, after #137. Nick keeps an "Amex" pot in Monzo and moves money into it from the spending pots during each review, rather than once per statement. Built in the `amex-pot/1`–`4` PR series (A1–A4 in the table above).
+**Status:** agreed with Nick on 11 November 2026, after #137. Nick keeps an "Amex" pot in Monzo and moves money into it from the spending pots during each review, rather than once per statement. Built in the `amex-pot/1`–`4` PR series (A1–A4 in the table above). Since month health 4, "free" is **Spare**, "still to move" is **To move**, "In Monzo now" is **In the pot**, and the Amex pot's statements are bills (see "Bill and pot sums").
 
 - **The setting** (Household → Cards): "Set money aside in" a pot, "Starting with" a statement (`CardAccount.setAside = { potId, fromCloseDate }`). The choices are the two statements before the open one, the open one (the default) and the next. Statements closing on or after `fromCloseDate` are paid from the pot (`usesSetAside`); earlier ones keep settling once via the pay-from account (§6.8). With no pot, nothing changes.
 - **A move** (`SetAsideMove`, `card.moves`) records when it happened and, for each transaction, the lines it moved: all its lines the first time, the change since it was last moved after that. What a transaction has moved is the sum over moves (`movedByTransaction`), so undoing any move (`undoMove`) is just removing it.
@@ -264,6 +267,8 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 ## Checking the Amex pot
 
 **Status:** agreed with Nick on 15 November 2026, from the [Amex pot check build plan](amex-pot-check-build-plan.md) (decisions R1–R5, Q1–Q5). Built in the `amex-check/1`–`3` PR series (C1–C3 in the table above); this section grows with each PR.
+
+> Since month health 4 the screens word this differently (see "Bill and pot sums"): Should hold is **Expected** in Check balances and the sum of the bills' **In the Amex pot** elsewhere; "In Monzo now" is **In the Amex pot**; "Matches" shows only after a check made since the last move. The rules below are unchanged; the quoted copy is as C1–C3 shipped it.
 
 - **Should hold** (`shouldHold`, `src/domain/setAsideCheck.ts`): what has moved into the card's set-aside pot for the statements paid from it that have no Pay tick yet. It's Σ every moved line of their transactions, refunds negative, lines sorted to the pot itself included (a purchase sorted to the Amex pot is paid from what's in it). It comes from the moves alone, never from a balance check, so extra money can't hide in a checked balance.
 - **Holds:** the pot's balance (`potBalance`): the last check plus every flow since.
@@ -282,6 +287,46 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **Check balances** (`amex-check/3`): the Amex pot's row reads "Should hold £312.85 · checked Sat 31 Oct". A typed figure says Matches, "£5.80 extra" or "£9.20 short" against what it should hold. While anything sorted is still to move, the row adds "£140.59 sorted and still to move. Moved it in Monzo already? Press Moved first, or it counts twice." Same as North shows only when the pot already holds what it should. Saving says "1 balance checked. The Amex pot has £5.80 extra." (or "is £9.20 short."), with **Open Amex pot** on Month and Spending.
 - **Settle up** (`amex-check/3`, `billCover`): on a statement paid from the pot, once nothing is left to move and until Pay is ticked, the Pay step says "The Amex pot covers the £169.20 bill · £5.80 to spare.", "£9.20 short of the bill: top up the Amex pot before you pay." or, before any check, "Check the Amex pot against Monzo to see if it covers the bill."
 - **Home** (`amex-check/3`): with a gap, To do has "Move extra out of the Amex pot" (£5.80, "To Monzo Joint · checked Sat 14 Nov") or "The Amex pot is short" (£9.20, "Less than it should hold · checked Sat 14 Nov"), toned, opening the Amex pot's page. It's the `gap:<cardId>` task in `homeMonths`.
+
+## Bill and pot sums
+
+**Status:** month-health plan PR 4 (`health/4-sums`), decisions D1, D2, D13 and P1, built 16 November 2026. One sum per bill and one per pot, so every figure on screen adds up.
+
+**The bill** (`billSum(document, statementKey, today)`, `src/domain/billSum.ts`), for a statement paid from the Amex pot (null otherwise):
+
+```
+Bill = In the Amex pot + To move + To sort (+ Expecting back, D11: 0 until PR 9)
+```
+
+- **In the Amex pot:** Σ what has moved in for the bill's purchases and refunds, lines sorted to the pot itself included.
+- **To move:** sorted and not moved yet (`toMove` for the statement), with how many transactions.
+- **To sort:** purchases and refunds not sorted yet, less anything they moved before they were unsorted, so the parts always add up to the bill (Σ purchases and refunds, payments left out).
+- **Open** while today ≤ the close date: "November bill so far". **Covered** once it has closed and nothing is left to move or sort, until the Pay tick. **Paid** once Pay is ticked.
+- **Known** (`amexPotKnown`): **checked** only when the Amex pot was checked after its last move (no flow since the check) and matched; otherwise **worked out**. "Matches Monzo" appears only when checked.
+- **Which bills** (`potBills`): every unpaid statement paid from the pot with something on it or in the pot, oldest first, then the open one even when empty. **Home's bill** (`homeBill`) is the first of them: the oldest unpaid bill until its Pay tick, then the open one.
+
+**The pot** (`potSum(document, potId, month, today)`, `src/domain/potSum.ts`):
+
+```
+In the pot = Left this month + Waiting to move + Carried over   (Tracked pots)
+Not explained = In the pot − (Left + Waiting + Carried over)    (once checked, this month only)
+Spare = In the pot − waiting to move − bills still due          (Carries over pots)
+```
+
+- **Left this month** is Month's Left. **Waiting to move** is `waitingShares`: card spend on the pot not yet moved out (per bill: "Waiting to move · November bill"; "Waiting to settle · October statement" for a statement that settles once). **Carried over** is `builtUp` without this month (P1). It's shown, never part of Left (D13).
+- **In the pot** is `potBalance`: the last check plus every flow since. Before the first check there's none: the pot shows Left and Waiting, "Not checked against Monzo yet" and **Check against Monzo** (§7).
+- **Not explained** is its own line whenever it isn't £0 (a missed transfer, interest, an unticked payday move), toned, with Check against Monzo, until a check makes it add up. It's only worked out for the current month, since the balance is today's.
+- Funded only and Saving pots show In the pot and what's waiting; their own leads come in PR 5. The month's to-sort total (`toSortPence`) rides along for PR 5's "To sort beside Left".
+- A pot that changes kind recomputes (it's read from `potKind` each time); closed months keep their records.
+
+**On screen:**
+- **Pot page** (`PotSumSection`): an **In the pot** section in place of Balance, its count the total: the sum's lines, "Checked against Monzo Wed 11 Nov" when nothing has moved since the check, else "Worked out from Monzo on Sat 31 Oct", and "How In the pot is worked out" folding the flows. A carry-over pot leads with **Spare** and its sums end in Spare.
+- **Amex pot page** (`SetAsideCheckLead`): **In the Amex pot**, its figure (the bank's when checked, else the moves'), a status line ("Matches Monzo · checked Thu 12 Nov", "Worked out · checked against Monzo Thu 12 Nov", "Worked out · not checked against Monzo yet", or "£5.80 extra · checked Thu 12 Nov" toned), then one line per bill it holds money for ("For the November bill so far £109.20"), Extra or Short, and the total. **Bills it pays** lists each bill: "November bill so far · £44.60 in the Amex pot · £58.20 to move · £18.00 to sort · £120.80", or "Covered · all in the Amex pot". Evening up extra or a top-up says "The Amex pot has what its bills need." and reads worked out until the next check.
+- **Month's Amex row:** its figure is In the Amex pot ("£109.20 in the pot"), its status the bill closing that month: "November bill so far · £60.00 to move", "… · covered", "… · paid" or "… · all in the pot"; extra or short still takes its place.
+- **Statement page:** "£312.85 of £649.23 is in the Amex pot", then "£140.59 to move · £18.00 to sort" or "All moved in".
+- **Check balances:** the Amex pot's row reads "Expected £109.20 · checked …" (the only place "Expected" is used), and warns "£60.00 sorted, to move. Moved it in Monzo already? Press Moved first, or it counts twice."
+- **Home's card figure:** "Amex · £649.23 November bill so far", "£312.85 in the Amex pot · closes Tue 24 Nov"; once it closes, "November bill" with "due Fri 18 Dec", and "covered" once it's all in. The gap task says "Less than its bills need".
+- **Retired** (copy guard, `src/copy.vocabulary.test.ts`): "free", "this statement", "£X set aside" and "In Monzo now", "still to move", "should hold".
 
 ## Links between Spending and Month
 
@@ -303,4 +348,4 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 
 ## Words on screen
 
-See the [glossary](product-design-spec.md#glossary). **Spent**, **Left**, **Bring in**, **Sort / To sort / Sorted**, **Split**, **Pace**, **Close <Month>**, **Settle up**, **Built up** and **Free** are this feature's words. **Move** keeps its meaning (account → pot). Money leaving a pot is "Out of <pot>", and account to account is "Send to <account>". The UI says "sort", never "assign".
+See the [glossary](product-design-spec.md#glossary). **Spent**, **Left**, **Bring in**, **Sort / To sort / Sorted**, **Split**, **Pace**, **Close <Month>**, **Settle up**, **Built up**, **Bill**, **In the Amex pot**, **To move**, **To sort**, **In the pot**, **Waiting to move**, **Carried over**, **Not explained** and **Spare** are this feature's words. **Move** keeps its meaning (account → pot). Money leaving a pot is "Out of <pot>", and account to account is "Send to <account>". The UI says "sort", never "assign".

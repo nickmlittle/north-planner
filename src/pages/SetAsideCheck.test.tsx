@@ -45,41 +45,53 @@ function Harness({ initial, onChange = () => {}, today = TODAY, onOpenStatement 
     setDocument={update => setDocument(current => { const next = typeof update === 'function' ? update(current) : update; onChange(next); return next })}/>
 }
 
-const lead = () => screen.getByRole('region', { name: /^(Should hold|Checked against Monzo)/ })
+const lead = () => screen.getByRole('region', { name: 'In the Amex pot' })
+const status = () => lead().querySelector('.pot-check-status')
 
 describe('the Amex pot’s check', () => {
-  it('asks for a check before it can say anything', () => {
+  it('is worked out from the moves until it is checked', () => {
     render(<Harness initial={household()}/>)
-    expect(within(lead()).getByText('£109.20')).toBeInTheDocument()
-    expect(within(lead()).getByText(/Check it against Monzo to see if it holds that/)).toBeInTheDocument()
+    expect(lead().querySelector('.pot-lead-value')).toHaveTextContent('£109.20')
+    expect(status()).toHaveTextContent('Worked out · not checked against Monzo yet')
+    // It names the bill it holds money for (D1).
+    expect(within(lead()).getByText('All of it is for the November bill so far.')).toBeInTheDocument()
     fireEvent.click(within(lead()).getByRole('button', { name: 'Check against Monzo' }))
     expect(screen.getByRole('dialog', { name: 'Check against Monzo' })).toBeInTheDocument()
   })
 
-  it('matches when Monzo holds what has moved in', () => {
+  it('matches when Monzo holds what has moved in, checked after the last move', () => {
     render(<Harness initial={household(10920)}/>)
-    expect(lead()).toHaveAccessibleName('Checked against Monzo · Thu 12 Nov')
-    expect(within(lead()).getByText('Matches')).toBeInTheDocument()
-    expect(within(lead()).getByText('Should hold').nextSibling).toHaveTextContent('£109.20')
-    expect(within(lead()).getByText('In Monzo now').nextSibling).toHaveTextContent('£109.20')
+    expect(status()).toHaveTextContent('Matches Monzo · checked Thu 12 Nov')
+    expect(lead().querySelector('.pot-lead-value')).toHaveTextContent('£109.20')
     expect(within(lead()).queryByRole('button')).toBeNull()
+  })
+
+  it('says worked out, not Matches, once anything has moved since the check', () => {
+    const document = household(10920)
+    document.card!.moves = [...document.card!.moves!, { id: 'm2', cardId: 'amex', at: '2026-11-13T09:00:00.000Z', transactions: [{ transactionId: 'fuel', lines: [{ amountPence: 6000, destination: pot('fuel') }] }] }]
+    render(<Harness initial={document}/>)
+    expect(status()).toHaveTextContent('Worked out · checked against Monzo Thu 12 Nov')
+    expect(lead().querySelector('.pot-lead-value')).toHaveTextContent('£169.20')
+    expect(within(lead()).getByRole('button', { name: 'Check against Monzo' })).toBeInTheDocument()
   })
 
   it('moves extra to the buffer: the steps, Moved, then it matches; Undo puts it back', () => {
     let saved: BudgetDocument | undefined
     render(<Harness initial={household(11500)} onChange={next => { saved = next }}/>)
-    expect(within(lead()).getByText('£5.80 extra')).toBeInTheDocument()
+    expect(status()).toHaveTextContent('£5.80 extra · checked Thu 12 Nov')
+    expect(within(lead()).getByText('Extra').nextSibling).toHaveTextContent('£5.80')
     expect(within(lead()).getByText('Move it to Monzo Joint.')).toBeInTheDocument()
     const steps = within(lead()).getByRole('list', { name: 'Moves to make' })
     expect(within(steps).getAllByRole('listitem').map(row => row.textContent)).toEqual(['Out of Amex£5.80'])
     expect(within(lead()).getByText(/Moved money early for a purchase that isn’t in North yet\? Leave it/)).toBeInTheDocument()
     fireEvent.click(within(lead()).getByRole('button', { name: 'Moved £5.80' }))
     expect(saved!.card!.gapMoves).toEqual([expect.objectContaining({ pence: 580, destination: { kind: 'account', accountId: 'joint' } })])
-    expect(within(lead()).getByText('Matches')).toBeInTheDocument()
-    expect(screen.getByText('Moved £5.80 to Monzo Joint. The Amex pot matches.')).toBeInTheDocument()
+    // Evened up, but moved since the check: worked out until the next check.
+    expect(status()).toHaveTextContent('Worked out · checked against Monzo Thu 12 Nov')
+    expect(screen.getByText('Moved £5.80 to Monzo Joint. The Amex pot has what its bills need.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(saved!.card!.gapMoves).toBeUndefined()
-    expect(within(lead()).getByText('£5.80 extra')).toBeInTheDocument()
+    expect(status()).toHaveTextContent('£5.80 extra')
   })
 
   it('sends extra into a buffer pot when the card has one', () => {
@@ -93,7 +105,7 @@ describe('the Amex pot’s check', () => {
   it('when short: the recent moves with Undo, and a top-up from the buffer', () => {
     let saved: BudgetDocument | undefined
     render(<Harness initial={household(10000)} onChange={next => { saved = next }}/>)
-    expect(within(lead()).getByText('£9.20 short')).toBeInTheDocument()
+    expect(status()).toHaveTextContent('£9.20 short · checked Thu 12 Nov')
     expect(within(lead()).getByText('Did a transfer not happen? Make it now, then check the Amex pot again.')).toBeInTheDocument()
     const moves = within(lead()).getByRole('list', { name: 'Recent moves' })
     expect(within(moves).getAllByRole('listitem')[0]).toHaveTextContent('Tue 10 Nov · £109.20')
@@ -101,7 +113,7 @@ describe('the Amex pot’s check', () => {
     expect(within(within(lead()).getByRole('list', { name: 'Top-up to make' })).getAllByRole('listitem').map(row => row.textContent)).toEqual(['Into Amex£9.20'])
     fireEvent.click(within(lead()).getByRole('button', { name: 'Topped up £9.20' }))
     expect(saved!.card!.gapMoves).toEqual([expect.objectContaining({ pence: -920 })])
-    expect(within(lead()).getByText('Matches')).toBeInTheDocument()
+    expect(status()).toHaveTextContent(/^Worked out/)
   })
 
   it('undoing a move that wasn’t made puts its transactions back to move', () => {
@@ -110,7 +122,8 @@ describe('the Amex pot’s check', () => {
     fireEvent.click(within(lead()).getByRole('button', { name: 'Undo the move on Tue 10 Nov' }))
     expect(saved!.card!.moves).toBeUndefined()
     expect(screen.getByText('Move undone. Those transactions are back on the list to move.')).toBeInTheDocument()
-    expect(within(lead()).getByText('Matches')).toBeInTheDocument()
+    // With the move gone, nothing has moved since the check: it's the bank's figure again.
+    expect(status()).toHaveTextContent('Matches Monzo · checked Thu 12 Nov')
   })
 
   it('a closed statement with no Pay tick links to its settle up', () => {
@@ -119,7 +132,7 @@ describe('the Amex pot’s check', () => {
     expect(within(lead()).getByText(/^The November statement has no Pay tick\. Paid it\? Tick Pay when you settle up\./)).toBeInTheDocument()
     fireEvent.click(within(lead()).getByRole('button', { name: 'Open the November statement' }))
     expect(onOpenStatement).toHaveBeenCalledWith(NOV)
-    fireEvent.click(screen.getByRole('button', { name: /^November statement, .*open it in Spending$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^November bill, .*open it in Spending$/ }))
     expect(onOpenStatement).toHaveBeenLastCalledWith(NOV)
   })
 })
@@ -127,10 +140,10 @@ describe('the Amex pot’s check', () => {
 describe('Month’s Amex row', () => {
   it('says extra or short in place of what’s left to move', () => {
     render(<MonthPage document={household(11500)} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={() => {}} onSort={() => {}} today={TODAY}/>)
-    expect(screen.getByRole('button', { name: /^Amex · set aside: .*£5.80 extra$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Amex: £115\.00 in the pot\. £5.80 extra$/ })).toBeInTheDocument()
     cleanup()
     render(<MonthPage document={household()} setDocument={() => {}} month="2026-11" onMonthChange={() => {}} payday={null} onOpenPot={() => {}} onSort={() => {}} today={TODAY}/>)
-    expect(screen.getByRole('button', { name: /^Amex · set aside: .*£60.00 still to move for November$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Amex: £109\.20 in the pot\. November bill so far · £60.00 to move$/ })).toBeInTheDocument()
   })
 })
 
@@ -146,14 +159,14 @@ describe('Check balances, for the Amex pot', () => {
     return screen.getByRole('dialog', { name: 'Check balances' })
   }
 
-  it('holds the Amex pot against what it should hold, warns while anything is still to move, and offers to open it', () => {
+  it('holds the Amex pot against what’s Expected, warns while anything is waiting to move, and offers to open it', () => {
     const onOpenPot = vi.fn()
     let saved: BudgetDocument | undefined
     render(<MonthHarness initial={household()} onChange={next => { saved = next }} onOpenPot={onOpenPot}/>)
     const dialog = open()
     const amex = within(dialog).getByLabelText(/^Amex/)
-    expect(amex).toHaveAccessibleName(/Should hold £109\.20 · not checked yet$/)
-    expect(amex).toHaveAccessibleDescription(/£60.00 sorted and still to move\. Moved it in Monzo already\? Press Moved first, or it counts twice\./)
+    expect(amex).toHaveAccessibleName(/Expected £109\.20 · not checked yet$/)
+    expect(amex).toHaveAccessibleDescription(/£60.00 sorted, to move\. Moved it in Monzo already\? Press Moved first, or it counts twice\./)
     fireEvent.change(amex, { target: { value: '109.20' } })
     expect(within(dialog).getByText('Matches')).toBeInTheDocument()
     fireEvent.change(amex, { target: { value: '100' } })

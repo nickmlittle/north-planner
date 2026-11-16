@@ -3,14 +3,15 @@ import { ChevronRight } from 'lucide-react'
 import { EmptyState, Meter, Section, useMobilePresentation } from '../../components/ui'
 import type { BudgetDocument } from '../../domain/budgetDocument'
 import { monthSpending, needsALook, type DestinationSpending, type MonthSpending } from '../../domain/cardSpending'
-import { cardTracker, destinationKey, shiftMonth, type PotKind } from '../../domain/cardTracker'
+import { cardTracker, closeDateFor, destinationKey, shiftMonth, statementKey, type PotKind } from '../../domain/cardTracker'
+import { billSum, type BillSum } from '../../domain/billSum'
 import { resolveBudget, type BudgetDestination } from '../../domain/monthlyBudget'
-import { potBalance, setAsideStatements } from '../../domain/potBalances'
+import { potBalance } from '../../domain/potBalances'
 import { POT_KIND_LABELS, potKind } from '../../domain/potKinds'
 import { setAsideCheck } from '../../domain/setAsideCheck'
 import { formatMonth } from '../../formatting/month'
 import { destinationNamer } from '../cardLabels'
-import { dayOf, pounds, signedPounds } from '../spendingFormat'
+import { billName, dayOf, pounds, signedPounds } from '../spendingFormat'
 import { FreshnessLine } from '../Freshness'
 import type { OpenTransactions } from '../SpendingMonth'
 import { paceStatus } from '../../formatting/paceLabels'
@@ -27,7 +28,7 @@ type PotRow = {
   /** An account's one-offs: opens Spending › Transactions filtered to it (F1). */
   accountKey?: string
   name: string
-  /** "set aside" or "one-offs": a pot's kind is its group's heading. */
+  /** "one-offs": a pot's kind is its group's heading. */
   kind?: string
   /** The phone row's figure when it isn't Left: "£1,135.42 moved in". */
   figure?: string
@@ -63,9 +64,9 @@ function spendingRow(document: BudgetDocument, row: DestinationSpending, figures
   if (row.kind === 'funded-only') return { ...base, planned: pounds(row.plannedPence), left: '—', figure: `${pounds(row.plannedPence)} moved in`, status: row.spentPence ? `${pounds(row.spentPence)} on the Amex` : 'Nothing on the Amex' }
   if (row.kind === 'saving') return { ...base, planned: row.plannedPence ? pounds(row.plannedPence) : '—', left: '—', ...row.plannedPence ? { figure: `${pounds(row.plannedPence)} put by` } : {}, status: row.spentPence ? `${pounds(row.spentPence)} spent from it` : 'Nothing spent' }
   if (row.carriesOver) {
-    const free = balance?.freePence
+    const spare = balance?.freePence
     const dueText = row.duePence > 0 ? `${pounds(row.duePence)} due this month` : ''
-    return { ...base, planned: '—', left: free === undefined ? '—' : `${signedPounds(free)} free`, status: free === undefined ? ['Check the balance to see what’s free', dueText].filter(Boolean).join(' · ') : dueText || 'No pace' }
+    return { ...base, planned: '—', left: spare === undefined ? '—' : `${signedPounds(spare)} spare`, status: spare === undefined ? ['Check the balance to see what’s spare', dueText].filter(Boolean).join(' · ') : dueText || 'No pace' }
   }
   const paced = row.pace === 'steady' && row.plannedPence > 0
   const meter = paced ? { value: row.spentPence + row.takenPence, max: row.plannedPence, ...figures.when === 'current' && row.expectedPence !== undefined ? { pace: row.expectedPence / row.plannedPence } : {}, tone: row.status === 'over' ? 'critical' as const : row.status === 'ahead' ? 'warning' as const : 'neutral' as const } : undefined
@@ -102,12 +103,13 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   }
   const setAsideRow = (): PotRow | null => {
     if (!setAsideCard || !setAsidePot) return null
-    const statement = setAsideStatements(document, setAsideCard.id).find(row => row.closeDate.slice(0, 7) === month)
+    // The bill closing this month (D1): what's still to move or sort for it, by name.
+    const bill = billSum(document, statementKey(setAsideCard.id, closeDateFor(`${month}-01`, setAsideCard.closeDay)), today)
     const balance = potBalance(document, setAsidePot.id, today).balancePence
     // Checking the Amex pot: extra or short takes over the status, since it's what needs doing.
     const check = setAsideCheck(document, setAsideCard.id, today)
     const gap = check?.state === 'extra' ? `${pounds(check.gapPence!)} extra` : check?.state === 'short' ? `${pounds(-check.gapPence!)} short` : ''
-    return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, kind: 'set aside', spent: '—', planned: '—', left: '—', status: gap || (statement?.toMovePence ? `${pounds(statement.toMovePence)} still to move for ${monthName(month)}` : statement ? 'All moved in' : 'Nothing to move'), inBank: balance === undefined ? '—' : signedPounds(balance), ...gap ? { tone: 'warning' as const } : {} }
+    return { key: `set-aside:${setAsidePot.id}`, potId: setAsidePot.id, name: setAsidePot.name, spent: '—', planned: '—', left: '—', ...check ? { figure: `${signedPounds(check.holdsPence ?? check.shouldHoldPence)} in the pot` } : {}, status: gap || (bill ? billStatus(bill) : 'Nothing to move'), inBank: balance === undefined ? '—' : signedPounds(balance), ...gap ? { tone: 'warning' as const } : {} }
   }
   // One group per kind (D3), each ordered Joint first, then each person's pots. The Amex pot and an account's one-offs sit apart.
   const kindOf = (potId: string): PotKind => potKind(document, potId) ?? 'tracked'
@@ -164,8 +166,17 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   </Section>
 }
 
-/** A phone row's figure: "£143.57 left", "£1,134.01 free", "£112.81 spent" or the balance. */
-const cardFigure = (row: PotRow) => row.figure ?? (row.left?.startsWith('−') ? `${row.left.slice(1)} over` : row.left && row.left !== '—' ? `${row.left}${row.left.endsWith('free') ? '' : ' left'}` : row.spent && row.spent !== '—' ? `${row.spent} spent` : row.inBank && row.inBank !== '—' ? `${row.inBank} in the pot` : '')
+/** The Amex row's status (D1): "November bill · £402.00 to move · £24.00 to sort", "… · covered" or "… · all in the pot". */
+function billStatus(bill: BillSum): string {
+  const name = billName(bill.closeDate, bill.open)
+  if (bill.paid) return `${name} · paid`
+  if (bill.covered) return `${name} · covered`
+  const parts = [bill.toMovePence ? `${pounds(bill.toMovePence)} to move` : '', bill.toSort ? `${pounds(bill.toSortPence)} to sort` : ''].filter(Boolean)
+  return `${name} · ${parts.length ? parts.join(' · ') : 'all in the pot'}`
+}
+
+/** A phone row's figure: "£143.57 left", "£1,134.01 spare", "£112.81 spent" or the balance. */
+const cardFigure = (row: PotRow) => row.figure ?? (row.left?.startsWith('−') ? `${row.left.slice(1)} over` : row.left && row.left !== '—' ? `${row.left}${row.left.endsWith('spare') ? '' : ' left'}` : row.spent && row.spent !== '—' ? `${row.spent} spent` : row.inBank && row.inBank !== '—' ? `${row.inBank} in the pot` : '')
 
 /** A phone row: name and what's left, the meter, then the status in words. */
 function cardBody(row: PotRow, pace: (row: PotRow) => ReactNode) {

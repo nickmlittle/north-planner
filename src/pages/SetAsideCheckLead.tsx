@@ -8,17 +8,18 @@ import { cardTracker, destinationKey, localDate, type SetAsideMove } from '../do
 import type { SettleStep } from '../domain/cardStatements'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { potPhrase, undoMove } from '../domain/setAside'
+import { amexPotKnown, potBills } from '../domain/billSum'
 import { gapDestination, gapSteps, recordGapMove, setAsideCheck, undoGapMove } from '../domain/setAsideCheck'
 import { shortAccountLabels } from './budgetLabels'
 import { dayDate, destinationNamer } from './cardLabels'
-import { dayOf, plural, pounds, signedPounds, statementName } from './spendingFormat'
+import { billName, dayOf, plural, pounds, signedPounds, statementName } from './spendingFormat'
 
 type Props = {
   document: BudgetDocument
   setDocument: Dispatch<SetStateAction<BudgetDocument>>
   cardId: string
   today: string
-  /** "Monzo", for "In Monzo now" and "Check against Monzo". */
+  /** "Monzo", for "Matches Monzo" and "Check against Monzo". */
   bank: string
   onCheck: () => void
   /** A statement's page on Spending, for a closed statement with no Pay tick. */
@@ -29,9 +30,10 @@ type Props = {
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /**
- * The Amex pot's check (card-tracker-rules, "Checking the Amex pot"): what it should hold against what's in it.
- * Extra: the steps to move it to the card's buffer, then Moved. Short: what might explain it (a statement paid but
- * not ticked, the recent moves, each with Undo) and a top-up from the buffer. Unchecked: a nudge to check it.
+ * The Amex pot's lead (card-tracker-rules, "Checking the Amex pot" and "Bill and pot sums"): In the Amex pot, one line
+ * per bill it holds money for, plus any extra or short. It reads "Matches Monzo" only after a check made after the last
+ * move; until then it's worked out. Extra: the steps to move it to the card's buffer, then Moved. Short: what might
+ * explain it (a statement paid but not ticked, the recent moves, each with Undo) and a top-up from the buffer.
  */
 export function SetAsideCheckLead({ document, setDocument, cardId, today, bank, onCheck, onOpenStatement, now = () => new Date() }: Props) {
   const { show, toast } = useToast()
@@ -45,25 +47,31 @@ export function SetAsideCheckLead({ document, setDocument, cardId, today, bank, 
   const record = (pence: number) => {
     const id = crypto.randomUUID()
     setDocument(current => recordGapMove(current, cardId, pence, now(), id))
-    show(pence > 0 ? `Moved ${pounds(pence)} to ${buffer}. ${capital(phrase)} matches.` : `Topped up ${phrase} with ${pounds(-pence)}. It matches.`,
+    show(pence > 0 ? `Moved ${pounds(pence)} to ${buffer}. ${capital(phrase)} has what its bills need.` : `Topped up ${phrase} with ${pounds(-pence)}. It has what its bills need.`,
       { label: 'Undo', onClick: () => setDocument(current => undoGapMove(current, id)) })
   }
   const undo = (move: SetAsideMove) => {
     setDocument(current => undoMove(current, move.id))
     show('Move undone. Those transactions are back on the list to move.')
   }
-  const headline = check.state === 'unchecked' ? signedPounds(check.shouldHoldPence) : check.state === 'matches' ? 'Matches' : `${pounds(Math.abs(gap))} ${check.state === 'extra' ? 'extra' : 'short'}`
+  const known = amexPotKnown(document, cardId, today)
+  const inPot = check.holdsPence ?? check.shouldHoldPence
+  const held = potBills(document, cardId, today).filter(bill => bill.inPotPence !== 0)
+  // What the figure is: matched at a check after the last move, a gap the check found, or worked out from the moves.
+  const status = check.state === 'extra' || check.state === 'short' ? `${pounds(Math.abs(gap))} ${check.state} · checked ${dayOf(check.checkedAt!)}`
+    : known === 'checked' ? `Matches ${bank} · checked ${dayOf(check.checkedAt!)}` : check.checkedAt ? `Worked out · checked against ${bank} ${dayOf(check.checkedAt)}` : `Worked out · not checked against ${bank} yet`
 
-  return <section className={`pot-lead pot-check is-${check.state}`} aria-labelledby="pot-check-label">
-    <p className="pot-lead-label" id="pot-check-label">{check.state === 'unchecked' ? 'Should hold' : `Checked against ${bank} · ${dayOf(check.checkedAt!)}`}</p>
-    <p className="pot-lead-value">{headline}</p>
-    {check.state === 'unchecked' ? <>
-      <p className="pot-check-say">What has moved in for statements not paid yet. Check it against {bank} to see if it holds that.</p>
-      <p><button type="button" className="secondary-button" onClick={onCheck}>Check against {bank}</button></p>
-    </> : <dl className="carry-over-sums">
-      <div><dt>Should hold</dt><dd>{signedPounds(check.shouldHoldPence)}</dd></div>
-      <div><dt>In {bank} now</dt><dd>{signedPounds(check.holdsPence!)}</dd></div>
+  return <section className={`pot-lead pot-check is-${check.state === 'matches' && known !== 'checked' ? 'unchecked' : check.state}`} aria-labelledby="pot-check-label">
+    <p className="pot-lead-label" id="pot-check-label">In {phrase}</p>
+    <p className="pot-lead-value">{signedPounds(inPot)}</p>
+    <p className="pot-check-status">{status}</p>
+    {held.length === 1 && gap === 0 && <p className="pot-check-status">All of it is for the {billName(held[0]!.closeDate, held[0]!.open)}.</p>}
+    {(held.length > 1 || gap !== 0) && <dl className="carry-over-sums">
+      {held.map(bill => <div key={bill.statementKey}><dt>For the {billName(bill.closeDate, bill.open)}</dt><dd>{signedPounds(bill.inPotPence)}</dd></div>)}
+      {gap !== 0 && <div><dt>{gap > 0 ? 'Extra' : 'Short'}</dt><dd>{signedPounds(gap)}</dd></div>}
+      <div className="is-total"><dt>In {phrase}</dt><dd>{signedPounds(inPot)}</dd></div>
     </dl>}
+    {known !== 'checked' && check.state !== 'extra' && check.state !== 'short' && <p className="pot-check-again"><button type="button" className="secondary-button" onClick={onCheck}>Check against {bank}</button></p>}
     {check.state === 'extra' && <div className="pot-check-act">
       <p className="pot-check-say">Move it to {buffer}.</p>
       <GapSteps document={document} cardId={cardId} pence={gap}/>
