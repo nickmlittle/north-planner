@@ -1048,6 +1048,12 @@ button.spending-row:focus-visible{outline-offset:-2px}
 .split-line.is-item.can-hold{grid-template-columns:minmax(0,1fr) 110px minmax(0,1.5fr) auto 44px}
 .split-back{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;color:var(--charcoal);font-weight:var(--weight-medium)}
 .split-back input{width:20px;height:20px;margin:0;accent-color:var(--pine)}
+.split-discount{display:grid;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md)}
+.split-discount-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
+.split-discount-head h3{margin:0;font-size:var(--text-md)}
+.split-covers{display:flex;flex-wrap:wrap;gap:0 var(--space-4);margin:0;padding:0;border:0}
+.split-covers legend{width:100%}
+.split-covers legend{padding:0;color:var(--muted);font-size:var(--text-sm)}
 .split-back-hint{margin:0;color:var(--muted);font-size:var(--text-sm)}
 .split-add{display:inline-flex;align-items:center;gap:var(--space-1);justify-self:start;min-height:44px}
 .split-add svg{width:18px;height:18px}

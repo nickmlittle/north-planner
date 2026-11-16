@@ -42,17 +42,46 @@ export const byFundingShare = (document: Pick<BudgetDocument, 'budget' | 'househ
   return shares ? sharedLines(document, transaction, shares, fallback) : null
 }
 
+/** What a discount takes off the covered items: a typed amount, or a percentage of their original prices. */
+export function discountPence(coveredPrices: readonly number[], discount: { pence?: number; percent?: number }): number {
+  if (discount.percent !== undefined) return Math.round(coveredPrices.reduce((sum, price) => sum + price, 0) * discount.percent / 100)
+  return discount.pence ?? 0
+}
+
+/**
+ * One discount spread over items in proportion to their prices (D12). Whole pennies by largest remainder, ties and leftovers going to
+ * the largest items first, so the shares always add up to the discount. Null when the discount is nothing or takes the whole lot.
+ */
+export function spreadDiscount(prices: readonly number[], discount: number): number[] | null {
+  const sum = prices.reduce((a, b) => a + b, 0)
+  if (!prices.length || prices.some(price => price <= 0) || discount <= 0 || discount >= sum) return null
+  const exact = prices.map(price => discount * price / sum)
+  const shares = exact.map(Math.floor)
+  let spare = discount - shares.reduce((a, b) => a + b, 0)
+  const order = exact.map((value, index) => ({ index, remainder: value - Math.floor(value) })).sort((a, b) => b.remainder - a.remainder || prices[b.index]! - prices[a.index]! || a.index - b.index)
+  // A penny never takes an item to nothing; the next one down gets it.
+  for (const { index } of order) { if (spare <= 0) break; if (shares[index]! + 1 < prices[index]!) { shares[index]! += 1; spare -= 1 } }
+  return spare > 0 ? null : shares
+}
+
 /**
  * Receipt items: each typed item is a line, and "Everything else" takes the remainder. Amounts are typed
- * as positive pence and given the transaction's sign. An item ticked Back is expected back (D11). Null when the items
- * come to more than the transaction.
+ * as positive pence and given the transaction's sign. An item ticked Back is expected back (D11). A discount (D12)
+ * is spread over the items marked `covered`: their lines hold the discounted amount and keep `originalPence`. Null when the
+ * items (less the discount) come to more than the transaction, or the discount is nothing or too big.
  */
-export function receiptLines(transaction: Pick<CardTransaction, 'amountPence'>, items: ReadonlyArray<{ item: string; pence: number; destination: BudgetDestination; back?: boolean }>, rest: BudgetDestination): SplitLine[] | null {
+export function receiptLines(transaction: Pick<CardTransaction, 'amountPence'>, items: ReadonlyArray<{ item: string; pence: number; destination: BudgetDestination; back?: boolean; covered?: boolean }>, rest: BudgetDestination, discount?: number): SplitLine[] | null {
   const sign = transaction.amountPence < 0 ? -1 : 1
   const total = Math.abs(transaction.amountPence)
-  const placed = items.reduce((sum, row) => sum + row.pence, 0)
-  if (placed > total || items.some(row => row.pence <= 0)) return null
-  const lines: SplitLine[] = items.map(row => ({ amountPence: row.pence * sign, destination: row.destination, ...(row.item.trim() ? { item: row.item.trim() } : {}), ...row.back && sign > 0 ? { expectingBack: true as const } : {} }))
+  if (items.some(row => row.pence <= 0)) return null
+  const covered = items.filter(row => row.covered)
+  const shares = discount ? spreadDiscount(covered.map(row => row.pence), discount) : []
+  if (!shares) return null
+  const take = new Map(covered.map((row, index) => [row, shares[index] ?? 0]))
+  const priced = items.map(row => ({ row, pence: row.pence - (take.get(row) ?? 0) }))
+  const placed = priced.reduce((sum, entry) => sum + entry.pence, 0)
+  if (placed > total) return null
+  const lines: SplitLine[] = priced.map(({ row, pence }) => ({ amountPence: pence * sign, destination: row.destination, ...(row.item.trim() ? { item: row.item.trim() } : {}), ...row.back && sign > 0 ? { expectingBack: true as const } : {}, ...pence !== row.pence ? { originalPence: row.pence } : {} }))
   return total - placed > 0 ? [...lines, { amountPence: (total - placed) * sign, destination: rest }] : lines
 }
 

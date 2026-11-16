@@ -97,10 +97,10 @@ const replaceTransaction = <T extends Pick<BudgetDocument, 'card'>>(document: T,
 }
 
 /** Sort a transaction by hand: its lines must add up to it. Payments are never sorted. */
-export function sortTransaction<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, lines: SplitLine[], now: Date): T {
+export function sortTransaction<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, lines: SplitLine[], now: Date, discount?: TransactionSort['discount']): T {
   const transaction = cardTracker(document).transactions.find(row => row.id === id)
   if (!transaction || transaction.kind === 'payment' || !lines.length || lines.reduce((sum, line) => sum + line.amountPence, 0) !== transaction.amountPence) return document
-  return replaceTransaction(document, id, row => ({ ...row, sort: { lines, by: 'person', at: now.toISOString() } }))
+  return replaceTransaction(document, id, row => ({ ...row, sort: { lines, by: 'person', at: now.toISOString(), ...discount && lines.some(line => line.originalPence) ? { discount } : {} } }))
 }
 
 export function unsortTransaction<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string): T {
