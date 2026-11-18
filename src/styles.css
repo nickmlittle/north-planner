@@ -170,6 +170,14 @@ h1:focus, .error-summary:focus { outline: none }
 .secondary-button { border: 1px solid var(--line) }
 
 .text-button { background: transparent; border: 0; padding: var(--space-2) 0; margin: 0; font-size: var(--text-md) }
+/* Touch (audit 5, F14): small controls get a transparent hit area of at least 44×44 around them, so nothing looks
+   different. :where() keeps an existing position rule in charge; an element already 44 or more keeps its own box. */
+@media (pointer:coarse) {
+  :where(.text-button, button.step-amount, .segmented-option, .budget-v3-item-name, .budget-v3-amount, .plan-toolbar-chip, .budget-v3-transfer-account button, .secondary-button, .toast-action, .plan-toolbar-clear-search, summary, label:has(> input:is([type=checkbox], [type=radio]))) { position: relative }
+  :where(.text-button, button.step-amount, .segmented-option, .budget-v3-item-name, .budget-v3-amount, .plan-toolbar-chip, .budget-v3-transfer-account button, .secondary-button, .toast-action, .plan-toolbar-clear-search, summary, label:has(> input:is([type=checkbox], [type=radio])))::after { content: ""; position: absolute; top: min(0px, calc((100% - 44px) / 2)); right: min(0px, calc((100% - 44px) / 2)); bottom: min(0px, calc((100% - 44px) / 2)); left: min(0px, calc((100% - 44px) / 2)) }
+  /* A select can't carry a pseudo element: the Close page's "covered from" takes the touch height. */
+  .step-row select.close-cover-from { min-height: var(--control-h-touch) }
+}
 .text-button:hover { color: var(--pine-strong) }
 .danger-button { background: var(--danger); color: var(--white); border: 1px solid var(--danger) }
 .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) }
