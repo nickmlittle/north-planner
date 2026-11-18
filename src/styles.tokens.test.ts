@@ -15,11 +15,11 @@ const otherFiles = (readdirSync(new URL('.', import.meta.url), { recursive: true
 const rest = [css.slice(rootEnd + 3), ...otherFiles.map(({ source }) => source)].join('\n')
 const allCss = [css, ...otherFiles.map(({ source }) => source)].join('\n')
 
-/** `selector { property: value }` for every declaration after the token block, media queries included. */
+/** `selector { property: value }` for every declaration after the token block, media queries included (`!important` dropped). */
 const declarations = [...rest.matchAll(/([^{}]*)\{([^{}]*)\}/g)].flatMap(([, selector, body]) =>
   body!.split(';').flatMap(part => {
     const match = part.match(/^\s*([a-zA-Z-]+)\s*:\s*([\s\S]+?)\s*$/)
-    return match && !match[1]!.startsWith('--') ? [{ selector: selector!.trim().replace(/\s+/g, ' '), property: match[1]!.toLowerCase(), value: match[2]! }] : []
+    return match && !match[1]!.startsWith('--') ? [{ selector: selector!.trim().replace(/\s+/g, ' '), property: match[1]!.toLowerCase(), value: match[2]!.replace(/\s*!important$/, '') }] : []
   }))
 const offenders = (test: (d: { selector: string; property: string; value: string }) => boolean) =>
   declarations.filter(test).map(d => `${d.selector} { ${d.property}: ${d.value} }`)
@@ -88,5 +88,10 @@ describe('design tokens', () => {
 
   it('uses shadow tokens', () => {
     expect(offenders(d => d.property === 'box-shadow' && d.value !== 'none' && !/var\(--shadow-/.test(d.value) && !/var\(--line\)/.test(d.value))).toEqual([])
+  })
+
+  it('keeps fields at 16px or more on touch devices, so iOS does not zoom when one takes focus', () => {
+    expect(css).toMatch(/--text-lg:\s*16px/)
+    expect(css).toMatch(/@media \(pointer:coarse\) \{\s*input:not\([^{]*\), select, textarea \{ font-size: var\(--text-lg\)!important \}/)
   })
 })
