@@ -23,7 +23,11 @@
 .allocation-meter.is-compact .allocation-meter-balance{font-size:var(--text-lg)}
 .allocation-meter.is-compact .allocation-meter-track{height:6px}
 .allocation-meter.is-compact .allocation-meter-people{gap:var(--space-1)}
-.allocation-meter.is-compact .allocation-meter-person{grid-template-columns:40px minmax(0,1fr) auto;gap:var(--space-2)}
+/* One name column for every row (subgrid), as wide as the longest name up to 30vw, so the bars line up and a long
+   name ends in "…" instead of running under its bar (audit 5, F8). */
+.allocation-meter.is-compact .allocation-meter-people{grid-template-columns:auto minmax(0,1fr) auto;column-gap:var(--space-2)}
+.allocation-meter.is-compact .allocation-meter-person{grid-column:1 / -1;grid-template-columns:subgrid}
+.allocation-meter.is-compact .allocation-meter-name{max-width:30vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .allocation-meter.is-compact .allocation-meter-name,.allocation-meter.is-compact .allocation-meter-person-balance{font-size:var(--text-sm)}
 .allocation-meter-links{display:flex;justify-content:space-between;gap:var(--space-3)}
 @media(max-width:1099px){.allocation-meter:not(.is-compact){grid-template-columns:180px minmax(0,1fr)}.allocation-meter:not(.is-compact) .allocation-meter-side{grid-column:1 / -1;display:flex;justify-content:flex-start;gap:var(--space-4);text-align:left}}
