@@ -61,9 +61,10 @@
 }
 @media(max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
   /* The strip as three rows: label and figure, the detail below; the whole row opens (its Open link, stretched). */
-  .home-page .stat-tile{position:relative;grid-template-columns:minmax(0,1fr) auto;column-gap:var(--space-3);align-items:baseline}
+  /* The label keeps its width; a long figure ("Nothing planned for November yet") wraps instead of overlapping it (F17). */
+  .home-page .stat-tile{position:relative;grid-template-columns:auto minmax(0,1fr);column-gap:var(--space-3);align-items:baseline}
   .home-page .stat-tile-label{grid-column:1;color:var(--text);font-size:var(--text-md)}
-  .home-page .stat-tile-value{grid-column:2;grid-row:1;font-size:var(--text-lg);text-align:right}
+  .home-page .stat-tile-value{grid-column:2;grid-row:1;min-width:0;font-size:var(--text-lg);text-align:right;overflow-wrap:break-word}
   .home-page .stat-tile-detail{grid-column:1/-1}
   .home-page .stat-tile-open{position:absolute;inset:0;min-height:0;margin:0;color:transparent;overflow:hidden}
   .home-page .stat-tile-open svg{display:none}
@@ -72,7 +73,9 @@
   /* Rows keep to one line each so the strip and five tasks fit above the tab bar. */
   .home-list .list-row-text>.list-row-meta{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .home-list .list-row-text{overflow:hidden}
-  .home-progress{flex-wrap:nowrap}
+  /* Inline in a one-line row, so the row's ellipsis applies; a flex row would hard-clip mid-word (F10). */
+  .home-list .list-row-meta .home-progress,.home-list .list-row-meta .home-progress-person{display:inline}
+  .home-list .list-row-meta .home-progress-person+.home-progress-person{margin-left:var(--space-3)}
   /* Nothing above To do yet (a new household): its heading sits on the pine band under the header (audit 5, F16). */
   .home-page>.ui-section:first-child>.ui-section-head :is(.ui-section-title,.home-open-todo){color:var(--cream)}
   .home-page>.ui-section:first-child>.ui-section-head .ui-section-count{color:var(--on-pine-muted)}
