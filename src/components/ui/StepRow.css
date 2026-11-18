@@ -24,7 +24,8 @@ button.step-tick:focus-visible{outline-offset:-2px}
 .step-tick.is-changed .step-tick-dot{border-color:var(--warning);background:var(--warning-bg);color:var(--warning)}
 .step-tick.is-changed .step-tick-dot svg{stroke-width:2.4}
 
-.step-body{display:grid;gap:2px;align-self:center;min-width:0;padding:var(--space-1) 0}
+/* One column that never grows past the row: a wide select or amount line can't push the row sideways (audit 5, F3). */
+.step-body{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;align-self:center;min-width:0;padding:var(--space-1) 0}
 .step-main{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);min-width:0;min-height:32px;margin:0}
 .step-label{min-width:0;color:var(--accent);font-size:var(--text-md);font-weight:var(--weight-medium);line-height:1.35;overflow-wrap:anywhere}
 .step-row.is-done .step-label{color:var(--text-muted)}
