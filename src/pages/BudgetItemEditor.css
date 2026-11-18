@@ -44,7 +44,8 @@
 .item-editor-another{gap:var(--space-1);color:var(--text-muted);font-size:var(--text-sm)}
 .item-editor-remove{color:var(--danger)}
 @media(max-width:767px){
-  .sheet-overlay>.sheet.item-editor-sheet{height:100dvh;max-height:100dvh;border-radius:0}
+  /* Full screen: the visual viewport (above the keyboard when it's up), below the Home Screen app's status bar. */
+  .sheet-overlay>.sheet.item-editor-sheet,.sheet-overlay[data-keyboard]>.sheet.item-editor-sheet{height:var(--sheet-viewport-height,100dvh);max-height:var(--sheet-viewport-height,100dvh);padding-top:env(safe-area-inset-top,0px);border-radius:0}
   .item-editor-pair{grid-template-columns:minmax(0,1fr)}
   .item-editor-pair.is-amount{grid-template-columns:minmax(0,1fr) 120px}
   .item-editor-chip{min-height:var(--control-h-touch)}

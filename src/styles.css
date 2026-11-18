@@ -405,6 +405,8 @@ main[tabindex="-1"]:focus{outline:none}
 
   .page-frame>.page-frame-heading{display:none}
   .planner-app-shell:has([aria-modal=true]) .mobile-bottom-nav{display:none}
+  /* Keyboard up (keyboard.ts): iOS leaves fixed bars at the layout bottom, mid-screen over the page. */
+  html[data-keyboard] .mobile-bottom-nav,html[data-keyboard] .allocation-meter-mini{display:none}
 }
 .mobile-utility-settings{display:flex;align-items:center;gap:var(--space-3);width:100%;min-height:48px;margin:var(--space-2) 0 0;padding:0 var(--space-3);border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--text);font:var(--weight-medium) var(--text-md) var(--font-family);text-align:left;cursor:pointer}
 .mobile-utility-settings span{flex:1}

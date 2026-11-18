@@ -22,8 +22,12 @@
 .sheet-footer>*{margin:0}
 
 @media (max-width: 767px), (min-width: 768px) and (max-width: 980px) and (max-height: 480px) and (orientation: landscape) and (hover: none) and (pointer: coarse){
-  .sheet-overlay{align-items:flex-end}
-  .sheet-overlay>.sheet{width:100%;max-height:90dvh;margin:0;border-width:1px 0 0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;animation:sheet-up .18s ease-out}
+  /* The scrim covers the page; the sheet sits in the visual viewport (Sheet.tsx sets the variables), so the keyboard
+     never covers it. */
+  .sheet-overlay{padding:var(--sheet-viewport-top,0px) 0 var(--sheet-viewport-bottom,0px);align-items:flex-end}
+  /* With the keyboard up iOS shows page below the layout viewport, behind its floating bars: dim that too. */
+  .sheet-overlay::after{content:"";position:absolute;top:100%;left:0;right:0;height:100vh;background:var(--scrim);pointer-events:none}
+  .sheet-overlay>.sheet{width:100%;max-height:calc(var(--sheet-viewport-height,100dvh) * .9);margin:0;border-width:1px 0 0;border-radius:var(--radius-lg) var(--radius-lg) 0 0;animation:sheet-up .18s ease-out}
   .sheet-handle{display:block;flex:none;width:36px;height:4px;margin:var(--space-2) auto 0;border-radius:var(--radius-pill);background:var(--border)}
   .sheet-header{padding-top:var(--space-1)}
   .sheet-body,.sheet-footer{padding-left:max(var(--space-4),env(safe-area-inset-left,0px));padding-right:max(var(--space-4),env(safe-area-inset-right,0px))}
@@ -31,6 +35,14 @@
   /* Full-width actions, primary last: nearest the thumb. */
   .sheet-footer{flex-direction:column;align-items:stretch}
   .sheet-footer>*{width:100%}
+  /* Keyboard up: the sheet takes the space above it, and the header and footer give the fields as much as they can. */
+  /* In the Home Screen app the visual viewport starts under the status bar: keep the header below it. */
+  .sheet-overlay[data-keyboard]>.sheet{max-height:calc(var(--sheet-viewport-height) - max(var(--space-2),env(safe-area-inset-top,0px)))}
+  .sheet-overlay[data-keyboard] .sheet-handle{display:none}
+  .sheet-overlay[data-keyboard] .sheet-header{padding-top:var(--space-1);padding-bottom:var(--space-1)}
+  .sheet-overlay[data-keyboard] .sheet-footer{flex-direction:row;padding-top:var(--space-2)}
+  .sheet-overlay[data-keyboard] .sheet-footer>*{flex:1 1 0;width:auto}
+  .sheet-overlay[data-keyboard] .sheet>:last-child{padding-bottom:var(--space-2)}
 }
 @media (prefers-reduced-motion: reduce){
   .sheet-overlay>.sheet{animation:none}

@@ -25,7 +25,7 @@
   .mobile-header-bar .mobile-search-trigger{grid-area:actions;margin-right:0}
   .mobile-app-header.is-collapsed .mobile-search-trigger{grid-area:auto;grid-column:2;grid-row:1}
   .sheet-overlay:has(.command-palette){padding-top:0}
-  .sheet-overlay>.sheet.command-palette{height:100dvh;max-height:100dvh;border-radius:0}
+  .sheet-overlay>.sheet.command-palette,.sheet-overlay[data-keyboard]>.sheet.command-palette{height:var(--sheet-viewport-height,100dvh);max-height:var(--sheet-viewport-height,100dvh);padding-top:env(safe-area-inset-top,0px);border-radius:0}
   .palette-foot{display:none}
   .palette-option-keys{display:none}
 }
