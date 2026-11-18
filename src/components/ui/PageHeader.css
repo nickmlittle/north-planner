@@ -24,5 +24,7 @@
   .page-header-mobile .status-chip.is-positive{background:var(--cream);color:var(--accent)}
   .page-header{margin-bottom:var(--space-4)}
   /* Scrolled: the title joins the pinned bar's one row, like the app header's own. */
+  /* Pinned, the bar keeps the page name (or ‹ month ›) and ⋯: a text action stays at the top of the page (F3, F4). */
+  .mobile-app-header.is-collapsed .page-header-mobile .page-header-actions>button:not(:has(svg)){display:none}
   .mobile-app-header.is-collapsed .mobile-header-page.page-header-mobile h1.page-header-title{grid-area:auto;grid-column:1;grid-row:1;overflow:hidden;margin:0;font-size:var(--text-lg);letter-spacing:0;white-space:nowrap;text-overflow:ellipsis;overflow-wrap:normal}
 }
