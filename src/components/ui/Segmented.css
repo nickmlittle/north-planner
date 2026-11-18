@@ -1,6 +1,9 @@
 /* Segmented. Tokens only (styles.tokens.test.ts). */
-.segmented{display:inline-flex;gap:2px;padding:2px;border-radius:var(--radius-md);background:var(--surface-sunken)}
-.segmented-option{display:inline-flex;align-items:center;gap:var(--space-1);min-height:32px;margin:0;padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;cursor:pointer}
+/* Fits its line: a long label is capped and truncates, its detail (0/5) stays; options shrink only as a last resort (audit 5, F8). */
+.segmented{display:inline-flex;max-width:100%;min-width:0;gap:2px;padding:2px;border-radius:var(--radius-md);background:var(--surface-sunken)}
+.segmented-label{min-width:0;max-width:30vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.segmented-detail{flex:none}
+.segmented-option{display:inline-flex;align-items:center;gap:var(--space-1);min-width:0;min-height:32px;margin:0;padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-muted);font:inherit;font-size:var(--text-sm);font-weight:var(--weight-medium);white-space:nowrap;cursor:pointer}
 .segmented-option:hover{color:var(--text)}
 .segmented-option[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-control)}
 .segmented-option:focus-visible{outline-offset:-2px}

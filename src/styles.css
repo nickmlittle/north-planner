@@ -784,6 +784,15 @@ main[tabindex="-1"]:focus{outline:none}
 .budget-month-actions .budget-remove-action{color:var(--status-error);text-align:left;justify-self:start}
 @media(max-width:767px), (min-width:768px) and (max-width:980px) and (max-height:480px) and (orientation:landscape) and (hover:none) and (pointer:coarse){
   .planner-app-shell,.planner-app-content,.page-frame{height:auto;min-height:0;overflow:visible}
+  /* Funding by account: amounts never wrap or run together; the name column takes what is left and truncates or
+     wraps, and below that the table scrolls in its wrap, which is positioned so hidden headings scroll with it (F7). */
+  .budget-v3-transfer-table-wrap{position:relative}
+  .budget-v3-transfer-table{table-layout:auto}
+  .budget-v3-transfer-table th:first-child,.budget-v3-transfer-table td:first-child{width:auto;min-width:80px}
+  .budget-v3-transfer-table th{white-space:normal}
+  .budget-v3-transfer-table thead th{overflow-wrap:normal}
+  .budget-v3-transfer-table :is(tbody,tfoot) td{width:1%;white-space:nowrap}
+  .budget-v3-transfer-account button{width:0;min-width:100%}
   /* The page behind is pine (F18), so a short page such as setup still fills the screen with cream. */
   .planner-app-shell{min-height:100dvh}
   .planner-app-content{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
