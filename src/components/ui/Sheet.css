@@ -46,6 +46,16 @@
   .sheet-overlay[data-keyboard] .sheet-footer>*{flex:1 1 0;width:auto}
   .sheet-overlay[data-keyboard] .sheet>:last-child{padding-bottom:var(--space-2)}
 }
+/* Landscape phones have little height: the sheet takes nearly all of it and the handle, header and footer give the
+   body the room (audit 5, F20). */
+@media (orientation: landscape) and (max-height: 480px) and (hover: none) and (pointer: coarse){
+  .sheet-overlay>.sheet{max-height:calc(var(--sheet-viewport-height,100dvh) - max(var(--space-2),env(safe-area-inset-top,0px)))}
+  .sheet-handle{display:none}
+  .sheet-header{padding-top:var(--space-1);padding-bottom:var(--space-1)}
+  .sheet-footer{flex-direction:row;padding-top:var(--space-2)}
+  .sheet-footer>*{flex:1 1 0;width:auto}
+  .sheet>:last-child{padding-bottom:calc(var(--space-2) + env(safe-area-inset-bottom,0px))}
+}
 @media (prefers-reduced-motion: reduce){
   .sheet-overlay>.sheet{animation:none}
 }
