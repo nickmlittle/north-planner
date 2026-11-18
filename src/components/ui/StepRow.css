@@ -1,9 +1,10 @@
 /* StepRow and StepGroup: every money move (Payday, Set aside, Settle up, covers). Tokens only (styles.tokens.test.ts). */
 
 .step-group{min-width:0}
-.step-group-band{display:flex;align-items:baseline;gap:var(--space-2);margin:0;padding:var(--space-3) var(--space-4) var(--space-2);border-top:1px solid var(--border);background:var(--surface-header);color:var(--text);font-size:var(--text-sm);line-height:1.35}
+/* A long aside ("Alexandra-…'s · 4 items") wraps under the title rather than squeezing it (audit 5, F8). */
+.step-group-band{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);margin:0;padding:var(--space-3) var(--space-4) var(--space-2);border-top:1px solid var(--border);background:var(--surface-header);color:var(--text);font-size:var(--text-sm);line-height:1.35}
 .step-group-title{flex:1 1 auto;min-width:0;margin:0;color:inherit;font-size:var(--text-md);font-weight:var(--weight-bold);overflow-wrap:anywhere}
-.step-group-aside{flex:none;color:var(--text-muted);font-weight:var(--weight-medium);text-align:right}
+.step-group-aside{flex:none;max-width:100%;margin-left:auto;color:var(--text-muted);font-weight:var(--weight-medium);text-align:right}
 .step-group-link{display:inline-flex;align-items:center;gap:2px;flex:none;min-height:32px;margin:-6px 0;padding:0;font-size:var(--text-sm)}
 .step-group-link svg{width:16px;height:16px}
 

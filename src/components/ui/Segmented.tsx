@@ -10,7 +10,7 @@ export type SegmentedOption = { value: string; label: string; detail?: ReactNode
 export function Segmented({ options, value, onChange, label }: { options: SegmentedOption[]; value: string; onChange: (value: string) => void; label: string }) {
   return <div className="segmented" role="group" aria-label={label}>
     {options.map(option => <button key={option.value} type="button" className="segmented-option" aria-pressed={option.value === value} onClick={() => onChange(option.value)}>
-      {option.label}{option.detail !== undefined && option.detail !== '' && <small className="segmented-detail">{option.detail}</small>}
+      <span className="segmented-label">{option.label}</span>{option.detail !== undefined && option.detail !== '' && <small className="segmented-detail">{option.detail}</small>}
     </button>)}
   </div>
 }
