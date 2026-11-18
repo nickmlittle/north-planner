@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { PlannerHeader, type PlannerHeaderProps } from './PlannerHeader'
 import { Kbd } from './ui/Kbd'
 import { ShortcutsSheet } from './ui/ShortcutsSheet'
+import { useFieldAboveKeyboard } from './ui/keyboard'
 import { usePendingSequence, useShortcut } from '../state/shortcuts'
 import type { PlannerView } from '../state/navigation'
 
@@ -25,6 +26,7 @@ function GoTo({ keys, view, label, onSelectView }: { keys: string; view: Planner
 export function AppLayout({ children, navigation }: { children: ReactNode; navigation: PlannerHeaderProps }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const pending = usePendingSequence()
+  useFieldAboveKeyboard()
   useShortcut({ keys: '/', description: 'Search', group: 'This page', when: () => !!window.document.querySelector('[data-shortcut="search"]'), run: () => window.document.querySelector<HTMLElement>('[data-shortcut="search"]')?.focus() })
   useShortcut({ keys: '?', description: 'Keyboard shortcuts', group: 'General', run: () => setShortcutsOpen(true) })
   const focusContent = () => window.document.getElementById('content')?.focus()

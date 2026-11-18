@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { Sheet } from './Sheet'
@@ -102,4 +102,46 @@ it('starts focus on a [data-autofocus] control when there is one', () => {
   const onClose = vi.fn()
   render(<Sheet title="Remove Groceries?" onClose={onClose}><button type="button">Remove</button><button type="button" data-autofocus>Cancel</button></Sheet>)
   expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
+})
+
+describe('on a touch screen (audit 5)', () => {
+  const touch = () => vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: query === '(pointer: coarse)', media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList)
+  beforeEach(() => { if (!window.matchMedia) window.matchMedia = (() => ({ matches: false })) as unknown as typeof window.matchMedia })
+  afterEach(() => { vi.restoreAllMocks(); Reflect.deleteProperty(window, 'visualViewport') })
+
+  it('does not focus a [data-autofocus] field when it opens, so the keyboard stays down; the first button takes focus', () => {
+    touch()
+    render(<Sheet title="Can we afford…" onClose={() => {}}><input data-autofocus aria-label="Amount"/><select data-autofocus aria-label="Pot"><option>Groceries</option></select></Sheet>)
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
+  })
+
+  it('still focuses a [data-autofocus] button or checkbox', () => {
+    touch()
+    render(<Sheet title="Remove Groceries?" onClose={() => {}}><button type="button">Remove</button><button type="button" data-autofocus>Cancel</button></Sheet>)
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus()
+  })
+
+  it('keeps focusing the field with a mouse and keyboard', () => {
+    render(<Sheet title="Can we afford…" onClose={() => {}}><input data-autofocus aria-label="Amount"/></Sheet>)
+    expect(screen.getByRole('textbox', { name: 'Amount' })).toHaveFocus()
+  })
+
+  it('pads the sheet into the visual viewport, and marks the keyboard up while a field has focus', async () => {
+    touch()
+    const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: 549, scale: 1 })
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
+    render(<Sheet title="Check against Monzo" onClose={() => {}}><input aria-label="Balance"/></Sheet>)
+    const overlay = document.querySelector<HTMLElement>('.sheet-overlay')!
+    expect(overlay.style.getPropertyValue('--sheet-viewport-height')).toBe('549px')
+    screen.getByRole('textbox', { name: 'Balance' }).focus()
+    Object.assign(viewport, { offsetTop: 237, height: 312 })
+    viewport.dispatchEvent(new Event('resize'))
+    await new Promise(resolve => setTimeout(resolve))
+    expect(overlay.style.getPropertyValue('--sheet-viewport-top')).toBe('237px')
+    expect(overlay.style.getPropertyValue('--sheet-viewport-height')).toBe('312px')
+    expect(overlay).toHaveAttribute('data-keyboard')
+    screen.getByRole('button', { name: 'Close' }).focus()
+    await new Promise(resolve => setTimeout(resolve))
+    expect(overlay).not.toHaveAttribute('data-keyboard')
+  })
 })

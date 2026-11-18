@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { isEntryField, keyboardUp, onTouchScreen } from './keyboard'
 import './Sheet.css'
 
 export type SheetSize = 'sm' | 'md' | 'lg' | 'xl'
@@ -13,8 +14,10 @@ const closedTargets = new WeakMap<Element, HTMLElement | null | undefined>()
 /**
  * Every overlay: a centred dialog on desktop and tablet, a bottom sheet on phones.
  * It portals to #root, makes the rest of the page inert, locks the page scroll, traps Tab, closes on Escape
- * and restores focus. Focus starts on a `[data-autofocus]` control when there is one, else the first button.
+ * and restores focus. Focus starts on a `[data-autofocus]` control when there is one, else the first button; on a
+ * touch screen a field never takes it, so the keyboard or picker stays down until the field is tapped (audit 5, N1).
  * The body scrolls on its own; `footer` holds the actions (on phones: full width, primary last, nearest the thumb).
+ * On phones the overlay follows the visual viewport, so with the keyboard up the sheet sits above it (audit 5, F2).
  */
 export function Sheet({ title, onClose, children, footer, size = 'md', returnFocusTo, className = '', description, dismissOnScrim = false }: {
   title: string
@@ -31,6 +34,7 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
   dismissOnScrim?: boolean
 }) {
   const ref = useRef<HTMLElement>(null)
+  const overlay = useRef<HTMLDivElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const titleId = useId(), descriptionId = useId()
   useLayoutEffect(() => {
@@ -51,7 +55,8 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
       dialog.querySelector<HTMLButtonElement>('button')?.focus()
     }
     document.addEventListener('focusin', keepFocus)
-    ;(dialog.querySelector<HTMLElement>('[data-autofocus]') ?? dialog.querySelector<HTMLButtonElement>('button'))?.focus()
+    const preferred = dialog.querySelector<HTMLElement>('[data-autofocus]')
+    ;((preferred && !(onTouchScreen() && isEntryField(preferred)) ? preferred : null) ?? dialog.querySelector<HTMLButtonElement>('button'))?.focus()
     return () => {
       document.removeEventListener('focusin', keepFocus)
       background.forEach(({ element, inert }) => { if (!inert) element.removeAttribute('inert') })
@@ -73,6 +78,38 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
     // Runs once per open; returnFocusTo is the one passed when the sheet opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // iOS shrinks only the visual viewport for the keyboard, and pans it to show the field. The overlay pads the sheet into
+  // the visual viewport (Sheet.css reads the variables; the overlay's own height is the layout viewport, which iOS
+  // sometimes shrinks too), and the focused field is kept in view inside the sheet.
+  useLayoutEffect(() => {
+    const viewport = window.visualViewport, element = overlay.current
+    if (!viewport || !element) return
+    let timer: number | undefined
+    const sync = () => {
+      element.style.setProperty('--sheet-viewport-top', `${viewport.offsetTop}px`)
+      element.style.setProperty('--sheet-viewport-height', `${viewport.height}px`)
+      element.style.setProperty('--sheet-viewport-bottom', `${Math.max(0, element.clientHeight - viewport.offsetTop - viewport.height)}px`)
+      const field = document.activeElement, keyboard = keyboardUp(field) && !!ref.current?.contains(field)
+      element.toggleAttribute('data-keyboard', keyboard)
+      const body = ref.current?.querySelector('.sheet-body')
+      if (!keyboard || !body?.contains(field)) return
+      const box = field!.getBoundingClientRect(), visible = body.getBoundingClientRect()
+      if (box.top < visible.top || box.bottom > visible.bottom) field!.scrollIntoView({ block: 'center' })
+    }
+    // Focus moving between fields fires focusout then focusin: settle once both have run.
+    const soon = () => { window.clearTimeout(timer); timer = window.setTimeout(sync) }
+    sync()
+    viewport.addEventListener('resize', sync)
+    viewport.addEventListener('scroll', sync)
+    window.addEventListener('resize', sync)
+    element.addEventListener('focusin', soon)
+    element.addEventListener('focusout', soon)
+    return () => {
+      window.clearTimeout(timer)
+      viewport.removeEventListener('resize', sync); viewport.removeEventListener('scroll', sync); window.removeEventListener('resize', sync)
+      element.removeEventListener('focusin', soon); element.removeEventListener('focusout', soon)
+    }
+  }, [])
   // The same commit can remove what focus went back to (an item removed from its own editor). Once the DOM has
   // settled, lost focus falls back to returnFocusTo.
   useEffect(() => () => {
@@ -81,7 +118,7 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
     if (fallback?.isConnected) fallback.focus({ preventScroll: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  return createPortal(<div className="sheet-overlay" onMouseDown={dismissOnScrim ? event => { if (event.target === event.currentTarget) onClose() } : undefined}>
+  return createPortal(<div ref={overlay} className="sheet-overlay" onMouseDown={dismissOnScrim ? event => { if (event.target === event.currentTarget) onClose() } : undefined}>
     <section ref={ref} className={`sheet ${className}`.trim()} data-size={size} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
