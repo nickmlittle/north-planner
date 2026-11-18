@@ -9,6 +9,8 @@
 .sheet-overlay{position:fixed;inset:0;z-index:1400;display:flex;align-items:center;justify-content:center;background:var(--scrim)}
 .sheet{box-sizing:border-box;display:flex;flex-direction:column;width:min(var(--sheet-width),calc(100% - 48px));max-height:calc(100dvh - 48px);margin:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface);color:var(--text);box-shadow:var(--shadow-dialog);overflow:hidden}
 .sheet-handle{display:none}
+/* Focus lands on the sheet itself only when it has no visible button (Search on a touch screen). */
+.sheet[tabindex="-1"]:focus{outline:none}
 .sheet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-2);flex:none;margin:0;padding:var(--space-3) var(--space-3) var(--space-3) var(--space-4);border-bottom:1px solid var(--border)}
 .sheet-heading{min-width:0;padding-top:var(--space-2)}
 .sheet-header h2{margin:0;color:var(--accent);font-size:var(--text-xl);font-weight:var(--weight-bold);line-height:1.3;overflow-wrap:anywhere}

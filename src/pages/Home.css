@@ -73,6 +73,9 @@
   .home-list .list-row-text>.list-row-meta{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .home-list .list-row-text{overflow:hidden}
   .home-progress{flex-wrap:nowrap}
+  /* Nothing above To do yet (a new household): its heading sits on the pine band under the header (audit 5, F16). */
+  .home-page>.ui-section:first-child>.ui-section-head :is(.ui-section-title,.home-open-todo){color:var(--cream)}
+  .home-page>.ui-section:first-child>.ui-section-head .ui-section-count{color:var(--on-pine-muted)}
 }
 .home-landed{flex-basis:100%;color:var(--text-muted);font-size:var(--text-sm)}
 .home-payday{display:grid;gap:var(--space-2);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius-lg);background:var(--surface)}

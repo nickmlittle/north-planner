@@ -11,12 +11,18 @@
   /* The app header hides its own h1 while a page fills the slot; this one is the page's title, so it shows. */
   .mobile-app-header .mobile-header-page.page-header-mobile h1.page-header-title{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;grid-area:title;margin:var(--space-1) 0 0;color:var(--cream);font-size:var(--text-2xl);letter-spacing:-.6px;line-height:1.15}
   .page-header-mobile .page-header-context{grid-area:note;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-1) 0 0;color:var(--on-pine-muted);font-size:var(--text-sm)}
-  .page-header-mobile .page-header-actions{grid-area:actions;justify-self:end;margin:0}
-  /* Actions on pine: cream outlines, and the one primary in cream. */
-  .page-header-mobile .page-header-actions button{min-height:var(--control-h);border-color:var(--on-pine-strong);background:var(--on-pine-faint);color:var(--cream)}
+  .page-header-mobile .page-header-actions{grid-area:actions;justify-self:end;min-width:0;max-width:100%;margin:0 0 0 var(--space-2)}
+  /* Actions on pine: cream outlines, and the one primary in cream. Not a ⋯ menu's items, which sit on a card (F6). */
+  .page-header-mobile .page-header-actions button:where(:not([role=menuitem])){min-height:var(--control-h);border-color:var(--on-pine-strong);background:var(--on-pine-faint);color:var(--cream)}
+  /* A text action truncates rather than squeezing the wordmark or the title (F4). */
+  .page-header-mobile .page-header-actions>button:not(:has(svg)){display:block;min-width:0;max-width:100%;padding-inline:var(--space-3);overflow:hidden;line-height:calc(var(--control-h) - 2 * var(--space-1) - 2px);text-overflow:ellipsis;white-space:nowrap}
+  /* The header ⋯ menu drops from the bar's top row at the screen's right edge, inside the screen (F6). */
+  .page-header-mobile .page-header-actions .budget-options-menu{position:static}
+  .page-header-mobile .page-header-actions .budget-options-list{top:calc(var(--page-safe-top) + 44px + var(--space-1));left:auto;right:var(--page-gutter-right);width:min(320px,calc(100% - var(--page-gutter-left) - var(--page-gutter-right)));min-width:0;z-index:90}
+  .page-header-mobile .page-header-actions .budget-options-list button{white-space:normal}
   .page-header-mobile .page-header-actions .primary-button{border-color:var(--cream);background:var(--cream);color:var(--accent)}
   .page-header-mobile .status-chip.is-positive{background:var(--cream);color:var(--accent)}
   .page-header{margin-bottom:var(--space-4)}
   /* Scrolled: the title joins the pinned bar's one row, like the app header's own. */
-  .mobile-app-header.is-collapsed .mobile-header-page.page-header-mobile h1.page-header-title{grid-area:auto;grid-column:1;grid-row:1;margin:0;font-size:var(--text-lg);letter-spacing:0}
+  .mobile-app-header.is-collapsed .mobile-header-page.page-header-mobile h1.page-header-title{grid-area:auto;grid-column:1;grid-row:1;overflow:hidden;margin:0;font-size:var(--text-lg);letter-spacing:0;white-space:nowrap;text-overflow:ellipsis;overflow-wrap:normal}
 }
