@@ -115,6 +115,19 @@ describe('on a touch screen (audit 5)', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
   })
 
+  it('focuses the sheet itself when no button shows (Search hides its header), so Escape still closes it', () => {
+    touch()
+    const visible = vi.fn(function (this: Element) { return !this.classList.contains('sheet-close') })
+    Object.defineProperty(HTMLElement.prototype, 'checkVisibility', { configurable: true, value: visible })
+    const onClose = vi.fn()
+    try {
+      render(<Sheet title="Search North" onClose={onClose}><input data-autofocus aria-label="Search North"/></Sheet>)
+      expect(screen.getByRole('dialog')).toHaveFocus()
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+      expect(onClose).toHaveBeenCalled()
+    } finally { Reflect.deleteProperty(HTMLElement.prototype, 'checkVisibility') }
+  })
+
   it('still focuses a [data-autofocus] button or checkbox', () => {
     touch()
     render(<Sheet title="Remove Groceries?" onClose={() => {}}><button type="button">Remove</button><button type="button" data-autofocus>Cancel</button></Sheet>)

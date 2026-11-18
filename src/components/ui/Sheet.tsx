@@ -10,12 +10,15 @@ export type SheetSize = 'sm' | 'md' | 'lg' | 'xl'
 // that closes records where its focus goes for a sheet opened from inside it.
 let scrollLocks = 0, savedOverflow = ''
 const closedTargets = new WeakMap<Element, HTMLElement | null | undefined>()
+/** The first button that shows (Search hides its header and Close), else the dialog itself. */
+const firstStop = (dialog: HTMLElement) => [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.checkVisibility?.() ?? true) ?? dialog
 
 /**
  * Every overlay: a centred dialog on desktop and tablet, a bottom sheet on phones.
  * It portals to #root, makes the rest of the page inert, locks the page scroll, traps Tab, closes on Escape
- * and restores focus. Focus starts on a `[data-autofocus]` control when there is one, else the first button; on a
- * touch screen a field never takes it, so the keyboard or picker stays down until the field is tapped (audit 5, N1).
+ * and restores focus. Focus starts on a `[data-autofocus]` control when there is one, else the first visible button
+ * (else the sheet itself); on a touch screen a field never takes it, so the keyboard or picker stays down until the
+ * field is tapped (audit 5, N1).
  * The body scrolls on its own; `footer` holds the actions (on phones: full width, primary last, nearest the thumb).
  * On phones the overlay follows the visual viewport, so with the keyboard up the sheet sits above it (audit 5, F2).
  */
@@ -52,11 +55,11 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
     const keepFocus = (event: FocusEvent) => {
       if (!(event.target instanceof Node) || dialog.contains(event.target)) return
       if (event.target instanceof Element && event.target.closest('[aria-modal="true"]')) return
-      dialog.querySelector<HTMLButtonElement>('button')?.focus()
+      firstStop(dialog).focus()
     }
     document.addEventListener('focusin', keepFocus)
     const preferred = dialog.querySelector<HTMLElement>('[data-autofocus]')
-    ;((preferred && !(onTouchScreen() && isEntryField(preferred)) ? preferred : null) ?? dialog.querySelector<HTMLButtonElement>('button'))?.focus()
+    ;(preferred && !(onTouchScreen() && isEntryField(preferred)) ? preferred : firstStop(dialog)).focus()
     return () => {
       document.removeEventListener('focusin', keepFocus)
       background.forEach(({ element, inert }) => { if (!inert) element.removeAttribute('inert') })
@@ -119,7 +122,7 @@ export function Sheet({ title, onClose, children, footer, size = 'md', returnFoc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return createPortal(<div ref={overlay} className="sheet-overlay" onMouseDown={dismissOnScrim ? event => { if (event.target === event.currentTarget) onClose() } : undefined}>
-    <section ref={ref} className={`sheet ${className}`.trim()} data-size={size} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
+    <section ref={ref} className={`sheet ${className}`.trim()} data-size={size} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
         if (event.key !== 'Tab') return

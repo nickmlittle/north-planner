@@ -23,7 +23,8 @@
 @media(max-width:767px){
   /* The phone header's search icon on Home, left of the account button. */
   .mobile-header-bar .mobile-search-trigger{grid-area:actions;margin-right:0}
-  .mobile-app-header.is-collapsed .mobile-search-trigger{grid-area:auto;grid-column:2;grid-row:1}
+  /* Both header buttons are .mobile-utility-trigger, whose collapsed rule loads later: outrank it (audit 5, F5). */
+  .mobile-app-header.is-collapsed .mobile-utility-trigger.mobile-search-trigger{grid-area:auto;grid-column:2;grid-row:1}
   .sheet-overlay:has(.command-palette){padding-top:0}
   .sheet-overlay>.sheet.command-palette,.sheet-overlay[data-keyboard]>.sheet.command-palette{height:var(--sheet-viewport-height,100dvh);max-height:var(--sheet-viewport-height,100dvh);padding-top:env(safe-area-inset-top,0px);border-radius:0}
   .palette-foot{display:none}
