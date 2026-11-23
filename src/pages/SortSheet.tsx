@@ -4,14 +4,15 @@ import { useId, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, defaultRuleText, localDate, normaliseDescription, sameDestination, type CardTransaction } from '../domain/cardTracker'
-import { addRule, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
+import { cardTracker, collapseWhitespace, defaultRuleText, localDate, normaliseDescription, sameDestination, type CardTransaction, type WaitingOn } from '../domain/cardTracker'
+import { addRule, clearWaiting, markWaiting, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
 import { refundPlan, refundPurchase, sortRefund, type RefundChoice } from '../domain/cardRefunds'
 import { formatMonth } from '../formatting/month'
 import { shortDate } from './cardLabels'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { destinationGroups, destinationNamer } from './cardLabels'
-import { pounds, signedPounds, transactionMeta } from './spendingFormat'
+import { pounds, sameReason, signedPounds, transactionMeta, waitedFor, waitingReason } from './spendingFormat'
+import { WaitingFields } from './WaitingList'
 import { pickerPace, placeImpact, type Tipped } from './sortPace'
 
 type Props = {
@@ -54,6 +55,18 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const [showAll, setShowAll] = useState(false)
   const [filter, setFilter] = useState('')
   const [picked, setPicked] = useState<BudgetDestination | undefined>()
+  // Change on a waiting row (audit 6, waiting/3): the reason being chosen, while the mark is being changed.
+  const waiting = transaction.waiting
+  const [waitOn, setWaitOn] = useState<WaitingOn | null>(null)
+  const [waitNote, setWaitNote] = useState(waiting?.note ?? '')
+  const waitUnchanged = !!waiting && sameReason(waitOn ?? undefined, waiting.on) && collapseWhitespace(waitNote) === (waiting.note ?? '')
+  const saveWaiting = () => {
+    if (!waitOn) return
+    const at = now()
+    setDocument(latest => markWaiting(latest, transaction.id, waitOn, waitNote, at))
+    onSorted(`${transaction.description} is waiting: ${waitingReason(document, waitOn)}.`)
+  }
+  const backToSort = () => { setDocument(latest => clearWaiting(latest, transaction.id)); onSorted(`${transaction.description} is back in To sort.`) }
   const reason = (value: SuggestionReason) => value === 'last-used' ? 'Used last time' : value === 'own' ? `${person ?? 'Their'}’s card` : value === 'joint' ? 'Joint' : value === 'joint-account' ? 'One-offs' : 'Buffer'
   const merchant = transaction.merchant || normaliseDescription(transaction.description)
   // A refund goes back against its purchase (§6.4): the same pot, the matching line of a split, or spread across it.
@@ -94,15 +107,15 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   }
   const option = (destination: BudgetDestination, sub?: string) => {
     const selected = sameDestination(destination, chosen)
-    return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected} onClick={() => setPicked(destination)}>
+    return <li key={`${destination.kind}:${destination.kind === 'pot' ? destination.potId : destination.accountId}`}><button type="button" className="sort-option" aria-pressed={selected && !waitOn} onClick={() => { setPicked(destination); setWaitOn(null) }}>
       <span className="sort-option-text"><span className="sort-option-name">{name(destination)}</span>{sub && <span className="sort-option-sub">{sub}</span>}</span>
       {(() => { const { text, tone } = pace(destination); return text && <span className={`sort-option-left${tone ? ` is-${tone}` : ''}`}>{text}</span> })()}
-      {selected && <Check aria-hidden="true"/>}
+      {selected && !waitOn && <Check aria-hidden="true"/>}
     </button></li>
   }
   const groups = destinationGroups(document).map(group => ({ ...group, options: group.options.filter(row => !filter.trim() || row.label.toLocaleLowerCase('en-GB').includes(filter.trim().toLocaleLowerCase('en-GB'))) })).filter(group => group.options.length)
 
-  const footer = <>
+  const footer = waitOn ? <button type="button" className="primary-button sort-place" disabled={waitUnchanged} onClick={saveWaiting}>{waitUnchanged ? `Already waiting · ${waitingReason(document, waitOn)}` : `Mark waiting · ${waitingReason(document, waitOn)}`}</button> : <>
     {impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`} id={`${id}-impact`}>{impact.text}</p>}
     <button type="button" className="primary-button sort-place" disabled={!chosen || unchanged} aria-describedby={impact?.text ? `${id}-impact` : undefined} onClick={() => { if (chosen) place(chosen) }}>
       {!chosen ? 'Choose a pot or account' : unchanged ? `Already in ${name(chosen)}` : `Place in ${name(chosen)}`}
@@ -111,12 +124,23 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
 
   return <ModalDialog title={`Sort ${transaction.description}`} onClose={onClose} className="sort-sheet" footer={footer}>
     <p className="sort-sheet-summary"><strong>{signedPounds(transaction.amountPence)}</strong><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span></p>
+    {waiting && <section className="sort-waiting" aria-label="Waiting">
+      <p className="sort-waiting-head"><strong>Waiting · {waitingReason(document, waiting.on)}</strong><span>{(waited => waited === 'today' ? 'Marked today' : `For ${waited}`)(waitedFor(waiting.at, today))}</span></p>
+      {waiting.note && !waitOn && <p className="sort-waiting-note">“{waiting.note}”</p>}
+      {waitOn ? <>
+        <WaitingFields document={document} transaction={transaction} on={waitOn} note={waitNote} onChangeOn={setWaitOn} onChangeNote={setWaitNote}/>
+        <button type="button" className="text-button sort-waiting-cancel" onClick={() => { setWaitOn(null); setWaitNote(waiting.note ?? '') }}>Cancel</button>
+      </> : <div className="sort-waiting-actions">
+        <button type="button" className="secondary-button" onClick={() => setWaitOn(waiting.on)} data-autofocus>Change</button>
+        <button type="button" className="text-button" onClick={backToSort}>Back to To sort</button>
+      </div>}
+    </section>}
     {placedPot && onOpenMonth && <button type="button" className="text-button sort-open-month" onClick={() => onOpenMonth(placedPot.id, transaction.date.slice(0, 7))}>Open {placedPot.name} in Month<ChevronRight aria-hidden="true"/></button>}
     {purchase ? null : rule ? <div className="sort-rule-note">
       <p>Sorted by your rule “{rule.contains}”{rule.cardSuffix ? ` on ${person ?? 'this'}’s card` : ''}.</p>
       {rule.destination && <label className="spending-check"><input type="checkbox" checked={changeRule} onChange={event => setChangeRule(event.target.checked)}/>Change the rule too</label>}
     </div> : <div className="sort-always">
-      <label className="spending-check"><input type="checkbox" checked={always} onChange={event => setAlways(event.target.checked)} data-autofocus/>Always put {merchant} in this pot</label>
+      <label className="spending-check"><input type="checkbox" checked={always} onChange={event => setAlways(event.target.checked)} data-autofocus={waiting ? undefined : true}/>Always put {merchant} in this pot</label>
       {always && <div className="sort-always-fields">
         <label className="spending-field">Matching text<input value={ruleText} onChange={event => setRuleText(event.target.value)} aria-describedby={`${id}-match`}/></label>
         <span id={`${id}-match`} className="sort-always-hint">Any transaction whose description contains this.</span>

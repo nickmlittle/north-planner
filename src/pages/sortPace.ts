@@ -49,6 +49,6 @@ export function placeImpact(document: BudgetDocument, transaction: CardTransacti
   const previous = transaction.sort
   return {
     text, ...tone && text ? { tone } : {},
-    ...tip && destination.kind === 'pot' ? { tipped: { text: tip, potId: destination.potId, potName: name, month: monthOf(transaction.date), undo: current => restoreSort(current, transaction.id, previous), undone: `${transaction.description} is back ${previous ? 'where it was' : 'in To sort'}.` } } : {},
+    ...tip && destination.kind === 'pot' ? { tipped: { text: tip, potId: destination.potId, potName: name, month: monthOf(transaction.date), undo: current => restoreSort(current, transaction.id, previous, transaction.waiting), undone: `${transaction.description} is back ${previous ? 'where it was' : transaction.waiting ? 'in Waiting' : 'in To sort'}.` } } : {},
   }
 }

@@ -46,7 +46,16 @@
 .spending-month-head:first-child{border-top:0}
 .spending-month-head>span,.sort-table-month span{color:var(--text-muted);font-weight:var(--weight-regular)}
 .spending-month-head+li>.list-row{border-top:0}
-/* Set aside after To sort. */
+/* Set aside, always on top (audit 6, W8). Desktop: one line that wraps its buttons; See the moves opens the steps under it. */
+.set-aside-band{display:grid;gap:var(--space-3);padding:var(--space-3) var(--space-4);border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.set-aside-band-line{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-3);min-width:0}
+.set-aside-band-text{min-width:0}
+.set-aside-band-title{display:inline;margin:0;color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.set-aside-band-count{color:var(--text-muted);font-variant-numeric:tabular-nums}
+.set-aside-band-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-left:auto}
+.set-aside-band-toggle{display:inline-flex;align-items:center;gap:var(--space-1);min-height:36px}
+.set-aside-band-toggle svg{width:16px;height:16px}
+.set-aside-band-moves{display:grid;gap:var(--space-3)}
 .set-aside-steps{display:grid;gap:var(--space-3);align-items:start}
 .set-aside-steps>.step-group{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
 .set-aside-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-3)}

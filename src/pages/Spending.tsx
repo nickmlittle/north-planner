@@ -6,7 +6,7 @@ import { cardTracker, localDate, monthOf, type CardTransaction } from '../domain
 import { monthSpending, needsALook, type LookRow } from '../domain/cardSpending'
 import { paceHeadline } from '../formatting/paceLabels'
 import { formatMonth } from '../formatting/month'
-import { checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts } from '../domain/cardSorting'
+import { checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts, waitingRows } from '../domain/cardSorting'
 import { statementKeys, statementSummary } from '../domain/cardStatements'
 import { potBalance } from '../domain/potBalances'
 import type { SpendingSection } from '../state/navigation'
@@ -32,6 +32,7 @@ import { CheckBalancesSheet } from './CheckBalancesSheet'
 import { ExpectingBackList } from './ExpectingBack'
 import { heldOut, isHeld, ordersWithReturns } from '../domain/expectingBack'
 import { useShortcut } from '../state/shortcuts'
+import { WaitingList } from './WaitingList'
 
 type Props = {
   document: BudgetDocument
@@ -76,8 +77,8 @@ export function TransactionRow({ document, transaction, where, tag, moved, actio
 }
 
 /**
- * Spending: the card's own workspace. One header (the card, its open statement, Bring in), three tabs (To sort,
- * Transactions, Statements), and setting money aside as the last step of sorting.
+ * Spending: the card's own workspace. One header (the card, its open statement, Bring in) and three tabs (To sort,
+ * Transactions, Statements). To sort runs Set aside, To sort, Waiting, then Expecting back (audit 6, W8).
  */
 export function Spending({ document, setDocument, view, onSelectView, onOpenCardSettings, onOpenRules = () => {}, onOpenMonth, transactionId = null, statementKey = null, onOpenStatement = () => {}, today = localDate() }: Props) {
   const compact = useMobilePresentation()
@@ -95,6 +96,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   // After Check balances: the Amex pot, when its check has a gap, for Open Amex pot.
   const [gapPot, setGapPot] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
+  // Desktop's Set aside band: See the moves opens the steps in place.
+  const [showMoves, setShowMoves] = useState(false)
   const [checkingBalances, setCheckingBalances] = useState(false)
   const { copy, status: copiedStatus } = useStepCopy()
   const setMessage = (text: string) => { setMessageText(text); setUndoId(null); setGapPot(null) }
@@ -114,6 +117,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
   useShortcut(hasCard ? { keys: 'n', description: 'Add a transaction', group: 'This page', run: () => setSheet('manual') } : null)
   const toSort = transactionsToSort(tracker)
+  const waiting = waitingRows(document)
   // Rows from an earlier month sit under their own month's heading (PR 7).
   const heads = monthHeads(toSort, today)
   const byRules = uncheckedRuleSorts(tracker)
@@ -183,26 +187,34 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     <button type="button" className="secondary-button" onClick={() => { setDocument(current => checkRuleSorts(current, byRules.map(row => row.id), new Date())); setChecking(false); setMessage(`${plural(byRules.length, 'rule sort')} checked.`) }}>They all look right</button>
   </section>
 
-  // Set aside: the last step of sorting. It sits under the list, or on top once nothing is left to sort.
+  // Set aside: always on top of the To sort tab (audit 6, W8). Desktop: one line, with See the moves opening the steps
+  // in place. Phones: the card, with Review and mark moved.
   const lastMove = [...tracker.moves ?? []].filter(move => move.cardId === setAsideCard?.id).map(move => move.at).sort().at(-1)
   const markMoved = () => { const { text, id } = markSetAsideMoved(document, setDocument, setAsideCard!.id, pending, new Date()); setMessageText(text); setUndoId(id) }
-  const setAside = setAsideCard && setAsidePot && pending.length > 0 && <Section title={`Set aside in ${potPhrase(setAsidePot.name)}`} count={`${pendingPence < 0 ? `${pounds(-pendingPence)} back out` : pounds(pendingPence)} · ${plural(pending.length, 'transaction')} sorted since ${lastMove ? dayOf(lastMove) : 'the start'}`}
-    aside={!compact && <button type="button" className="text-button" onClick={() => setMoving(true)}>What it covers</button>}>
-    {compact ? <div className="set-aside-card">
-      <p>{plural(pending.length, 'transaction')} sorted since {lastMove ? dayOf(lastMove) : 'the start'}. Make the moves in your banking app, then mark them moved.</p>
+  const setAsideTitle = setAsidePot ? `Set aside in ${potPhrase(setAsidePot.name)}` : ''
+  const setAsideCount = `${pendingPence < 0 ? `${pounds(-pendingPence)} back out` : pounds(pendingPence)} · ${plural(pending.length, 'transaction')} sorted since ${lastMove ? dayOf(lastMove) : 'the start'}`
+  const setAside = setAsideCard && setAsidePot && pending.length > 0 && (compact ? <Section title={setAsideTitle} count={setAsideCount}>
+    <div className="set-aside-card">
+      <p>Make the moves in your banking app, then mark them moved.</p>
       <button type="button" className="secondary-button" onClick={() => setMoving(true)}>Review and mark moved</button>
-    </div> : <>
-      {copiedStatus}
-      <div className="set-aside-steps"><SetAsideSteps document={document} cardId={setAsideCard.id} rows={pending} onCopy={pence => void copy(pence)}/></div>
-      <div className="set-aside-actions">
+    </div>
+  </Section> : <section className="set-aside-band" aria-labelledby="set-aside-title">
+    <div className="set-aside-band-line">
+      <div className="set-aside-band-text"><h2 id="set-aside-title" className="set-aside-band-title">{setAsideTitle}</h2> <span className="set-aside-band-count">· {setAsideCount}</span></div>
+      <div className="set-aside-band-actions">
+        <button type="button" className="text-button set-aside-band-toggle" aria-expanded={showMoves} aria-controls="set-aside-moves" onClick={() => setShowMoves(value => !value)}>See the moves{showMoves ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</button>
         <button type="button" className="secondary-button" onClick={() => setMoving(true)}>Not all of it</button>
         <button type="button" className="secondary-button" onClick={markMoved}>Mark {pounds(Math.abs(pendingPence))} moved</button>
       </div>
-    </>}
-  </Section>
+    </div>
+    {showMoves && <div id="set-aside-moves" className="set-aside-band-moves">
+      {copiedStatus}
+      <div className="set-aside-steps"><SetAsideSteps document={document} cardId={setAsideCard.id} rows={pending} onCopy={pence => void copy(pence)}/></div>
+    </div>}
+  </section>)
 
   const sortPanel = <div className="spending-sort">
-    {!toSort.length && setAside}
+    {setAside}
     <Section title="To sort" count={toSort.length || undefined} aside={!compact ? `${latest ? `Brought in ${dayOf(latest.at)}` : 'Nothing brought in yet'}${sortedThrough ? ` · sorted to ${shortDate(sortedThrough)}` : ''}` : undefined}>
       {toSort.length ? compact
         ? <ul className="spending-sort-list" aria-label="To sort">{toSort.map(transaction => <Fragment key={transaction.id}>{heads.has(transaction.id) && <li className="spending-month-head" aria-hidden="true">{heads.get(transaction.id)!.name}{heads.get(transaction.id)!.earlier && <span> · earlier month</span>}</li>}<li><ListRow title={transaction.description}
@@ -210,12 +222,14 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
           meta={[dayDate(transaction.date), document.household.adults.find(person => person.id === transaction.personId)?.name ?? cardLabel(document, transaction), hint(transaction)].filter(Boolean).join(' · ')}
           trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li></Fragment>)}</ul>
         : <SortTable document={document} setDocument={setDocument} transactions={toSort} heads={heads} today={today} onSorted={sorted} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
+        : waiting.length ? <EmptyState title="Nothing left to sort">{waiting.length === 1 ? 'The 1 waiting is below.' : `The ${waiting.length} waiting are below.`}</EmptyState>
         : tracker.transactions.length ? <EmptyState title="Everything is sorted"/>
         : <EmptyState title="Nothing to sort" action={<button type="button" className="secondary-button" onClick={() => setSheet('bring-in')}>Bring in</button>}>Bring in the Excel export from {card.name} to start.</EmptyState>}
       {(compact || !toSort.length) && ruleToggle && <div className="spending-rule-line">{ruleToggle}</div>}
       {ruleSorts}
     </Section>
-    {toSort.length > 0 && setAside}
+    {/* Go through them opens the group's first row, until waiting/5's go-through. */}
+    <WaitingList document={document} today={today} onOpen={setSorting} onGoThrough={group => setSorting(group.rows[0]!.id)}/>
     <ExpectingBackList document={document} setDocument={setDocument} today={today}/>
   </div>
   const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>

@@ -792,6 +792,7 @@ describe('on desktop', () => {
 })
 
 describe('the Amex pot', () => {
+  afterEach(() => vi.unstubAllGlobals())
   const sorted = (potId: string, amountPence: number) => ({ sort: { lines: [{ amountPence, destination: { kind: 'pot' as const, potId } }], by: 'person' as const, at: 'x' } })
   function withPot(): BudgetDocument {
     const document = household()
@@ -807,12 +808,19 @@ describe('the Amex pot', () => {
     return document
   }
 
-  it('sets aside after To sort: the moves to copy, Mark moved with Undo, and Not all of it for the checklist', () => {
+  it('sets aside on top of To sort: one line, See the moves to copy, Mark moved with Undo, and Not all of it for the checklist', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     let saved: BudgetDocument | undefined
     render(<Harness initial={withPot()} onChange={next => { saved = next }}/>)
-    const block = screen.getByRole('heading', { name: /^Set aside in the Amex pot/ }).closest('section')!
-    expect(block).toHaveTextContent('£102.80 · 2 transactions sorted since the start')
+    const block = screen.getByRole('region', { name: 'Set aside in the Amex pot' })
+    expect(block).toHaveTextContent('Set aside in the Amex pot · £102.80 · 2 transactions sorted since the start')
+    // Always on top (W8), even with a row still to sort.
+    expect(block.compareDocumentPosition(screen.getByRole('table', { name: 'To sort' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The steps open in place.
+    expect(within(block).queryAllByRole('listitem')).toEqual([])
+    const toggle = within(block).getByRole('button', { name: 'See the moves' })
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(within(block).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Out of Fuel£58.20', 'Send to Joint£58.20', 'Out of Groceries£44.60', 'Into Amex£102.80'])
     expect(screen.queryByText(/to move to the Amex pot/)).not.toBeInTheDocument()
     // Not all of it: the checklist, where the fuel can wait for next time.
