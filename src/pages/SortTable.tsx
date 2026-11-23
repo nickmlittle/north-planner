@@ -1,14 +1,15 @@
 import { Fragment, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react'
-import { Check, Split } from 'lucide-react'
+import { Check, Clock, Split } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Kbd, StatusChip } from '../components/ui'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { refundPlan, refundPurchase, sortRefund } from '../domain/cardRefunds'
 import { ordersWithReturns } from '../domain/expectingBack'
-import { addRule, suggestions, sortTransaction } from '../domain/cardSorting'
-import { cardTracker, defaultRuleText, destinationKey, localDate, monthOf, parseDestinationValue, type CardTransaction } from '../domain/cardTracker'
+import { addRule, markWaiting, suggestions, sortTransaction } from '../domain/cardSorting'
+import { cardTracker, defaultRuleText, destinationKey, localDate, monthOf, parseDestinationValue, type CardTransaction, type WaitingOn } from '../domain/cardTracker'
 import { dayDate, destinationGroups, destinationNamer, shortDate } from './cardLabels'
-import { cardLabel, signedPounds } from './spendingFormat'
+import { cardLabel, signedPounds, waitingReason } from './spendingFormat'
+import { WaitMenu } from './WaitMenu'
 import { pickerPace, placeImpact, type Tipped } from './sortPace'
 
 type Props = {
@@ -18,6 +19,8 @@ type Props = {
   /** After placing one: what to announce, and the toast's content when it tipped a pot into ahead or over. */
   onSorted: (message: string, tipped?: Tipped) => void
   onSplit: (id: string) => void
+  /** After marking one waiting (W7): what to announce, and the row, for Undo. */
+  onMarked: (message: string, id: string) => void
   /** The full sort sheet, for anything the table can't do (a refund of a split). */
   onOpen: (id: string) => void
   /** The footer's right side: "Sorted by rules · 15 · Check". */
@@ -32,10 +35,11 @@ type Props = {
 /**
  * Desktop To sort (board 7): a table built for the keyboard. ↑/↓ (or J/K) move between rows, / jumps to the pot
  * list (type a pot's name), Enter places it, A toggles Always, S splits. Focus moves to the next row once one is
- * placed. For the mouse, the focused or hovered row shows a ✓ beside its pot. Each pot option carries its Left and pace,
+ * placed. W (or the clock beside Split) marks a row waiting instead (audit 6, W7). For the mouse, the focused or hovered
+ * row shows a ✓ beside its pot and the clock. Each pot option carries its Left and pace,
  * and the focused row says what placing it would change ("Groceries: On track → £110 ahead · runs out ~Fri 20 Nov").
  */
-export function SortTable({ document, setDocument, transactions, onSorted, onSplit, onOpen, footerAside, heads, now = () => new Date(), today = localDate() }: Props) {
+export function SortTable({ document, setDocument, transactions, onSorted, onSplit, onMarked, onOpen, footerAside, heads, now = () => new Date(), today = localDate() }: Props) {
   const name = destinationNamer(document)
   const groups = destinationGroups(document)
   const tracker = cardTracker(document)
@@ -47,6 +51,9 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
   const paceByMonth = new Map<string, ReturnType<typeof pickerPace>>()
   const paceFor = (month: string) => { if (!paceByMonth.has(month)) paceByMonth.set(month, pickerPace(document, month, today)); return paceByMonth.get(month)! }
   const selects = useRef<Record<string, HTMLSelectElement | null>>({})
+  // The Wait menu's row, and the clock icons it opens beside.
+  const [waitingFor, setWaitingFor] = useState<string | null>(null)
+  const clocks = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const suggested = (transaction: CardTransaction) => {
     const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
@@ -80,6 +87,17 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
     requestAnimationFrame(() => { if (nextId) rows.current[nextId]?.focus() })
   }
 
+  /** Mark a row waiting: it leaves the table, so focus moves on as it does after placing one. */
+  const markRow = (transaction: CardTransaction, index: number, on: WaitingOn, note: string) => {
+    const at = now()
+    setDocument(current => markWaiting(current, transaction.id, on, note, at))
+    setWaitingFor(null)
+    onMarked(`${transaction.description} is waiting: ${waitingReason(document, on)}.`, transaction.id)
+    const nextId = transactions[index + 1]?.id ?? transactions[index - 1]?.id
+    requestAnimationFrame(() => { if (nextId) rows.current[nextId]?.focus() })
+  }
+  const cancelWait = (transaction: CardTransaction, refocus: boolean) => { setWaitingFor(null); if (refocus) rows.current[transaction.id]?.focus() }
+
   const onRowKey = (event: KeyboardEvent<HTMLTableRowElement>, transaction: CardTransaction, index: number) => {
     if (event.target !== event.currentTarget) return
     if (event.key === 'ArrowDown' || event.key === 'j') { event.preventDefault(); focusRow(index + 1) }
@@ -88,12 +106,13 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
     else if (event.key === 'Enter') { event.preventDefault(); place(transaction, index) }
     else if (event.key.toLowerCase() === 'a' && transaction.kind !== 'refund') { event.preventDefault(); setAlways({ ...always, [transaction.id]: !always[transaction.id] }) }
     else if (event.key.toLowerCase() === 's') { event.preventDefault(); onSplit(transaction.id) }
+    else if (event.key.toLowerCase() === 'w') { event.preventDefault(); setWaitingFor(transaction.id) }
   }
 
   return <div className="sort-table-wrap">
     <table className="sort-table" aria-label="To sort" aria-describedby="sort-table-keys">
       <colgroup><col className="sort-col-date"/><col/><col className="sort-col-card"/><col className="sort-col-amount"/><col className="sort-col-pot"/><col className="sort-col-always"/><col className="sort-col-split"/></colgroup>
-      <thead><tr><th scope="col">Date</th><th scope="col">Merchant</th><th scope="col">Card</th><th scope="col" className="is-amount">Amount</th><th scope="col">Pot or account</th><th scope="col">Always</th><th scope="col"><span className="visually-hidden">Split</span></th></tr></thead>
+      <thead><tr><th scope="col">Date</th><th scope="col">Merchant</th><th scope="col">Card</th><th scope="col" className="is-amount">Amount</th><th scope="col">Pot or account</th><th scope="col">Always</th><th scope="col"><span className="visually-hidden">Split or wait</span></th></tr></thead>
       <tbody>{transactions.map((transaction, index) => {
         const purchase = transaction.kind === 'refund' ? refundPurchase(tracker, transaction) : undefined
         const order = returnOrder(transaction)
@@ -104,7 +123,7 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
         const impact = focused === transaction.id && chosen ? placeImpact(document, transaction, chosen, today) : undefined
         const impactId = `sort-impact-${transaction.id}`
         const head = heads?.get(transaction.id)
-        return <Fragment key={transaction.id}>{head && <tr className="sort-table-month"><th scope="colgroup" colSpan={7}>{head.name}{head.earlier && <span> · earlier month</span>}</th></tr>}<tr ref={element => { rows.current[transaction.id] = element }} tabIndex={0} className="sort-table-row" data-transaction={transaction.id} aria-keyshortcuts="ArrowUp ArrowDown J K / Enter A S"
+        return <Fragment key={transaction.id}>{head && <tr className="sort-table-month"><th scope="colgroup" colSpan={7}>{head.name}{head.earlier && <span> · earlier month</span>}</th></tr>}<tr ref={element => { rows.current[transaction.id] = element }} tabIndex={0} className="sort-table-row" data-transaction={transaction.id} aria-keyshortcuts="ArrowUp ArrowDown J K / Enter A S W"
           aria-label={`${transaction.description}, ${signedPounds(transaction.amountPence)}, ${dayDate(transaction.date)}`} onKeyDown={event => onRowKey(event, transaction, index)}
           onFocus={() => setFocused(transaction.id)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(current => current === transaction.id ? null : current) }}>
           <td onClick={() => rows.current[transaction.id]?.focus()}>{dayDate(transaction.date)}</td>
@@ -122,10 +141,16 @@ export function SortTable({ document, setDocument, transactions, onSorted, onSpl
             <button type="button" className="icon-button sort-table-place" aria-label={chosen ? `Place ${transaction.description} in ${name(chosen)}` : `Place ${transaction.description}`} title="Place (Enter)" onClick={() => place(transaction, index)}><Check aria-hidden="true"/></button>
           </span>{impact?.text && <p id={impactId} className={`sort-impact sort-table-impact${impact.tone ? ` is-${impact.tone}` : ''}`}>{impact.text}</p>}</td>
           <td>{transaction.kind !== 'refund' && <label className="sort-table-always"><input type="checkbox" checked={!!always[transaction.id]} onChange={event => setAlways({ ...always, [transaction.id]: event.target.checked })}/><span className="visually-hidden">Always put {transaction.merchant} in this pot</span></label>}</td>
-          <td><button type="button" className="icon-button" aria-label={`Split ${transaction.description}`} onClick={() => onSplit(transaction.id)}><Split aria-hidden="true"/></button></td>
+          <td><span className="sort-table-icons">
+            <button type="button" className="icon-button" aria-label={`Split ${transaction.description}`} title="Split (S)" onClick={() => onSplit(transaction.id)}><Split aria-hidden="true"/></button>
+            <button type="button" ref={element => { clocks.current[transaction.id] = element }} className={`icon-button sort-table-wait${waitingFor === transaction.id ? ' is-open' : ''}`} aria-label={`Not ready to sort ${transaction.description}`} title="Not ready to sort (W)"
+              aria-haspopup="dialog" aria-expanded={waitingFor === transaction.id} onClick={() => setWaitingFor(current => current === transaction.id ? null : transaction.id)}><Clock aria-hidden="true"/></button>
+          </span>
+            {waitingFor === transaction.id && <WaitMenu document={document} transaction={transaction} anchor={() => clocks.current[transaction.id] ?? null} onMark={(on, note) => markRow(transaction, index, on, note)} onCancel={refocus => cancelWait(transaction, refocus)}/>}
+          </td>
         </tr></Fragment>
       })}</tbody>
     </table>
-    <div className="sort-table-foot"><p className="sort-table-keys" id="sort-table-keys"><Kbd>J</Kbd> <Kbd>K</Kbd> move · <Kbd>↵</Kbd> place · <Kbd>/</Kbd> choose a pot · <Kbd>A</Kbd> always · <Kbd>S</Kbd> split</p>{footerAside}</div>
+    <div className="sort-table-foot"><p className="sort-table-keys" id="sort-table-keys"><Kbd>J</Kbd> <Kbd>K</Kbd> move · <Kbd>↵</Kbd> place · <Kbd>/</Kbd> choose a pot · <Kbd>A</Kbd> always · <Kbd>S</Kbd> split · <Kbd>W</Kbd> waiting</p>{footerAside}</div>
   </div>
 }

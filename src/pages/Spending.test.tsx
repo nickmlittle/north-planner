@@ -737,7 +737,7 @@ describe('on desktop', () => {
     render(<Harness initial={sortingHousehold()} onChange={next => { saved = next }}/>)
     expect(screen.getByRole('tab', { name: 'Transactions' })).toBeInTheDocument()
     const table = screen.getByRole('table', { name: 'To sort' })
-    expect(table).toHaveAccessibleDescription('J K move · ↵ place · / choose a pot · A always · S split')
+    expect(table).toHaveAccessibleDescription('J K move · ↵ place · / choose a pot · A always · S split · W waiting')
     // No Place column: Enter places, and a quiet ✓ does for the mouse.
     expect(within(table).queryByRole('button', { name: 'Place' })).not.toBeInTheDocument()
     const rows = () => within(table).getAllByRole('row').slice(1)

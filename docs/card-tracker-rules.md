@@ -125,7 +125,7 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 
 ## Waiting (audit 6, W1–W12)
 
-**Status:** `waiting/2-model` (W1, W4–W6, W10, WP2–WP7) and `waiting/3-spending` (W8, W9), built 23 November 2026 from the [Waiting build plan](waiting-build-plan.md). A row goes **To sort → Waiting → Sorted**. Waiting is for rows that need the other cardholder, a conversation or an order lookup before they can be sorted. The screens come in later PRs; this section grows with them.
+**Status:** `waiting/2-model` (W1, W4–W6, W10, WP2–WP7), `waiting/3-spending` (W8, W9) and `waiting/4-mark` (W5–W7), built 23 November 2026 from the [Waiting build plan](waiting-build-plan.md). A row goes **To sort → Waiting → Sorted**. Waiting is for rows that need the other cardholder, a conversation or an order lookup before they can be sorted. The screens come in later PRs; this section grows with them.
 
 - **The mark** (`CardTransaction.waiting`, W4): `on` is an adult (`{ kind: 'person', personId }`, "Ask Ada") or `{ kind: 'discuss' }` ("To discuss"), with an optional `note` and `at`, when it was first marked. A reason is required and a note is optional (W6). The note is trimmed and kept on one line, up to 140 characters (`WAITING_NOTE_MAX`, WP6). Waiting is a mark on the transaction, never a sort.
 - **Validation:** the mark is allowed only on a purchase or refund with no sort, waiting on an adult in the household or To discuss. A mark with a sort, on a payment, for someone else, or with a longer note makes the document invalid.
@@ -142,6 +142,12 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 - **Days waited** count from `at` (WP5): "today", "1 day", "8 days".
 - **With nothing to sort** but rows waiting, To sort reads "Nothing left to sort" ("The 6 waiting are below."), never "Everything is sorted".
 - **Opening a waiting row** opens the sort sheet. The reason, how long it has waited and the note come first. **Change** shows the reasons as buttons, the cardholder first, then the other adults and To discuss, plus the note box. The footer then reads "Mark waiting · Ask Ada", and the message after it reads "BOOTS 1182 SIDCUP is waiting: To discuss." Choosing a pot leaves Change. **Back to To sort** clears the mark. Placing the row sorts it and drops the mark, and Undo on the tipped-pot toast puts it back in Waiting.
+
+**Marking a row** (`waiting/4`, W5–W7). Only rows in To sort can be marked (WP4). Marking adds no column and no row height.
+
+- **Desktop:** a clock icon sits beside Split, in the same column. Like ✓ Place, it shows only on the hovered or focused row. The clock or the **W** key opens "Not ready to sort?", under the clock, or over it when the row is near the bottom of the window. It lists the reasons with keys: Ask <cardholder> ("Ada's card") first, then the other adult and To discuss ("Both of you"). The cardholder starts chosen, so W then Enter marks a row. 1–3 choose a reason, the note box is optional, and Enter marks it from anywhere in the menu except Cancel. Enter on a reason button marks that reason. Esc and Cancel close it and put focus back on the row. A click elsewhere closes it too. Once a row is marked, it leaves the table and focus moves to the next row, as after placing one. The table's key line adds "W waiting".
+- **Sort sheet** (phones, and any row in To sort opened on desktop): **Not ready to sort?** ("It leaves To sort and counts in no pot until it's sorted.") shows the reasons as buttons, with none chosen. Choosing one works like choosing a pot: the footer becomes "Mark waiting · Ask Ada" and the note box appears. Tapping the chosen reason again, or choosing a pot, goes back to Place. Enter in the note box marks it. The section isn't shown on a sorted row or on one already waiting, which uses Change instead.
+- **After marking**, the message reads "ZARA UK LONDON is waiting: Ask Ada." with **Undo**, which puts the row back in To sort ("ZARA UK LONDON is back in To sort.").
 
 **What counts where** (W1). Waiting rows count in no pot, no pace and no move, the same as rows to sort.
 

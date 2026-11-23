@@ -1,17 +1,19 @@
 /* Spending (audit 3 PR 13): the card's header, tabs, To sort and Set aside. Tokens only (styles.tokens.test.ts). */
 .spending-page .tabs{margin-bottom:var(--space-4)}
 .spending-page .spending-bring-in svg{width:18px;height:18px}
-.spending-sort{display:grid;gap:var(--space-6)}
+.spending-sort{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-6)}
 /* The To sort table: full width now the rail has gone; columns sized so nothing clips from 1100px. */
-.sort-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
-.sort-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--text-md)}
+.sort-table-wrap{position:relative;overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+/* At its narrowest it scrolls inside its box (from about 980px wide) rather than squeezing the merchant to nothing. */
+.sort-table{width:100%;min-width:840px;table-layout:fixed;border-collapse:collapse;font-size:var(--text-md)}
 .sort-col-date{width:96px}
 .sort-col-card{width:112px}
 .sort-col-amount{width:100px}
 /* Wide enough for "Spending · Starling Ada · £1,122.92 left" (Left and pace, link F5). */
 .sort-col-pot{width:42%}
 .sort-col-always{width:70px}
-.sort-col-split{width:52px}
+/* Split and the Wait clock (audit 6, W7): two icons in one column, so the table gains no column and no height. */
+.sort-col-split{width:80px}
 .sort-table th{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border);color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--weight-medium);text-align:left;white-space:nowrap}
 .sort-table td{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}
 .sort-table td:first-child,.sort-table td:nth-child(3){white-space:nowrap}
@@ -29,6 +31,14 @@
 /* ✓ Place: quiet until the row is hovered or focused. */
 .sort-table-place{flex:none;opacity:0}
 .sort-table-row:hover .sort-table-place,.sort-table-row:focus-within .sort-table-place,.sort-table-place:focus-visible{opacity:1}
+.sort-table td:has(>.sort-table-icons){padding-inline:var(--space-1)}
+.sort-table-icons{display:flex;align-items:center;justify-content:flex-end;gap:0}
+/* Under 1100px the pot column gives up some width, so the merchant doesn't squeeze down to a letter a line. */
+@media (max-width:1099px){.sort-col-pot{width:34%}.sort-col-always{width:60px}}
+/* The clock: quiet until the row is hovered or focused, like ✓ Place. */
+.sort-table-wait{opacity:0}
+.sort-table-row:hover .sort-table-wait,.sort-table-row:focus-within .sort-table-wait,.sort-table-wait:focus-visible,.sort-table-wait.is-open{opacity:1}
+.sort-table-wait.is-open{background:var(--pine);color:var(--cream)}
 .sort-table-always{display:grid;place-items:center;width:44px;height:44px}
 .sort-table-always input{width:20px;height:20px;margin:0}
 .sort-table tbody tr:last-child td{border-bottom:0}
