@@ -22,6 +22,8 @@ type Props = {
   onClose: () => void
   /** After placing it: what to announce, and the toast's content when it tipped a pot into ahead or over. */
   onSorted: (message: string, tipped?: Tipped) => void
+  /** After marking it waiting from To sort (W7): what to announce, and the row, for Undo. Changing a mark uses onSorted. */
+  onMarked?: (message: string, id: string) => void
   /** "Split across pots": open the split editor instead. */
   onSplit?: () => void
   now?: () => Date
@@ -38,7 +40,7 @@ const SHOWN = 6
  * Sort one transaction: choose a pot (the suggestion is chosen to start), see what placing it there would change, then
  * Place (board M2). "Always" makes a rule in place. A split refund's parts still place with one tap.
  */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onSplit, now = () => new Date(), today = localDate(), onOpenMonth }: Props) {
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onMarked, onSplit, now = () => new Date(), today = localDate(), onOpenMonth }: Props) {
   // Left and pace for each pot in the transaction's month, so the choice shows its consequence (link F5).
   const pace = pickerPace(document, transaction.date.slice(0, 7), today)
   const id = useId()
@@ -55,16 +57,20 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const [showAll, setShowAll] = useState(false)
   const [filter, setFilter] = useState('')
   const [picked, setPicked] = useState<BudgetDestination | undefined>()
-  // Change on a waiting row (audit 6, waiting/3): the reason being chosen, while the mark is being changed.
+  // Change on a waiting row (audit 6, waiting/3), or Not ready to sort? on a row in To sort (waiting/4): the reason
+  // being chosen. Choosing one swaps the footer to Mark waiting, as choosing a pot does to Place.
   const waiting = transaction.waiting
+  const canWait = !waiting && !transaction.sort && transaction.kind !== 'payment'
   const [waitOn, setWaitOn] = useState<WaitingOn | null>(null)
   const [waitNote, setWaitNote] = useState(waiting?.note ?? '')
   const waitUnchanged = !!waiting && sameReason(waitOn ?? undefined, waiting.on) && collapseWhitespace(waitNote) === (waiting.note ?? '')
   const saveWaiting = () => {
-    if (!waitOn) return
+    if (!waitOn || waitUnchanged) return
     const at = now()
     setDocument(latest => markWaiting(latest, transaction.id, waitOn, waitNote, at))
-    onSorted(`${transaction.description} is waiting: ${waitingReason(document, waitOn)}.`)
+    const message = `${transaction.description} is waiting: ${waitingReason(document, waitOn)}.`
+    if (!waiting && onMarked) onMarked(message, transaction.id)
+    else onSorted(message)
   }
   const backToSort = () => { setDocument(latest => clearWaiting(latest, transaction.id)); onSorted(`${transaction.description} is back in To sort.`) }
   const reason = (value: SuggestionReason) => value === 'last-used' ? 'Used last time' : value === 'own' ? `${person ?? 'Their'}’s card` : value === 'joint' ? 'Joint' : value === 'joint-account' ? 'One-offs' : 'Buffer'
@@ -128,7 +134,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
       <p className="sort-waiting-head"><strong>Waiting · {waitingReason(document, waiting.on)}</strong><span>{(waited => waited === 'today' ? 'Marked today' : `For ${waited}`)(waitedFor(waiting.at, today))}</span></p>
       {waiting.note && !waitOn && <p className="sort-waiting-note">“{waiting.note}”</p>}
       {waitOn ? <>
-        <WaitingFields document={document} transaction={transaction} on={waitOn} note={waitNote} onChangeOn={setWaitOn} onChangeNote={setWaitNote}/>
+        <WaitingFields document={document} transaction={transaction} on={waitOn} note={waitNote} onChangeOn={setWaitOn} onChangeNote={setWaitNote} onSubmit={saveWaiting}/>
         <button type="button" className="text-button sort-waiting-cancel" onClick={() => { setWaitOn(null); setWaitNote(waiting.note ?? '') }}>Cancel</button>
       </> : <div className="sort-waiting-actions">
         <button type="button" className="secondary-button" onClick={() => setWaitOn(waiting.on)} data-autofocus>Change</button>
@@ -166,6 +172,11 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
       {!groups.length && <p className="spending-none">No pot or account matches “{filter.trim()}”.</p>}
     </div>}
     {onSplit && <button type="button" className="secondary-button sort-split" onClick={onSplit}><Split aria-hidden="true"/>{transaction.sort && transaction.sort.lines.length > 1 ? 'Change the split' : 'Split across pots'}</button>}
+    {canWait && <section className="sort-not-ready" aria-labelledby={`${id}-not-ready`}>
+      <div><h3 className="sort-not-ready-title" id={`${id}-not-ready`}>Not ready to sort?</h3><p className="sort-not-ready-hint">It leaves To sort and counts in no pot until it’s sorted.</p></div>
+      <WaitingFields document={document} transaction={transaction} on={waitOn ?? undefined} note={waitNote} onSubmit={saveWaiting}
+        onChangeOn={on => setWaitOn(current => current && sameReason(current, on) ? null : on)} onChangeNote={setWaitNote}/>
+    </section>}
     {transaction.sort && <button type="button" className="text-button sort-unsort" onClick={() => { setDocument(latest => unsortTransaction(latest, transaction.id)); onSorted(`${transaction.description} is back in To sort.`) }}>Move back to To sort</button>}
   </ModalDialog>
 }

@@ -67,20 +67,23 @@ export function WaitingList({ document, onOpen, onGoThrough, today = localDate()
 
 /**
  * Who it's waiting on and an optional note (W5, W6): the reasons as toggle buttons, the cardholder first, then the note
- * box. The sort sheet uses it to change a mark (waiting/3) and, from waiting/4, to mark one.
+ * box once a reason is chosen. The sort sheet uses it to change a mark (waiting/3) and to mark one (waiting/4). Enter in
+ * the note box saves.
  */
-export function WaitingFields({ document, transaction, on, note, onChangeOn, onChangeNote }: {
+export function WaitingFields({ document, transaction, on, note, onChangeOn, onChangeNote, onSubmit }: {
   document: BudgetDocument
   transaction: CardTransaction
   on: WaitingOn | undefined
   note: string
   onChangeOn: (on: WaitingOn) => void
   onChangeNote: (note: string) => void
+  onSubmit?: () => void
 }) {
   return <div className="waiting-fields">
     <div className="waiting-reasons" role="group" aria-label="Waiting on">
       {waitingReasons(document, transaction).map(reason => <button key={reason.kind === 'person' ? reason.personId : 'discuss'} type="button" className="waiting-reason" aria-pressed={sameReason(reason, on)} onClick={() => onChangeOn(reason)}>{waitingReason(document, reason)}</button>)}
     </div>
-    <label className="spending-field">Note (optional)<input className="waiting-note-input" value={note} maxLength={WAITING_NOTE_MAX} onChange={event => onChangeNote(event.target.value)} enterKeyHint="done"/></label>
+    {on && <label className="spending-field">Note (optional)<input className="waiting-note-input" value={note} maxLength={WAITING_NOTE_MAX} onChange={event => onChangeNote(event.target.value)} enterKeyHint="done"
+      onKeyDown={event => { if (event.key === 'Enter' && onSubmit) { event.preventDefault(); onSubmit() } }}/></label>}
   </div>
 }

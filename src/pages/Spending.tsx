@@ -6,7 +6,7 @@ import { cardTracker, localDate, monthOf, type CardTransaction } from '../domain
 import { monthSpending, needsALook, type LookRow } from '../domain/cardSpending'
 import { paceHeadline } from '../formatting/paceLabels'
 import { formatMonth } from '../formatting/month'
-import { checkRuleSorts, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts, waitingRows } from '../domain/cardSorting'
+import { checkRuleSorts, clearWaiting, lastImport, sortDestination, suggestions, transactionsToSort, uncheckedRuleSorts, waitingRows } from '../domain/cardSorting'
 import { statementKeys, statementSummary } from '../domain/cardStatements'
 import { potBalance } from '../domain/potBalances'
 import type { SpendingSection } from '../state/navigation'
@@ -93,6 +93,8 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const [checking, setChecking] = useState(false)
   const [message, setMessageText] = useState('')
   const [undoId, setUndoId] = useState<string | null>(null)
+  // After marking a row waiting (W7): the row, for Undo, which puts it back in To sort.
+  const [undoWaiting, setUndoWaiting] = useState<{ id: string; description: string } | null>(null)
   // After Check balances: the Amex pot, when its check has a gap, for Open Amex pot.
   const [gapPot, setGapPot] = useState<string | null>(null)
   const [moving, setMoving] = useState(false)
@@ -100,7 +102,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const [showMoves, setShowMoves] = useState(false)
   const [checkingBalances, setCheckingBalances] = useState(false)
   const { copy, status: copiedStatus } = useStepCopy()
-  const setMessage = (text: string) => { setMessageText(text); setUndoId(null); setGapPot(null) }
+  const setMessage = (text: string) => { setMessageText(text); setUndoId(null); setGapPot(null); setUndoWaiting(null) }
   // A placing that tips a pot into ahead or over gets a toast: Open the pot in Month, or Undo (link F5).
   const { show: showToast, toast } = useToast()
   // Mounted from the first tip on, so the page keeps one status line until then.
@@ -112,6 +114,10 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       ...onOpenMonth ? [{ label: `Open ${tipped.potName}`, onClick: () => onOpenMonth(tipped.potId, tipped.month) }] : [],
       { label: 'Undo', onClick: () => { setDocument(tipped.undo); setMessage(tipped.undone) } },
     ])
+  }
+  const marked = (text: string, id: string) => {
+    setMessage(text)
+    setUndoWaiting({ id, description: tracker.transactions.find(row => row.id === id)?.description ?? 'It' })
   }
   const hasCard = tracker.cards.length > 0
   useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
@@ -221,7 +227,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
           label={[transaction.description, signedPounds(transaction.amountPence), `${dayDate(transaction.date)} · ${cardLabel(document, transaction)}`, hint(transaction)].filter(Boolean).join(', ')}
           meta={[dayDate(transaction.date), document.household.adults.find(person => person.id === transaction.personId)?.name ?? cardLabel(document, transaction), hint(transaction)].filter(Boolean).join(' · ')}
           trailing={<span className={transaction.amountPence < 0 ? 'spending-credit' : undefined}>{signedPounds(transaction.amountPence)}</span>} onOpen={() => setSorting(transaction.id)}/></li></Fragment>)}</ul>
-        : <SortTable document={document} setDocument={setDocument} transactions={toSort} heads={heads} today={today} onSorted={sorted} onSplit={setSplitting} onOpen={setSorting} footerAside={ruleToggle}/>
+        : <SortTable document={document} setDocument={setDocument} transactions={toSort} heads={heads} today={today} onSorted={sorted} onSplit={setSplitting} onMarked={marked} onOpen={setSorting} footerAside={ruleToggle}/>
         : waiting.length ? <EmptyState title="Nothing left to sort">{waiting.length === 1 ? 'The 1 waiting is below.' : `The ${waiting.length} waiting are below.`}</EmptyState>
         : tracker.transactions.length ? <EmptyState title="Everything is sorted"/>
         : <EmptyState title="Nothing to sort" action={<button type="button" className="secondary-button" onClick={() => setSheet('bring-in')}>Bring in</button>}>Bring in the Excel export from {card.name} to start.</EmptyState>}
@@ -234,7 +240,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   </div>
   const allPanel = <Section title="Transactions"><TransactionsTable document={document} onOpen={setSorting} onBringIn={() => setSheet('bring-in')} movedOf={movedOf} focusId={transactionId} onOpenMonth={onOpenMonth}/></Section>
 
-  const messageLine = <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}{gapPot && onOpenMonth && <> <button type="button" className="text-button" onClick={() => onOpenMonth(gapPot, monthOf(today))}>Open {potTitle(document.budget.pots.find(pot => pot.id === gapPot)?.name ?? 'Amex')}</button></>}</p>
+  const messageLine = <p className="budget-manage-message spending-message" role="status">{message}{undoId && <> <button type="button" className="text-button" onClick={() => { setDocument(current => undoMove(current, undoId)); setMessage('Move undone. Those transactions are back on the list to move.') }}>Undo</button> · <button type="button" className="text-button" onClick={() => setCheckingBalances(true)}>Check balances</button></>}{undoWaiting && <> <button type="button" className="text-button" onClick={() => { setDocument(current => clearWaiting(current, undoWaiting.id)); setMessage(`${undoWaiting.description} is back in To sort.`) }}>Undo</button></>}{gapPot && onOpenMonth && <> <button type="button" className="text-button" onClick={() => onOpenMonth(gapPot, monthOf(today))}>Open {potTitle(document.budget.pots.find(pot => pot.id === gapPot)?.name ?? 'Amex')}</button></>}</p>
 
   return <div className="page-frame spending-page">
     <PageHeader title={tracker.cards.length > 1 ? 'Spending' : card.name} titleText="Spending" context={context} actions={<>
@@ -257,7 +263,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       {view === 'sort' ? sortPanel : view === 'transactions' ? allPanel
         : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>}
     </Tabs>
-    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={(text, tipped) => { setSorting(null); sorted(text, tipped) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
+    {sortingTransaction && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={(text, tipped) => { setSorting(null); sorted(text, tipped) }} onMarked={(text, id) => { setSorting(null); marked(text, id) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)} onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}

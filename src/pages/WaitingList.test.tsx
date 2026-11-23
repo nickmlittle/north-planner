@@ -183,3 +183,152 @@ describe('Waiting labels', () => {
     expect(waitingReasons(document, { personId: 'ben' })).toEqual([{ kind: 'person', personId: 'ben' }, { kind: 'person', personId: 'ada' }, { kind: 'discuss' }])
   })
 })
+
+describe('marking a row waiting on desktop (waiting/4)', () => {
+  // Two rows to sort: Ben's TESCO and Ada's CAFE NERO, plus a payment, which never shows in To sort.
+  const toMark = () => {
+    const document = household()
+    document.card!.transactions.push(tx('nero', '2026-11-21', 'CAFE NERO 0291', 1710), tx('paid', '2026-11-20', 'PAYMENT RECEIVED - THANK YOU', -50000, { kind: 'payment' }))
+    return document
+  }
+  const table = () => screen.getByRole('table', { name: 'To sort' })
+  const rows = () => within(table()).getAllByRole('row').slice(1)
+  const pressed = (menu: HTMLElement) => within(within(menu).getByRole('group', { name: 'Waiting on' })).getAllByRole('button').map(button => `${button.textContent}${button.getAttribute('aria-pressed') === 'true' ? ' ✓' : ''}`)
+
+  it('W opens the menu with the cardholder chosen; 1–3 choose, Enter marks, and focus moves to the next row', async () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={toMark()} onChange={next => { saved = next }}/>)
+    expect(table()).toHaveAccessibleDescription('J K move · ↵ place · / choose a pot · A always · S split · W waiting')
+    // Split and the clock share a column: still seven.
+    expect(within(table()).getAllByRole('columnheader')).toHaveLength(7)
+    expect(within(table()).getAllByRole('button', { name: /^Not ready to sort / })).toHaveLength(2)
+    expect(rows().map(row => row.getAttribute('aria-label'))).toEqual(['TESCO STORES 3180, £32.70, Sun 22 Nov', 'CAFE NERO 0291, £17.10, Sat 21 Nov'])
+    rows()[0]!.focus()
+    fireEvent.keyDown(rows()[0]!, { key: 'w' })
+    const menu = screen.getByRole('dialog', { name: 'Not ready to sort?' })
+    expect(menu).toHaveAccessibleDescription('TESCO STORES 3180 · £32.70 · leaves To sort, counts in no pot')
+    // TESCO is on Ben's card, so Ask Ben comes first.
+    expect(pressed(menu)).toEqual(['1Ask BenBen’s card ✓', '2Ask Ada', '3To discussBoth of you'])
+    expect(within(menu).getByRole('button', { name: /Ask Ben/ })).toHaveFocus()
+    expect(within(rows()[0]!).getByRole('button', { name: 'Not ready to sort TESCO STORES 3180' })).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.keyDown(within(menu).getByRole('button', { name: /Ask Ben/ }), { key: '3' })
+    expect(pressed(menu)[2]).toBe('3To discussBoth of you ✓')
+    expect(within(menu).getByRole('button', { name: /To discuss/ })).toHaveFocus()
+    fireEvent.change(within(menu).getByLabelText('Note (optional)'), { target: { value: 'Weekly shop, or ours?' } })
+    // Digits typed in the note are the note's.
+    fireEvent.keyDown(within(menu).getByLabelText('Note (optional)'), { key: '1' })
+    expect(pressed(menu)[2]).toBe('3To discussBoth of you ✓')
+    fireEvent.keyDown(within(menu).getByLabelText('Note (optional)'), { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'tesco')!.waiting).toMatchObject({ on: { kind: 'discuss' }, note: 'Weekly shop, or ours?' })
+    expect(decodeBudgetDocument(saved)).not.toBeNull()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('TESCO STORES 3180 is waiting: To discuss. Undo')
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    expect(rows()).toHaveLength(1)
+    expect(rows()[0]).toHaveFocus()
+    expect(screen.getByRole('tab', { name: /^To sort/ })).toHaveTextContent('To sort1')
+  })
+
+  it('W then Enter marks it for the cardholder, and Undo puts it back in To sort', () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={toMark()} onChange={next => { saved = next }}/>)
+    rows()[1]!.focus()
+    fireEvent.keyDown(rows()[1]!, { key: 'W' })
+    fireEvent.keyDown(within(screen.getByRole('dialog')).getByRole('button', { name: /Ask Ada/ }), { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'nero')!.waiting).toEqual({ on: { kind: 'person', personId: 'ada' }, at: expect.any(String) })
+    expect(screen.getByRole('status')).toHaveTextContent('CAFE NERO 0291 is waiting: Ask Ada.')
+    fireEvent.click(within(screen.getByRole('status')).getByRole('button', { name: 'Undo' }))
+    expect(saved!.card!.transactions.find(row => row.id === 'nero')!.waiting).toBeUndefined()
+    expect(screen.getByRole('status')).toHaveTextContent('CAFE NERO 0291 is back in To sort.')
+    expect(rows()).toHaveLength(2)
+  })
+
+  it('2 then Enter marks the second reason', () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={toMark()} onChange={next => { saved = next }}/>)
+    rows()[0]!.focus()
+    fireEvent.keyDown(rows()[0]!, { key: 'w' })
+    fireEvent.keyDown(document.activeElement!, { key: '2' })
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'tesco')!.waiting?.on).toEqual({ kind: 'person', personId: 'ada' })
+  })
+
+  it('Enter on another reason marks that one; Esc and Cancel change nothing and return to the row', () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={toMark()} onChange={next => { saved = next }}/>)
+    rows()[1]!.focus()
+    fireEvent.keyDown(rows()[1]!, { key: 'w' })
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(rows()[1]).toHaveFocus()
+    fireEvent.click(within(rows()[1]!).getByRole('button', { name: 'Not ready to sort CAFE NERO 0291' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    expect(rows()[1]).toHaveFocus()
+    expect(saved).toBeUndefined()
+    fireEvent.click(within(rows()[1]!).getByRole('button', { name: 'Not ready to sort CAFE NERO 0291' }))
+    fireEvent.keyDown(within(screen.getByRole('dialog')).getByRole('button', { name: /Ask Ben/ }), { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'nero')!.waiting?.on).toEqual({ kind: 'person', personId: 'ben' })
+  })
+
+  it('the clock opens the menu, and Mark waiting marks with the note', () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={toMark()} onChange={next => { saved = next }}/>)
+    fireEvent.click(within(rows()[0]!).getByRole('button', { name: 'Not ready to sort TESCO STORES 3180' }))
+    const menu = screen.getByRole('dialog', { name: 'Not ready to sort?' })
+    fireEvent.click(within(menu).getByRole('button', { name: /Ask Ada/ }))
+    fireEvent.change(within(menu).getByLabelText('Note (optional)'), { target: { value: '  Hers   or ours? ' } })
+    fireEvent.click(within(menu).getByRole('button', { name: 'Mark waiting' }))
+    expect(saved!.card!.transactions.find(row => row.id === 'tesco')!.waiting).toMatchObject({ on: { kind: 'person', personId: 'ada' }, note: 'Hers or ours?' })
+  })
+})
+
+describe('Not ready to sort? in the sort sheet (waiting/4)', () => {
+  it('choosing a reason shows the note and swaps the footer to Mark waiting; Enter in the note marks it, with Undo', () => {
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={household()} onChange={next => { saved = next }}/>)
+    fireEvent.click(screen.getByRole('button', { name: /^TESCO STORES 3180/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Sort TESCO STORES 3180' })
+    const section = within(dialog).getByRole('region', { name: 'Not ready to sort?' })
+    expect(section).toHaveTextContent('It leaves To sort and counts in no pot until it’s sorted.')
+    expect(within(section).getAllByRole('button').map(button => button.textContent)).toEqual(['Ask Ben', 'Ask Ada', 'To discuss'])
+    // Nothing chosen yet: no note box, and the footer still places.
+    expect(within(dialog).queryByLabelText('Note (optional)')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /^Place in / })).toBeInTheDocument()
+    fireEvent.click(within(section).getByRole('button', { name: 'Ask Ben' }))
+    expect(within(dialog).queryByRole('button', { name: /^Place in / })).not.toBeInTheDocument()
+    // Tapping it again unchooses it.
+    fireEvent.click(within(section).getByRole('button', { name: 'Ask Ben' }))
+    expect(within(dialog).getByRole('button', { name: /^Place in / })).toBeInTheDocument()
+    fireEvent.click(within(section).getByRole('button', { name: 'Ask Ada' }))
+    expect(within(dialog).getByRole('button', { name: 'Mark waiting · Ask Ada' })).toBeEnabled()
+    // Choosing a pot goes back to Place.
+    fireEvent.click(within(within(dialog).getByRole('list', { name: 'Suggested pots and accounts' })).getAllByRole('button')[0]!)
+    expect(within(dialog).getByRole('button', { name: /^Place in / })).toBeInTheDocument()
+    fireEvent.click(within(section).getByRole('button', { name: 'Ask Ada' }))
+    const note = within(dialog).getByLabelText('Note (optional)')
+    fireEvent.change(note, { target: { value: 'Ben’s lunch?' } })
+    fireEvent.keyDown(note, { key: 'Enter' })
+    expect(saved!.card!.transactions.find(row => row.id === 'tesco')!.waiting).toMatchObject({ on: { kind: 'person', personId: 'ada' }, note: 'Ben’s lunch?' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('TESCO STORES 3180 is waiting: Ask Ada. Undo')
+    fireEvent.click(within(screen.getByRole('status')).getByRole('button', { name: 'Undo' }))
+    expect(saved!.card!.transactions.find(row => row.id === 'tesco')!.waiting).toBeUndefined()
+    expect(screen.getByRole('tab', { name: /^To sort/ })).toHaveTextContent('To sort1')
+  })
+
+  it('is only on rows in To sort: not on a sorted row (WP4) or one already waiting', () => {
+    const document = household()
+    render(<Harness initial={document}/>)
+    fireEvent.click(screen.getByRole('button', { name: /^ZARA UK LONDON/ }))
+    expect(within(screen.getByRole('dialog')).queryByRole('region', { name: 'Not ready to sort?' })).not.toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Close/ }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }))
+    fireEvent.click(screen.getByRole('button', { name: /^GREEN GROCER/ }))
+    expect(within(screen.getByRole('dialog')).queryByRole('region', { name: 'Not ready to sort?' })).not.toBeInTheDocument()
+  })
+})
