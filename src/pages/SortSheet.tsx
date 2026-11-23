@@ -1,8 +1,10 @@
 import { isHeld, linkedOrder, ordersWithReturns } from '../domain/expectingBack'
 import { ReturnLink } from './ReturnLink'
-import { useId, useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Check, ChevronDown, ChevronRight, Split } from 'lucide-react'
 import { ModalDialog } from '../components/ModalDialog'
+import { useMobilePresentation } from '../components/ui'
+import type { GoThrough, GoThroughStep } from '../domain/goThrough'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { cardTracker, collapseWhitespace, defaultRuleText, localDate, normaliseDescription, sameDestination, type CardTransaction, type WaitingOn } from '../domain/cardTracker'
 import { addRule, clearWaiting, markWaiting, sortDestination, sortTransaction, suggestions, unsortTransaction, updateRule, type SuggestionReason } from '../domain/cardSorting'
@@ -11,7 +13,7 @@ import { formatMonth } from '../formatting/month'
 import { shortDate } from './cardLabels'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { destinationGroups, destinationNamer } from './cardLabels'
-import { pounds, sameReason, signedPounds, transactionMeta, waitedFor, waitingReason } from './spendingFormat'
+import { goThroughTitle, pounds, sameReason, signedPounds, transactionMeta, waitedFor, waitingReason } from './spendingFormat'
 import { WaitingFields } from './WaitingList'
 import { pickerPace, placeImpact, type Tipped } from './sortPace'
 
@@ -31,6 +33,13 @@ type Props = {
   today?: string
   /** A placed transaction's pot, on Month, for the transaction's month (Spending ↔ Month link F1). */
   onOpenMonth?: (potId: string, month: string) => void
+  /**
+   * Go through them (audit 6, W9): the sheet steps through a waiting group, one row at a time. Placing, a new reason or
+   * note, Back to To sort and Skip each move on; the parent passes the next row as `transaction`.
+   */
+  goThrough?: { state: GoThrough; step: GoThroughStep; onSkip: () => void }
+  /** Where focus goes on close when the opener has gone (a go-through that emptied its group). */
+  returnFocusTo?: () => HTMLElement | null | undefined
 }
 
 /** How many suggestions show before "All pots and accounts". */
@@ -40,7 +49,8 @@ const SHOWN = 6
  * Sort one transaction: choose a pot (the suggestion is chosen to start), see what placing it there would change, then
  * Place (board M2). "Always" makes a rule in place. A split refund's parts still place with one tap.
  */
-export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onMarked, onSplit, now = () => new Date(), today = localDate(), onOpenMonth }: Props) {
+export function SortSheet({ document, setDocument, transaction, onClose, onSorted, onMarked, onSplit, now = () => new Date(), today = localDate(), onOpenMonth, goThrough, returnFocusTo }: Props) {
+  const compact = useMobilePresentation()
   // Left and pace for each pot in the transaction's month, so the choice shows its consequence (link F5).
   const pace = pickerPace(document, transaction.date.slice(0, 7), today)
   const id = useId()
@@ -63,6 +73,23 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   const canWait = !waiting && !transaction.sort && transaction.kind !== 'payment'
   const [waitOn, setWaitOn] = useState<WaitingOn | null>(null)
   const [waitNote, setWaitNote] = useState(waiting?.note ?? '')
+  // A go-through keeps one sheet open (so a phone's sheet doesn't slide up again for every row) and starts each row
+  // afresh: its suggestion chosen, nothing ticked, the lists closed.
+  const [rowId, setRowId] = useState(transaction.id)
+  if (rowId !== transaction.id) {
+    setRowId(transaction.id); setAlways(false); setRuleText(defaultRuleText(transaction.merchant)); setOnlyThisCard(false); setChangeRule(false)
+    setShowAll(false); setFilter(''); setPicked(undefined); setWaitOn(null); setWaitNote(waiting?.note ?? '')
+  }
+  const placeRef = useRef<HTMLButtonElement>(null)
+  const skipRef = useRef<HTMLButtonElement>(null)
+  const firstRow = useRef(true)
+  // On to the next row: back to the top, with focus on Place (or Skip when nothing is chosen), so Enter walks the group.
+  useEffect(() => {
+    if (firstRow.current) { firstRow.current = false; return }
+    const body = (placeRef.current ?? skipRef.current)?.closest('.sheet')?.querySelector('.sheet-body')
+    if (body) body.scrollTop = 0
+    ;(placeRef.current && !placeRef.current.disabled ? placeRef.current : skipRef.current)?.focus()
+  }, [transaction.id])
   const waitUnchanged = !!waiting && sameReason(waitOn ?? undefined, waiting.on) && collapseWhitespace(waitNote) === (waiting.note ?? '')
   const saveWaiting = () => {
     if (!waitOn || waitUnchanged) return
@@ -121,15 +148,31 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
   }
   const groups = destinationGroups(document).map(group => ({ ...group, options: group.options.filter(row => !filter.trim() || row.label.toLocaleLowerCase('en-GB').includes(filter.trim().toLocaleLowerCase('en-GB'))) })).filter(group => group.options.length)
 
-  const footer = waitOn ? <button type="button" className="primary-button sort-place" disabled={waitUnchanged} onClick={saveWaiting}>{waitUnchanged ? `Already waiting · ${waitingReason(document, waitOn)}` : `Mark waiting · ${waitingReason(document, waitOn)}`}</button> : <>
-    {impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`} id={`${id}-impact`}>{impact.text}</p>}
-    <button type="button" className="primary-button sort-place" disabled={!chosen || unchanged} aria-describedby={impact?.text ? `${id}-impact` : undefined} onClick={() => { if (chosen) place(chosen) }}>
-      {!chosen ? 'Choose a pot or account' : unchanged ? `Already in ${name(chosen)}` : `Place in ${name(chosen)}`}
-    </button>
-  </>
+  const impactLine = impact?.text && <p className={`sort-impact${impact.tone ? ` is-${impact.tone}` : ''}`} id={`${id}-impact`}>{impact.text}</p>
+  const placeButton = <button ref={placeRef} type="button" className="primary-button sort-place" disabled={!chosen || unchanged} aria-describedby={impact?.text ? `${id}-impact` : undefined} onClick={() => { if (chosen) place(chosen) }} data-autofocus={goThrough ? true : undefined}>
+    {!chosen ? 'Choose a pot or account' : unchanged ? `Already in ${name(chosen)}` : `Place in ${name(chosen)}`}
+  </button>
+  const next = goThrough?.step.next
+  const footer = waitOn ? <button type="button" className="primary-button sort-place" disabled={waitUnchanged} onClick={saveWaiting}>{waitUnchanged ? `Already waiting · ${waitingReason(document, waitOn)}` : `Mark waiting · ${waitingReason(document, waitOn)}`}</button>
+    // Go through them (board 3): Skip, then Place, and the next row under them. Back to To sort stays by Change.
+    : goThrough ? <div className="sort-go-footer">
+      {impactLine}
+      <div className="sort-go-actions">
+        <button ref={skipRef} type="button" className="secondary-button sort-go-skip" aria-label="Skip, still waiting" onClick={goThrough.onSkip}>{compact ? 'Skip' : 'Skip · still waiting'}</button>
+        {placeButton}
+      </div>
+      {next && <p className="sort-go-next">Next: {[next.description, signedPounds(next.amountPence), !compact && next.waiting?.note ? `“${next.waiting.note}”` : ''].filter(Boolean).join(' · ')}</p>}
+    </div>
+    : <>{impactLine}{placeButton}</>
 
-  return <ModalDialog title={`Sort ${transaction.description}`} onClose={onClose} className="sort-sheet" footer={footer}>
-    <p className="sort-sheet-summary"><strong>{signedPounds(transaction.amountPence)}</strong><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span></p>
+  const count = goThrough?.state.ids.length ?? 0
+  const position = goThrough?.step.position ?? 0
+  return <ModalDialog title={goThrough ? goThroughTitle(document, goThrough.state.on) : `Sort ${transaction.description}`} onClose={onClose} returnFocusTo={returnFocusTo} className={`sort-sheet${goThrough ? ' sort-go-sheet' : ''}`} footer={footer}
+    description={goThrough && `${position} of ${count}${compact ? '' : ` · ${pounds(goThrough.state.totalPence)}`}`}>
+    {goThrough && <div className={`sort-go-progress${count > 12 ? ' is-continuous' : ''}`} aria-hidden="true">
+      {count > 12 ? <span className="is-on" style={{ width: `${(position / count) * 100}%` }}/> : goThrough.state.ids.map((row, index) => <span key={row} className={index < position ? 'is-on' : undefined}/>)}
+    </div>}
+    <p className="sort-sheet-summary">{goThrough && <span className="sort-go-name">{transaction.description}</span>}<strong>{signedPounds(transaction.amountPence)}</strong><span>{transactionMeta(document, transaction)}{transaction.kind === 'refund' ? ' · refund' : ''}</span></p>
     {waiting && <section className="sort-waiting" aria-label="Waiting">
       <p className="sort-waiting-head"><strong>Waiting · {waitingReason(document, waiting.on)}</strong><span>{(waited => waited === 'today' ? 'Marked today' : `For ${waited}`)(waitedFor(waiting.at, today))}</span></p>
       {waiting.note && !waitOn && <p className="sort-waiting-note">“{waiting.note}”</p>}
@@ -137,7 +180,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
         <WaitingFields document={document} transaction={transaction} on={waitOn} note={waitNote} onChangeOn={setWaitOn} onChangeNote={setWaitNote} onSubmit={saveWaiting}/>
         <button type="button" className="text-button sort-waiting-cancel" onClick={() => { setWaitOn(null); setWaitNote(waiting.note ?? '') }}>Cancel</button>
       </> : <div className="sort-waiting-actions">
-        <button type="button" className="secondary-button" onClick={() => setWaitOn(waiting.on)} data-autofocus>Change</button>
+        <button type="button" className="secondary-button" onClick={() => setWaitOn(waiting.on)} data-autofocus={goThrough ? undefined : true}>Change</button>
         <button type="button" className="text-button" onClick={backToSort}>Back to To sort</button>
       </div>}
     </section>}

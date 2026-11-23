@@ -51,3 +51,23 @@
 .sort-not-ready{display:grid;gap:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border)}
 .sort-not-ready-title{margin:0;color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
 .sort-not-ready-hint{margin:0;color:var(--text-muted);font-size:var(--text-sm)}
+/* Go through them (waiting/5, board 3): progress under the title, the row's name first, and a footer of Skip and Place
+   with the next row under them. */
+.sort-go-progress{display:flex;gap:var(--space-1);margin-top:var(--space-1)}
+.sort-go-progress span{flex:1;height:4px;border-radius:var(--radius-pill);background:var(--border)}
+.sort-go-progress span.is-on{background:var(--pine)}
+.sort-go-progress.is-continuous{overflow:hidden;border-radius:var(--radius-pill);background:var(--border)}
+.sort-go-progress.is-continuous span{flex:none}
+.sort-sheet-summary .sort-go-name{color:var(--text);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.sort-go-footer{display:grid;flex:1 1 100%;gap:var(--space-2);min-width:0}
+.sort-go-actions{display:flex;align-items:center;justify-content:flex-end;gap:var(--space-3);min-width:0}
+.sort-go-sheet{--sheet-width:600px}
+.sort-go-skip{white-space:nowrap}
+.sort-go-actions .sort-place{min-width:0;white-space:normal;line-height:1.25;text-align:center}
+.sort-go-next{overflow:hidden;margin:0;color:var(--text-muted);font-size:var(--text-sm);text-overflow:ellipsis;white-space:nowrap}
+@media (max-width: 767px){
+  /* Phones: Skip and Place side by side, Place taking the room. */
+  .sort-go-actions{gap:var(--space-2)}
+  .sort-go-skip{flex:none}
+  .sort-go-actions .sort-place{flex:1 1 0}
+}
