@@ -34,6 +34,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Month health 9: Expecting back: the Back tick, held lines, the bill's fifth part, refunds, settle up, Not coming back (D11, P7) | health/9 | `src/domain/expectingBack.ts`, `src/pages/ExpectingBack.tsx`, `SplitEditor.tsx`, `MoveToPotSheet.tsx`, `PotLeads.tsx` |
 | Month health 10: discounts, original prices and Add discount (D12) | health/10 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
 | Month health 11: How did <Month> go?, leading Home (P8); Needs a look drops a covered overspend | health/11 | `src/domain/monthSummary.ts`, `src/pages/MonthSummaryCard.tsx`, `Home.tsx`, `MonthPage.tsx`, `coveredAtClose` in `cardSpending.ts` |
+| Waiting 2: the Waiting mark, what counts where, Close blocked (W1, W4–W6, W10) | waiting/2 | `WaitingMark`, `withSort` in `cardTracker.ts`; `markWaiting`, `clearWaiting`, `transactionsWaiting` in `cardSorting.ts`; `billSum.ts`, `monthStages.ts`, `cardStatements.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -53,7 +54,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 
 ## Data model
 
-The tracker is an optional `card` field on the budget document, like `ticks`. A document without it is valid and there is no version bump. `decodeBudgetDocument` validates it with `validCardTracker`; an invalid `card` makes the whole document invalid, as for `ticks`. Every destination must be an existing pot or account, every person an adult, and every transaction's card and statement must exist. Split lines must add up to their transaction. An adult who is a cardholder, or a transaction's person, can't be removed.
+The tracker is an optional `card` field on the budget document, like `ticks`. A document without it is valid and there is no version bump. `decodeBudgetDocument` validates it with `validCardTracker`; an invalid `card` makes the whole document invalid, as for `ticks`. Every destination must be an existing pot or account, every person an adult, and every transaction's card and statement must exist. Split lines must add up to their transaction. An adult who is a cardholder, a transaction's person, or someone a row is waiting on can't be removed.
 
 Money is integer pence everywhere. Spreadsheet amounts are floats and become pence with `Math.round(value * 100)` (`penceFromAmount`); typed amounts are parsed without floats (`parsePence`).
 
@@ -119,7 +120,31 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 
 ## To sort
 
-`transactionsToSort` is every purchase and refund with no sort, newest first (by date, then the order they came in). Payments are never listed. "Last brought in" is the latest `ImportRecord`'s time (`lastImport`), so a future feed that records imports updates it the same way.
+`transactionsToSort` is every purchase and refund with no sort that isn't waiting (`needsSort`), newest first (by date, then the order they came in). Payments are never listed. "Last brought in" is the latest `ImportRecord`'s time (`lastImport`), so a future feed that records imports updates it the same way.
+
+## Waiting (audit 6, W1–W12)
+
+**Status:** `waiting/2-model` (W1, W4–W6, W10, WP2–WP7), built 23 November 2026 from the [Waiting build plan](waiting-build-plan.md). A row goes **To sort → Waiting → Sorted**. Waiting is for rows that need the other cardholder, a conversation or an order lookup before they can be sorted. The screens come in later PRs; this section grows with them.
+
+- **The mark** (`CardTransaction.waiting`, W4): `on` is an adult (`{ kind: 'person', personId }`, "Ask Ada") or `{ kind: 'discuss' }` ("To discuss"), with an optional `note` and `at`, when it was first marked. A reason is required and a note is optional (W6). The note is trimmed and kept on one line, up to 140 characters (`WAITING_NOTE_MAX`, WP6). Waiting is a mark on the transaction, never a sort.
+- **Validation:** the mark is allowed only on a purchase or refund with no sort, waiting on an adult in the household or To discuss. A mark with a sort, on a payment, for someone else, or with a longer note makes the document invalid.
+- **Marking** (`markWaiting`): only a row in To sort (WP4). A sorted row goes back to To sort first. Changing the mark keeps `at`, so days waited count from when it was first marked, not from the purchase date (WP5). **Back to To sort** is `clearWaiting`.
+- **Sorting clears it:** every write that sets a sort goes through `withSort`, which drops the mark: `sortTransaction`, `restoreSort`, `sortRefund`, `linkRefund` and rule sorts. Undo of a placing passes the row's old mark to `restoreSort`, so the row goes back to Waiting.
+- **Rules never sort a waiting row** (WP7): `addRule`'s "also sorted" skips them. New rows from an import are never waiting. A refund whose purchase is waiting gets the usual suggestions.
+- **People:** an adult someone is waiting on can't be removed, as for a cardholder.
+- **The list** (`transactionsWaiting`): one group per reason. The Ask <person> groups come first: adults on a card in household order, then other adults. To discuss comes last. Each group has its count and total, with rows newest first, as in To sort.
+
+**What counts where** (W1). Waiting rows count in no pot, no pace and no move, the same as rows to sort.
+
+| Where | With Waiting |
+| --- | --- |
+| `transactionsToSort`, Spending's tab count, the nav count, Home's Sort task | Rows to sort only, not waiting |
+| Spent, Left, pace, To move, Expecting back, Needs a look | Unchanged: waiting rows have no sort, so they're left out |
+| `potSum`'s and `afford`'s To sort | Rows to sort only |
+| `billSum` | Adds **Waiting** (`waiting`, `waitingPence`): its rows' amounts less anything they had moved, the same as To sort. **Covered** needs none waiting. |
+| `freshness` | Adds `waiting`, the count |
+| `closeMonthPlan` readiness | `waiting` is counted apart from `toSort`. **Waiting blocks Close** (W10): it can close only once nothing is waiting. Home's "All <Month> transactions sorted" is done only then. The blocker reads "Close <Month> once nothing is waiting." |
+| `statementSummary` | `waiting` is counted apart from `toSort`. **Ready** and **settled** still need none waiting, so settle up waits for every row to be sorted until the buffer can cover them (WP2, `waiting/7`). A statement that settles once, before the Amex pot, always will (WP3). |
 
 ## Sorting and suggestions (§6.3)
 
@@ -240,7 +265,7 @@ Payday progress (`paydayProgress`) counts the month's Transfers steps and ticks 
 
 ## Closing a month (D7, D8, D11, R1, §6.10)
 
-- **Can close** (`closeMonthPlan`'s readiness) once the month has ended, every purchase and refund dated in it is sorted, and the latest import is at least 3 days after the month's last day (`LATE_POSTING_DAYS`), or "All <Month> transactions are in" was pressed (`markAllIn`).
+- **Can close** (`closeMonthPlan`'s readiness) once the month has ended, every purchase and refund dated in it is sorted (none to sort and none waiting, W10), and the latest import is at least 3 days after the month's last day (`LATE_POSTING_DAYS`), or "All <Month> transactions are in" was pressed (`markAllIn`).
 - **Overspends**: every Tracked pot with a plan and Left below 0 (Funded only, Saving and carry-over pots have none). Each is covered by its whole overspend from the buffer by default, or from another monthly pot with money left that month (most left first), or from next month's funding for the pot. A chosen source is stored at once (`setCover`) so its step can be ticked before Close; changing the source drops the step's tick.
 - **Cover steps** (`cover:<potId>`), ticked like any step (`setCoverTick`): from an account, "Move £35.00 from Joint Monzo into Eating out"; from a pot, "Out of Treats £35.00, then move into Eating out". A next-month cover moves no money; next month's pot shows "£35.00 taken by October" and has that much less left.
 - **Leftovers**: Planned − Spent (− anything last month took, − covers taken from the pot), above 0, for each Tracked pot with a plan.
@@ -287,7 +312,7 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 - **Which statement** a transaction is on is its `statementKey`. A statement is named by the month it closes in: the 25 Oct – 24 Nov statement is the "November statement". Statements are listed newest first (`statementKeys`).
 - **Total** = Σ purchases and refunds on it; payments are excluded. **Which months it counts in**: the same transactions totalled by the month of their date.
 - **Summary check**: North's positive rows against Amex's Charges, and negative rows (refunds and payments) against Payments & Credits, from the latest import of the period.
-- **Open** while today ≤ the close date. **Complete** once a final export is in (`finalImportAt`) or "Settle without the final export" is chosen (`settleWithoutFinalAt`). **Ready to settle**: closed, complete and every purchase and refund on it sorted. **Settled**: ready, and every settle-up step done (`settledAt` records when the last tick made it so; unticking or a later change clears it).
+- **Open** while today ≤ the close date. **Complete** once a final export is in (`finalImportAt`) or "Settle without the final export" is chosen (`settleWithoutFinalAt`). **Ready to settle**: closed, complete and every purchase and refund on it sorted, none of them waiting. **Settled**: ready, and every settle-up step done (`settledAt` records when the last tick made it so; unticking or a later change clears it).
 
 ## Settle up (§6.8)
 
@@ -355,14 +380,15 @@ Payments to Amex (`payments`) are never sorted or counted as spending. They're l
 **The bill** (`billSum(document, statementKey, today)`, `src/domain/billSum.ts`), for a statement paid from the Amex pot (null otherwise):
 
 ```
-Bill = In the Amex pot + To move + To sort + Expecting back
+Bill = In the Amex pot + To move + To sort + Expecting back + Waiting
 ```
 
 - **In the Amex pot:** Σ what has moved in for the bill's purchases and refunds, lines sorted to the pot itself included.
 - **To move:** sorted and not moved yet (`toMove` for the statement), with how many transactions.
-- **To sort:** purchases and refunds not sorted yet, less anything they moved before they were unsorted, so the parts always add up to the bill (Σ purchases and refunds, payments left out).
+- **To sort:** purchases and refunds not sorted yet and not waiting, less anything they moved before they were unsorted, so the parts always add up to the bill (Σ purchases and refunds, payments left out).
+- **Waiting** (`waiting/2`): rows in Waiting, worked out the same way as To sort.
 - **Expecting back** (month-health PR 9): what `heldOut` leaves out of the bill's sorted rows: held returns less refunds on the same bill, while the bill is open. Once it has closed, anything still held is part of To move (see "Expecting back" below).
-- **Open** while today ≤ the close date: "November bill so far". **Covered** once it has closed and nothing is left to move or sort, until the Pay tick. **Paid** once Pay is ticked.
+- **Open** while today ≤ the close date: "November bill so far". **Covered** once it has closed and nothing is left to move, sort or waiting, until the Pay tick. **Paid** once Pay is ticked.
 - **Known** (`amexPotKnown`): **checked** only when the Amex pot was checked after its last move (no flow since the check) and matched; otherwise **worked out**. "Matches Monzo" appears only when checked.
 - **Which bills** (`potBills`): every unpaid statement paid from the pot with something on it or in the pot, oldest first, then the open one even when empty. **Home's bill** (`homeBill`) is the first of them: the oldest unpaid bill until its Pay tick, then the open one.
 

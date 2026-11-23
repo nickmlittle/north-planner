@@ -105,7 +105,22 @@ export interface CardTransaction {
   /** Absent = to sort. Never set on payments. */
   sort?: TransactionSort
   refundOf?: { transactionId: string; lineIndex?: number }
+  /** Waiting (audit 6, W4): parked until someone is asked or it's talked over. Only on a purchase or refund with no sort; sorting it clears it. */
+  waiting?: WaitingMark
 }
+
+/** Who a waiting row is waiting on: an adult ("Ask Ada") or a conversation ("To discuss"). */
+export type WaitingOn = { kind: 'person'; personId: string } | { kind: 'discuss' }
+
+export interface WaitingMark {
+  on: WaitingOn
+  /** Trimmed, one line, up to `WAITING_NOTE_MAX` characters (WP6). */
+  note?: string
+  /** ISO: when it was first marked. Days waited count from here (WP5). */
+  at: string
+}
+
+export const WAITING_NOTE_MAX = 140
 
 export interface TransactionSort {
   /** One line for a simple sort; the lines add up to the transaction. */
@@ -331,6 +346,20 @@ export const sameDestination = (a: BudgetDestination | undefined, b: BudgetDesti
 /** The buffer: the card's setting, else the pay-from account's main balance. */
 export const bufferOf = (card: CardAccount): BudgetDestination => card.bufferDestination ?? { kind: 'account', accountId: card.payFromAccountId }
 
+// ——— Waiting and To sort (audit 6, W1, W4) ———
+
+/** Parked in Waiting: not to sort, and counted in no pot, pace or move. */
+export const isWaiting = (row: Pick<CardTransaction, 'waiting'>) => !!row.waiting
+/** A purchase or refund with no sort that isn't waiting: one to sort. */
+export const needsSort = (row: Pick<CardTransaction, 'kind' | 'sort' | 'waiting'>) => row.kind !== 'payment' && !row.sort && !row.waiting
+
+/** The one way to give a row a sort: it also drops any Waiting mark, since a sorted row is never waiting. */
+export function withSort(row: CardTransaction, sort: TransactionSort): CardTransaction {
+  const next: CardTransaction = { ...row, sort }
+  delete next.waiting
+  return next
+}
+
 // ——— Cards ———
 
 export const cardTracker = (document: { card?: CardTracker }) => document.card ?? emptyCardTracker()
@@ -417,6 +446,14 @@ const validTick = (value: unknown) => isRecord(value) && isInt(value.amountPence
 const validTicks = (value: unknown) => value === undefined || isRecord(value) && Object.values(value).every(validTick)
 const uniqueIds = (rows: Array<{ id: unknown }>) => rows.every(row => typeof row.id === 'string' && !!row.id) && new Set(rows.map(row => row.id)).size === rows.length
 
+/** A Waiting mark: on a purchase or refund with no sort, waiting on an adult or "to discuss", with an optional short note. */
+function validWaiting(value: unknown, row: Record<string, unknown>, personIds: ReadonlySet<string>): boolean {
+  if (!isRecord(value) || row.kind === 'payment' || row.sort !== undefined || typeof value.at !== 'string' || !isRecord(value.on)) return false
+  const on = value.on
+  if (!(on.kind === 'discuss' || on.kind === 'person' && typeof on.personId === 'string' && personIds.has(on.personId))) return false
+  return value.note === undefined || typeof value.note === 'string' && value.note.length <= WAITING_NOTE_MAX
+}
+
 export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>, personIds: ReadonlySet<string>): value is CardTracker {
   if (!isRecord(value)) return false
   const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves, accounts } = value
@@ -437,6 +474,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
     if (typeof row.cardId !== 'string' || !cardIds.has(row.cardId) || !validIsoDate(row.date) || typeof row.description !== 'string' || typeof row.merchant !== 'string' || !isInt(row.amountPence)) return false
     if (!['purchase', 'refund', 'payment'].includes(row.kind as string) || typeof row.cardSuffix !== 'string' || !validStatementKey(row.statementKey) || !(row.statementKey as string).startsWith(`${row.cardId}:`)) return false
     if (row.personId !== undefined && (typeof row.personId !== 'string' || !personIds.has(row.personId)) || !optionalString(row.amexCategory) || typeof row.importedAt !== 'string') return false
+    if (row.waiting !== undefined && !validWaiting(row.waiting, row, personIds)) return false
     if (row.refundOf !== undefined && !(isRecord(row.refundOf) && typeof row.refundOf.transactionId === 'string' && (row.refundOf.lineIndex === undefined || isInt(row.refundOf.lineIndex) && row.refundOf.lineIndex >= 0))) return false
     if (row.sort !== undefined) {
       if (row.kind === 'payment' || !isRecord(row.sort)) return false

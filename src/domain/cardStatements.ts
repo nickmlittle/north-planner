@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, dueDate, monthOf, parseStatementKey, statementWindow, type CardTracker, type CardTransaction, type StatementRecord } from './cardTracker'
+import { cardTracker, dueDate, isWaiting, monthOf, needsSort, parseStatementKey, statementWindow, type CardTracker, type CardTransaction, type StatementRecord } from './cardTracker'
 import { stepStatus, type StepTick } from './transferTicks'
 import { toMove, usesSetAside } from './setAside'
 import type { BudgetDestination } from './monthlyBudget'
@@ -25,7 +25,10 @@ export type StatementSummary = {
   /** Σ purchases and refunds: what to pay. Payments are excluded. */
   totalPence: number
   transactions: number
+  /** Purchases and refunds to sort, not counting Waiting ones. */
   toSort: number
+  /** Purchases and refunds in Waiting. Until the buffer can cover them (PR 7, WP2), they block settling as To sort does. */
+  waiting: number
   payments: CardTransaction[]
   /** Spending on it by the month each transaction counts in (D2). */
   byMonth: Array<{ month: string; pence: number }>
@@ -169,14 +172,14 @@ export function statementSummary(document: Pick<BudgetDocument, 'budget' | 'card
   const done = plan ? steps.filter(step => settleStepDone(plan, record?.ticks, step)).length : 0
   const open = today <= parsed.closeDate
   const complete = !!record?.finalImportAt || !!record?.settleWithoutFinalAt
-  const toSort = spending.filter(row => !row.sort).length
+  const toSort = spending.filter(needsSort).length, waiting = spending.filter(row => !row.sort && isWaiting(row)).length, unsorted = toSort + waiting
   return {
     key, cardId: card.id, closeDate: parsed.closeDate, from: statementWindow(parsed.closeDate, card.closeDay).from, dueDate: dueDate(parsed.closeDate, card), record,
-    totalPence: spending.reduce((sum, row) => sum + row.amountPence, 0), transactions: spending.length, toSort,
+    totalPence: spending.reduce((sum, row) => sum + row.amountPence, 0), transactions: spending.length, toSort, waiting,
     payments: rows.filter(row => row.kind === 'payment'),
     byMonth: [...byMonth].sort(([a], [b]) => a.localeCompare(b)).map(([month, pence]) => ({ month, pence })),
     ...summary ? { summaryCheck: { matches: summary.chargesPence === charges && summary.paymentsAndCreditsPence === credits, missingChargesPence: summary.chargesPence - charges, missingCreditsPence: summary.paymentsAndCreditsPence - credits } } : {},
-    open, complete, ready: !open && complete && toSort === 0, settled: steps.length > 0 && done === steps.length && toSort === 0 && !open, done, steps: steps.length,
+    open, complete, ready: !open && complete && unsorted === 0, settled: steps.length > 0 && done === steps.length && unsorted === 0 && !open, done, steps: steps.length,
   }
 }
 

@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, daysInMonth, localDate, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy, type PotKind } from './cardTracker'
+import { cardTracker, daysInMonth, localDate, DEFAULT_BUILD_UP_LIMIT, destinationKey, monthOf, shiftMonth, type CardTracker, type CardTransaction, type PacePolicy, type PotKind, withSort } from './cardTracker'
 import { resolveBudget, type BudgetDestination, type BudgetPot } from './monthlyBudget'
 import { monthBills, potBillTotals } from './recurringBills'
 import { merchantBreakdown } from './merchants'
@@ -260,7 +260,7 @@ export function needsALook(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
 /** The document as it would be with this transaction placed whole in `destination`, for "what would this change". */
 export function withPlaced<T extends Pick<BudgetDocument, 'card'>>(document: T, transaction: Pick<CardTransaction, 'id'>, destination: BudgetDestination): T {
   const tracker = cardTracker(document)
-  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => row.id === transaction.id ? { ...row, sort: { lines: [{ amountPence: row.amountPence, destination }], by: 'person' as const, at: '' } } : row) } }
+  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => row.id === transaction.id ? withSort(row, { lines: [{ amountPence: row.amountPence, destination }], by: 'person', at: '' }) : row) } }
 }
 
 export type PlacedPace = {

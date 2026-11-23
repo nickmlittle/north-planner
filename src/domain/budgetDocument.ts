@@ -195,7 +195,7 @@ export function renameAdult(document: BudgetDocument, id: string, name: string):
 
 export function removeAdult(document: BudgetDocument, id: string): BudgetDocument {
   const used = document.budget.accounts.some(account => account.ownerPersonIds.includes(id)) || document.budget.incomeSources.some(source => source.personId === id) || document.budget.incomePolicies.some(policy => policy.personId === id) || allItems(document.budget).some(item => item.singleFunderId === id || item.customShares?.[id] !== undefined || item.contributions?.some(row => row.personId === id))
-    || !!document.card?.cards.some(card => card.cardholders.some(row => row.personId === id)) || !!document.card?.transactions.some(row => row.personId === id)
+    || !!document.card?.cards.some(card => card.cardholders.some(row => row.personId === id)) || !!document.card?.transactions.some(row => row.personId === id || row.waiting?.on.kind === 'person' && row.waiting.on.personId === id)
   if (used) return document
   return { ...document, household: { ...document.household, adults: document.household.adults.filter(person => person.id !== id) } }
 }

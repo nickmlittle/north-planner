@@ -51,13 +51,16 @@ function SpendingHarness({ initial = household(), view = 'transactions', onOpenM
 
 describe('the freshness line (F2)', () => {
   it('says how far the card is sorted and what is waiting, leaving payments out', () => {
-    expect(freshness(household())).toEqual({ lead: 'Amex sorted to Fri 13 Nov', toSort: 1, broughtIn: true })
+    expect(freshness(household())).toEqual({ lead: 'Amex sorted to Fri 13 Nov', toSort: 1, waiting: 0, broughtIn: true })
     const sorted = household()
     sorted.card!.transactions = sorted.card!.transactions.filter(row => row.id !== 'waiting')
-    expect(freshness(sorted)).toEqual({ lead: 'Amex sorted to Fri 13 Nov', toSort: 0, broughtIn: true })
+    expect(freshness(sorted)).toEqual({ lead: 'Amex sorted to Fri 13 Nov', toSort: 0, waiting: 0, broughtIn: true })
+    const parked = household()
+    parked.card!.transactions = parked.card!.transactions.map(row => row.id === 'waiting' ? { ...row, waiting: { on: { kind: 'discuss' }, at: 'x' } } : row)
+    expect(freshness(parked)).toEqual({ lead: 'Amex sorted to Fri 13 Nov', toSort: 0, waiting: 1, broughtIn: true })
     const empty = household()
     empty.card!.transactions = []
-    expect(freshness(empty)).toEqual({ lead: 'Amex not brought in yet', toSort: 0, broughtIn: false })
+    expect(freshness(empty)).toEqual({ lead: 'Amex not brought in yet', toSort: 0, waiting: 0, broughtIn: false })
     const noCard = household()
     delete noCard.card
     expect(freshness(noCard)).toBeNull()

@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, closeDateFor, localDate, parseStatementKey, statementKey as keyOf, type CardAccount, type CardTracker } from './cardTracker'
+import { cardTracker, closeDateFor, isWaiting, localDate, parseStatementKey, statementKey as keyOf, type CardAccount, type CardTracker } from './cardTracker'
 import { SETTLE_PAY_KEY, statementTransactions } from './cardStatements'
 import { potBalance } from './potBalances'
 import { movedByTransaction, toMove, usesSetAside } from './setAside'
@@ -7,10 +7,11 @@ import { setAsideCheck } from './setAsideCheck'
 import { heldOut, heldPence } from './expectingBack'
 
 /**
- * One sum per bill (month-health plan D1, D11): Bill = In the Amex pot + To move + To sort + Expecting back.
+ * One sum per bill (month-health plan D1, D11; audit 6 W1): Bill = In the Amex pot + To move + To sort + Expecting back + Waiting.
  * - In the Amex pot: what has moved in for the bill's purchases and refunds (lines sorted to the pot itself count).
  * - To move: sorted, not moved yet (`toMove`).
- * - To sort: purchases and refunds not sorted yet, less anything they had moved before they were unsorted.
+ * - To sort: purchases and refunds not sorted yet and not waiting, less anything they had moved before they were unsorted.
+ * - Waiting: rows parked in Waiting, worked out the same way as To sort.
  * - Expecting back: held returns, not refunded yet, while the bill is open (`heldOut`). Closed, they're To move.
  * The parts add up to the bill by construction. Only for statements paid from the card's set-aside pot.
  * Rules: docs/card-tracker-rules.md, "Bill and pot sums".
@@ -36,11 +37,14 @@ export type BillSum = {
   toMove: number
   toSortPence: number
   toSort: number
+  /** Rows in Waiting, less anything they had moved before they were unsorted. */
+  waitingPence: number
+  waiting: number
   /** Held returns (D11), less refunds on the same bill. Once the bill has closed they're part of To move. */
   expectingBackPence: number
   /** Σ purchases and refunds. */
   billPence: number
-  /** Closed, and all of it is in the Amex pot: "covered" until the Pay tick. */
+  /** Closed, and all of it is in the Amex pot, with nothing to sort or waiting: "covered" until the Pay tick. */
   covered: boolean
   known: BillKnown
 }
@@ -70,11 +74,12 @@ export function billSum(document: Pick<BudgetDocument, 'budget' | 'card' | 'tick
   const expectingBackPence = heldPence(heldOut(tracker, today), sorted)
   const toMovePence = moving.reduce((sum, row) => sum + row.pence, 0)
   const unsorted = rows.filter(row => !row.sort)
-  const toSortPence = unsorted.reduce((sum, row) => sum + row.amountPence - movedFor(row.id), 0)
+  const owed = (list: typeof rows) => list.reduce((sum, row) => sum + row.amountPence - movedFor(row.id), 0)
+  const waiting = unsorted.filter(isWaiting), toSort = unsorted.filter(row => !isWaiting(row))
   const open = today <= parsed.closeDate
   return {
     statementKey, cardId: card.id, closeDate: parsed.closeDate, open, paid: !unpaid(tracker, statementKey),
-    inPotPence, toMovePence, toMove: moving.length, toSortPence, toSort: unsorted.length, expectingBackPence, billPence,
+    inPotPence, toMovePence, toMove: moving.length, toSortPence: owed(toSort), toSort: toSort.length, waitingPence: owed(waiting), waiting: waiting.length, expectingBackPence, billPence,
     covered: !open && moving.length === 0 && unsorted.length === 0, known: amexPotKnown(document, card.id, today),
   }
 }

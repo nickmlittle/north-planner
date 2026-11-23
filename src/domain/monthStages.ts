@@ -6,7 +6,7 @@ import { toMove } from './setAside'
 import { heldOut } from './expectingBack'
 import { setAsideCheck } from './setAsideCheck'
 import { potBalance } from './potBalances'
-import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
+import { addDays, bufferOf, cardTracker, closeDateFor, daysBetween, destinationKey, isWaiting, lastDayOf, localDate, monthOf, sameDestination, shiftMonth, statementKey, type CardTracker, type CoverSource, type MonthCover, type MonthRecord } from './cardTracker'
 import { moneyArrives } from './workingDays'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { orderTransferAccounts, paydayPlans } from './personTransfers'
@@ -72,7 +72,7 @@ export function monthStage(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
 export type CoverOption = { source: CoverSource; leftPence?: number }
 export type Overspend = { potId: string; overPence: number; cover: MonthCover; options: CoverOption[]; stepKey: string }
 export type Leftover = { potId: string; leftPence: number; plannedPence: number; builtUpPence: number; flag?: { limitPence: number; movePence: number } }
-export type CloseReadiness = { toSort: number; lastImportDate?: string; postingsIn: boolean; allIn: boolean; canClose: boolean }
+export type CloseReadiness = { toSort: number; /** Waiting rows block Close too (W10). */ waiting: number; lastImportDate?: string; postingsIn: boolean; allIn: boolean; canClose: boolean }
 export type ClosePlan = {
   month: string
   figures: MonthSpending
@@ -112,10 +112,11 @@ export function closeMonthPlan(document: Pick<BudgetDocument, 'budget' | 'card' 
   const monthly = figures.rows.filter(row => row.destination.kind === 'pot' && row.kind === 'tracked' && row.plannedPence > 0)
   const potId = (row: { destination: BudgetDestination }) => (row.destination as { potId: string }).potId
   const lastImportDate = [...tracker.imports].reverse()[0]?.at
-  const toSort = monthTransactions(tracker, month).filter(row => !row.sort).length
+  const unsorted = monthTransactions(tracker, month).filter(row => row.kind !== 'payment' && !row.sort)
+  const waiting = unsorted.filter(isWaiting).length, toSort = unsorted.length - waiting
   const postingsIn = !!lastImportDate && lastImportDate.slice(0, 10) >= addDays(lastDayOf(month), LATE_POSTING_DAYS)
   const allIn = !!record?.allInAt
-  const readiness: CloseReadiness = { toSort, ...lastImportDate ? { lastImportDate } : {}, postingsIn, allIn, canClose: today > lastDayOf(month) && toSort === 0 && (postingsIn || allIn) }
+  const readiness: CloseReadiness = { toSort, waiting, ...lastImportDate ? { lastImportDate } : {}, postingsIn, allIn, canClose: today > lastDayOf(month) && toSort === 0 && waiting === 0 && (postingsIn || allIn) }
   const buffer = bufferOf(card)
   const stored = record?.covers ?? []
   const overRows = monthly.filter(row => row.leftPence < 0)
@@ -263,7 +264,7 @@ export function homeMonths(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
   for (const status of past.filter(row => row.stage !== 'settled')) {
     const plan = closeMonthPlan(document, status.month, today)!
     const tasks: HomeTask[] = [
-      { key: `sorted:${status.month}`, kind: 'sorted', month: status.month, done: plan.readiness.toSort === 0 && (plan.readiness.postingsIn || plan.readiness.allIn) },
+      { key: `sorted:${status.month}`, kind: 'sorted', month: status.month, done: plan.readiness.toSort === 0 && plan.readiness.waiting === 0 && (plan.readiness.postingsIn || plan.readiness.allIn) },
       { key: `close:${status.month}`, kind: 'close', month: status.month, done: !!status.closedAt },
       ...status.statements.map(key => { const summary = statementSummary(document, key, today)!; return { key: `settle:${key}`, kind: 'settle' as const, month: status.month, statementKey: key, amountPence: summary.totalPence, dueDate: summary.dueDate, done: summary.settled } }),
     ]

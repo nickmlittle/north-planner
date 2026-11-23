@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
 import { bufferBalance } from './buffer'
-import { cardTracker, monthOf, shiftMonth } from './cardTracker'
+import { cardTracker, monthOf, needsSort, shiftMonth } from './cardTracker'
 import { moneyArrivesDates } from './monthStages'
 import type { BudgetDestination } from './monthlyBudget'
 import { monthSpending, monthTransactions, PACE_AHEAD_MIN_PENCE, PACE_AHEAD_SHARE } from './cardSpending'
@@ -44,7 +44,7 @@ export function affordCheck(document: Pick<BudgetDocument, 'budget' | 'card' | '
   const row = figures.rows.find(item => item.key === `pot:${potId}`)
   if (!row) return { kind: 'not-offered' }
   const leftAfterPence = row.leftPence - pence
-  const unsorted = monthTransactions(cardTracker(document), month).filter(item => item.kind !== 'payment' && !item.sort)
+  const unsorted = monthTransactions(cardTracker(document), month).filter(needsSort)
   const toSortPence = unsorted.reduce((sum, item) => sum + item.amountPence, 0)
   const toSort: { toSort?: ToSort } = unsorted.length ? { toSort: { count: unsorted.length, pence: toSortPence, leftIfSortedPence: leftAfterPence - toSortPence } } : {}
   if (leftAfterPence < 0) {

@@ -1,5 +1,5 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, isWaiting, lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
 import { refundsOf } from '../domain/cardRefunds'
 import { transactionsToSort } from '../domain/cardSorting'
 import { formatGBP } from '../formatting/money'
@@ -38,6 +38,7 @@ export function statementStatus(summary: StatementSummary): { text: string; tone
   if (summary.settled) return { text: `Settled${summary.record?.settledAt ? ` ${dayOf(summary.record.settledAt)}` : ''}`, tone: 'done' }
   if (summary.open) return { text: `Open · closes ${dayDate(summary.closeDate)}`, tone: 'open' }
   if (summary.toSort) return { text: `${summary.toSort} to sort`, tone: 'todo' }
+  if (summary.waiting) return { text: `${summary.waiting} waiting`, tone: 'todo' }
   if (!summary.complete) return { text: 'Needs the final export', tone: 'todo' }
   if (summary.done) return { text: `${summary.done} of ${summary.steps} done`, tone: 'ready' }
   return { text: `Ready to settle · due ${dayDate(summary.dueDate)}`, tone: 'ready' }
@@ -58,6 +59,7 @@ export function closeBlocker(plan: ClosePlan, month: string, today: string): str
   const name = monthName(month)
   if (today <= lastDayOf(month)) return `${name} ends on ${dayDate(lastDayOf(month))}.`
   if (plan.readiness.toSort) return `Sort ${plural(plan.readiness.toSort, 'transaction')} first.`
+  if (plan.readiness.waiting) return `Close ${name} once nothing is waiting.`
   return `Waiting for late ${name} transactions to post.`
 }
 
@@ -70,16 +72,17 @@ export function transactionLink(document: BudgetDocument, transaction: CardTrans
 }
 
 /**
- * How far pace can see (Spending ↔ Month link, design rule 1): the newest card transaction brought in, and how many
- * are still waiting to be sorted. Null without a card. "Amex sorted to Fri 13 Nov", 3 to sort; "Amex not brought in yet".
+ * How far pace can see (Spending ↔ Month link, design rule 1): the newest card transaction brought in, how many are
+ * still to sort, and how many are waiting. Null without a card. "Amex sorted to Fri 13 Nov", 3 to sort, 6 waiting;
+ * "Amex not brought in yet".
  */
-export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: string; toSort: number; broughtIn: boolean } | null {
+export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: string; toSort: number; waiting: number; broughtIn: boolean } | null {
   const tracker = cardTracker(document)
   if (!tracker.cards.length) return null
   const card = tracker.cards.length === 1 ? tracker.cards[0]!.name : 'Cards'
   const newest = tracker.transactions.filter(row => row.kind !== 'payment').reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
-  if (!newest) return { lead: `${card} not brought in yet`, toSort: 0, broughtIn: false }
-  return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, broughtIn: true }
+  if (!newest) return { lead: `${card} not brought in yet`, toSort: 0, waiting: 0, broughtIn: false }
+  return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, waiting: tracker.transactions.filter(row => !row.sort && isWaiting(row)).length, broughtIn: true }
 }
 
 /** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort · £79.00 expecting back", or "Covered" once it's all in. */
