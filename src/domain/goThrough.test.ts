@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { clearWaiting, markWaiting, sortTransaction, transactionsWaiting } from './cardSorting'
 import { emptyCardTracker, type CardTransaction } from './cardTracker'
-import { goThroughCounts, goThroughStep, handleRow, startGoThrough, type GoThrough } from './goThrough'
+import { goThroughCounts, goThroughStep, handleRow, startGoThrough, startMonthGoThrough, type GoThrough } from './goThrough'
 
 // Go through them (audit 6, W9, WP8): a waiting group, one row at a time, with the queue fixed when it opens.
 const NOV = 'amex:2026-11-24'
@@ -33,7 +33,7 @@ describe('the go-through queue', () => {
   it('starts on the group’s first row, in the group’s order, with its count and total fixed', () => {
     const document = household()
     const state = adaGroup(document)
-    expect(state).toEqual({ on: askAda, ids: ['zara', 'boots', 'works'], totalPence: 6800 + 2345 + 2099, handled: [] })
+    expect(state).toEqual({ scope: { kind: 'group', on: askAda }, ids: ['zara', 'boots', 'works'], totalPence: 6800 + 2345 + 2099, handled: [] })
     const step = goThroughStep(document, state)!
     expect([step.current.id, step.position, step.next?.id]).toEqual(['zara', 1, 'boots'])
   })
@@ -78,6 +78,26 @@ describe('the go-through queue', () => {
     const document = household()
     const state = ['zara', 'boots', 'works'].reduce(handleRow, adaGroup(document))
     expect(goThroughStep(document, state)).toBeUndefined()
+  })
+})
+
+describe('Close’s go-through: every row the month is waiting on', () => {
+  it('runs every reason in one queue, the cardholder’s group first, then To discuss', () => {
+    const document = household()
+    const state = startMonthGoThrough(document, '2026-11')
+    expect(state).toEqual({ scope: { kind: 'month', month: '2026-11' }, ids: ['zara', 'boots', 'works', 'lewis'], totalPence: 6800 + 2345 + 2099 + 3800, handled: [] })
+    const seen: string[] = []
+    let step = state
+    for (let current = goThroughStep(document, step); current; current = goThroughStep(document, step)) { seen.push(current.current.id); step = handleRow(step, current.current.id) }
+    expect(seen).toEqual(['zara', 'boots', 'works', 'lewis'])
+  })
+
+  it('leaves out rows waiting from another month, as Close does', () => {
+    let document = household()
+    document.card!.transactions.push(tx('cinema', '2026-12-02', 1500))
+    document = markWaiting(document, 'cinema', discuss, undefined, now)
+    expect(startMonthGoThrough(document, '2026-11').ids).not.toContain('cinema')
+    expect(startMonthGoThrough(document, '2026-12').ids).toEqual(['cinema'])
   })
 })
 

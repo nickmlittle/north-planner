@@ -167,7 +167,7 @@ export function SortSheet({ document, setDocument, transaction, onClose, onSorte
 
   const count = goThrough?.state.ids.length ?? 0
   const position = goThrough?.step.position ?? 0
-  return <ModalDialog title={goThrough ? goThroughTitle(document, goThrough.state.on) : `Sort ${transaction.description}`} onClose={onClose} returnFocusTo={returnFocusTo} className={`sort-sheet${goThrough ? ' sort-go-sheet' : ''}`} footer={footer}
+  return <ModalDialog title={goThrough ? goThroughTitle(document, goThrough.state.scope) : `Sort ${transaction.description}`} onClose={onClose} returnFocusTo={returnFocusTo} className={`sort-sheet${goThrough ? ' sort-go-sheet' : ''}`} footer={footer}
     description={goThrough && `${position} of ${count}${compact ? '' : ` · ${pounds(goThrough.state.totalPence)}`}`}>
     {goThrough && <div className={`sort-go-progress${count > 12 ? ' is-continuous' : ''}`} aria-hidden="true">
       {count > 12 ? <span className="is-on" style={{ width: `${(position / count) * 100}%` }}/> : goThrough.state.ids.map((row, index) => <span key={row} className={index < position ? 'is-on' : undefined}/>)}

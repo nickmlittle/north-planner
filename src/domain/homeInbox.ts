@@ -4,8 +4,8 @@ import { homeBill } from './billSum'
 import { monthSpending, needsALook, plannedByDestination } from './cardSpending'
 import { potKind } from './potKinds'
 import { statementSummary } from './cardStatements'
-import { transactionsToSort } from './cardSorting'
-import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey } from './cardTracker'
+import { transactionsToSort, transactionsWaiting, type WaitingGroup } from './cardSorting'
+import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey, type WaitingOn } from './cardTracker'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { closeMonthPlan, homeMonths, moneyArrivesDates, type HomeMonth, type HomeTask } from './monthStages'
 import { HOUSEHOLD, orderTransferAccounts, paydayPlans } from './personTransfers'
@@ -40,11 +40,13 @@ export type HomeTarget =
   | { view: 'settings'; section: 'accounts' }
   /** Home's own Renewal sheet for a yearly bill's renewal on `date`. */
   | { view: 'renewal'; itemId: string; date: string }
+  /** Go through them (W12), over Home: one waiting group's rows. */
+  | { view: 'go-through'; on: WaitingOn }
 
-/** Where Home sends a row it doesn't open itself (it opens the Renewal sheet). */
-export type AppHomeTarget = Exclude<HomeTarget, { view: 'renewal' }>
+/** Where Home sends a row it doesn't open itself (it opens the Renewal sheet and the go-through). */
+export type AppHomeTarget = Exclude<HomeTarget, { view: 'renewal' } | { view: 'go-through' }>
 
-export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'set-aside' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace' | 'renewal'
+export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'waiting' | 'set-aside' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace' | 'renewal'
 export type InboxTask = {
   key: string
   kind: InboxKind
@@ -135,8 +137,11 @@ export const COMING_UP_DAYS = 45
 /** Next month's payday steps join To do this many days before its money arrives. */
 export const FUND_AHEAD_DAYS = 7
 
-/** The To do order: by due date first, then the everyday card work, then plan fixes. */
-const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, 'set-aside': 5, 'bring-in': 6, 'over-plan': 7, 'review-accounts': 8, pace: 9, renewal: 6 }
+/**
+ * The To do order: by due date first, then the everyday card work, then plan fixes. Waiting rows come straight after
+ * Sort and before Set aside (WP10): decisions before transfers, and Spending's Set aside band leads anyway (W8).
+ */
+const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, waiting: 5, 'set-aside': 6, 'bring-in': 7, 'over-plan': 8, 'review-accounts': 9, pace: 10, renewal: 7 }
 const order = (a: InboxTask, b: InboxTask) => RANK[a.kind] - RANK[b.kind] || (a.due ?? '').localeCompare(b.due ?? '') || a.key.localeCompare(b.key)
 
 /** The payday steps for a month, per person: the same plans and ticks as Month. */
@@ -157,6 +162,7 @@ function fundingFor(document: BudgetDocument, month: string, today: string) {
 export function homeInbox(document: BudgetDocument, { month, today = localDate(), nameDestination = () => 'Pot', nameAccount = () => 'Account' }: Options): HomeInbox {
   const adults = document.household.adults
   const name = (personId: string) => personId === HOUSEHOLD ? 'Either of you' : adults.find(person => person.id === personId)?.name ?? 'Someone'
+  const reasonName = (on: WaitingOn) => on.kind === 'discuss' ? 'To discuss' : `Ask ${name(on.personId)}`
   const tracker = cardTracker(document)
   const card = tracker.cards[0]
   const todo: InboxTask[] = [], headsUp: InboxTask[] = [], done: InboxTask[] = [], comingUp: Upcoming[] = []
@@ -195,7 +201,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
     const open = bill ? bill.open : true
     const pot = card.setAside && document.budget.pots.find(row => row.id === card.setAside!.potId)
     cardFigure = { name: card.name, value: pounds(bill?.billPence ?? summary?.totalPence ?? 0), sub: `${monthName(close.slice(0, 7))} bill${open ? ' so far' : ''}`,
-      detail: [bill && pot ? bill.covered ? 'covered' : `${pounds(bill.inPotPence)} in ${potPhrase(pot.name)}` : '', bill?.expectingBackPence ? `${pounds(bill.expectingBackPence)} expecting back` : '', open ? `closes ${dayDate(close)}` : summary ? `due ${dayDate(summary.dueDate)}` : ''].filter(Boolean).join(' · ') }
+      detail: [bill && pot ? bill.covered ? 'covered' : `${pounds(bill.inPotPence)} in ${potPhrase(pot.name)}` : '', bill?.waiting ? `${pounds(bill.waitingPence)} waiting` : '', bill?.expectingBackPence ? `${pounds(bill.expectingBackPence)} expecting back` : '', open ? `closes ${dayDate(close)}` : summary ? `due ${dayDate(summary.dueDate)}` : ''].filter(Boolean).join(' · ') }
   }
 
   // ——— First run: plan the month first ———
@@ -218,7 +224,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
       case 'close': {
         const target: HomeTarget = { view: 'month', month: task.month, close: true }
         if (task.done) { done.push({ key: task.key, kind: 'close', title: `${monthName(task.month)} closed`, meta: '', target }); return }
-        todo.push({ key: task.key, kind: 'close', title: `Close ${monthName(task.month)}`, meta: closeMeta(document, task.month, today, nameDestination), chip: `Ended ${dayDate(lastDayOf(task.month)).slice(4)}`, due: lastDayOf(task.month), target })
+        todo.push({ key: task.key, kind: 'close', title: `Close ${monthName(task.month)}`, meta: closeMeta(document, task.month, today, nameDestination, reasonName), chip: `Ended ${dayDate(lastDayOf(task.month)).slice(4)}`, due: lastDayOf(task.month), target })
         return
       }
       case 'settle': {
@@ -282,6 +288,12 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
   // ——— Sort: anything waiting to be sorted ———
   const toSort = transactionsToSort(tracker)
   if (card && toSort.length) todo.push({ key: 'sort', kind: 'sort', title: `Sort ${plural(toSort.length, `${card.name} transaction`)}`, meta: lastImportAt ? `Brought in ${dayDate(localDate(new Date(lastImportAt)))}` : 'Added by hand', trailing: pounds(toSort.reduce((sum, row) => sum + row.amountPence, 0)), target: { view: 'spending', section: 'sort' } })
+
+  // ——— Waiting: a row per reason, opening its go-through over Home (W12) ———
+  // The key keeps the groups in their own order (the cardholder's first, To discuss last) when the list is sorted.
+  if (card) transactionsWaiting(document).forEach((group, index) => todo.push({
+    key: `waiting:${index}:${group.key}`, kind: 'waiting', title: waitingTitle(group, name), meta: waitingMeta(group, today), trailing: pounds(group.totalPence), target: { view: 'go-through', on: group.on },
+  }))
 
   // ——— Fund: this month after its payday, and next month a week before (or once started) ———
   const fund = (target: string, data: ReturnType<typeof fundingFor>) => {
@@ -429,12 +441,35 @@ function renewalWhen(date: string, today: string) {
   return days < 14 ? `In ${days} days` : `In ${Math.floor(days / 7)} weeks`
 }
 
+/** "Go through 4 with Ada", "2 to discuss" (W12). */
+function waitingTitle(group: WaitingGroup, name: (personId: string) => string) {
+  return group.on.kind === 'discuss' ? `${group.rows.length} to discuss` : `Go through ${group.rows.length} with ${name(group.on.personId)}`
+}
+
+/**
+ * How long they've waited (from when they were marked, WP5), then which: "The oldest has waited 8 days · ZARA, BOOTS,
+ * AMAZON and 1 more". The wait leads, since phones cut the meta short.
+ */
+function waitingMeta(group: WaitingGroup, today: string) {
+  const oldest = group.rows.reduce((min, row) => row.waiting!.at < min ? row.waiting!.at : min, group.rows[0]!.waiting!.at)
+  const days = Math.max(0, daysBetween(localDate(new Date(oldest)), today))
+  const one = group.rows.length === 1
+  const waited = days === 0 ? one ? 'Marked today' : 'All marked today' : one ? `Waited ${plural(days, 'day')}` : `The oldest has waited ${plural(days, 'day')}`
+  const merchants = [...new Set(group.rows.map(row => row.merchant || row.description))]
+  const which = merchants.length > 3 ? `${merchants.slice(0, 3).join(', ')} and ${merchants.length - 3} more` : merchants.join(', ')
+  return `${waited} · ${which}`
+}
+
 /** "Groceries £88.58 over · 3 pots with money left", or what's still missing before it can close. */
-function closeMeta(document: BudgetDocument, month: string, today: string, nameDestination: (destination: BudgetDestination) => string) {
+function closeMeta(document: BudgetDocument, month: string, today: string, nameDestination: (destination: BudgetDestination) => string, reasonName: (on: WaitingOn) => string) {
   const plan = closeMonthPlan(document, month, today)
   if (!plan) return ''
   if (plan.readiness.toSort) return `${plural(plan.readiness.toSort, 'transaction')} to sort first`
-  if (plan.readiness.waiting) return `${plan.readiness.waiting} waiting · sort them first`
+  // "6 waiting · Ask Ada 4 · To discuss 2": what's holding it up, by reason (W10, W12).
+  if (plan.readiness.waiting) return [`${plan.readiness.waiting} waiting`, ...transactionsWaiting(document).flatMap(group => {
+    const count = group.rows.filter(row => monthOf(row.date) === month).length
+    return count ? [`${reasonName(group.on)} ${count}`] : []
+  })].join(' · ')
   if (!plan.readiness.postingsIn && !plan.readiness.allIn) return 'Waiting for late postings, or mark them all in'
   const pot = (potId: string) => nameDestination({ kind: 'pot', potId }).split(' · ')[0]
   const over = plan.overspends.length === 1 ? `${pot(plan.overspends[0]!.potId)} ${pounds(plan.overspends[0]!.overPence)} over` : plan.overspends.length ? `${plural(plan.overspends.length, 'pot')} over` : 'Nothing over'

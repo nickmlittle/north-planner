@@ -1,6 +1,6 @@
 import type { BudgetDocument } from './budgetDocument'
-import type { WaitingGroup } from './cardSorting'
-import { cardTracker, type CardTransaction, type WaitingOn } from './cardTracker'
+import { waitingRows, type WaitingGroup } from './cardSorting'
+import { cardTracker, monthOf, type CardTransaction, type WaitingOn } from './cardTracker'
 
 /**
  * Go through them (audit 6, W9): one waiting group's rows, one at a time, in the sort sheet. The queue is fixed when it
@@ -8,7 +8,8 @@ import { cardTracker, type CardTransaction, type WaitingOn } from './cardTracker
  * out. Only which rows have been dealt with is kept; what happened to each is read from the document.
  */
 export type GoThrough = {
-  on: WaitingOn
+  /** One waiting group (Spending, Home), or every row a month is waiting on, all reasons in one queue (Close). */
+  scope: GoThroughScope
   /** The group's rows when it opened, in its order (newest first). */
   ids: string[]
   /** The group's total when it opened. */
@@ -17,7 +18,18 @@ export type GoThrough = {
   handled: string[]
 }
 
-export const startGoThrough = (group: WaitingGroup): GoThrough => ({ on: group.on, ids: group.rows.map(row => row.id), totalPence: group.totalPence, handled: [] })
+export type GoThroughScope = { kind: 'group'; on: WaitingOn } | { kind: 'month'; month: string }
+
+export const startGoThrough = (group: WaitingGroup): GoThrough => ({ scope: { kind: 'group', on: group.on }, ids: group.rows.map(row => row.id), totalPence: group.totalPence, handled: [] })
+
+/**
+ * Close <Month>'s Go through them (audit 6, PR 6): every waiting row dated in the month, in `transactionsWaiting`'s order
+ * (the cardholder's group first, then the others, then To discuss; newest first in each). The same rows Close counts.
+ */
+export function startMonthGoThrough(document: Pick<BudgetDocument, 'card' | 'household'>, month: string): GoThrough {
+  const rows = waitingRows(document).filter(row => monthOf(row.date) === month)
+  return { scope: { kind: 'month', month }, ids: rows.map(row => row.id), totalPence: rows.reduce((sum, row) => sum + row.amountPence, 0), handled: [] }
+}
 
 /** A row still to come: still waiting and not dealt with yet. */
 const stillToCome = (rows: Map<string, CardTransaction>, state: GoThrough) => (id: string) => {

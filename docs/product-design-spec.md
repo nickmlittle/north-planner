@@ -141,7 +141,7 @@ The sort sheet shows “£181.40 left” (or “£12.50 over”) beside each pla
 #### Stages and Close <Month>
 
 **Month stages** show as the header's chip (see Month). An ended month that isn't closed is its own close checklist, in order, with **Close October** as the header's primary action. The button is disabled while anything is waiting, with the reason in its title and on a line below the header (“Waiting for late October transactions to post.”). The sections are:
-- **Waiting** (only while not ready): “4 transactions to sort” with Sort them, or “Last brought in Mon 2 Nov · Late October transactions can take a few days to post.” with Bring in transactions and “All October transactions are in”.
+- **Before you can close October** (only while not ready): “4 transactions to sort” with Sort them; “6 waiting · £212.40 · Ask Ada 4 · To discuss 2” with Go through them, which steps through all of them over Month; or “Last brought in Mon 2 Nov · Late October transactions can take a few days to post.” with Bring in transactions and “All October transactions are in”. Once they're all in, “All October transactions are in” shows as done. While rows wait, a line under the covers says they aren't counted yet.
 - **Cover overspends · 1:** each overspent pot is a step row with its amount to copy (“Move from Monzo Joint into Groceries · £88.58”, or “Out of Treats, then into Eating out”). Its caption reads “Groceries · Monzo Joint is £88.58 over · covered from Monzo Joint ▾”, an inline choice of the buffer, pots with money left (“Holidays · £1,406.36 left”) or “November's Groceries (moves no money)”; that last one adds “Leaves Groceries £88.58 short in November.”
 - **Money left · stays in the pot:** a table of Pot, Left and Built up. A pot past its limit gets “Move £100.00…” (records the move) and Keep it, and the line “Car has built up £180.00, more than £160.00 (2× its £80.00 monthly plan). Move some?”
 - **Carry-over pots:** what's spare in each.
@@ -286,13 +286,16 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | **Tracked** / **Funded only** / **Saving** / **Carries over** | A pot's kind, chosen in Settings › Accounts & pots. Tracked pots have Left and pace; a Funded only pot is moved into on payday and no more (“£1,135.42 moved in”); a Saving pot is put by; a Carries over pot keeps what's left. | Monthly, shows pace |
 | **Bring in** | Import the Amex Excel export: “Bring in transactions”, “Last brought in Mon 9 Nov”. | Upload, sync |
 | **Sort** / **To sort** / **Sorted** | Give a transaction a pot or account. “Sorted by rules”. | Assign, categorise |
+| **Waiting** | A row that can't be sorted yet: it needs the other cardholder or a conversation. It counts in no pot until it's sorted, and blocks Close: “6 waiting”, “£212.40 waiting”. On its own the word means only this. | Parked, on hold, pending |
+| **Ask <person>** / **To discuss** | Why a row is waiting: “Ask Ada”, “To discuss”. The cardholder comes first. | |
+| **Go through them** | Step through waiting rows one at a time in the sort sheet: “Go through with Ada · 1 of 4”, “Go through 4 with Ada” on Home. | Review, triage |
 | **Split** | A transaction with more than one line. | |
 | **Pace** | “On track”, “£131 ahead of pace”, “Runs out around Thu 19 Nov”. | Burn rate |
 | **Close <Month>** | The month-end step: cover overspends, note leftovers. | Finalise, lock |
 | **Settle up** | Paying a statement. Steps: “Out of Treats”, “Send to Joint Monzo”, “Pay Amex”. | Pay off |
 | **Built up** | The leftover total in a monthly pot. | Surplus, savings |
 | **Spare** | A carry-over pot's money minus card spend waiting to move and the bills still due this month: “£1,185.02 spare”. | Free, available (that is income) |
-| **Bill** | What a card statement costs, named by the month it closes: “November bill”, “November bill so far” while open. Bill = In the Amex pot + To move + To sort + Expecting back. | This statement, balance |
+| **Bill** | What a card statement costs, named by the month it closes: “November bill”, “November bill so far” while open. Bill = In the Amex pot + To move + To sort + Waiting + Expecting back. | This statement, balance |
 | **Expecting back** | Receipt items ticked **Back**: a return on its way, held in its pot (not spent, not moved) until the refund is linked or the bill. **That's everything back** settles the order; **Not coming back** makes it spending. | Pending refund, returned |
 | **In the Amex pot** | What has moved into the Amex pot for a bill; on the Amex pot's page, what's in it. “Worked out” until a check made after the last move matches: “Matches Monzo”. | Set aside (as a balance), should hold, in Monzo now |
 | **To move** / **To sort** | A bill's sorted spend not moved to the Amex pot yet, and its spend not sorted yet. | Still to move |

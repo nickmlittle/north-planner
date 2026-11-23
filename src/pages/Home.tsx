@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BellRing, CalendarCheck, Check, ChevronRight, FileText, Inbox, ListPlus, PiggyBank, TrendingUp, TriangleAlert, Upload } from 'lucide-react'
+import { ArrowLeftRight, BellRing, CalendarCheck, Check, ChevronRight, Clock, FileText, Inbox, ListPlus, PiggyBank, TrendingUp, TriangleAlert, Upload } from 'lucide-react'
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
 import { EmptyState, ListKeysHint, ListRow, PageHeader, Section, StatStrip, StatTile, StatusChip } from '../components/ui'
 import { Sheet } from '../components/ui/Sheet'
@@ -7,6 +7,8 @@ import { useListNavigation } from '../state/useListNavigation'
 import type { BudgetDocument } from '../domain/budgetDocument'
 import { localDate, monthOf } from '../domain/cardTracker'
 import { markSummarySeen } from '../domain/monthSummary'
+import { transactionsWaiting, waitingKey } from '../domain/cardSorting'
+import { startGoThrough, type GoThrough } from '../domain/goThrough'
 import { homeCount, homeInbox, type AppHomeTarget, type HomeInbox, type HomeTarget, type InboxKind, type InboxTask, type PaydayCard } from '../domain/homeInbox'
 import { resolveBudget } from '../domain/monthlyBudget'
 import { answerRenewal, undoRenewalAnswer } from '../domain/recurringBills'
@@ -19,6 +21,7 @@ import { AffordSheet } from './AffordSheet'
 import { BroughtInLines } from './BroughtInLines'
 import { destinationNamer } from './cardLabels'
 import { FreshnessLine } from './Freshness'
+import { GoThroughSheet } from './GoThroughSheet'
 import { MonthSummaryCard } from './MonthSummaryCard'
 import { RenewalSheet } from './RenewalSheet'
 import { WhatMoved } from './WhatMoved'
@@ -37,7 +40,7 @@ type Props = {
 }
 
 const icons: Record<InboxKind, ReactNode> = {
-  plan: <ListPlus/>, settle: <FileText/>, 'final-export': <Upload/>, close: <CalendarCheck/>, fund: <ArrowLeftRight/>, sort: <Inbox/>,
+  plan: <ListPlus/>, settle: <FileText/>, 'final-export': <Upload/>, close: <CalendarCheck/>, fund: <ArrowLeftRight/>, sort: <Inbox/>, waiting: <Clock/>,
   'set-aside': <PiggyBank/>, 'bring-in': <Upload/>, 'over-plan': <TriangleAlert/>, 'review-accounts': <TriangleAlert/>, pace: <TrendingUp/>, renewal: <BellRing/>,
 }
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
@@ -117,8 +120,14 @@ function TodoSheet({ inbox, onOpen, samePrice, onClose }: { inbox: HomeInbox; on
  */
 export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, today = localDate() }: Props) {
   const [renewal, setRenewal] = useState<{ itemId: string; date: string }>()
+  // Go through them (W12): a waiting group's rows over Home, so it ends back here.
+  const [going, setGoing] = useState<GoThrough | null>(null)
   const { show: showToast, toast } = useToast()
-  const onOpen = (target: HomeTarget) => { if (target.view === 'renewal') setRenewal({ itemId: target.itemId, date: target.date }); else onOpenElsewhere(target) }
+  const onOpen = (target: HomeTarget) => {
+    if (target.view === 'renewal') setRenewal({ itemId: target.itemId, date: target.date })
+    else if (target.view === 'go-through') { const group = transactionsWaiting(document).find(row => row.key === waitingKey(target.on)); if (group) setGoing(startGoThrough(group)) }
+    else onOpenElsewhere(target)
+  }
   const answered = (text: string, undo: (current: BudgetDocument) => BudgetDocument) => showToast(text, { label: 'Undo', onClick: () => setDocument(undo) })
   /** "Same price" on a renewal's To do row: answers it without opening the sheet. */
   const samePrice = (task: InboxTask) => {
@@ -166,6 +175,7 @@ export function Home({ document, setDocument, month, onOpen: onOpenElsewhere, to
     {toast}
     {afford && <AffordSheet document={document} today={today} onClose={() => setAfford(false)}/>}
     {sheet && <TodoSheet inbox={inbox} samePrice={samePrice} onClose={() => setSheet(false)} onOpen={target => { setSheet(false); onOpen(target) }}/>}
+    {going && <GoThroughSheet document={document} setDocument={setDocument} start={going} today={today} onEnd={text => { setGoing(null); if (text) showToast(text) }}/>}
     {renewal && <RenewalSheet document={document} setDocument={setDocument} itemId={renewal.itemId} date={renewal.date} today={today} onClose={() => setRenewal(undefined)}
       onAnswered={(text, undo) => { setRenewal(undefined); answered(text, undo) }}
       onEditItem={(itemId, itemMonth) => { setRenewal(undefined); onOpenElsewhere({ view: 'plan', editItemId: itemId, month: itemMonth }) }}/>}

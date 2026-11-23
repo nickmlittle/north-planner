@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from './budgetDocument'
 import { budgetTransfers } from './budgetTransfers'
 import { homeCount, homeInbox } from './homeInbox'
+import { markWaiting } from './cardSorting'
 import { savePotKind } from './potKinds'
 import { monthSpending } from './cardSpending'
 import { paceHeadline } from '../formatting/paceLabels'
@@ -353,5 +354,52 @@ describe('the payday card (month-health PR 2, D10)', () => {
     const document = audit4()
     expect(inbox(document, '2026-12-01', '2026-12').payday).toBeUndefined()
     expect(inbox(document, '2026-11-27', '2026-10').payday).toBeUndefined()
+  })
+})
+
+describe('waiting rows on Home (audit 6, W12, WP10)', () => {
+  const ben = { kind: 'person', personId: 'ben' } as const, discuss = { kind: 'discuss' } as const
+  /** The seed on Wed 11 Nov: Homeware Hut and Corner Cafe ask Ben (marked Tue 3 Nov), Train Tickets is to discuss (today). */
+  function waitingSeed() {
+    let document = seed()
+    document = markWaiting(document, 'AT268000000000000000018', ben, 'Which bedroom?', new Date('2026-11-03T10:00:00Z'))
+    document = markWaiting(document, 'AT268000000000000000024', ben, undefined, new Date('2026-11-03T10:00:00Z'))
+    return markWaiting(document, 'AT268000000000000000027', discuss, undefined, new Date('2026-11-11T09:00:00Z'))
+  }
+
+  it('lists a row per reason straight after Sort, before Set aside, each with its total', () => {
+    const result = inbox(waitingSeed())
+    expect(result.todo.map(row => row.kind)).toEqual(['settle', 'close', 'fund', 'sort', 'waiting', 'waiting', 'set-aside', 'renewal', 'over-plan'])
+    expect(result.todo.filter(row => ['sort', 'waiting'].includes(row.kind)).map(row => [row.title, row.meta, row.trailing])).toEqual([
+      ['Sort 1 Amex transaction', 'Brought in Mon 9 Nov', '-£24.99'],
+      ['Go through 2 with Ben', 'The oldest has waited 8 days · CORNER CAFE, HOMEWARE HUT', '£107.97'],
+      ['1 to discuss', 'Marked today · TRAIN TICKETS', '£112.81'],
+    ])
+  })
+
+  it('opens each group’s go-through over Home', () => {
+    const rows = inbox(waitingSeed()).todo.filter(row => row.kind === 'waiting')
+    expect(rows.map(row => row.target)).toEqual([{ view: 'go-through', on: ben }, { view: 'go-through', on: discuss }])
+  })
+
+  it('names at most three merchants, then how many more', () => {
+    let document = waitingSeed()
+    document = markWaiting(document, 'AT268000000000000000021', ben, undefined, new Date('2026-11-10T10:00:00Z'))
+    document = markWaiting(document, 'AT268000000000000000027', ben, undefined, new Date('2026-11-10T10:00:00Z'))
+    const row = inbox(document).todo.find(task => task.kind === 'waiting')!
+    expect(row.title).toBe('Go through 4 with Ben')
+    expect(row.meta).toBe('The oldest has waited 8 days · TRAIN TICKETS, CORNER CAFE, HOMEWARE HUT')
+  })
+
+  it('adds what is waiting to the Amex card', () => {
+    expect(inbox(waitingSeed()).strip.card!.detail).toMatch(/· £\d[\d,]*\.\d\d waiting ·/)
+  })
+
+  it('says what Close is waiting on, by reason', () => {
+    let document = seed()
+    const october = document.card!.transactions.find(row => row.date.startsWith('2026-10') && row.kind === 'purchase' && row.personId === 'ada')!
+    delete october.sort
+    document = markWaiting(document, october.id, { kind: 'discuss' }, undefined, new Date('2026-11-01T10:00:00Z'))
+    expect(inbox(document).todo.find(row => row.kind === 'close')!.meta).toBe('1 waiting · To discuss 1')
   })
 })

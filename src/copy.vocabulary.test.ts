@@ -59,4 +59,14 @@ describe('on-screen vocabulary', () => {
     const hits = texts.filter(({ text }) => pattern.test(text)).map(({ file, text }) => `${file}: “${text}” → use ${instead}`)
     expect(hits).toEqual([])
   })
+
+  // Waiting (audit 6, waiting-build-plan §3): on its own it means the new state, and nothing else. Close's old "Waiting"
+  // section is now "Before you can close <Month>"; the older uses keep a longer phrase ("Waiting to move").
+  it('keeps a bare “Waiting” title or label for the Waiting state', () => {
+    const owners = ['./pages/WaitingList.tsx', './pages/SortSheet.tsx']
+    const bare = /(title|aria-label)=("Waiting"|\{['"`]Waiting['"`]\})/
+    const hits = files.filter(file => !owners.includes(file) && bare.test(readFileSync(new URL(file, import.meta.url), 'utf8')))
+    expect(hits).toEqual([])
+    expect(texts.some(({ text }) => text.includes('Before you can close'))).toBe(true)
+  })
 })

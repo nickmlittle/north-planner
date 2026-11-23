@@ -22,7 +22,7 @@ import { SortTable } from './SortTable'
 import type { Tipped } from './sortPace'
 import { TransactionsTable } from './TransactionsTable'
 import { splitLabel } from '../domain/cardSplits'
-import { cardLabel, dayOf, goThroughEnded, monthHeads, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
+import { cardLabel, dayOf, monthHeads, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { closeDateFor } from '../domain/cardTracker'
 import './Spending.css'
 import { movedByTransaction, moveState, potPhrase, potTitle, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
@@ -33,7 +33,8 @@ import { ExpectingBackList } from './ExpectingBack'
 import { heldOut, isHeld, ordersWithReturns } from '../domain/expectingBack'
 import { useShortcut } from '../state/shortcuts'
 import { WaitingList } from './WaitingList'
-import { goThroughCounts, goThroughStep, handleRow, startGoThrough, type GoThrough } from '../domain/goThrough'
+import { startGoThrough, type GoThrough } from '../domain/goThrough'
+import { GoThroughSheet } from './GoThroughSheet'
 
 type Props = {
   document: BudgetDocument
@@ -91,8 +92,7 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   useEffect(() => { if (window.history.state?.northBringIn || window.history.state?.northAddTransaction) { const rest = { ...window.history.state }; delete rest.northBringIn; delete rest.northAddTransaction; window.history.replaceState(rest, '') } }, [])
   const [sorting, setSorting] = useState<string | null>(null)
   const [splitting, setSplitting] = useState<string | null>(null)
-  // Go through them (W9): a waiting group, one row at a time in the sort sheet. It stays set while a row's split is
-  // open, so saving the split carries on with the next row.
+  // Go through them (W9): a waiting group, one row at a time, in GoThroughSheet.
   const [going, setGoing] = useState<GoThrough | null>(null)
   const [checking, setChecking] = useState(false)
   const [message, setMessageText] = useState('')
@@ -123,14 +123,6 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
     setMessage(text)
     setUndoWaiting({ id, description: tracker.transactions.find(row => row.id === id)?.description ?? 'It' })
   }
-  // The row in front is dealt with: on to the next. Its own message shows until the go-through ends.
-  const goOn = (state: GoThrough, id: string, text: string) => { setGoing(handleRow(state, id)); setMessage(text) }
-  /** Closed, or nothing left: "Gone through 4 with Ada: 3 sorted, 1 still waiting." */
-  const endGoThrough = (state: GoThrough) => {
-    setGoing(null)
-    const ended = goThroughEnded(document, state.on, state.ids.length, goThroughCounts(document, state))
-    if (ended) setMessage(ended)
-  }
   const hasCard = tracker.cards.length > 0
   useShortcut(hasCard ? { keys: 'i', description: 'Bring in transactions', group: 'This page', run: () => setSheet('bring-in') } : null)
   useShortcut(hasCard ? { keys: 'n', description: 'Add a transaction', group: 'This page', run: () => setSheet('manual') } : null)
@@ -142,9 +134,6 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const latest = lastImport(tracker)
   const sortedThrough = tracker.transactions.reduce<string | undefined>((max, row) => !max || row.date > max ? row.date : max, undefined)
   const sortingTransaction = tracker.transactions.find(row => row.id === sorting)
-  const goStep = going ? goThroughStep(document, going) : undefined
-  // The last row dealt with (or sorted elsewhere): the go-through ends, with what happened to its rows.
-  if (going && !goStep) endGoThrough(going)
   const splittingTransaction = tracker.transactions.find(row => row.id === splitting)
   // The set-aside pot (the Amex pot): what's sorted but not moved into it yet, and each row's state.
   const setAsideCard = tracker.cards.find(card => card.setAside)
@@ -278,14 +267,12 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
         : <StatementsPanel document={document} setDocument={setDocument} today={today} statementKey={statementKey} onOpenStatement={onOpenStatement} onSort={() => onSelectView('sort')} onBringIn={() => setSheet('bring-in')}/>}
     </Tabs>
     {sortingTransaction && !going && <SortSheet document={document} setDocument={setDocument} transaction={sortingTransaction} today={today} onOpenMonth={onOpenMonth} onClose={() => setSorting(null)} onSorted={(text, tipped) => { setSorting(null); sorted(text, tipped) }} onMarked={(text, id) => { setSorting(null); marked(text, id) }} onSplit={() => { setSorting(null); setSplitting(sortingTransaction.id) }}/>}
-    {/* Go through them: one sheet for the whole group. A pot it tips gets no toast here, since the impact line says so
-        before Place and a toast would sit behind the sheet. Split hands over to the split editor and back. */}
-    {going && goStep && !splitting && <SortSheet document={document} setDocument={setDocument} transaction={goStep.current} today={today}
-      goThrough={{ state: going, step: goStep, onSkip: () => goOn(going, goStep.current.id, `${goStep.current.description} is still waiting.`) }}
-      returnFocusTo={() => window.document.querySelector<HTMLElement>('.waiting-go') ?? window.document.querySelector<HTMLElement>('.spending-page [role="tab"][aria-selected="true"]')}
-      onClose={() => endGoThrough(going)} onSorted={text => goOn(going, goStep.current.id, text)} onSplit={() => setSplitting(goStep.current.id)}/>}
+    {/* Each row's own message shows until the go-through ends. */}
+    {going && <GoThroughSheet document={document} setDocument={setDocument} start={going} today={today} onStep={setMessage}
+      onEnd={text => { setGoing(null); if (text) setMessage(text) }}
+      returnFocusTo={() => window.document.querySelector<HTMLElement>('.waiting-go') ?? window.document.querySelector<HTMLElement>('.spending-page [role="tab"][aria-selected="true"]')}/>}
     {splittingTransaction && <SplitEditor document={document} setDocument={setDocument} transaction={splittingTransaction} onClose={() => setSplitting(null)}
-      onSaved={text => { setSplitting(null); if (going) goOn(going, splittingTransaction.id, text); else setMessage(text) }}/>}
+      onSaved={text => { setSplitting(null); setMessage(text) }}/>}
     {sheet === 'bring-in' && <BringInSheet document={document} setDocument={setDocument} onClose={() => setSheet(null)} onSort={() => { setSheet(null); onSelectView('sort') }}/>}
     {moving && setAsideCard && <MoveToPotSheet document={document} setDocument={setDocument} cardId={setAsideCard.id} onClose={() => setMoving(false)} onMoved={(text, id) => { setMoving(false); setMessageText(text); setUndoId(id) }}/>}
     {checkingBalances && <CheckBalancesSheet document={document} setDocument={setDocument} onClose={() => setCheckingBalances(false)} onSaved={(text, potId) => { setCheckingBalances(false); setMessage(text); setGapPot(potId ?? null) }}/>}

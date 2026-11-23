@@ -9,6 +9,7 @@ import { formatMonth } from '../formatting/month'
 import type { MonthSpending } from '../domain/cardSpending'
 import type { ClosePlan, MonthStatus } from '../domain/monthStages'
 import type { BillSum } from '../domain/billSum'
+import type { GoThroughScope } from '../domain/goThrough'
 
 export const pounds = (pence: number) => formatGBP(pence / 100)
 /** "£62.40", or "−£24.99" for a refund. */
@@ -38,18 +39,22 @@ export const sameReason = (a: WaitingOn | undefined, b: WaitingOn | undefined) =
 const goThroughWho = (document: Pick<BudgetDocument, 'household'>, on: WaitingOn) =>
   on.kind === 'discuss' ? 'to discuss' : `with ${document.household.adults.find(person => person.id === on.personId)?.name ?? 'them'}`
 
-/** The go-through sheet's title: "Go through with Ada", or "Go through what’s to discuss". */
-export const goThroughTitle = (document: Pick<BudgetDocument, 'household'>, on: WaitingOn) =>
-  on.kind === 'discuss' ? 'Go through what’s to discuss' : `Go through ${goThroughWho(document, on)}`
+/** The go-through sheet's title: "Go through with Ada", "Go through what’s to discuss", or Close's "Go through November’s waiting". */
+export const goThroughTitle = (document: Pick<BudgetDocument, 'household'>, scope: GoThroughScope) =>
+  scope.kind === 'month' ? `Go through ${monthName(scope.month)}’s waiting`
+    : scope.on.kind === 'discuss' ? 'Go through what’s to discuss' : `Go through ${goThroughWho(document, scope.on)}`
 
 /**
  * The message once a go-through ends: "Gone through 4 with Ada: 3 sorted, 1 still waiting.", or, closed part way,
- * "Gone through 2 of 4 to discuss: 1 sorted, 1 back in To sort." Empty when nothing was gone through.
+ * "Gone through 2 of 4 to discuss: 1 sorted, 1 back in To sort." Close's reads "Gone through November’s 6 waiting: …"
+ * or "Gone through 2 of November’s 6 waiting: …". Empty when nothing was gone through.
  */
-export function goThroughEnded(document: Pick<BudgetDocument, 'household'>, on: WaitingOn, of: number, counts: { passed: number; sorted: number; waiting: number; back: number; all: boolean }): string {
+export function goThroughEnded(document: Pick<BudgetDocument, 'household'>, scope: GoThroughScope, of: number, counts: { passed: number; sorted: number; waiting: number; back: number; all: boolean }): string {
   if (!counts.passed) return ''
   const parts = [counts.sorted ? `${counts.sorted} sorted` : '', counts.back ? `${counts.back} back in To sort` : '', counts.waiting ? `${counts.waiting} still waiting` : ''].filter(Boolean)
-  return `Gone through ${counts.passed}${counts.all ? '' : ` of ${of}`} ${goThroughWho(document, on)}: ${parts.join(', ')}.`
+  const what = scope.kind === 'month' ? `${counts.all ? '' : `${counts.passed} of `}${monthName(scope.month)}’s ${of} waiting`
+    : `${counts.passed}${counts.all ? '' : ` of ${of}`} ${goThroughWho(document, scope.on)}`
+  return `Gone through ${what}: ${parts.join(', ')}.`
 }
 
 /** How long a row has waited, from when it was marked (WP5): "today", "1 day", "8 days". */
@@ -122,10 +127,10 @@ export function freshness(document: Pick<BudgetDocument, 'card'>): { lead: strin
   return { lead: `${card} sorted to ${dayDate(newest)}`, toSort: transactionsToSort(tracker).length, waiting: tracker.transactions.filter(row => !row.sort && isWaiting(row)).length, broughtIn: true }
 }
 
-/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort · £79.00 expecting back", or "Covered" once it's all in. */
+/** "£727.27 in the Amex pot · £402.00 to move · £24.00 to sort · £212.40 waiting · £79.00 expecting back", or "Covered" once it's all in. */
 export function billParts(bill: BillSum, phrase: string): string {
   if (bill.covered) return `Covered · all in ${phrase}`
-  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '', bill.expectingBackPence ? `${signedPounds(bill.expectingBackPence)} expecting back` : '']
+  const parts = [`${signedPounds(bill.inPotPence)} in ${phrase}`, bill.toMovePence ? `${signedPounds(bill.toMovePence)} to move` : '', bill.toSort ? `${signedPounds(bill.toSortPence)} to sort` : '', bill.waiting ? `${signedPounds(bill.waitingPence)} waiting` : '', bill.expectingBackPence ? `${signedPounds(bill.expectingBackPence)} expecting back` : '']
   return parts.filter(Boolean).join(' · ')
 }
 
