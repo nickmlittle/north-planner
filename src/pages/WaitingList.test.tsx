@@ -110,10 +110,100 @@ describe('the Waiting section', () => {
     expect(screen.getByRole('dialog', { name: 'Sort BOOTS 1182 SIDCUP' })).toBeInTheDocument()
   })
 
-  it('Go through them opens the group’s first row', () => {
+})
+
+describe('Go through them (waiting/5)', () => {
+  const sheet = () => screen.getByRole('dialog', { name: 'Go through with Ada' })
+  const open = () => fireEvent.click(screen.getByRole('button', { name: 'Go through them: Ask Ada' }))
+  const row = (document: BudgetDocument | undefined, id: string) => document!.card!.transactions.find(item => item.id === id)!
+
+  it('opens on the group’s first row: progress, the note first, Place focused and the next row under it', () => {
+    desktop()
+    render(<Harness initial={household()}/>)
+    open()
+    expect(sheet()).toHaveAccessibleDescription('1 of 3 · £112.44')
+    expect(sheet().querySelectorAll('.sort-go-progress .is-on')).toHaveLength(1)
+    expect(within(sheet()).getByRole('region', { name: 'Waiting' })).toHaveTextContent('Waiting · Ask AdaFor 4 days“Keeping both? One may go back”ChangeBack to To sort')
+    expect(within(sheet()).getByText('ZARA UK LONDON')).toBeInTheDocument()
+    expect(within(sheet()).getByRole('button', { name: /^Place in / })).toHaveFocus()
+    expect(within(sheet()).getByText('Next: BOOTS 1182 SIDCUP · £23.45 · “Hers or the kids’?”')).toBeInTheDocument()
+  })
+
+  it('walks the group: Place, Skip and Back to To sort each move on, then it ends with what happened', () => {
+    desktop()
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={household()} onChange={next => { saved = next }}/>)
+    open()
+    fireEvent.click(within(sheet()).getByRole('button', { name: /^Place in / }))
+    expect(row(saved, 'zara').sort).toBeDefined()
+    expect(sheet()).toHaveAccessibleDescription('2 of 3 · £112.44')
+    expect(within(sheet()).getByText('BOOTS 1182 SIDCUP')).toBeInTheDocument()
+    expect(within(sheet()).getByRole('button', { name: /^Place in / })).toHaveFocus()
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Skip, still waiting' }))
+    expect(row(saved, 'boots').waiting).toBeDefined()
+    expect(sheet()).toHaveAccessibleDescription('3 of 3 · £112.44')
+    expect(within(sheet()).queryByText(/^Next:/)).not.toBeInTheDocument()
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Back to To sort' }))
+    expect(row(saved, 'works').waiting).toBeUndefined()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Gone through 3 with Ada: 1 sorted, 1 back in To sort, 1 still waiting.')
+  })
+
+  it('a new reason or note moves on and counts as still waiting', () => {
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={household()} onChange={next => { saved = next }}/>)
+    open()
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Change' }))
+    fireEvent.click(within(within(sheet()).getByRole('group', { name: 'Waiting on' })).getByRole('button', { name: 'To discuss' }))
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Mark waiting · To discuss' }))
+    expect(row(saved, 'zara').waiting?.on).toEqual({ kind: 'discuss' })
+    expect(sheet()).toHaveAccessibleDescription('2 of 3')
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Gone through 1 of 3 with Ada: 1 still waiting.')
+  })
+
+  it('on phones: Skip, and no note in the next line', () => {
+    render(<Harness initial={household()}/>)
+    open()
+    expect(sheet()).toHaveAccessibleDescription('1 of 3')
+    expect(within(sheet()).getByRole('button', { name: 'Skip, still waiting' })).toHaveTextContent(/^Skip$/)
+    expect(within(sheet()).getByText('Next: BOOTS 1182 SIDCUP · £23.45')).toBeInTheDocument()
+  })
+
+  it('a row sorted elsewhere drops out; closing part way says how far it got', () => {
+    const document = household()
+    document.card!.transactions = document.card!.transactions.map(item => item.id === 'boots' ? { ...item, waiting: undefined, sort: { lines: [{ amountPence: 2345, destination: { kind: 'pot' as const, potId: 'groceries' } }], by: 'person' as const, at: '2026-11-20T09:00:00Z' } } : item)
+    render(<Harness initial={document}/>)
+    open()
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Skip, still waiting' }))
+    expect(sheet()).toHaveAccessibleDescription('2 of 2')
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Gone through 1 of 2 with Ada: 1 still waiting.')
+  })
+
+  it('Split hands over to the split editor: saving goes on to the next row, Cancel comes back to the same one', () => {
+    let saved: BudgetDocument | undefined
+    render(<Harness initial={household()} onChange={next => { saved = next }}/>)
+    open()
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Split across pots' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Split ZARA UK LONDON' })).getByRole('button', { name: 'Cancel' }))
+    expect(sheet()).toHaveAccessibleDescription('1 of 3')
+    fireEvent.click(within(sheet()).getByRole('button', { name: 'Split across pots' }))
+    const split = screen.getByRole('dialog', { name: 'Split ZARA UK LONDON' })
+    fireEvent.click(within(split).getByRole('button', { name: 'Half each' }))
+    fireEvent.click(within(split).getByRole('button', { name: 'Save split' }))
+    expect(row(saved, 'zara').sort?.lines).toHaveLength(2)
+    expect(row(saved, 'zara').waiting).toBeUndefined()
+    expect(sheet()).toHaveAccessibleDescription('2 of 3')
+  })
+
+  it('To discuss has its own title and end message', () => {
     render(<Harness initial={household()}/>)
     fireEvent.click(screen.getByRole('button', { name: 'Go through them: To discuss' }))
-    expect(screen.getByRole('dialog', { name: 'Sort JOHN LEWIS 0211' })).toBeInTheDocument()
+    const discuss = screen.getByRole('dialog', { name: 'Go through what’s to discuss' })
+    expect(discuss).toHaveAccessibleDescription('1 of 1')
+    fireEvent.click(within(discuss).getByRole('button', { name: 'Skip, still waiting' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Gone through 1 to discuss: 1 still waiting.')
   })
 })
 
