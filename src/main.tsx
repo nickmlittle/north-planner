@@ -1,3 +1,5 @@
+// First, so a local review's staged day is in place before anything reads the date.
+import './reviewClock'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
