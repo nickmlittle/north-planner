@@ -1,9 +1,20 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { destinationKey } from '../domain/cardTracker'
+import { bufferSource, destinationKey, sameDestination, type CardAccount } from '../domain/cardTracker'
 import type { BudgetDestination } from '../domain/monthlyBudget'
 import { accountOwnerGroups, destinationLabel, shortAccountLabels } from './budgetLabels'
 
 type Labelled = Pick<BudgetDocument, 'budget' | 'household'>
+
+/** A pot or account in a sentence: "Holidays", "Monzo Joint Savings". */
+export function shortName(document: Labelled, destination: BudgetDestination) {
+  return destination.kind === 'pot' ? document.budget.pots.find(pot => pot.id === destination.potId)?.name ?? 'the pot'
+    : shortAccountLabels(document.budget.accounts, document.household.adults).get(destination.accountId) ?? 'the account'
+}
+
+/** Where the waiting was covered from (W11): "the buffer" for the card's buffer, else the pot or account's name. */
+export function frontSourceName(document: Labelled, card: Pick<CardAccount, 'bufferDestination' | 'payFromAccountId' | 'setAside'>, source: BudgetDestination) {
+  return sameDestination(source, bufferSource(card)) ? 'the buffer' : shortName(document, source)
+}
 
 /** One name for a pot or account, as Plan and Transfers show it: "Bills · Monzo Joint", or "Monzo Joint" for the account itself. */
 export function destinationNamer(document: Labelled) {

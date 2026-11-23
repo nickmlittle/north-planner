@@ -5,13 +5,14 @@ import { monthSpending, needsALook, plannedByDestination } from './cardSpending'
 import { potKind } from './potKinds'
 import { statementSummary } from './cardStatements'
 import { transactionsToSort, transactionsWaiting, type WaitingGroup } from './cardSorting'
-import { addDays, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, shiftMonth, statementKey, type WaitingOn } from './cardTracker'
+import { addDays, bufferSource, cardTracker, closeDateFor, daysBetween, firstDayOf, lastDayOf, localDate, monthOf, parseStatementKey, sameDestination, shiftMonth, statementKey, type WaitingOn } from './cardTracker'
 import { resolveBudget, type BudgetDestination } from './monthlyBudget'
 import { closeMonthPlan, homeMonths, moneyArrivesDates, type HomeMonth, type HomeTask } from './monthStages'
 import { HOUSEHOLD, orderTransferAccounts, paydayPlans } from './personTransfers'
 import { landedText, paydayArrivals, type Arrival } from './paydayCard'
 import { potBalance } from './potBalances'
 import { potPhrase } from './setAside'
+import { frontsOwed } from './fronts'
 import { gapDestination } from './setAsideCheck'
 import { buildTransferInstructions, type TransferInstructions } from './transferInstructions'
 import { householdProgress, personProgress } from './transferTicks'
@@ -46,7 +47,7 @@ export type HomeTarget =
 /** Where Home sends a row it doesn't open itself (it opens the Renewal sheet and the go-through). */
 export type AppHomeTarget = Exclude<HomeTarget, { view: 'renewal' } | { view: 'go-through' }>
 
-export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'waiting' | 'set-aside' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace' | 'renewal'
+export type InboxKind = 'plan' | 'settle' | 'close' | 'fund' | 'sort' | 'waiting' | 'set-aside' | 'pay-back' | 'bring-in' | 'final-export' | 'over-plan' | 'review-accounts' | 'pace' | 'renewal'
 export type InboxTask = {
   key: string
   kind: InboxKind
@@ -141,7 +142,7 @@ export const FUND_AHEAD_DAYS = 7
  * The To do order: by due date first, then the everyday card work, then plan fixes. Waiting rows come straight after
  * Sort and before Set aside (WP10): decisions before transfers, and Spending's Set aside band leads anyway (W8).
  */
-const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, waiting: 5, 'set-aside': 6, 'bring-in': 7, 'over-plan': 8, 'review-accounts': 9, pace: 10, renewal: 7 }
+const RANK: Record<InboxKind, number> = { plan: 0, settle: 1, 'final-export': 1, close: 2, fund: 3, sort: 4, waiting: 5, 'set-aside': 6, 'pay-back': 6, 'bring-in': 7, 'over-plan': 8, 'review-accounts': 9, pace: 10, renewal: 7 }
 const order = (a: InboxTask, b: InboxTask) => RANK[a.kind] - RANK[b.kind] || (a.due ?? '').localeCompare(b.due ?? '') || a.key.localeCompare(b.key)
 
 /** The payday steps for a month, per person: the same plans and ticks as Month. */
@@ -253,6 +254,16 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         const phrase = potPhrase(pot?.name ?? owner?.name ?? 'card')
         const amount = task.amountPence ?? 0
         todo.push({ key: task.key, kind: 'set-aside', title: amount < 0 ? `Take money back out of ${phrase}` : `Set aside in ${phrase}`, meta: `${plural(task.count ?? 0, 'transaction')} sorted since the last move`, trailing: pounds(Math.abs(amount)), target: { view: 'spending', section: 'sort' } })
+        return
+      }
+      case 'pay-back': {
+        // Rows the buffer covered at Pay, sorted since (W11): their pots pay it back. Straight after Set aside (same rank, key order).
+        const owed = frontsOwed(document, today).find(row => row.front.statementKey === task.statementKey)
+        const owner = tracker.cards.find(row => row.id === task.cardId)
+        if (!owed || !owner || !task.statementKey) return
+        const after = owed.owedPence - owed.toMovePence
+        const still = after > 0 ? ` · ${pounds(after)} still owed${owed.unsorted ? ` for ${owed.unsorted} ${owed.waiting === owed.unsorted ? 'waiting' : 'not sorted yet'}` : ''}` : ''
+        todo.push({ key: task.key, kind: 'pay-back', title: `Pay ${sameDestination(owed.front.source, bufferSource(owner)) ? 'the buffer' : shortName(owed.front.source)} back`, meta: `For the ${monthName((parseStatementKey(task.statementKey)?.closeDate ?? '').slice(0, 7))} bill · ${plural(task.count ?? 0, 'transaction')} sorted${still}`, trailing: pounds(task.amountPence ?? 0), target: { view: 'spending', section: 'sort' } })
         return
       }
       case 'gap': {

@@ -289,6 +289,7 @@ The card tracker (Spending) adds these words. Its rules are in [card-tracker-rul
 | **Waiting** | A row that can't be sorted yet: it needs the other cardholder or a conversation. It counts in no pot until it's sorted, and blocks Close: “6 waiting”, “£212.40 waiting”. On its own the word means only this. | Parked, on hold, pending |
 | **Ask <person>** / **To discuss** | Why a row is waiting: “Ask Ada”, “To discuss”. The cardholder comes first. | |
 | **Go through them** | Step through waiting rows one at a time in the sort sheet: “Go through with Ada · 1 of 4”, “Go through 4 with Ada” on Home. | Review, triage |
+| **Pay the buffer back** | Once rows the buffer covered at settle up are sorted, their pots pay it back in the Move sheet: “£88.00 stays in Monzo Joint’s main balance”, “Pay the buffer back · £88.00” on Home. | Repay, reimburse |
 | **Split** | A transaction with more than one line. | |
 | **Pace** | “On track”, “£131 ahead of pace”, “Runs out around Thu 19 Nov”. | Burn rate |
 | **Close <Month>** | The month-end step: cover overspends, note leftovers. | Finalise, lock |

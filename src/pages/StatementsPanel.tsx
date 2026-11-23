@@ -17,7 +17,7 @@ import type { BudgetDestination } from '../domain/monthlyBudget'
 import { GoThroughSheet } from './GoThroughSheet'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
-import { dayDate, destinationGroups, destinationNamer, shortDate } from './cardLabels'
+import { dayDate, destinationGroups, destinationNamer, frontSourceName, shortDate, shortName } from './cardLabels'
 import { Breadcrumb, EmptyState, ListRow, Meter, Section, StatusChip } from '../components/ui'
 import { useListNavigation } from '../state/useListNavigation'
 import { StepCaption, StepGroup, StepRow } from '../components/ui/StepRow'
@@ -172,17 +172,6 @@ function StatementDetail({ document, setDocument, today, statementKey, onBack, o
 function owners(document: BudgetDocument, ownerPersonIds: readonly string[]) {
   if (ownerPersonIds.length > 1) return 'Either of you'
   return document.household.adults.find(person => person.id === ownerPersonIds[0])?.name ?? 'Needs an owner'
-}
-
-/** A pot or account in a sentence: "Holidays", "Monzo Joint Savings". */
-function shortName(document: BudgetDocument, destination: BudgetDestination) {
-  return destination.kind === 'pot' ? document.budget.pots.find(pot => pot.id === destination.potId)?.name ?? 'the pot'
-    : shortAccountLabels(document.budget.accounts, document.household.adults).get(destination.accountId) ?? 'the account'
-}
-
-/** "the buffer" for the card's buffer, else the pot or account's name. */
-function frontSourceName(document: BudgetDocument, card: CardAccount, source: BudgetDestination) {
-  return sameDestination(source, bufferSource(card)) ? 'the buffer' : shortName(document, source)
 }
 
 /** Waiting on this bill (audit 6, PR 7): the statement's waiting rows by reason, each with Go through them. */

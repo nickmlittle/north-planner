@@ -12,7 +12,7 @@ import { potBalance } from '../domain/potBalances'
 import type { SpendingSection } from '../state/navigation'
 import { BudgetOptionsMenu } from './BudgetOptionsMenu'
 import { BringInSheet } from './BringInSheet'
-import { dayDate, destinationNamer, shortDate } from './cardLabels'
+import { dayDate, destinationNamer, frontSourceName, shortDate } from './cardLabels'
 import { refundPlan, refundPurchase } from '../domain/cardRefunds'
 import { ManualEntrySheet } from './ManualEntrySheet'
 import { SortSheet } from './SortSheet'
@@ -25,9 +25,9 @@ import { splitLabel } from '../domain/cardSplits'
 import { cardLabel, dayOf, monthHeads, plural, pounds, signedPounds, statementName, transactionLink, transactionMeta } from './spendingFormat'
 import { closeDateFor } from '../domain/cardTracker'
 import './Spending.css'
-import { movedByTransaction, moveState, potPhrase, potTitle, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
+import { movedByTransaction, moveSteps, moveState, potPhrase, potTitle, toMove, undoMove, usesSetAside, type MoveState } from '../domain/setAside'
 import { MoveToPotSheet, SetAsideSteps } from './MoveToPotSheet'
-import { markSetAsideMoved } from './setAsideMove'
+import { markSetAsideMoved, payBackNotes } from './setAsideMove'
 import { CheckBalancesSheet } from './CheckBalancesSheet'
 import { ExpectingBackList } from './ExpectingBack'
 import { heldOut, isHeld, ordersWithReturns } from '../domain/expectingBack'
@@ -139,7 +139,11 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   const setAsideCard = tracker.cards.find(card => card.setAside)
   const setAsidePot = document.budget.pots.find(pot => pot.id === setAsideCard?.setAside?.potId)
   const pending = setAsideCard ? toMove(document, setAsideCard.id, undefined, today) : []
-  const pendingPence = pending.reduce((sum, row) => sum + row.pence, 0)
+  // Rows the buffer covered at Pay, sorted since, pay it back in the same move (W11); the rest go into the Amex pot.
+  const intoPot = pending.filter(row => !row.front)
+  const pendingPence = intoPot.reduce((sum, row) => sum + row.pence, 0)
+  const pendingPlan = setAsideCard && pending.length ? moveSteps(document, setAsideCard.id, pending) : null
+  const payBackPence = pendingPlan?.payBackPence ?? 0
   const moves = movedByTransaction(tracker)
   const held = heldOut(tracker, today)
   const movedOf = (transaction: CardTransaction): MoveState | undefined => {
@@ -201,11 +205,17 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
   // in place. Phones: the card, with Review and mark moved.
   const lastMove = [...tracker.moves ?? []].filter(move => move.cardId === setAsideCard?.id).map(move => move.at).sort().at(-1)
   const markMoved = () => { const { text, id } = markSetAsideMoved(document, setDocument, setAsideCard!.id, pending, new Date()); setMessageText(text); setUndoId(id) }
-  const setAsideTitle = setAsidePot ? `Set aside in ${potPhrase(setAsidePot.name)}` : ''
-  const setAsideCount = `${pendingPence < 0 ? `${pounds(-pendingPence)} back out` : pounds(pendingPence)} · ${plural(pending.length, 'transaction')} sorted since ${lastMove ? dayOf(lastMove) : 'the start'}`
+  const payingBack = pending.find(row => row.front)?.front
+  // Only pay-backs to move: the band is named for them. "Pay the buffer back · £88.00 · 2 transactions sorted since …".
+  const setAsideTitle = !setAsidePot ? '' : intoPot.length || !payingBack ? `Set aside in ${potPhrase(setAsidePot.name)}` : `Pay ${frontSourceName(document, setAsideCard!, payingBack.source)} back`
+  const titlePence = intoPot.length || !payingBack ? pendingPence : payBackPence
+  const setAsideCount = `${titlePence < 0 ? `${pounds(-titlePence)} back out` : pounds(titlePence)} · ${plural(intoPot.length || !payingBack ? intoPot.length : pending.length, 'transaction')} sorted since ${lastMove ? dayOf(lastMove) : 'the start'}`
+  const payBackNote = setAsideCard && pendingPlan ? payBackNotes(document, setAsideCard, pendingPlan, pending, today).map(line => <p key={line.key} className="set-aside-band-note"><strong>{line.lead}.</strong> {line.detail}</p>) : null
+  const markPence = Math.abs(pendingPence + payBackPence)
   const setAside = setAsideCard && setAsidePot && pending.length > 0 && (compact ? <Section title={setAsideTitle} count={setAsideCount}>
     <div className="set-aside-card">
       <p>Make the moves in your banking app, then mark them moved.</p>
+      {payBackNote}
       <button type="button" className="secondary-button" onClick={() => setMoving(true)}>Review and mark moved</button>
     </div>
   </Section> : <section className="set-aside-band" aria-labelledby="set-aside-title">
@@ -214,9 +224,10 @@ export function Spending({ document, setDocument, view, onSelectView, onOpenCard
       <div className="set-aside-band-actions">
         <button type="button" className="text-button set-aside-band-toggle" aria-expanded={showMoves} aria-controls="set-aside-moves" onClick={() => setShowMoves(value => !value)}>See the moves{showMoves ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</button>
         <button type="button" className="secondary-button" onClick={() => setMoving(true)}>Not all of it</button>
-        <button type="button" className="secondary-button" onClick={markMoved}>Mark {pounds(Math.abs(pendingPence))} moved</button>
+        <button type="button" className="secondary-button" onClick={markMoved}>Mark {pounds(markPence)} moved</button>
       </div>
     </div>
+    {payBackNote}
     {showMoves && <div id="set-aside-moves" className="set-aside-band-moves">
       {copiedStatus}
       <div className="set-aside-steps"><SetAsideSteps document={document} cardId={setAsideCard.id} rows={pending} onCopy={pence => void copy(pence)}/></div>

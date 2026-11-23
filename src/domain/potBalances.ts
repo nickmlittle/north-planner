@@ -4,7 +4,7 @@ import { monthBills, potBillTotals } from './recurringBills'
 import { SETTLE_PAY_KEY, settleIntoKey, settleOutKey, statementShares, statementTransactions } from './cardStatements'
 import { moveTotal, usesSetAside } from './setAside'
 import { heldOut } from './expectingBack'
-import { frontOf, frontPence } from './fronts'
+import { frontOf, frontPence, frontedRows, paidBackBy, paidBackInto } from './fronts'
 
 /**
  * Every pot's balance, worked out (§6.6, extended for the Amex pot): the balance last checked against the bank,
@@ -14,7 +14,7 @@ import { frontOf, frontPence } from './fronts'
  * Rules: docs/card-tracker-rules.md.
  */
 
-export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid' | 'gap' | 'front'
+export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid' | 'gap' | 'front' | 'paid-back'
 export type FlowEntry = { at: string; pence: number; flow: BalanceFlow }
 export type WaitingShare = { statementKey: string; closeDate: string; pence: number }
 
@@ -36,7 +36,7 @@ export type PotBalance = {
   setAside: boolean
 }
 
-const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid', 'front', 'gap']
+const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid', 'front', 'paid-back', 'gap']
 
 /** The card whose set-aside pot this is, if any. */
 export const setAsideCardFor = (tracker: Pick<CardTracker, 'cards'>, potId: string) => tracker.cards.find(card => card.setAside?.potId === potId)
@@ -51,7 +51,7 @@ export function startOfDay(date: string): string {
  * `fromMonth` to today, at the start of each bill's day), Close month covers into it or out of it, built-up money
  * moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into the Amex pot),
  * paying the card from the Amex pot (less what the buffer covered for rows waiting), covering waiting rows out of a source
- * pot at Pay (audit 6, W11), and evening the Amex pot up after a check (extra out to the buffer, or a top-up).
+ * pot at Pay and the moves that pay it back once they're sorted (audit 6, W11), and evening the Amex pot up after a check (extra out to the buffer, or a top-up).
  */
 export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, potId: string, today: string = localDate(), fromMonth: string = monthOf(today)): FlowEntry[] {
   const tracker = cardTracker(document)
@@ -77,9 +77,10 @@ export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'tic
     if (card && pay && statement.cardId === card.id && usesSetAside(card, key)) flows.push({ at: pay.at, pence: -(pay.amountPence - frontPence(frontOf(tracker, key))), flow: 'paid' })
   }
   for (const front of tracker.fronts ?? []) if (front.source.kind === 'pot' && front.source.potId === potId) flows.push({ at: front.at, pence: -frontPence(front), flow: 'front' })
+  for (const row of paidBackInto(tracker, { kind: 'pot', potId })) flows.push({ at: row.at, pence: row.pence, flow: 'paid-back' })
   for (const move of tracker.moves ?? []) {
     const moveCard = tracker.cards.find(row => row.id === move.cardId)
-    if (moveCard?.setAside?.potId === potId) { const total = moveTotal(move, potId); if (total) flows.push({ at: move.at, pence: total, flow: 'set-aside' }); continue }
+    if (moveCard?.setAside?.potId === potId) { const total = moveTotal(move, potId, tracker); if (total) flows.push({ at: move.at, pence: total, flow: 'set-aside' }); continue }
     const out = move.transactions.flatMap(row => row.lines).filter(line => line.destination.kind === 'pot' && line.destination.potId === potId).reduce((sum, line) => sum + line.amountPence, 0)
     if (out) flows.push({ at: move.at, pence: -out, flow: 'set-aside' })
   }
@@ -162,7 +163,9 @@ export function setAsideStatements(document: Pick<BudgetDocument, 'card'>, cardI
   const card = tracker.cards.find(row => row.id === cardId)
   if (!card?.setAside) return []
   const moved = new Map<string, number>()
-  for (const move of tracker.moves ?? []) if (move.cardId === cardId) for (const row of move.transactions) moved.set(row.transactionId, (moved.get(row.transactionId) ?? 0) + row.lines.reduce((sum, line) => sum + line.amountPence, 0))
+  const fronted = frontedRows(tracker)
+  // Rows paying the buffer back (W11) moved their money to the Front's source, not into the pot.
+  for (const move of tracker.moves ?? []) if (move.cardId === cardId) for (const row of move.transactions) if (!paidBackBy(fronted, row.transactionId, move.at)) moved.set(row.transactionId, (moved.get(row.transactionId) ?? 0) + row.lines.reduce((sum, line) => sum + line.amountPence, 0))
   const keys = new Set([...tracker.transactions.filter(row => row.cardId === cardId).map(row => row.statementKey), ...Object.keys(tracker.statements).filter(key => tracker.statements[key]!.cardId === cardId)])
   return [...keys].filter(key => usesSetAside(card, key)).sort().reverse().map(statementKey => {
     const rows = statementTransactions(tracker, statementKey).filter(row => row.kind !== 'payment')

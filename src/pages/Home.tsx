@@ -41,7 +41,7 @@ type Props = {
 
 const icons: Record<InboxKind, ReactNode> = {
   plan: <ListPlus/>, settle: <FileText/>, 'final-export': <Upload/>, close: <CalendarCheck/>, fund: <ArrowLeftRight/>, sort: <Inbox/>, waiting: <Clock/>,
-  'set-aside': <PiggyBank/>, 'bring-in': <Upload/>, 'over-plan': <TriangleAlert/>, 'review-accounts': <TriangleAlert/>, pace: <TrendingUp/>, renewal: <BellRing/>,
+  'set-aside': <PiggyBank/>, 'pay-back': <PiggyBank/>, 'bring-in': <Upload/>, 'over-plan': <TriangleAlert/>, 'review-accounts': <TriangleAlert/>, pace: <TrendingUp/>, renewal: <BellRing/>,
 }
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 /** "Wednesday 11 November". */
