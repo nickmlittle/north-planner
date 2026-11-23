@@ -108,6 +108,8 @@ function flowLabel(flow: BalanceFlow, document: BudgetDocument, setAside: boolea
     'set-aside': setAside ? 'Moved in from pots' : `Moved to ${phrase}`, paid: `Paid to ${card?.name ?? 'the card'}`,
     // Settle up with rows waiting (W11): this pot covered them when the bill was paid.
     front: `Covered the waiting on ${card?.name ?? 'the card'}`,
+    // Paying it back (W11): the waiting rows it covered, sorted and moved since.
+    'paid-back': 'Paid back for the waiting',
     // Checking the Amex pot: extra moved out of it to the buffer, or a top-up from the buffer.
     gap: setAside ? (pence < 0 ? 'Extra moved out' : 'Topped up') : pence > 0 ? `Extra from ${phrase}` : `Topped up ${phrase}`,
   }[flow]

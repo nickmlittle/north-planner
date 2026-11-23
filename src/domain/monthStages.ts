@@ -3,6 +3,7 @@ import { budgetTransfers } from './budgetTransfers'
 import { monthSpending, potSettings, spentByDestination, monthTransactions, type MonthSpending } from './cardSpending'
 import { statementSummary } from './cardStatements'
 import { toMove } from './setAside'
+import { frontsOwed } from './fronts'
 import { heldOut } from './expectingBack'
 import { setAsideCheck } from './setAsideCheck'
 import { potBalance } from './potBalances'
@@ -225,7 +226,7 @@ export const previousMonth = (month: string) => shiftMonth(month, -1)
 
 // ——— Home: one card per month that isn't finished (§7.1) ———
 
-export type HomeTask = { key: string; done: boolean; kind: 'sorted' | 'close' | 'settle' | 'bring-in' | 'final-export' | 'transfers' | 'closes-soon' | 'move' | 'gap'; statementKey?: string; amountPence?: number; count?: number; cardId?: string; dueDate?: string; month: string }
+export type HomeTask = { key: string; done: boolean; kind: 'sorted' | 'close' | 'settle' | 'bring-in' | 'final-export' | 'transfers' | 'closes-soon' | 'move' | 'pay-back' | 'gap'; statementKey?: string; amountPence?: number; count?: number; cardId?: string; dueDate?: string; month: string }
 export type HomeMonth =
   | { role: 'current'; month: string; status: MonthStatus; figures: MonthSpending; tasks: HomeTask[]; lastImportAt?: string }
   | { role: 'previous'; month: string; status: MonthStatus; tasks: HomeTask[]; overspends: number; leftovers: number }
@@ -276,9 +277,10 @@ export function homeMonths(document: Pick<BudgetDocument, 'budget' | 'card' | 'h
   const tasks: HomeTask[] = []
   if (!lastImportAt || daysBetween(localDate(new Date(lastImportAt)), today) >= BRING_IN_AFTER_DAYS) tasks.push({ key: 'bring-in', kind: 'bring-in', month: current, done: false })
   for (const card of tracker.cards) {
-    // Money sorted since the last move, for the set-aside pot (the Amex pot).
-    const rows = toMove(document, card.id, undefined, today)
+    // Money sorted since the last move, for the set-aside pot (the Amex pot). Rows the buffer covered at Pay pay it back instead (W11).
+    const rows = toMove(document, card.id, undefined, today).filter(row => !row.front)
     if (rows.length) tasks.push({ key: `move:${card.id}`, kind: 'move', month: current, done: false, cardId: card.id, count: rows.length, amountPence: rows.reduce((sum, row) => sum + row.pence, 0) })
+    for (const owed of frontsOwed(document, today)) if (owed.front.cardId === card.id && owed.toMove.length) tasks.push({ key: `pay-back:${owed.front.statementKey}`, kind: 'pay-back', month: current, done: false, cardId: card.id, statementKey: owed.front.statementKey, count: owed.toMove.length, amountPence: owed.toMovePence })
     // Checking the Amex pot: extra to move out, or short (amountPence is the gap: + extra, − short).
     const gap = setAsideCheck(document, card.id, today)?.gapPence
     if (gap) tasks.push({ key: `gap:${card.id}`, kind: 'gap', month: current, done: false, cardId: card.id, amountPence: gap })

@@ -1,7 +1,7 @@
 import type { BudgetDocument } from './budgetDocument'
 import { bufferSource, cardTracker, isWaiting, parseStatementKey, sameDestination, type CardTracker, type CardTransaction, type Front } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
-import { movedByTransaction, usesSetAside } from './setAside'
+import { movedByTransaction, toMove, usesSetAside, type ToMoveRow } from './setAside'
 
 /**
  * Covering the waiting rows at settle up (audit 6, W3, W11). A bill paid from the Amex pot can be paid while rows are
@@ -21,6 +21,71 @@ export function frontedRows(tracker: Pick<CardTracker, 'fronts'>): Map<string, F
   const rows = new Map<string, Front>()
   for (const front of tracker.fronts ?? []) for (const row of front.transactions) rows.set(row.transactionId, front)
   return rows
+}
+
+/** The Front a move pays back for this row: the row was fronted, and the move came after the Pay tick (W11). */
+export function paidBackBy(fronted: ReadonlyMap<string, Front>, transactionId: string, at: string): Front | undefined {
+  const front = fronted.get(transactionId)
+  return front && at > front.at ? front : undefined
+}
+
+/** Does this line pay its Front's source back with money? A line already at the source (or in the Amex pot) moves none. */
+export const paysBack = (front: Pick<Front, 'source'>, destination: BudgetDestination, setAsidePotId?: string) =>
+  !sameDestination(destination, front.source) && !(destination.kind === 'pot' && destination.potId === setAsidePotId)
+
+export type PayBackLine = { front: Front; at: string; transactionId: string; destination: BudgetDestination; amountPence: number }
+
+/**
+ * Every line moved for a fronted row after its Pay tick: what has paid its Front's source back (W11). Lines already at
+ * the source count as paid back, though no money moved for them.
+ */
+export function payBackLines(tracker: Pick<CardTracker, 'fronts' | 'moves'>): PayBackLine[] {
+  if (!tracker.fronts?.length) return []
+  const fronted = frontedRows(tracker)
+  return (tracker.moves ?? []).flatMap(move => move.transactions.flatMap(row => {
+    const front = paidBackBy(fronted, row.transactionId, move.at)
+    return front ? row.lines.map(line => ({ front, at: move.at, transactionId: row.transactionId, destination: line.destination, amountPence: line.amountPence })) : []
+  }))
+}
+
+/** Money paid back into a source since `after`: lines of fronted rows that moved money to it (a pot's balance, or the buffer's). */
+export function paidBackInto(tracker: Pick<CardTracker, 'cards' | 'fronts' | 'moves'>, source: BudgetDestination, after?: string): Array<{ at: string; pence: number }> {
+  const setAsidePot = (cardId: string) => tracker.cards.find(card => card.id === cardId)?.setAside?.potId
+  return payBackLines(tracker).filter(line => (!after || line.at > after) && sameDestination(line.front.source, source) && paysBack(line.front, line.destination, setAsidePot(line.front.cardId)))
+    .map(line => ({ at: line.at, pence: line.amountPence }))
+}
+
+export type FrontOwed = {
+  front: Front
+  /** What the Front's rows still owe its source: each row's amount on the Front, less its lines moved since Pay. */
+  owedPence: number
+  /** Sorted rows whose pay-back is still to move, and the money that moves (lines already at the source move none). */
+  toMove: ToMoveRow[]
+  toMovePence: number
+  /** Rows not sorted yet (waiting, or back in To sort), and what they still owe. */
+  unsorted: number
+  unsortedPence: number
+  /** Of those, how many are still waiting. */
+  waiting: number
+}
+
+/** "Pay the buffer back" (W11): what each Front is still owed, what's ready to move now, and what waits on rows still to sort. */
+export function frontsOwed(document: Pick<BudgetDocument, 'card'>, today?: string): FrontOwed[] {
+  const tracker = cardTracker(document)
+  if (!tracker.fronts?.length) return []
+  const paid = new Map<string, number>()
+  for (const line of payBackLines(tracker)) paid.set(line.transactionId, (paid.get(line.transactionId) ?? 0) + line.amountPence)
+  const byId = new Map(tracker.transactions.map(row => [row.id, row]))
+  return tracker.fronts.map(front => {
+    const setAsidePotId = tracker.cards.find(card => card.id === front.cardId)?.setAside?.potId
+    const ids = new Set(front.transactions.map(row => row.transactionId))
+    const moving = toMove(document, front.cardId, front.statementKey, today).filter(row => ids.has(row.transaction.id))
+    const owing = front.transactions.map(row => ({ transaction: byId.get(row.transactionId), owed: row.pence - (paid.get(row.transactionId) ?? 0) }))
+    const unsorted = owing.filter(row => row.transaction && !row.transaction.sort)
+    return { front, owedPence: owing.reduce((sum, row) => sum + row.owed, 0), toMove: moving,
+      toMovePence: moving.flatMap(row => row.lines).filter(line => paysBack(front, line.destination, setAsidePotId)).reduce((sum, line) => sum + line.amountPence, 0),
+      unsorted: unsorted.length, unsortedPence: unsorted.reduce((sum, row) => sum + row.owed, 0), waiting: unsorted.filter(row => isWaiting(row.transaction!)).length }
+  }).filter(row => row.owedPence !== 0 || row.toMove.length > 0)
 }
 
 /** "Cover the waiting from": what the statement chose, else the card's buffer. Never the Amex pot. Undefined unless paid from the Amex pot. */

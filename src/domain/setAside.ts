@@ -1,6 +1,7 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, destinationKey, localDate, parseStatementKey, type CardAccount, type CardTracker, type CardTransaction, type MovedLine, type SetAsideMove } from './cardTracker'
-import { shareSteps, type SettleAccount } from './cardStatements'
+import { cardTracker, destinationKey, localDate, parseStatementKey, type CardAccount, type CardTracker, type CardTransaction, type Front, type MovedLine, type SetAsideMove } from './cardTracker'
+import { shareSteps, type SettleAccount, type SettleStep } from './cardStatements'
+import { frontedRows, paidBackBy, paysBack } from './fronts'
 import type { BudgetDestination } from './monthlyBudget'
 import { heldOut, type DestinationTotals } from './expectingBack'
 
@@ -63,6 +64,8 @@ export type ToMoveRow = {
   lines: MovedLine[]
   pence: number
   changed: boolean
+  /** Covered by the buffer when its bill was paid (W11): its money pays the Front's source back, not the Amex pot. */
+  front?: Front
 }
 
 /**
@@ -75,12 +78,30 @@ export function toMove(document: Pick<BudgetDocument, 'card'>, cardId: string, s
   if (!card?.setAside) return []
   const moved = movedByTransaction(tracker)
   const held = heldOut(tracker, today)
+  const fronted = frontedRows(tracker)
   const order = new Map(tracker.transactions.map((row, index) => [row.id, index]))
   return tracker.transactions
     .filter(row => row.cardId === cardId && (!statementKey || row.statementKey === statementKey) && usesSetAside(card, row.statementKey))
-    .map(transaction => { const lines = pendingLines(transaction, moved.get(transaction.id), held.get(transaction.id)); return { transaction, lines, pence: lines.reduce((sum, line) => sum + line.amountPence, 0), changed: !!moved.get(transaction.id)?.size } })
+    .map(transaction => {
+      const lines = pendingLines(transaction, moved.get(transaction.id), held.get(transaction.id))
+      const front = fronted.get(transaction.id)
+      return { transaction, lines, pence: lines.reduce((sum, line) => sum + line.amountPence, 0), changed: !!moved.get(transaction.id)?.size, ...front ? { front } : {} }
+    })
     .filter(row => row.lines.length > 0)
     .sort((a, b) => b.transaction.date.localeCompare(a.transaction.date) || order.get(a.transaction.id)! - order.get(b.transaction.id)!)
+}
+
+/** Paying a Front's source back (W11): what moves to it, for which bills, and the steps after the money is gathered. */
+export type PayBack = {
+  source: BudgetDestination
+  pence: number
+  /** The bills it pays back for, oldest first. */
+  statementKeys: string[]
+  /**
+   * From the set-aside pot's account: nothing when the source is that account's main balance (the money stays there),
+   * Into a source pot there, or Send to another account (then Into its pot).
+   */
+  steps: SettleStep[]
 }
 
 export type MovePlan = {
@@ -89,19 +110,49 @@ export type MovePlan = {
   potId: string
   /** The set-aside pot's account. */
   accountId: string
-  /** Into the set-aside pot; negative when refunds outweigh spend and money comes out of it. */
+  /** Into the set-aside pot; negative when refunds outweigh spend and money comes out of it. Pay-backs are left out. */
   totalPence: number
+  /** Rows the buffer covered at Pay, now sorted: their money goes back to the Front's source, one entry per source. */
+  payBack: PayBack[]
+  /** Σ pay-backs. */
+  payBackPence: number
 }
 
-/** The steps for moving these rows' money to the card's set-aside pot. Lines sorted to that pot itself need no step. */
+/** The steps that take a pay-back from the set-aside pot's account to its source. */
+function payBackSteps(document: Pick<BudgetDocument, 'budget'>, source: BudgetDestination, pence: number, hubAccountId: string): SettleStep[] {
+  const accountId = source.kind === 'account' ? source.accountId : document.budget.pots.find(pot => pot.id === source.potId)?.accountId
+  if (!accountId || pence === 0) return []
+  const steps: SettleStep[] = []
+  if (accountId !== hubAccountId) steps.push(pence > 0 ? { key: `pay-back:send:${accountId}`, kind: 'send', accountId, amountPence: pence } : { key: `pay-back:return:${accountId}`, kind: 'return', accountId, amountPence: -pence })
+  if (source.kind === 'pot') steps.push(pence > 0 ? { key: `pay-back:into:${source.potId}`, kind: 'into', accountId, potId: source.potId, amountPence: pence } : { key: `pay-back:out:${source.potId}`, kind: 'out', accountId, potId: source.potId, amountPence: -pence })
+  return pence < 0 ? steps.reverse() : steps
+}
+
+/**
+ * The steps for moving these rows' money to the card's set-aside pot. Lines sorted to that pot itself need no step.
+ * Rows the buffer covered at Pay (W11) are gathered the same way, then go to the Front's source instead of the pot; their
+ * lines already at the source need no step.
+ */
 export function moveSteps(document: Pick<BudgetDocument, 'budget' | 'card' | 'household'>, cardId: string, rows: readonly ToMoveRow[]): MovePlan | null {
   const card = cardTracker(document).cards.find(row => row.id === cardId)
   const pot = card?.setAside && document.budget.pots.find(row => row.id === card.setAside!.potId)
   if (!pot) return null
   const shares: Totals = new Map()
-  for (const row of rows) for (const line of row.lines) if (!(line.destination.kind === 'pot' && line.destination.potId === pot.id)) add(shares, line.destination, line.amountPence)
+  const intoPot: Totals = new Map()
+  const payBacks = new Map<string, { source: BudgetDestination; pence: number; statementKeys: Set<string> }>()
+  for (const row of rows) for (const line of row.lines) {
+    if (row.front ? !paysBack(row.front, line.destination, pot.id) : line.destination.kind === 'pot' && line.destination.potId === pot.id) continue
+    add(shares, line.destination, line.amountPence)
+    if (!row.front) { add(intoPot, line.destination, line.amountPence); continue }
+    const key = destinationKey(row.front.source)
+    const payBack = payBacks.get(key) ?? { source: row.front.source, pence: 0, statementKeys: new Set() }
+    payBack.pence += line.amountPence
+    payBack.statementKeys.add(row.front.statementKey)
+    payBacks.set(key, payBack)
+  }
   const accounts = shareSteps(document, shares.values(), pot.accountId)
-  return { accounts, potId: pot.id, accountId: pot.accountId, totalPence: [...shares.values()].reduce((sum, row) => sum + row.pence, 0) }
+  const payBack = [...payBacks.values()].filter(row => row.pence !== 0).map(row => ({ source: row.source, pence: row.pence, statementKeys: [...row.statementKeys].sort(), steps: payBackSteps(document, row.source, row.pence, pot.accountId) }))
+  return { accounts, potId: pot.id, accountId: pot.accountId, totalPence: [...intoPot.values()].reduce((sum, row) => sum + row.pence, 0), payBack, payBackPence: payBack.reduce((sum, row) => sum + row.pence, 0) }
 }
 
 /** "Moved": record what these transactions still had to move, at `now`. Transactions with nothing to move are skipped. */
@@ -123,9 +174,13 @@ export function undoMove<T extends Pick<BudgetDocument, 'card'>>(document: T, mo
   return { ...document, card: next }
 }
 
-/** Σ a move's lines: what went into the pot (negative: out of it). Lines to the set-aside pot itself are left out. */
-export function moveTotal(move: SetAsideMove, setAsidePotId?: string): number {
-  return move.transactions.flatMap(row => row.lines).filter(line => !(line.destination.kind === 'pot' && line.destination.potId === setAsidePotId)).reduce((sum, line) => sum + line.amountPence, 0)
+/**
+ * Σ a move's lines: what went into the pot (negative: out of it). Lines to the set-aside pot itself are left out, and so
+ * are rows paying the buffer back (W11): moved after the Pay tick that covered them, their money went to the Front's source.
+ */
+export function moveTotal(move: SetAsideMove, setAsidePotId?: string, tracker?: Pick<CardTracker, 'fronts'>): number {
+  const fronted = tracker?.fronts?.length ? frontedRows(tracker) : undefined
+  return move.transactions.filter(row => !fronted || !paidBackBy(fronted, row.transactionId, move.at)).flatMap(row => row.lines).filter(line => !(line.destination.kind === 'pot' && line.destination.potId === setAsidePotId)).reduce((sum, line) => sum + line.amountPence, 0)
 }
 
 /** "Amex pot" as a title, without doubling pot: "Amex" → "Amex pot", "Amex pot" stays. */

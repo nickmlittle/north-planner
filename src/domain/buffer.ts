@@ -1,14 +1,15 @@
 import type { BudgetDocument } from './budgetDocument'
 import { bufferOf, cardTracker, localDate, sameDestination, type CardTracker } from './cardTracker'
 import { checkPotBalance, potBalance } from './potBalances'
-import { frontPence } from './fronts'
+import { frontPence, paidBackInto } from './fronts'
 import type { BudgetDestination } from './monthlyBudget'
 
 /**
  * The card's buffer (month-health P9): where overspend covers come from and where the Amex pot's extra goes.
  * It's checked against the bank like a pot. A buffer pot is just a pot, so its check and worked-out balance are the pot's.
  * A buffer that is an account's main balance keeps its own check in `CardTracker.accounts`, and North works it out from
- * there: the covers ticked since, the Amex pot's extra and top-ups since, and what it covered for waiting rows at Pay.
+ * there: the covers ticked since, the Amex pot's extra and top-ups since, what it covered for waiting rows at Pay, and what
+ * has paid it back since (W11).
  */
 export type BufferBalance = {
   destination: BudgetDestination
@@ -32,7 +33,10 @@ export function bufferBalance(document: Pick<BudgetDocument, 'budget' | 'card' |
   return { destination, checked, balancePence: checked.pence + movesSince(tracker, destination, checked.at) }
 }
 
-/** What moved through the buffer after `at`: covers ticked out of it (−), the Amex pot's extra (+) or top-ups (−), and waiting rows it covered at Pay (−). */
+/**
+ * What moved through the buffer after `at`: covers ticked out of it (−), the Amex pot's extra (+) or top-ups (−), waiting
+ * rows it covered at Pay (−), and their pots paying it back once they're sorted (+).
+ */
 function movesSince(tracker: CardTracker, buffer: BudgetDestination, at: string): number {
   let pence = 0
   for (const month of Object.values(tracker.months)) for (const cover of month.covers ?? []) {
@@ -41,6 +45,7 @@ function movesSince(tracker: CardTracker, buffer: BudgetDestination, at: string)
   }
   for (const gap of tracker.gapMoves ?? []) if (gap.at > at && sameDestination(gap.destination, buffer)) pence += gap.pence
   for (const front of tracker.fronts ?? []) if (front.at > at && sameDestination(front.source, buffer)) pence -= frontPence(front)
+  for (const row of paidBackInto(tracker, buffer, at)) pence += row.pence
   return pence
 }
 
