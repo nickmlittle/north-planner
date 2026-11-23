@@ -53,10 +53,13 @@ export function reviewDayLabel(day: string, realYear: number): string {
   return Number(day.slice(0, 4)) === realYear ? dayDate(day) : `${dayDate(day)} ${day.slice(0, 4)}`
 }
 
+// Bottom left past the sidebar on desktop; above the bottom nav on phone, clear of the header's
+// buttons and the home indicator. Over the nav (80) and under sheets (1400), so it never covers a sheet's footer.
 const chipStyles = `
-.review-clock{position:fixed;z-index:1000;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:var(--space-1);max-width:calc(100vw - 32px);box-sizing:border-box;padding:0 var(--space-1) 0 var(--space-3);border:1px solid var(--on-pine-strong);border-radius:var(--radius-pill);background:var(--pine);color:var(--cream);box-shadow:var(--shadow-pop);font-size:var(--text-sm);font-weight:var(--weight-medium);line-height:1.2;white-space:nowrap}
+.review-clock{position:fixed;z-index:85;bottom:var(--space-4);left:calc(68px + var(--space-4));display:flex;align-items:center;gap:var(--space-1);max-width:calc(100vw - 32px);box-sizing:border-box;padding:0 var(--space-1) 0 var(--space-3);border:1px solid var(--on-pine-strong);border-radius:var(--radius-pill);background:var(--pine);color:var(--cream);box-shadow:var(--shadow-pop);font-size:var(--text-sm);font-weight:var(--weight-medium);line-height:1.2;white-space:nowrap}
 .review-clock button{--ring:var(--focus-on-pine);min-height:32px;margin:0;padding:0 var(--space-2);border:0;border-radius:var(--radius-pill);background:transparent;color:var(--cream);font:inherit;font-weight:var(--weight-bold);text-decoration:underline;cursor:pointer}
 .review-clock button:hover{background:var(--on-pine-hover)}
+@media (max-width:767px){.review-clock{bottom:calc(60px + env(safe-area-inset-bottom,0px) + var(--space-2));left:50%;transform:translateX(-50%)}}
 @media print{.review-clock{display:none}}`
 
 /** Reads `?today=`, takes it out of the address, shifts `Date`, and shows the chip. */
