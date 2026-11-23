@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { StatementSummary } from '../domain/cardStatements'
 import type { ClosePlan } from '../domain/monthStages'
-import { closeBlocker, statementStatus } from './spendingFormat'
+import type { BillSum } from '../domain/billSum'
+import { billParts, closeBlocker, statementStatus } from './spendingFormat'
 
-// Waiting (audit 6, W10, WP2): until Close and the statement page show the Waiting section (waiting/6, waiting/7),
-// their one-line status still says why they're held.
+// Waiting (audit 6, W10, WP2): Close's header and the statement chip say why they're held in one line.
 describe('Waiting in the status lines', () => {
   const plan = (toSort: number, waiting: number) => ({ readiness: { toSort, waiting, postingsIn: true, allIn: false, canClose: false } }) as unknown as ClosePlan
 
@@ -17,5 +17,19 @@ describe('Waiting in the status lines', () => {
     const summary = { settled: false, open: false, complete: true, toSort: 0, waiting: 2, done: 0, steps: 4, closeDate: '2026-11-24', dueDate: '2026-12-19' } as unknown as StatementSummary
     expect(statementStatus(summary)).toEqual({ text: '2 waiting', tone: 'todo' })
     expect(statementStatus({ ...summary, toSort: 1 })).toEqual({ text: '1 to sort', tone: 'todo' })
+  })
+})
+
+// Close and Home (waiting/6, W12): "£X waiting" joins every bill line, between To sort and Expecting back.
+describe('Waiting on the bill lines', () => {
+  const bill = { inPotPence: 81206, toMovePence: 17220, toMove: 6, toSortPence: 5820, toSort: 3, waitingPence: 21240, waiting: 6, expectingBackPence: 0, billPence: 125486, covered: false } as unknown as BillSum
+
+  it('names the waiting part, and its five parts add up to the bill', () => {
+    expect(billParts(bill, 'the Amex pot')).toBe('£812.06 in the Amex pot · £172.20 to move · £58.20 to sort · £212.40 waiting')
+    expect(bill.inPotPence + bill.toMovePence + bill.toSortPence + bill.waitingPence + bill.expectingBackPence).toBe(bill.billPence)
+  })
+
+  it('leaves it out when nothing is waiting', () => {
+    expect(billParts({ ...bill, waiting: 0, waitingPence: 0 }, 'the Amex pot')).not.toMatch(/waiting/)
   })
 })

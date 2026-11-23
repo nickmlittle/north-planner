@@ -67,7 +67,7 @@ export type WaitingGroup = {
   totalPence: number
 }
 
-const waitingKey = (on: WaitingOn) => on.kind === 'person' ? `person:${on.personId}` : 'discuss'
+export const waitingKey = (on: WaitingOn) => on.kind === 'person' ? `person:${on.personId}` : 'discuss'
 
 /**
  * The waiting rows by reason: Ask <person> for each adult with rows, cardholders first and then household order, then

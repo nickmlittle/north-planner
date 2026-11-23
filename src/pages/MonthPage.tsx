@@ -130,7 +130,7 @@ export function MonthPage({ document, setDocument, month, onMonthChange, payday,
   const summarySection = summary && (summaryFor === month
     ? <MonthSummaryCard document={document} summary={summary} onOpenPot={onOpenPot}/>
     : <Section title={`How did ${name} go?`} id="month-summary" collapsed={{ summary: summary.verdict ?? `Closed ${dayOf(summary.closedAt)}`, onExpand: () => setSummaryFor(month) }}/>)
-  const closeSections = closePlan && <CloseSections document={document} setDocument={setDocument} month={month} today={today} onSort={onSort} onBringIn={() => setBringingIn(true)}/>
+  const closeSections = closePlan && <CloseSections document={document} setDocument={setDocument} month={month} today={today} onSort={onSort} onBringIn={() => setBringingIn(true)} onMessage={text => { setMessage(text); setGapPot(null) }}/>
   if (potId) return <div ref={frame} className="page-frame monthly-budget-page month-page is-pot">
     <PotDetail document={document} setDocument={setDocument} potId={potId} month={month} today={today} onBack={() => onOpenPot(null)} onOpenSettings={onOpenPotSettings} onOpenTransactions={onOpenTransactions} onSort={onSort} onOpenRules={onOpenRules} onOpenStatement={onOpenStatement}/>
   </div>

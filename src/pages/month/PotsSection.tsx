@@ -166,12 +166,12 @@ export function PotsSection({ document, month, today, onOpenPot, onOpenSpending,
   </Section>
 }
 
-/** The Amex row's status (D1, D11): "November bill · £402.00 to move · £24.00 to sort · £79.00 expecting back", "… · covered" or "… · all in the pot". */
+/** The Amex row's status (D1, D11): "November bill · £402.00 to move · £24.00 to sort · £212.40 waiting · £79.00 expecting back", "… · covered" or "… · all in the pot". */
 function billStatus(bill: BillSum): string {
   const name = billName(bill.closeDate, bill.open)
   if (bill.paid) return `${name} · paid`
   if (bill.covered) return `${name} · covered`
-  const parts = [bill.toMovePence ? `${pounds(bill.toMovePence)} to move` : '', bill.toSort ? `${pounds(bill.toSortPence)} to sort` : '', bill.expectingBackPence ? `${pounds(bill.expectingBackPence)} expecting back` : ''].filter(Boolean)
+  const parts = [bill.toMovePence ? `${pounds(bill.toMovePence)} to move` : '', bill.toSort ? `${pounds(bill.toSortPence)} to sort` : '', bill.waiting ? `${pounds(bill.waitingPence)} waiting` : '', bill.expectingBackPence ? `${pounds(bill.expectingBackPence)} expecting back` : ''].filter(Boolean)
   return `${name} · ${parts.length ? parts.join(' · ') : 'all in the pot'}`
 }
 

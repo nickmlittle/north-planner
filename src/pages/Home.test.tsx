@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { decodeBudgetDocument, newBudgetDocument, type BudgetDocument } from '../domain/budgetDocument'
 import { resolveBudget } from '../domain/monthlyBudget'
+import { markWaiting } from '../domain/cardSorting'
 import { Home } from './Home'
 
 afterEach(cleanup)
@@ -261,4 +262,25 @@ it('opens To sort from the verdict’s date line', () => {
   const onOpen = renderHome(seed())
   fireEvent.click(within(screen.getByRole('region', { name: 'How November is going' })).getByRole('button', { name: /to sort/ }))
   expect(onOpen).toHaveBeenLastCalledWith({ view: 'spending', section: 'sort' })
+})
+
+it('goes through a waiting group over Home, and says how it went (W12)', () => {
+  const ben = { kind: 'person', personId: 'ben' } as const
+  let document = seed()
+  document = markWaiting(document, 'AT268000000000000000018', ben, 'Which bedroom?', new Date('2026-11-03T10:00:00Z'))
+  document = markWaiting(document, 'AT268000000000000000024', ben, undefined, new Date('2026-11-03T10:00:00Z'))
+  const onOpen = renderHome(document)
+  const todo = openTodo()
+  const row = within(todo).getByRole('button', { name: /^Go through 2 with Ben/ })
+  expect(row).toHaveTextContent('The oldest has waited 8 days · CORNER CAFE, HOMEWARE HUT')
+  fireEvent.click(row)
+  expect(screen.queryByRole('dialog', { name: 'To do' })).not.toBeInTheDocument()
+  const sheet = screen.getByRole('dialog', { name: 'Go through with Ben' })
+  expect(sheet).toHaveAccessibleDescription(/^1 of 2/)
+  expect(within(sheet).getByText('CORNER CAFE 0042 BRISTOL')).toBeInTheDocument()
+  fireEvent.click(within(sheet).getByRole('button', { name: 'Skip, still waiting' }))
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Go through with Ben' })).getByRole('button', { name: 'Skip, still waiting' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Gone through 2 with Ben: 2 still waiting.')
+  expect(onOpen).not.toHaveBeenCalled()
 })

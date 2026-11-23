@@ -1,32 +1,42 @@
 import { useId, useState, type Dispatch, type SetStateAction } from 'react'
-import { Clock, Inbox } from 'lucide-react'
+import { Check, Clock, Inbox } from 'lucide-react'
 import { ListRow, Section, Sheet } from '../components/ui'
 import { useListNavigation } from '../state/useListNavigation'
 import { StepRow } from '../components/ui/StepRow'
 import { useStepCopy } from '../components/ui/useStepCopy'
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, destinationKey, lastDayOf, parseDestinationValue, parsePence, shiftMonth, type CoverSource } from '../domain/cardTracker'
+import { cardTracker, destinationKey, lastDayOf, monthOf, parseDestinationValue, parsePence, shiftMonth, type CoverSource } from '../domain/cardTracker'
+import { transactionsWaiting } from '../domain/cardSorting'
+import { startMonthGoThrough, type GoThrough } from '../domain/goThrough'
 import { closeMonthPlan, keepBuiltUp, markAllIn, moveBuiltUp, setCover, setCoverTick, type Leftover, type Overspend } from '../domain/monthStages'
 import { formatMonth } from '../formatting/month'
 import { shortAccountLabels } from './budgetLabels'
 import { destinationNamer } from './cardLabels'
-import { dayOf, plural, pounds, signedPounds } from './spendingFormat'
+import { GoThroughSheet } from './GoThroughSheet'
+import { dayOf, plural, pounds, signedPounds, waitingReason } from './spendingFormat'
 
 const monthName = (month: string) => formatMonth(month).split(' ')[0]!
 const sourceValue = (source: CoverSource) => source.kind === 'next-month' ? 'next-month' : destinationKey(source)
 
-type Props = { document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; today: string; onSort: () => void; onBringIn: () => void; now?: () => Date }
+type Props = {
+  document: BudgetDocument; setDocument: Dispatch<SetStateAction<BudgetDocument>>; month: string; today: string; onSort: () => void; onBringIn: () => void; now?: () => Date
+  /** Month's status line: how a go-through went. */
+  onMessage?: (text: string) => void
+}
 
 /**
- * Close <Month>, inline on an ended month (D7, D8, D11, R1): what's still waiting, each overspend's cover as a step,
+ * Close <Month>, inline on an ended month (D7, D8, D11, R1): what's left before it can close (rows to sort, rows waiting
+ * with Go through them, late postings), each overspend's cover as a step,
  * the money left and its build-up, and the carry-over pots. Month's header holds the Close button. Once closed,
  * they fold to one line that expands.
  */
-export function CloseSections({ document, setDocument, month, today, onSort, onBringIn, now = () => new Date() }: Props) {
+export function CloseSections({ document, setDocument, month, today, onSort, onBringIn, now = () => new Date(), onMessage = () => {} }: Props) {
   const coverKeys = useListNavigation({ label: 'Cover overspends', keys: { x: 'Tick or untick', c: 'Copy the amount' } })
   const plan = closeMonthPlan(document, month, today)
   const [moving, setMoving] = useState<Leftover | null>(null)
   const [expanded, setExpanded] = useState(false)
+  // Go through them (W10): every row the month is waiting on, all reasons in one queue, over Month.
+  const [going, setGoing] = useState<GoThrough | null>(null)
   const { copy, status: copiedStatus } = useStepCopy()
   if (!plan) return null
   const name = monthName(month)
@@ -51,15 +61,25 @@ export function CloseSections({ document, setDocument, month, today, onSort, onB
     if (source) setDocument(current => setCover(current, month, { potId: overspend.potId, amountPence: overspend.overPence, source }))
   }}>{overspend.options.map(option => <option key={sourceValue(option.source)} value={sourceValue(option.source)}>{option.source.kind === 'next-month' ? `${nextName}’s ${potName(overspend.potId)} (moves no money)` : sourceLabel(option.source, option.leftPence)}</option>)}</select>
 
+  // The month's waiting rows, by reason: "Ask Ada 4 · To discuss 2".
+  const waitingGroups = transactionsWaiting(document).map(group => ({ group, rows: group.rows.filter(row => monthOf(row.date) === month) })).filter(row => row.rows.length)
+  const waitingPence = waitingGroups.reduce((sum, { rows }) => sum + rows.reduce((total, row) => total + row.amountPence, 0), 0)
+  const allIn = readiness.postingsIn || readiness.allIn
+  const allInMeta = [readiness.postingsIn && readiness.lastImportDate ? `Brought in ${dayOf(readiness.lastImportDate)}` : record?.allInAt ? `Marked all in ${dayOf(record.allInAt)}` : '', readiness.toSort ? '' : 'nothing to sort'].filter(Boolean).join(' · ')
+
   if (plan.closedAt && !expanded) return <Section title={`${name} closed`} id="month-close" collapsed={{ summary: `${dayOf(plan.closedAt)} · ${plural(plan.overspends.length, 'cover')} · ${plural(plan.leftovers.length, 'pot')} with money left`, onExpand: () => setExpanded(true) }}/>
 
   return <div className="close-sections" id="month-close" tabIndex={-1}>
     {copiedStatus}
-    {!plan.closedAt && !readiness.canClose && today > lastDayOf(month) && <Section title="Waiting">
-      <ul className="close-list" aria-label="Waiting">
+    {!plan.closedAt && !readiness.canClose && today > lastDayOf(month) && <Section title={`Before you can close ${name}`}>
+      <ul className="close-list" aria-label={`Before you can close ${name}`}>
         {readiness.toSort > 0 && <li><ListRow icon={<Inbox/>} tone="warning" title={`${plural(readiness.toSort, 'transaction')} to sort`} meta={`${name} can’t close until they’re sorted`} trailing={<button type="button" className="text-button" onClick={onSort}>Sort them</button>}/></li>}
+        {readiness.waiting > 0 && <li><ListRow icon={<Clock/>} tone="warning" title={`${readiness.waiting} waiting · ${signedPounds(waitingPence)}`}
+          meta={[...waitingGroups.map(({ group, rows }) => `${waitingReason(document, group.on)} ${rows.length}`), `${name} can’t close until they’re sorted`].join(' · ')}
+          trailing={<button type="button" className="secondary-button close-go" onClick={() => setGoing(startMonthGoThrough(document, month))}>Go through them</button>}/></li>}
         {!readiness.postingsIn && !readiness.allIn && <li><ListRow icon={<Clock/>} tone="warning" title={readiness.lastImportDate ? `Last brought in ${dayOf(readiness.lastImportDate)}` : 'Nothing brought in yet'} meta={`Late ${name} transactions can take a few days to post.`}
           trailing={<span className="close-actions"><button type="button" className="text-button" onClick={onBringIn}>Bring in transactions</button><button type="button" className="text-button" onClick={() => setDocument(current => markAllIn(current, month, now()))}>All {name} transactions are in</button></span>}/></li>}
+        {allIn && <li><ListRow icon={<Check/>} tone="done" title={`All ${name} transactions are in`} meta={allInMeta || undefined}/></li>}
       </ul>
     </Section>}
 
@@ -72,6 +92,7 @@ export function CloseSections({ document, setDocument, month, today, onSort, onB
             : <StepRow key={overspend.potId} stepKey={overspend.stepKey} name={stepText(overspend)} amountPence={overspend.cover.amountPence} ticks={record?.coverTicks} onCopy={pence => void copy(pence)} caption={caption}
               onTick={(_, amountPence) => setDocument(current => setCoverTick(current, month, overspend.potId, amountPence, now()))} changedNote={tickedPence => <>Changed since ticked: it was {pounds(tickedPence)}, it’s now {pounds(overspend.cover.amountPence)}.</>}/>
         })}</ol>}
+      {!plan.closedAt && readiness.waiting > 0 && <p className="close-waiting-note">The {readiness.waiting} waiting aren’t counted yet, so these figures may change once they’re sorted.</p>}
     </Section>
 
     {plan.leftovers.length > 0 && <Section title="Money left" count="stays in the pot">
@@ -88,6 +109,8 @@ export function CloseSections({ document, setDocument, month, today, onSort, onB
     {plan.carryOver.length > 0 && <Section title="Carry-over pots">
       <ul className="close-list" aria-label="Carry-over pots">{plan.carryOver.map(row => <li key={row.potId}><ListRow title={destination({ kind: 'pot', potId: row.potId })} meta={row.checkedAt ? `Checked ${dayOf(row.checkedAt)}` : 'Not checked yet'} trailing={row.freePence === undefined ? 'Not checked' : `${signedPounds(row.freePence)} spare`}/></li>)}</ul>
     </Section>}
+    {going && <GoThroughSheet document={document} setDocument={setDocument} start={going} today={today} returnFocusTo={() => window.document.querySelector<HTMLElement>('.close-go') ?? window.document.getElementById('month-close')}
+      onEnd={text => { setGoing(null); if (text) onMessage(text) }}/>}
     {moving && <MoveBuiltUp potName={potName(moving.potId)} suggested={moving.flag?.movePence ?? 0} onClose={() => setMoving(null)} onSave={pence => { setDocument(current => moveBuiltUp(current, moving.potId, pence, now())); setMoving(null) }}/>}
   </div>
 }
