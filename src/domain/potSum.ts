@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { addDays, cardTracker, daysBetween, daysInMonth, lastDayOf, localDate, monthOf, shiftMonth, type PotKind } from './cardTracker'
+import { addDays, cardTracker, daysBetween, needsSort, daysInMonth, lastDayOf, localDate, monthOf, shiftMonth, type PotKind } from './cardTracker'
 import { monthSpending, monthTransactions } from './cardSpending'
 import { builtUp } from './monthStages'
 import { potBalance, type WaitingShare } from './potBalances'
@@ -21,7 +21,7 @@ export type PotSum = {
   kind?: PotKind
   /** Tracked pots: the month's Left (negative is over). */
   leftPence?: number
-  /** The month's purchases and refunds not sorted yet, card-wide: shown beside Left, not part of the sum. */
+  /** The month's purchases and refunds to sort (not waiting), card-wide: shown beside Left, not part of the sum. */
   toSortPence: number
   toSort: number
   waiting: WaitingShare[]
@@ -45,7 +45,7 @@ export function potSum(document: Pick<BudgetDocument, 'budget' | 'card' | 'house
   const tracker = cardTracker(document)
   const kind = potKind(document, potId)
   const balance = potBalance(document, potId, today)
-  const unsorted = monthTransactions(tracker, month).filter(row => row.kind !== 'payment' && !row.sort)
+  const unsorted = monthTransactions(tracker, month).filter(needsSort)
   const base: PotSum = {
     potId, ...kind ? { kind } : {}, toSortPence: unsorted.reduce((sum, row) => sum + row.amountPence, 0), toSort: unsorted.length,
     waiting: balance.waiting, waitingPence: balance.waitingPence, billsDuePence: balance.billsDuePence, fresh: !!balance.checked && balance.since.length === 0,

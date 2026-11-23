@@ -101,7 +101,8 @@ function StatementDetail({ document, setDocument, today, statementKey, onBack, o
     <section className="statement-summary" aria-labelledby="statement-total">
       <div className="statement-summary-total"><p id="statement-total">{summary.settled ? `Paid to ${card.name}` : `To ${card.name} by ${dayDate(summary.dueDate)}`}</p><p className="statement-summary-amount">{signedPounds(summary.totalPence)}</p></div>
       <div className="statement-summary-checks">
-        {summary.toSort ? <StatusChip tone="warning">{summary.toSort} to sort</StatusChip> : <StatusChip tone="positive">✓ All {summary.transactions} sorted</StatusChip>}
+        {summary.toSort ? <StatusChip tone="warning">{summary.toSort} to sort</StatusChip> : !summary.waiting && <StatusChip tone="positive">✓ All {summary.transactions} sorted</StatusChip>}
+        {summary.waiting > 0 && <StatusChip tone="warning">{summary.waiting} waiting</StatusChip>}
         {summaryChip}
         {!summary.open && (summary.complete ? <StatusChip tone="positive">✓ Final export in</StatusChip> : <StatusChip tone="warning">Final export missing</StatusChip>)}
       </div>

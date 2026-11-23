@@ -1,4 +1,4 @@
-import { addDays, cardTracker, type CardTracker, type CardTransaction, type SplitLine, type TransactionSort } from './cardTracker'
+import { addDays, cardTracker, type CardTracker, type CardTransaction, type SplitLine, type TransactionSort, withSort } from './cardTracker'
 import { byNewest, splitByPercent } from './cardSorting'
 import type { BudgetDocument } from './budgetDocument'
 import type { BudgetDestination } from './monthlyBudget'
@@ -69,7 +69,7 @@ export function sortRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, 
     lineIndex = choice.lineIndex
   } else lines = [{ amountPence: refund.amountPence, destination: choice.destination }]
   const sort: TransactionSort = { lines, by, at: now.toISOString() }
-  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => row.id === refundId ? { ...row, sort, refundOf: { transactionId: purchaseId, ...(lineIndex !== undefined ? { lineIndex } : {}) } } : row) } }
+  return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => row.id === refundId ? { ...withSort(row, sort), refundOf: { transactionId: purchaseId, ...(lineIndex !== undefined ? { lineIndex } : {}) } } : row) } }
 }
 
 /**

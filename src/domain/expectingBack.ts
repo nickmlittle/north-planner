@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, destinationKey, localDate, parseStatementKey, type CardTracker, type CardTransaction, type SplitLine } from './cardTracker'
+import { cardTracker, destinationKey, localDate, parseStatementKey, type CardTracker, type CardTransaction, type SplitLine, withSort } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 
 /**
@@ -187,7 +187,7 @@ export function linkRefund<T extends Pick<BudgetDocument, 'card'>>(document: T, 
   const lines = linkLines(tracker, purchase, refund)
   const firstReturn = purchase.sort.lines.findIndex(isReturn)
   return { ...document, card: { ...tracker, transactions: tracker.transactions.map(row => {
-    if (row.id === refundId) return { ...row, refundOf: { transactionId: purchaseId, ...firstReturn >= 0 ? { lineIndex: firstReturn } : {} }, sort: { lines, by: 'person' as const, at } }
+    if (row.id === refundId) return { ...withSort(row, { lines, by: 'person', at }), refundOf: { transactionId: purchaseId, ...firstReturn >= 0 ? { lineIndex: firstReturn } : {} } }
     if (row.id === purchaseId && everything && row.sort) return { ...row, sort: { ...row.sort, lines: row.sort.lines.map(line => isHeld(line) ? { ...line, notComingBackAt: at } : line) } }
     return row
   }) } }

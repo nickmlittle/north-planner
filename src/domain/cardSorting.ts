@@ -1,5 +1,5 @@
 import type { BudgetDocument } from './budgetDocument'
-import { bufferOf, cardTracker, defaultRuleText, destinationKey, merchantKey, normaliseDescription, sameDestination, type CardTracker, type CardTransaction, type SortRule, type SplitLine, type TransactionSort } from './cardTracker'
+import { bufferOf, cardTracker, collapseWhitespace, defaultRuleText, destinationKey, merchantKey, needsSort, normaliseDescription, sameDestination, WAITING_NOTE_MAX, withSort, type CardTracker, type CardTransaction, type SortRule, type SplitLine, type TransactionSort, type WaitingMark, type WaitingOn } from './cardTracker'
 import type { BudgetDestination } from './monthlyBudget'
 
 /** The first rule, in list order, whose text appears in the normalised description (and whose card matches, if it names one). */
@@ -50,10 +50,63 @@ export function byNewest(a: CardTransaction, b: CardTransaction, order: Readonly
   return b.date.localeCompare(a.date) || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
 }
 
-/** Purchases and refunds with no pot or account yet, newest first. Payments are never sorted. */
+/** Purchases and refunds with no pot or account yet and not waiting, newest first. Payments are never sorted. */
 export function transactionsToSort(tracker: Pick<CardTracker, 'transactions'>): CardTransaction[] {
   const order = new Map(tracker.transactions.map((row, index) => [row.id, index]))
-  return tracker.transactions.filter(row => row.kind !== 'payment' && !row.sort).sort((a, b) => byNewest(a, b, order))
+  return tracker.transactions.filter(needsSort).sort((a, b) => byNewest(a, b, order))
+}
+
+// ——— Waiting (audit 6, W4–W6) ———
+
+export type WaitingGroup = {
+  /** `person:<id>` or `discuss`. */
+  key: string
+  on: WaitingOn
+  /** Newest first, as in To sort. */
+  rows: CardTransaction[]
+  totalPence: number
+}
+
+const waitingKey = (on: WaitingOn) => on.kind === 'person' ? `person:${on.personId}` : 'discuss'
+
+/**
+ * The waiting rows by reason: Ask <person> for each adult with rows, cardholders first and then household order, then
+ * To discuss. Rows run newest first.
+ */
+export function transactionsWaiting(document: Pick<BudgetDocument, 'card' | 'household'>): WaitingGroup[] {
+  const tracker = cardTracker(document)
+  const order = new Map(tracker.transactions.map((row, index) => [row.id, index]))
+  const rows = tracker.transactions.filter(row => row.waiting && row.kind !== 'payment' && !row.sort).sort((a, b) => byNewest(a, b, order))
+  const cardholders = new Set(tracker.cards.flatMap(card => card.cardholders.map(row => row.personId)))
+  const adults = document.household.adults.map((person, index) => ({ id: person.id, rank: (cardholders.has(person.id) ? 0 : 1) * 1000 + index }))
+  const reasons: WaitingOn[] = [...[...adults].sort((a, b) => a.rank - b.rank).map(person => ({ kind: 'person' as const, personId: person.id })), { kind: 'discuss' }]
+  return reasons.flatMap(on => {
+    const key = waitingKey(on)
+    const group = rows.filter(row => waitingKey(row.waiting!.on) === key)
+    return group.length ? [{ key, on, rows: group, totalPence: group.reduce((sum, row) => sum + row.amountPence, 0) }] : []
+  })
+}
+
+/** Every waiting row, in `transactionsWaiting`'s order. */
+export const waitingRows = (document: Pick<BudgetDocument, 'card' | 'household'>) => transactionsWaiting(document).flatMap(group => group.rows)
+
+/**
+ * Mark a row Waiting, or change its mark. Only a purchase or refund in To sort (WP4), waiting on an adult or To discuss
+ * (W5), with a reason always and a note if there is one (W6): one line, up to 140 characters (WP6). Changing the mark keeps
+ * when it was first marked, so days waited carry on (WP5). Anything else leaves the document unchanged.
+ */
+export function markWaiting<T extends Pick<BudgetDocument, 'card' | 'household'>>(document: T, id: string, on: WaitingOn, note: string | undefined, now: Date): T {
+  const transaction = cardTracker(document).transactions.find(row => row.id === id)
+  const text = collapseWhitespace(note ?? '')
+  if (!transaction || transaction.kind === 'payment' || transaction.sort || text.length > WAITING_NOTE_MAX) return document
+  if (on.kind === 'person' && !document.household.adults.some(person => person.id === on.personId)) return document
+  const mark: WaitingMark = { on: on.kind === 'person' ? { kind: 'person', personId: on.personId } : { kind: 'discuss' }, ...text ? { note: text } : {}, at: transaction.waiting?.at ?? now.toISOString() }
+  return replaceTransaction(document, id, row => ({ ...row, waiting: mark }))
+}
+
+/** Back to To sort: drop the Waiting mark. */
+export function clearWaiting<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string): T {
+  return replaceTransaction(document, id, row => { if (!row.waiting) return row; const next = { ...row }; delete next.waiting; return next })
 }
 
 /** The latest import, for "Last brought in Mon 9 Nov". */
@@ -100,16 +153,21 @@ const replaceTransaction = <T extends Pick<BudgetDocument, 'card'>>(document: T,
 export function sortTransaction<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, lines: SplitLine[], now: Date, discount?: TransactionSort['discount']): T {
   const transaction = cardTracker(document).transactions.find(row => row.id === id)
   if (!transaction || transaction.kind === 'payment' || !lines.length || lines.reduce((sum, line) => sum + line.amountPence, 0) !== transaction.amountPence) return document
-  return replaceTransaction(document, id, row => ({ ...row, sort: { lines, by: 'person', at: now.toISOString(), ...discount && lines.some(line => line.originalPence) ? { discount } : {} } }))
+  return replaceTransaction(document, id, row => withSort(row, { lines, by: 'person', at: now.toISOString(), ...discount && lines.some(line => line.originalPence) ? { discount } : {} }))
 }
 
 export function unsortTransaction<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string): T {
   return replaceTransaction(document, id, row => { const next = { ...row }; delete next.sort; return next })
 }
 
-/** Undo a placing: put the transaction's sort back as it was, or back in To sort when it had none. */
-export function restoreSort<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, sort: TransactionSort | undefined): T {
-  return sort ? replaceTransaction(document, id, row => ({ ...row, sort })) : unsortTransaction(document, id)
+/**
+ * Undo a placing: put the transaction's sort back as it was, or back in To sort when it had none. A row that was
+ * waiting before it was placed gets its mark back (`waiting`), so Undo returns it to Waiting.
+ */
+export function restoreSort<T extends Pick<BudgetDocument, 'card'>>(document: T, id: string, sort: TransactionSort | undefined, waiting?: WaitingMark): T {
+  if (sort) return replaceTransaction(document, id, row => withSort(row, sort))
+  const unsorted = unsortTransaction(document, id)
+  return waiting ? replaceTransaction(unsorted, id, row => row.kind === 'payment' ? row : { ...row, waiting }) : unsorted
 }
 
 /** "Check" on the rule-sorted ones: they leave the Sorted by rules list. */
@@ -137,17 +195,18 @@ export type RuleDraft = { contains: string; cardSuffix?: string; destination: Bu
 const withRules = <T extends Pick<BudgetDocument, 'card'>>(document: T, rules: SortRule[]): T => ({ ...document, card: { ...cardTracker(document), rules } })
 
 /**
- * "Always put <merchant> in this pot": a new rule at the end of the list. It also sorts anything still
- * waiting to be sorted that it matches, so the same merchant doesn't have to be placed twice.
+ * "Always put <merchant> in this pot": a new rule at the end of the list. It also sorts anything still to sort that
+ * it matches, so the same merchant doesn't have to be placed twice. Waiting rows are left alone: a rule never undoes
+ * a person's hold (WP7).
  */
 export function addRule<T extends Pick<BudgetDocument, 'card'>>(document: T, draft: RuleDraft, now: Date, id: string = crypto.randomUUID()): { document: T; rule: SortRule; alsoSorted: number } {
   const rule: SortRule = { id, contains: normaliseDescription(draft.contains), ...(draft.cardSuffix ? { cardSuffix: draft.cardSuffix } : {}), destination: draft.destination, createdAt: now.toISOString() }
   const tracker = cardTracker(document)
   let alsoSorted = 0
   const transactions = tracker.transactions.map(row => {
-    if (row.sort || row.kind === 'payment' || matchRule([rule], row) !== rule) return row
+    if (!needsSort(row) || matchRule([rule], row) !== rule) return row
     alsoSorted++
-    return { ...row, sort: ruleSort(rule, row.amountPence, now.toISOString()) }
+    return withSort(row, ruleSort(rule, row.amountPence, now.toISOString()))
   })
   return { document: { ...document, card: { ...tracker, rules: [...tracker.rules, rule], transactions } }, rule, alsoSorted }
 }

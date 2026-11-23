@@ -228,7 +228,7 @@ export function homeInbox(document: BudgetDocument, { month, today = localDate()
         // An open statement is Coming up, and one waiting for its final export asks for that instead.
         if (statement.open || !statement.complete) return
         const check = statement.summaryCheck ? statement.summaryCheck.matches ? ' · matches Amex’s summary' : ' · doesn’t match Amex’s summary' : ''
-        todo.push({ key: task.key, kind: 'settle', title: `Settle the ${statementName(closeDate)}`, meta: `${statement.toSort ? `${statement.toSort} to sort` : `All ${statement.transactions} sorted`}${check}`, trailing: pounds(statement.totalPence), trailingMeta: `due ${dayDate(statement.dueDate)}`, due: statement.dueDate, target })
+        todo.push({ key: task.key, kind: 'settle', title: `Settle the ${statementName(closeDate)}`, meta: `${statement.toSort || statement.waiting ? [statement.toSort ? `${statement.toSort} to sort` : '', statement.waiting ? `${statement.waiting} waiting` : ''].filter(Boolean).join(' · ') : `All ${statement.transactions} sorted`}${check}`, trailing: pounds(statement.totalPence), trailingMeta: `due ${dayDate(statement.dueDate)}`, due: statement.dueDate, target })
         return
       }
       case 'final-export':
@@ -434,6 +434,7 @@ function closeMeta(document: BudgetDocument, month: string, today: string, nameD
   const plan = closeMonthPlan(document, month, today)
   if (!plan) return ''
   if (plan.readiness.toSort) return `${plural(plan.readiness.toSort, 'transaction')} to sort first`
+  if (plan.readiness.waiting) return `${plan.readiness.waiting} waiting · sort them first`
   if (!plan.readiness.postingsIn && !plan.readiness.allIn) return 'Waiting for late postings, or mark them all in'
   const pot = (potId: string) => nameDestination({ kind: 'pot', potId }).split(' · ')[0]
   const over = plan.overspends.length === 1 ? `${pot(plan.overspends[0]!.potId)} ${pounds(plan.overspends[0]!.overPence)} over` : plan.overspends.length ? `${plural(plan.overspends.length, 'pot')} over` : 'Nothing over'
