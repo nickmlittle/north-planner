@@ -80,7 +80,8 @@ export function statementStatus(summary: StatementSummary): { text: string; tone
   if (summary.settled) return { text: `Settled${summary.record?.settledAt ? ` ${dayOf(summary.record.settledAt)}` : ''}`, tone: 'done' }
   if (summary.open) return { text: `Open · closes ${dayDate(summary.closeDate)}`, tone: 'open' }
   if (summary.toSort) return { text: `${summary.toSort} to sort`, tone: 'todo' }
-  if (summary.waiting) return { text: `${summary.waiting} waiting`, tone: 'todo' }
+  // Waiting rows block only a statement that settles once; on a bill paid from the Amex pot the buffer covers them (W11).
+  if (summary.waiting && summary.complete && !summary.ready) return { text: `${summary.waiting} waiting`, tone: 'todo' }
   if (!summary.complete) return { text: 'Needs the final export', tone: 'todo' }
   if (summary.done) return { text: `${summary.done} of ${summary.steps} done`, tone: 'ready' }
   return { text: `Ready to settle · due ${dayDate(summary.dueDate)}`, tone: 'ready' }

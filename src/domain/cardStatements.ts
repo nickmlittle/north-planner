@@ -4,6 +4,7 @@ import { stepStatus, type StepTick } from './transferTicks'
 import { toMove, usesSetAside } from './setAside'
 import type { BudgetDestination } from './monthlyBudget'
 import { countedTotals, type Held } from './expectingBack'
+import { frontOf, recordFront, removeFront } from './fronts'
 
 /** Settle-up step keys (§6.8), shared by settling up and a carry-over pot's Free (§6.6). */
 export const settleOutKey = (potId: string) => `settle:out:${potId}`
@@ -27,7 +28,10 @@ export type StatementSummary = {
   transactions: number
   /** Purchases and refunds to sort, not counting Waiting ones. */
   toSort: number
-  /** Purchases and refunds in Waiting. Until the buffer can cover them (PR 7, WP2), they block settling as To sort does. */
+  /**
+   * Purchases and refunds in Waiting. On a bill paid from the Amex pot they don't block settling: the buffer covers them at
+   * Pay (W11). A statement that settles once still needs them sorted (WP3).
+   */
   waiting: number
   payments: CardTransaction[]
   /** Spending on it by the month each transaction counts in (D2). */
@@ -136,7 +140,9 @@ export function settleSteps(document: Pick<BudgetDocument, 'budget' | 'card' | '
   const pot = usesSetAside(card, key) ? document.budget.pots.find(row => row.id === card.setAside!.potId) : undefined
   if (pot) {
     // Paid from the Amex pot: first everything on it moves into the pot (the Move sheet), then the card is paid from it.
-    const rows = toMove(document, card.id, key)
+    // Rows the buffer covered at Pay pay the buffer back instead (W11), so they're no part of this step.
+    const fronted = new Set(frontOf(tracker, key)?.transactions.map(row => row.transactionId))
+    const rows = toMove(document, card.id, key).filter(row => !fronted.has(row.transaction.id))
     return { accounts: [], pay: { key: SETTLE_PAY_KEY, kind: 'pay', accountId: pot.accountId, potId: pot.id, amountPence: totalPence }, totalPence, payFromAccountId: pot.accountId,
       setAside: { potId: pot.id, toMovePence: rows.reduce((sum, row) => sum + row.pence, 0), toMove: rows.length } }
   }
@@ -172,7 +178,9 @@ export function statementSummary(document: Pick<BudgetDocument, 'budget' | 'card
   const done = plan ? steps.filter(step => settleStepDone(plan, record?.ticks, step)).length : 0
   const open = today <= parsed.closeDate
   const complete = !!record?.finalImportAt || !!record?.settleWithoutFinalAt
-  const toSort = spending.filter(needsSort).length, waiting = spending.filter(row => !row.sort && isWaiting(row)).length, unsorted = toSort + waiting
+  const toSort = spending.filter(needsSort).length, waiting = spending.filter(row => !row.sort && isWaiting(row)).length
+  // Waiting rows on a bill paid from the Amex pot are covered by the buffer at Pay (W11); one that settles once needs them sorted (WP3).
+  const unsorted = toSort + (usesSetAside(card, key) ? 0 : waiting)
   return {
     key, cardId: card.id, closeDate: parsed.closeDate, from: statementWindow(parsed.closeDate, card.closeDay).from, dueDate: dueDate(parsed.closeDate, card), record,
     totalPence: spending.reduce((sum, row) => sum + row.amountPence, 0), transactions: spending.length, toSort, waiting,
@@ -198,10 +206,12 @@ const withStatement = <T extends Pick<BudgetDocument, 'card'>>(document: T, key:
 
 /**
  * Tick a settle-up step at its amount (or untick it). When every step is done the statement is settled
- * (`settledAt`); unticking or a later change clears it.
+ * (`settledAt`); unticking or a later change clears it. Ticking Pay on a bill paid from the Amex pot records what the
+ * buffer covers for rows still waiting (a Front), and unticking it removes that (WP9).
  */
 export function setSettleTick<T extends Pick<BudgetDocument, 'budget' | 'card' | 'household'>>(document: T, key: string, stepKey: string, amountPence: number | null, now: Date): T {
-  const ticked = withStatement(document, key, record => {
+  const fronted = stepKey !== SETTLE_PAY_KEY ? document : amountPence === null ? removeFront(document, key) : recordFront(document, key, now)
+  const ticked = withStatement(fronted, key, record => {
     const ticks: Record<string, StepTick> = { ...record.ticks }
     if (amountPence === null) delete ticks[stepKey]
     else ticks[stepKey] = { amountPence, at: now.toISOString() }

@@ -87,6 +87,14 @@ export function transactionsWaiting(document: Pick<BudgetDocument, 'card' | 'hou
   })
 }
 
+/** One statement's waiting rows, grouped as `transactionsWaiting` does: the statement page's "Waiting on this bill". */
+export function statementWaitingGroups(document: Pick<BudgetDocument, 'card' | 'household'>, statementKey: string): WaitingGroup[] {
+  return transactionsWaiting(document).flatMap(group => {
+    const rows = group.rows.filter(row => row.statementKey === statementKey)
+    return rows.length ? [{ ...group, rows, totalPence: rows.reduce((sum, row) => sum + row.amountPence, 0) }] : []
+  })
+}
+
 /** Every waiting row, in `transactionsWaiting`'s order. */
 export const waitingRows = (document: Pick<BudgetDocument, 'card' | 'household'>) => transactionsWaiting(document).flatMap(group => group.rows)
 

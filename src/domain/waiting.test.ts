@@ -194,7 +194,7 @@ describe('the bill (W1)', () => {
   })
 })
 
-describe('Close and settle up (W10, WP2)', () => {
+describe('Close and settle up (W10, W11, WP3)', () => {
   const allSorted = () => {
     let document = household()
     for (const id of ['zara', 'boots', 'amazon', 'pizza']) document = sortTransaction(document, id, [{ amountPence: row(document, id).amountPence, destination: pot('going-out') }], now)
@@ -216,11 +216,20 @@ describe('Close and settle up (W10, WP2)', () => {
     expect(done(markWaiting(restoreSort(allSorted(), 'pizza', undefined), 'pizza', discuss, '', now))).toBe(false)
   })
 
-  it('a statement with rows waiting isn’t ready to settle, and says what’s waiting', () => {
+  it('a bill paid from the Amex pot is ready to settle with rows waiting: the buffer covers them (W11)', () => {
     const complete = settleWithoutFinal(allSorted(), NOV, later)
     expect(statementSummary(complete, NOV, '2026-12-04')).toMatchObject({ toSort: 0, waiting: 0, ready: true })
     const waiting = markWaiting(restoreSort(complete, 'pizza', undefined), 'pizza', discuss, '', now)
-    const summary = statementSummary(waiting, NOV, '2026-12-04')!
-    expect(summary).toMatchObject({ toSort: 0, waiting: 1, ready: false, settled: false })
+    expect(statementSummary(waiting, NOV, '2026-12-04')).toMatchObject({ toSort: 0, waiting: 1, ready: true, settled: false })
+    // A row to sort still blocks it.
+    expect(statementSummary(restoreSort(complete, 'pizza', undefined), NOV, '2026-12-04')).toMatchObject({ toSort: 1, ready: false })
+  })
+
+  it('a statement that settles once still needs every row sorted, waiting ones included (WP3)', () => {
+    const OCT = 'amex:2026-10-24'
+    let document = household()
+    document.card!.transactions.push(tx('oct', '2026-10-10', 1500, { statementKey: OCT }))
+    document = settleWithoutFinal(markWaiting(document, 'oct', discuss, '', now), OCT, later)
+    expect(statementSummary(document, OCT, '2026-12-04')).toMatchObject({ toSort: 0, waiting: 1, ready: false, settled: false })
   })
 })

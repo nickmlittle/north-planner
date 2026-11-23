@@ -203,7 +203,7 @@ describe('settling up from the Amex pot', () => {
   const settle = (document: BudgetDocument) => {
     const Harness = () => { const [current, setCurrent] = useState(document); return <Spending document={current} setDocument={setCurrent} view="statements" onSelectView={() => {}} onOpenCardSettings={() => {}} statementKey={NOV} onOpenStatement={() => {}} today="2026-11-30"/> }
     render(<Harness/>)
-    return screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' }).closest('li')!
+    return screen.getByRole('button', { name: 'Pay Amex from Monzo Joint done' }).closest('li')!
   }
 
   it('says whether the pot covers the bill before Pay', () => {
@@ -218,7 +218,7 @@ describe('settling up from the Amex pot', () => {
 
   it('says nothing once Pay is ticked', () => {
     const pay = settle(ready(17500))
-    fireEvent.click(within(pay).getByRole('button', { name: 'Pay Amex from the Amex pot done' }))
+    fireEvent.click(within(pay).getByRole('button', { name: 'Pay Amex from Monzo Joint done' }))
     expect(screen.queryByText(/covers the £169.20 bill/)).toBeNull()
   })
 })

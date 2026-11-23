@@ -892,13 +892,13 @@ describe('the Amex pot', () => {
     fireEvent.click(screen.getByRole('button', { name: /^November statement/ }))
     // Ready: the steps are inline, starting with the Amex pot.
     expect(screen.getByText('Move the rest to the Amex pot')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pay Amex from Joint done' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Settle up0 of 2 done' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Move them' }))
     const dialog = screen.getByRole('dialog', { name: 'Move to the Amex pot' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Moved £102.80' }))
     expect(screen.getByText('Everything is in the Amex pot')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Pay Amex from the Amex pot done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pay Amex from Joint done' }))
     expect(screen.getByRole('button', { name: /^Settle up2 of 2 done/ })).toBeInTheDocument()
   })
 

@@ -4,6 +4,7 @@ import { monthBills, potBillTotals } from './recurringBills'
 import { SETTLE_PAY_KEY, settleIntoKey, settleOutKey, statementShares, statementTransactions } from './cardStatements'
 import { moveTotal, usesSetAside } from './setAside'
 import { heldOut } from './expectingBack'
+import { frontOf, frontPence } from './fronts'
 
 /**
  * Every pot's balance, worked out (§6.6, extended for the Amex pot): the balance last checked against the bank,
@@ -13,7 +14,7 @@ import { heldOut } from './expectingBack'
  * Rules: docs/card-tracker-rules.md.
  */
 
-export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid' | 'gap'
+export type BalanceFlow = 'payday' | 'bills' | 'covers' | 'built-up' | 'settled' | 'set-aside' | 'paid' | 'gap' | 'front'
 export type FlowEntry = { at: string; pence: number; flow: BalanceFlow }
 export type WaitingShare = { statementKey: string; closeDate: string; pence: number }
 
@@ -35,7 +36,7 @@ export type PotBalance = {
   setAside: boolean
 }
 
-const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid', 'gap']
+const FLOW_ORDER: BalanceFlow[] = ['payday', 'bills', 'covers', 'built-up', 'settled', 'set-aside', 'paid', 'front', 'gap']
 
 /** The card whose set-aside pot this is, if any. */
 export const setAsideCardFor = (tracker: Pick<CardTracker, 'cards'>, potId: string) => tracker.cards.find(card => card.setAside?.potId === potId)
@@ -49,7 +50,8 @@ export function startOfDay(date: string): string {
  * Every move in or out of a pot that North knows about: payday Move ticks, the bills it assumes went out (from
  * `fromMonth` to today, at the start of each bill's day), Close month covers into it or out of it, built-up money
  * moved out, settle-up Out of / Into ticks, moves to the Amex pot (out of a spending pot, into the Amex pot),
- * paying the card from the Amex pot, and evening the Amex pot up after a check (extra out to the buffer, or a top-up).
+ * paying the card from the Amex pot (less what the buffer covered for rows waiting), covering waiting rows out of a source
+ * pot at Pay (audit 6, W11), and evening the Amex pot up after a check (extra out to the buffer, or a top-up).
  */
 export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, potId: string, today: string = localDate(), fromMonth: string = monthOf(today)): FlowEntry[] {
   const tracker = cardTracker(document)
@@ -72,8 +74,9 @@ export function potFlows(document: Pick<BudgetDocument, 'budget' | 'card' | 'tic
     if (out) flows.push({ at: out.at, pence: -out.amountPence, flow: 'settled' })
     if (into) flows.push({ at: into.at, pence: into.amountPence, flow: 'settled' })
     const pay = statement.ticks?.[SETTLE_PAY_KEY]
-    if (card && pay && statement.cardId === card.id && usesSetAside(card, key)) flows.push({ at: pay.at, pence: -pay.amountPence, flow: 'paid' })
+    if (card && pay && statement.cardId === card.id && usesSetAside(card, key)) flows.push({ at: pay.at, pence: -(pay.amountPence - frontPence(frontOf(tracker, key))), flow: 'paid' })
   }
+  for (const front of tracker.fronts ?? []) if (front.source.kind === 'pot' && front.source.potId === potId) flows.push({ at: front.at, pence: -frontPence(front), flow: 'front' })
   for (const move of tracker.moves ?? []) {
     const moveCard = tracker.cards.find(row => row.id === move.cardId)
     if (moveCard?.setAside?.potId === potId) { const total = moveTotal(move, potId); if (total) flows.push({ at: move.at, pence: total, flow: 'set-aside' }); continue }
@@ -149,7 +152,7 @@ export type SetAsideStatement = {
   movedPence: number
   /** Total − moved: sorted or not, still to go into the pot. */
   toMovePence: number
-  /** Paid to the card from the pot (its Pay tick). */
+  /** Paid to the card from the pot: its Pay tick, less what the buffer covered for rows waiting. */
   paidPence: number
 }
 
@@ -165,6 +168,6 @@ export function setAsideStatements(document: Pick<BudgetDocument, 'card'>, cardI
     const rows = statementTransactions(tracker, statementKey).filter(row => row.kind !== 'payment')
     const totalPence = rows.reduce((sum, row) => sum + row.amountPence, 0)
     const movedPence = rows.reduce((sum, row) => sum + (moved.get(row.id) ?? 0), 0)
-    return { statementKey, closeDate: parseStatementKey(statementKey)?.closeDate ?? '', totalPence, movedPence, toMovePence: totalPence - movedPence, paidPence: tracker.statements[statementKey]?.ticks?.[SETTLE_PAY_KEY]?.amountPence ?? 0 }
+    return { statementKey, closeDate: parseStatementKey(statementKey)?.closeDate ?? '', totalPence, movedPence, toMovePence: totalPence - movedPence, paidPence: (tracker.statements[statementKey]?.ticks?.[SETTLE_PAY_KEY]?.amountPence ?? 0) - frontPence(frontOf(tracker, statementKey)) }
   })
 }
