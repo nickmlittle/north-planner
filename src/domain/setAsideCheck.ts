@@ -1,9 +1,10 @@
 import type { BudgetDocument } from './budgetDocument'
-import { cardTracker, localDate, parseStatementKey, type CardAccount, type CardTracker, type GapMove, type SetAsideMove } from './cardTracker'
+import { bufferSource, cardTracker, localDate, parseStatementKey, type CardAccount, type CardTracker, type GapMove, type SetAsideMove } from './cardTracker'
 import { SETTLE_PAY_KEY, settleIntoKey, shareSteps, statementTransactions, type SettleStep } from './cardStatements'
 import type { BudgetDestination } from './monthlyBudget'
 import { potBalance } from './potBalances'
 import { toMove, usesSetAside } from './setAside'
+import { frontPlan } from './fronts'
 
 /**
  * Checking the Amex pot: what the card's set-aside pot should hold against what it holds.
@@ -89,10 +90,7 @@ export function setAsideCheck(document: Pick<BudgetDocument, 'budget' | 'card' |
  * Where extra goes, and where a top-up comes from: the card's buffer (Buffer for overspends), else the main balance of
  * the account the card is paid from. Never the set-aside pot itself.
  */
-export function gapDestination(card: Pick<CardAccount, 'bufferDestination' | 'payFromAccountId' | 'setAside'>): BudgetDestination {
-  const buffer = card.bufferDestination
-  return buffer && !(buffer.kind === 'pot' && buffer.potId === card.setAside?.potId) ? buffer : { kind: 'account', accountId: card.payFromAccountId }
-}
+export const gapDestination = (card: Pick<CardAccount, 'bufferDestination' | 'payFromAccountId' | 'setAside'>): BudgetDestination => bufferSource(card)
 
 export type GapPlan = {
   /** Extra: Out of the Amex pot, Send to the buffer's account (another account), Into the buffer pot (a pot). A top-up runs the other way. */
@@ -144,15 +142,17 @@ export function undoGapMove<T extends Pick<BudgetDocument, 'card'>>(document: T,
 export type BillCover = {
   /** The statement's purchases and refunds. */
   billPence: number
+  /** What the buffer will cover for rows still waiting (audit 6, W11): the Amex pot doesn't pay that part. */
+  waitingPence: number
   /** Holds, less what has moved in for the card's other unpaid statements. */
   availablePence: number
-  /** Available − bill: to spare when positive, short when negative. */
+  /** Available − (bill − waiting): to spare when positive, short when negative. */
   coverPence: number
 }
 
 /**
- * Does the Amex pot cover this statement's bill? Money moved in for other unpaid statements (the next one, say)
- * doesn't count towards it. Null unless the statement is paid from the pot, isn't paid yet, and the pot is checked.
+ * Does the Amex pot cover this statement's bill, less what the buffer covers for rows waiting? Money moved in for other
+ * unpaid statements (the next one, say) doesn't count towards it. Null unless the statement is paid from the pot, isn't paid yet, and the pot is checked.
  */
 export function billCover(document: Pick<BudgetDocument, 'budget' | 'card' | 'ticks'>, statementKey: string, today: string = localDate()): BillCover | null {
   const tracker = cardTracker(document)
@@ -163,5 +163,6 @@ export function billCover(document: Pick<BudgetDocument, 'budget' | 'card' | 'ti
   const others = unpaidMoved(tracker, card).filter(([key]) => key !== statementKey).reduce((sum, [, pence]) => sum + pence, 0)
   const billPence = statementTransactions(tracker, statementKey).filter(row => row.kind !== 'payment').reduce((sum, row) => sum + row.amountPence, 0)
   const availablePence = holds - others
-  return { billPence, availablePence, coverPence: availablePence - billPence }
+  const waitingPence = frontPlan(document, statementKey)?.pence ?? 0
+  return { billPence, waitingPence, availablePence, coverPence: availablePence - (billPence - waitingPence) }
 }

@@ -199,7 +199,7 @@ describe('does the pot cover the bill?', () => {
     expect(billCover(document, NOV, '2026-12-01')).toBeNull()
     document = checkPotBalance(document, 'amex-pot', 15720 + 4000 + 580, at('2026-12-01'))
     // £5.80 extra, but the unsorted £9.99 was never moved in: £4.19 short.
-    expect(billCover(document, NOV, '2026-12-01')).toEqual({ billPence: 16719, availablePence: 16300, coverPence: -419 })
+    expect(billCover(document, NOV, '2026-12-01')).toEqual({ billPence: 16719, waitingPence: 0, availablePence: 16300, coverPence: -419 })
     expect(billCover(document, OCT, '2026-12-01')).toBeNull()
     document = setSettleTick(document, NOV, 'settle:pay', 16719, at('2026-12-10'))
     expect(billCover(document, NOV, '2026-12-10')).toBeNull()

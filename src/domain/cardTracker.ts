@@ -24,6 +24,24 @@ export interface CardTracker {
   gapMoves?: GapMove[]
   /** Account id → what its main balance showed when last checked. Only the card's buffer account uses it (month-health P9). */
   accounts?: Record<string, { checkedBalance?: { pence: number; at: string } }>
+  /** Bills paid with rows still waiting: what the buffer (or another source) covered for them (audit 6, W3, W11). At most one per statement. */
+  fronts?: Front[]
+}
+
+/**
+ * Covering the waiting rows at settle up (audit 6, W3, W11): written by the Pay tick on a bill paid from the Amex pot while
+ * rows wait, removed by unticking it (WP9). Each row's amount is what it still owed the Amex pot then: its amount less
+ * anything it had moved. The Amex pot pays the bill less this; the source pays this.
+ */
+export interface Front {
+  id: string
+  cardId: string
+  statementKey: string
+  /** ISO: the Pay tick's time. */
+  at: string
+  /** The buffer by default; any pot or account but the Amex pot itself. */
+  source: BudgetDestination
+  transactions: Array<{ transactionId: string; pence: number }>
 }
 
 export interface Cardholder { suffix: string; personId: string }
@@ -181,6 +199,8 @@ export interface StatementRecord {
   ticks?: Record<string, StepTick>
   /** Set when every step is done. */
   settledAt?: string
+  /** "Cover the waiting from", chosen before Pay. Absent: the card's buffer (`frontSourceFor`). */
+  frontSource?: BudgetDestination
 }
 
 export type CoverSource = BudgetDestination | { kind: 'next-month' }
@@ -345,6 +365,14 @@ export const destinationKey = (destination: BudgetDestination) => destination.ki
 export const sameDestination = (a: BudgetDestination | undefined, b: BudgetDestination | undefined) => !!a && !!b && destinationKey(a) === destinationKey(b)
 /** The buffer: the card's setting, else the pay-from account's main balance. */
 export const bufferOf = (card: CardAccount): BudgetDestination => card.bufferDestination ?? { kind: 'account', accountId: card.payFromAccountId }
+/**
+ * The buffer as somewhere money comes from or goes to: the card's buffer, else the main balance of the account the card
+ * is paid from. Never the set-aside pot itself. Checking the Amex pot's extra and top-ups, and covering waiting rows.
+ */
+export function bufferSource(card: Pick<CardAccount, 'bufferDestination' | 'payFromAccountId' | 'setAside'>): BudgetDestination {
+  const buffer = card.bufferDestination
+  return buffer && !(buffer.kind === 'pot' && buffer.potId === card.setAside?.potId) ? buffer : { kind: 'account', accountId: card.payFromAccountId }
+}
 
 // ——— Waiting and To sort (audit 6, W1, W4) ———
 
@@ -427,7 +455,7 @@ export function saveCard<T extends { card?: CardTracker }>(document: T, card: Ca
 export function cardRemovable(tracker: CardTracker, cardId: string): boolean {
   return !tracker.transactions.some(row => row.cardId === cardId) && !Object.values(tracker.statements).some(row => row.cardId === cardId)
     && !tracker.imports.some(row => row.cardId === cardId) && !(tracker.moves ?? []).some(row => row.cardId === cardId)
-    && !(tracker.gapMoves ?? []).some(row => row.cardId === cardId)
+    && !(tracker.gapMoves ?? []).some(row => row.cardId === cardId) && !(tracker.fronts ?? []).some(row => row.cardId === cardId)
 }
 
 /** Remove a card with no history (cardRemovable); otherwise the document is unchanged. */
@@ -456,8 +484,8 @@ function validWaiting(value: unknown, row: Record<string, unknown>, personIds: R
 
 export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'accounts' | 'pots'>, personIds: ReadonlySet<string>): value is CardTracker {
   if (!isRecord(value)) return false
-  const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves, accounts } = value
-  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves) || gapMoves !== undefined && !Array.isArray(gapMoves) || accounts !== undefined && !isRecord(accounts)) return false
+  const { cards, transactions, rules, statements, months, pots, imports, moves, gapMoves, accounts, fronts } = value
+  if (!Array.isArray(cards) || !Array.isArray(transactions) || !Array.isArray(rules) || !isRecord(statements) || !isRecord(months) || !isRecord(pots) || !Array.isArray(imports) || moves !== undefined && !Array.isArray(moves) || gapMoves !== undefined && !Array.isArray(gapMoves) || accounts !== undefined && !isRecord(accounts) || fronts !== undefined && !Array.isArray(fronts)) return false
   const destination = (row: unknown) => validDestination(row, budget)
   if (!cards.every(isRecord) || !uniqueIds(cards as Array<{ id: unknown }>)) return false
   for (const card of cards as Array<Record<string, unknown>>) {
@@ -498,6 +526,7 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
     const summary = statement.amexSummary
     if (summary !== undefined && !(isRecord(summary) && isInt(summary.previousPence) && isInt(summary.paymentsAndCreditsPence) && isInt(summary.chargesPence) && isInt(summary.totalPence) && typeof summary.at === 'string')) return false
     if (!optionalString(statement.finalImportAt) || !optionalString(statement.settleWithoutFinalAt) || !optionalString(statement.settledAt) || !validTicks(statement.ticks)) return false
+    if (statement.frontSource !== undefined && !destination(statement.frontSource)) return false
   }
   const potIds = new Set(budget.pots.map(pot => pot.id))
   for (const [key, month] of Object.entries(months)) {
@@ -527,6 +556,14 @@ export function validCardTracker(value: unknown, budget: Pick<MonthlyBudget, 'ac
   if (gapMoves !== undefined) {
     if (!gapMoves.every(isRecord) || !uniqueIds(gapMoves as Array<{ id: unknown }>)) return false
     if (!(gapMoves as Array<Record<string, unknown>>).every(row => typeof row.cardId === 'string' && cardIds.has(row.cardId) && typeof row.at === 'string' && isInt(row.pence) && row.pence !== 0 && destination(row.destination))) return false
+  }
+  if (fronts !== undefined) {
+    const transactionIds = new Set((transactions as unknown as CardTransaction[]).map(row => row.id))
+    if (!fronts.every(isRecord) || !uniqueIds(fronts as Array<{ id: unknown }>)) return false
+    const rows = fronts as Array<Record<string, unknown>>
+    if (new Set(rows.map(row => row.statementKey)).size !== rows.length) return false
+    if (!rows.every(row => typeof row.cardId === 'string' && cardIds.has(row.cardId) && validStatementKey(row.statementKey) && (row.statementKey as string).startsWith(`${row.cardId}:`) && typeof row.at === 'string' && destination(row.source)
+      && Array.isArray(row.transactions) && row.transactions.length > 0 && row.transactions.every(item => isRecord(item) && typeof item.transactionId === 'string' && transactionIds.has(item.transactionId) && isInt(item.pence)))) return false
   }
   if (accounts !== undefined) {
     const accountIds = new Set(budget.accounts.map(account => account.id))

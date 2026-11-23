@@ -38,3 +38,29 @@
 .statement-breakdown details[open] summary::before{content:"▾"}
 .settle-cover.is-covered{color:var(--positive);font-weight:var(--weight-medium)}
 .settle-cover.is-short{color:var(--warning);font-weight:var(--weight-medium)}
+/* Settle up with rows waiting (audit 6, PR 7): the bill's Waiting part, the buffer covering it, and Waiting on this bill. */
+.statement-summary-parts{display:flex;flex-wrap:wrap;grid-column:1/-1;gap:var(--space-1) var(--space-4);margin:0;font-size:var(--text-sm)}
+.statement-summary-parts div{display:flex;gap:var(--space-2)}
+.statement-summary-parts dt{color:var(--text-muted)}
+.statement-summary-parts dd{margin:0;font-weight:var(--weight-medium);font-variant-numeric:tabular-nums}
+.statement-summary-parts .is-waiting dt,.statement-summary-parts .is-waiting dd{color:var(--warning)}
+.settle-front{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-2);min-width:0;margin-top:var(--space-2);padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);background:var(--warning-bg);font-size:var(--text-sm)}
+.settle-front p{margin:0}
+.settle-front.is-paid{background:var(--surface-sunken)}
+.settle-front .settle-cover{margin:0}
+.settle-front-source{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-1);font-weight:var(--weight-medium)}
+.settle-front-source select{width:100%;min-width:0;max-width:100%;text-overflow:ellipsis;min-height:36px;padding:0 var(--space-2);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font:inherit;font-weight:var(--weight-regular)}
+.settle-front-move{font-weight:var(--weight-medium)}
+.settle-front-note{color:var(--text-muted)}
+.statement-waiting-go{display:inline-flex;align-items:center;gap:var(--space-3);font-variant-numeric:tabular-nums}
+.statement-waiting-go .waiting-go{min-height:36px;white-space:nowrap}
+.statement-waiting-go .go-short{display:none}
+.statement-waiting-note{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:var(--text-sm)}
+.statement-waiting-status{margin:var(--space-1) 0 0;font-size:var(--text-sm)}
+.statement-waiting-status:empty{display:none}
+@media(max-width:767px){
+  .settle-front-source select{min-height:44px}
+  .statement-waiting-go .waiting-go{min-height:44px}
+  .statement-waiting-go .go-long{display:none}
+  .statement-waiting-go .go-short{display:inline}
+}
