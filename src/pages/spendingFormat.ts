@@ -1,5 +1,5 @@
 import type { BudgetDocument } from '../domain/budgetDocument'
-import { cardTracker, isWaiting, lastDayOf, localDate, type CardTransaction } from '../domain/cardTracker'
+import { cardTracker, daysBetween, isWaiting, lastDayOf, localDate, type CardTransaction, type WaitingOn } from '../domain/cardTracker'
 import { refundsOf } from '../domain/cardRefunds'
 import { transactionsToSort } from '../domain/cardSorting'
 import { formatGBP } from '../formatting/money'
@@ -19,6 +19,25 @@ export const plural = (count: number, word: string, many = `${word}s`) => `${cou
 export function cardLabel(document: Pick<BudgetDocument, 'household'>, transaction: Pick<CardTransaction, 'personId' | 'cardSuffix'>): string {
   const name = document.household.adults.find(person => person.id === transaction.personId)?.name
   return `${name ?? 'Card'} ··${transaction.cardSuffix}`
+}
+
+/** A Waiting reason (W2, W5): "Ask Ada" or "To discuss". */
+export function waitingReason(document: Pick<BudgetDocument, 'household'>, on: WaitingOn): string {
+  return on.kind === 'discuss' ? 'To discuss' : `Ask ${document.household.adults.find(person => person.id === on.personId)?.name ?? 'them'}`
+}
+
+/** The reasons a row can wait on: its cardholder first, then the other adults in household order, then To discuss (W5). */
+export function waitingReasons(document: Pick<BudgetDocument, 'household'>, transaction: Pick<CardTransaction, 'personId'>): WaitingOn[] {
+  const adults = [...document.household.adults].sort((a, b) => Number(b.id === transaction.personId) - Number(a.id === transaction.personId))
+  return [...adults.map(person => ({ kind: 'person' as const, personId: person.id })), { kind: 'discuss' }]
+}
+
+export const sameReason = (a: WaitingOn | undefined, b: WaitingOn | undefined) => !!a && !!b && a.kind === b.kind && (a.kind === 'discuss' || a.personId === (b as { personId: string }).personId)
+
+/** How long a row has waited, from when it was marked (WP5): "today", "1 day", "8 days". */
+export function waitedFor(at: string, today: string): string {
+  const days = Math.max(0, daysBetween(localDate(new Date(at)), today))
+  return days === 0 ? 'today' : plural(days, 'day')
 }
 
 /** "Sun 8 Nov · Ada ··41001". */

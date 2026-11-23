@@ -35,6 +35,7 @@ Related: [transfer calculation rules](transfer-calculation-rules.md) (ticks, Mov
 | Month health 10: discounts, original prices and Add discount (D12) | health/10 | `src/domain/cardSplits.ts`, `src/pages/SplitEditor.tsx` |
 | Month health 11: How did <Month> go?, leading Home (P8); Needs a look drops a covered overspend | health/11 | `src/domain/monthSummary.ts`, `src/pages/MonthSummaryCard.tsx`, `Home.tsx`, `MonthPage.tsx`, `coveredAtClose` in `cardSpending.ts` |
 | Waiting 2: the Waiting mark, what counts where, Close blocked (W1, W4–W6, W10) | waiting/2 | `WaitingMark`, `withSort` in `cardTracker.ts`; `markWaiting`, `clearWaiting`, `transactionsWaiting` in `cardSorting.ts`; `billSum.ts`, `monthStages.ts`, `cardStatements.ts` |
+| Waiting 3: Set aside on top, the Waiting section, opening a waiting row (W8, W9) | waiting/3 | `WaitingList.tsx` (the section and `WaitingFields`), `Spending.tsx`, `SortSheet.tsx`; `waitingReason`, `waitingReasons`, `waitedFor` in `spendingFormat.ts` |
 
 ## The contract (decisions D1–D16, R1)
 
@@ -124,7 +125,7 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 
 ## Waiting (audit 6, W1–W12)
 
-**Status:** `waiting/2-model` (W1, W4–W6, W10, WP2–WP7), built 23 November 2026 from the [Waiting build plan](waiting-build-plan.md). A row goes **To sort → Waiting → Sorted**. Waiting is for rows that need the other cardholder, a conversation or an order lookup before they can be sorted. The screens come in later PRs; this section grows with them.
+**Status:** `waiting/2-model` (W1, W4–W6, W10, WP2–WP7) and `waiting/3-spending` (W8, W9), built 23 November 2026 from the [Waiting build plan](waiting-build-plan.md). A row goes **To sort → Waiting → Sorted**. Waiting is for rows that need the other cardholder, a conversation or an order lookup before they can be sorted. The screens come in later PRs; this section grows with them.
 
 - **The mark** (`CardTransaction.waiting`, W4): `on` is an adult (`{ kind: 'person', personId }`, "Ask Ada") or `{ kind: 'discuss' }` ("To discuss"), with an optional `note` and `at`, when it was first marked. A reason is required and a note is optional (W6). The note is trimmed and kept on one line, up to 140 characters (`WAITING_NOTE_MAX`, WP6). Waiting is a mark on the transaction, never a sort.
 - **Validation:** the mark is allowed only on a purchase or refund with no sort, waiting on an adult in the household or To discuss. A mark with a sort, on a payment, for someone else, or with a longer note makes the document invalid.
@@ -133,6 +134,14 @@ It is null for an unknown import or one that added nothing. `justBroughtIn(docum
 - **Rules never sort a waiting row** (WP7): `addRule`'s "also sorted" skips them. New rows from an import are never waiting. A refund whose purchase is waiting gets the usual suggestions.
 - **People:** an adult someone is waiting on can't be removed, as for a cardholder.
 - **The list** (`transactionsWaiting`): one group per reason. The Ask <person> groups come first: adults on a card in household order, then other adults. To discuss comes last. Each group has its count and total, with rows newest first, as in To sort.
+
+**On Spending** (`waiting/3`, W8, W9). The To sort tab runs **Set aside** (always on top), then **To sort**, **Waiting** and **Expecting back**.
+
+- **Set aside**, on desktop, is one line: "Set aside in the Amex pot · £172.20 · 6 transactions sorted since Fri 20 Nov", with See the moves (the steps, opened in place), Not all of it and Mark £X moved. On phones, its card moves to the top.
+- **Waiting** reads "6 · £212.40" and groups its rows as `transactionsWaiting` does. Each group shows its reason, count, total and **Go through them**. Until `waiting/5`, Go through them opens the group's first row. Desktop rows show the date, the merchant with its note on a second line (cut short with an ellipsis), the card, the amount and days waited. Phone rows put the date, the cardholder (when they aren't the one being asked), days waited and the note in the meta line.
+- **Days waited** count from `at` (WP5): "today", "1 day", "8 days".
+- **With nothing to sort** but rows waiting, To sort reads "Nothing left to sort" ("The 6 waiting are below."), never "Everything is sorted".
+- **Opening a waiting row** opens the sort sheet. The reason, how long it has waited and the note come first. **Change** shows the reasons as buttons, the cardholder first, then the other adults and To discuss, plus the note box. The footer then reads "Mark waiting · Ask Ada", and the message after it reads "BOOTS 1182 SIDCUP is waiting: To discuss." Choosing a pot leaves Change. **Back to To sort** clears the mark. Placing the row sorts it and drops the mark, and Undo on the tipped-pot toast puts it back in Waiting.
 
 **What counts where** (W1). Waiting rows count in no pot, no pace and no move, the same as rows to sort.
 

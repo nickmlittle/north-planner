@@ -369,6 +369,19 @@ describe('Pace where you sort (F5)', () => {
     expect(screen.getByText('TESCO STORES is back in To sort.')).toBeInTheDocument()
   })
 
+  it('puts a waiting row placed from its sheet back in Waiting with Undo (audit 6, waiting/3)', () => {
+    const document = tipping()
+    const mark = { on: { kind: 'discuss' as const }, note: 'Ours?', at: '2026-11-14T09:00:00Z' }
+    document.card!.transactions.find(row => row.id === 'big')!.waiting = mark
+    render(<SpendingHarness initial={document} view="sort"/>)
+    fireEvent.click(within(screen.getByRole('region', { name: 'To discuss' })).getByRole('button', { name: /^TESCO STORES, £60\.00/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Place in Groceries · Joint' }))
+    expect(screen.queryByRole('region', { name: 'To discuss' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(within(screen.getByRole('region', { name: 'To discuss' })).getByRole('button', { name: /^TESCO STORES, £60\.00.*“Ours\?”/ })).toBeInTheDocument()
+    expect(screen.getByText('TESCO STORES is back in Waiting.')).toBeInTheDocument()
+  })
+
   it('has no toast when the pot stays on track', () => {
     render(<SpendingHarness view="sort"/>)
     fireEvent.click(screen.getByRole('button', { name: /^CORNER SHOP/ }))

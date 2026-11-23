@@ -1,0 +1,38 @@
+/* Waiting (audit 6, waiting/3): Spending's Waiting section and the sort sheet's waiting block. Tokens only (styles.tokens.test.ts). */
+/* Desktop: the To sort table's look, with a group heading per reason. The note ellipsises rather than widening the table. */
+.waiting-col-days{width:96px}
+.waiting-col-open{width:52px}
+.waiting-table .waiting-group-row th{padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border);background:var(--surface-sunken);color:var(--text);font-size:var(--text-md);font-weight:var(--weight-regular);text-align:left;white-space:normal}
+.waiting-table tbody+tbody .waiting-group-row th{border-top:1px solid var(--border)}
+.waiting-group-head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-3);min-width:0}
+.waiting-group-name{margin:0;color:var(--pine);font-size:var(--text-md);font-weight:var(--weight-bold)}
+.waiting-group-count{color:var(--text-muted);font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+.waiting-go{margin-left:auto}
+.waiting-row{cursor:pointer}
+.waiting-table .waiting-note{display:block;overflow:hidden;color:var(--text-muted);font-size:var(--text-sm);text-overflow:ellipsis;white-space:nowrap}
+.waiting-table td.waiting-days{color:var(--text-muted);white-space:nowrap}
+.waiting-table tbody:last-child tr:last-child td{border-bottom:0}
+/* Phones: one card, a sunken heading per reason with its 44pt Go through them, then the rows. */
+.waiting-card{overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+.waiting-group+.waiting-group{border-top:1px solid var(--border)}
+.waiting-card .waiting-group-head{padding:var(--space-2) var(--space-2) var(--space-2) var(--space-4);background:var(--surface-sunken)}
+.waiting-card .waiting-go{min-height:44px}
+.waiting-rows{margin:0;padding:0;list-style:none}
+.waiting-rows>li>.list-row{border-top:1px solid var(--border)}
+/* One meta line, so rows stay 56pt: a long note ellipsises here and shows in full when the row opens. */
+.waiting-rows .list-row-meta{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The sort sheet: what it's waiting on and its note first, then Change and Back to To sort. */
+.sort-waiting{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-md);background:var(--surface-band)}
+.sort-waiting p{margin:0}
+.sort-waiting-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--space-1) var(--space-3)}
+.sort-waiting-head strong{color:var(--pine)}
+.sort-waiting-head span{color:var(--text-muted);font-size:var(--text-sm)}
+.sort-waiting-note{color:var(--text);overflow-wrap:anywhere}
+.sort-waiting-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4)}
+.sort-waiting-actions button,.sort-waiting-cancel{min-height:44px}
+.sort-waiting-cancel{justify-self:start}
+.waiting-fields{display:grid;gap:var(--space-3)}
+.waiting-reasons{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.waiting-reason{min-height:44px;margin:0;padding:0 var(--space-4);border:1px solid var(--line-strong);border-radius:var(--radius-pill);background:var(--surface-field);color:var(--text);font:inherit;font-weight:var(--weight-medium);cursor:pointer}
+.waiting-reason:hover{border-color:var(--pine)}
+.waiting-reason[aria-pressed=true]{border-color:var(--pine);background:var(--pine);color:var(--cream)}
