@@ -59,13 +59,15 @@ export function parseAmexSheets(sheets: XlsxSheets): AmexExport {
   if (headerIndex < 0) throw new AmexImportError(NOT_AN_EXPORT)
   const period = parsePeriod(cellText(details[0]?.[1]))
   if (!period) throw new AmexImportError('North can’t read the statement period at the top of this export. Download the Excel version of your transactions again.')
-  const figure = (label: string) => {
-    const row = summarySheet.find(cells => cellText(cells[0]).trim().toLowerCase() === label.toLowerCase())
+  /** The first of `labels` the summary has. An open period says "Total Balance"; once the statement closes, "Statement Balance". */
+  const figure = (...labels: string[]) => {
+    const wanted = labels.map(label => label.toLowerCase())
+    const row = summarySheet.find(cells => wanted.includes(cellText(cells[0]).trim().toLowerCase()))
     const value = row ? amountOf(row.slice(1).find(cell => cell !== null && cellText(cell).trim() !== '')) : null
-    if (value === null) throw new AmexImportError(`North can’t find “${label}” in the export’s summary. Download the Excel version of your transactions again.`)
+    if (value === null) throw new AmexImportError(`North can’t find “${labels[0]}” in the export’s summary. Download the Excel version of your transactions again.`)
     return value
   }
-  const summary = { previousPence: figure('Previous Balance'), paymentsAndCreditsPence: figure('Payments & Credits'), chargesPence: figure('Charges'), totalPence: figure('Total Balance') }
+  const summary = { previousPence: figure('Previous Balance'), paymentsAndCreditsPence: figure('Payments & Credits'), chargesPence: figure('Charges'), totalPence: figure('Total Balance', 'Statement Balance') }
   const column = (name: typeof AMEX_COLUMNS[number]) => AMEX_COLUMNS.indexOf(name)
   const rows: AmexRow[] = []
   details.slice(headerIndex + 1).forEach((cells, offset) => {

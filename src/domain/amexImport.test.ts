@@ -27,13 +27,13 @@ function household(card: CardAccount = amex): BudgetDocument {
 }
 
 /** A small export: the header block, the 13 columns and these rows. */
-function exportWith(rows: CellSpec[][], { period = 'Oct 25, 2026 to Nov 24, 2026', charges, credits }: { period?: string; charges?: number; credits?: number } = {}) {
+function exportWith(rows: CellSpec[][], { period = 'Oct 25, 2026 to Nov 24, 2026', charges, credits, totalLabel = 'Total Balance' }: { period?: string; charges?: number; credits?: number; totalLabel?: string } = {}) {
   const positives = rows.reduce((sum, row) => sum + (typeof row[4] === 'number' && row[4] > 0 ? row[4] : 0), 0)
   const negatives = rows.reduce((sum, row) => sum + (typeof row[4] === 'number' && row[4] < 0 ? row[4] : 0), 0)
   const header = (title: string): CellSpec[][] => [[title, `Example Card / ${period}`], ['Prepared for'], ['SOMEONE'], ['Account Number'], ['XXXX-XXXXXX-00000'], []]
   return workbook({
     'Transaction Details': [...header('Transaction Details'), [...AMEX_COLUMNS], ...rows],
-    'Transaction Summary': [...header('Transaction Summary'), ['SUMMARY'], [null, 'Total'], ['Previous Balance', 0], ['Payments & Credits', credits ?? negatives], ['Charges', charges ?? positives], ['Total Balance', (charges ?? positives) + (credits ?? negatives)]],
+    'Transaction Summary': [...header('Transaction Summary'), ['SUMMARY'], [null, 'Total'], ['Previous Balance', 0], ['Payments & Credits', credits ?? negatives], ['Charges', charges ?? positives], [totalLabel, (charges ?? positives) + (credits ?? negatives)]],
   })
 }
 const row = (date: string, description: string, suffix: string, amount: number, reference: string, category = 'General Purchases'): CellSpec[] =>
@@ -94,6 +94,13 @@ describe('reading the export', () => {
   it('names a row it cannot read rather than importing part of the file', async () => {
     await expect(readAmexExport(exportWith([row('08/11/2026', 'SHOP', '-41001', 1, 'R1'), row('soon', 'SHOP', '-41001', 1, 'R2')]))).rejects.toThrow('Row 9 has a date North can’t read.')
     await expect(readAmexExport(exportWith([row('08/11/2026', 'SHOP', '-41001', 1, 'R1')], { period: 'sometime' }))).rejects.toThrow('statement period')
+  })
+
+  it('reads the total from a closed statement, where Amex calls it Statement Balance', async () => {
+    const rows = [row('20/11/2026', 'SHOP', '-41001', 531.97, 'R1'), row('19/11/2026', 'PAYMENT RECEIVED - THANK YOU', '-41001', -500, 'R2', '')]
+    const parsed = await readAmexExport(exportWith(rows, { totalLabel: 'Statement Balance' }))
+    expect(parsed.summary).toEqual({ previousPence: 0, paymentsAndCreditsPence: -50000, chargesPence: 53197, totalPence: 3197 })
+    await expect(readAmexExport(exportWith(rows, { totalLabel: 'Balance' }))).rejects.toThrow('North can’t find “Total Balance”')
   })
 })
 
